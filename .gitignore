@@ -104,8 +104,10 @@ dist
 # vitepress cache directory
 **/.vitepress/cache
 
-# Docusaurus cache and generated files
+# Electron build
 .docusaurus
+dist-electron/
+release/
 
 # Serverless directories
 .serverless/
