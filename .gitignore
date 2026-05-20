@@ -143,3 +143,5 @@ release/
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+.idea/
+yarn.lock
