@@ -44,6 +44,7 @@ openclaw-desktop/
 - **Global CSS**：无 CSS Modules，样式通过 Semi CSS 变量和内联 style
 
 ## 禁止事项（本项目）
+- **DO NOT** 提交任何涉及代码贡献者隐私的内容，包括但不限于：API Key、Token、密钥、密码、证书、内网 IP、个人邮箱、手机号等敏感信息。本项目为开源项目，提交记录公开可见。
 - **DO NOT** 关闭 `contextIsolation` 或启用 `nodeIntegration`（`electron/main.ts`）
 - **DO NOT** 在 preload 中写业务逻辑，仅暴露 IPC 桥接
 - **DO NOT** 使用 `npm`（应使用 `yarn`）。当前两个 lockfile 并存，选择 yarn 后删除 `package-lock.json`
