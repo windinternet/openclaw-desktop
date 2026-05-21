@@ -1,14 +1,58 @@
-import { useState } from 'react';
-import { Layout, Nav, Avatar, Button } from '@douyinfe/semi-ui';
+import { useState, useEffect } from 'react';
+import { Layout, Nav, Avatar, Button, Spin, Modal } from '@douyinfe/semi-ui';
 import { IconHome, IconSetting, IconTerminal, IconGithubLogo } from '@douyinfe/semi-icons';
 import ChatView from './components/ChatView';
 import WelcomeView from './components/WelcomeView';
+import { useStore, createGatewayClient } from './lib';
 
 const { Sider, Content } = Layout;
 
 function App() {
-  const [_activeTab, setActiveTab] = useState('home');
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [showWizard, setShowWizard] = useState(false);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const initialize = async () => {
+      useStore.getState().loadInstances();
+      const { instances } = useStore.getState();
+
+      if (instances.length > 0) {
+        const first = instances[0];
+        const client = createGatewayClient({
+          url: first.gatewayUrl,
+          token: first.token,
+          onStatusChange: (status) => {
+            useStore.getState().setConnectionStatus(status);
+          },
+        });
+
+        try {
+          await client.connect();
+          if (!cancelled) {
+            useStore.getState().setCurrentInstance(first.id);
+            setShowWizard(false);
+            setChecking(false);
+          }
+          return;
+        } catch {
+          client.disconnect();
+        }
+      }
+
+      if (!cancelled) {
+        setShowWizard(true);
+        setChecking(false);
+      }
+    };
+
+    initialize();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <Layout style={{ height: '100vh' }}>
@@ -16,10 +60,6 @@ function App() {
         <Nav
           mode="vertical"
           defaultSelectedKeys={['home']}
-          onSelect={({ itemKey }) => {
-            setActiveTab(String(itemKey));
-            if (itemKey === 'home') setShowWelcome(true);
-          }}
           header={{
             logo: (
               <Avatar size="small" style={{ backgroundColor: 'rgb(var(--semi-blue-5))' }}>
@@ -52,8 +92,39 @@ function App() {
           flexDirection: 'column',
         }}
       >
-        {showWelcome ? <WelcomeView onConnect={() => setShowWelcome(false)} /> : <ChatView />}
+        {checking ? (
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 16,
+            }}
+          >
+            <Spin size="large" />
+          </div>
+        ) : (
+          <ChatView />
+        )}
       </Content>
+
+      <Modal
+        visible={showWizard}
+        closable={false}
+        maskClosable={false}
+        footer={null}
+        fullScreen
+        bodyStyle={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: 'var(--semi-color-bg-0)',
+        }}
+      >
+        <WelcomeView onConnect={() => setShowWizard(false)} />
+      </Modal>
     </Layout>
   );
 }
