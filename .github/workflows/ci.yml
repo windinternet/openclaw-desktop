@@ -1,0 +1,153 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20, 22]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format
+
+      - name: Stylelint
+        run: npm run stylelint
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+  doc-validation:
+    name: Doc Structure Validation
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate AGENTS.md references
+        run: |
+          echo "=== Checking referenced docs exist ==="
+          missing=0
+
+          check_doc() {
+            if [ ! -f "$1" ] && [ ! -d "$1" ]; then
+              echo "❌ MISSING: $1 (referenced in AGENTS.md)"
+              missing=1
+            else
+              echo "✅ FOUND: $1"
+            fi
+          }
+
+          check_doc "ARCHITECTURE.md"
+          check_doc "docs/product-specs"
+          check_doc "docs/design-docs"
+          check_doc "docs/FRONTEND.md"
+          check_doc "docs/DESIGN.md"
+          check_doc "docs/exec-plans/active"
+          check_doc "docs/exec-plans/completed"
+          check_doc "docs/QUALITY_SCORE.md"
+          check_doc "docs/SECURITY.md"
+          check_doc "docs/references"
+
+          if [ $missing -eq 1 ]; then
+            echo ""
+            echo "⚠️  Some documents referenced in AGENTS.md do not exist."
+            echo "Run 'doc-gardening' agents to create missing docs."
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ All AGENTS.md references verified."
+
+      - name: Validate docs links
+        run: |
+          echo "=== Checking internal doc links ==="
+
+          check_link() {
+            local source="$1" target="$2"
+            if [ ! -f "$target" ] && [ ! -d "$target" ]; then
+              echo "❌ Dead link in $source → $target"
+              return 1
+            else
+              echo "✅ $source → $target"
+            fi
+          }
+
+          # ARCHITECTURE.md links
+          check_link "docs/ARCHITECTURE.md" "docs/design-docs/core-beliefs.md"
+          check_link "docs/ARCHITECTURE.md" "docs/design-docs/startup-flow.md"
+          check_link "docs/ARCHITECTURE.md" "docs/FRONTEND.md"
+          check_link "docs/ARCHITECTURE.md" "docs/DESIGN.md"
+
+          # design-docs/index.md links
+          check_link "docs/design-docs/index.md" "docs/design-docs/core-beliefs.md"
+          check_link "docs/design-docs/index.md" "docs/design-docs/startup-flow.md"
+
+          echo ""
+          echo "✅ Doc links validated."
