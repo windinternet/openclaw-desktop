@@ -3,7 +3,7 @@ import { Layout, Nav, Avatar, Button, Spin, Modal } from '@douyinfe/semi-ui';
 import { IconHome, IconSetting, IconTerminal, IconGithubLogo } from '@douyinfe/semi-icons';
 import ChatView from './components/ChatView';
 import WelcomeView from './components/WelcomeView';
-import { useStore, createGatewayClient } from './lib';
+import { useStore } from './lib';
 
 const { Sider, Content } = Layout;
 
@@ -12,46 +12,15 @@ function App() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    let cancelled = false;
+    useStore.getState().loadInstances();
+    const { instances } = useStore.getState();
 
-    const initialize = async () => {
-      useStore.getState().loadInstances();
-      const { instances } = useStore.getState();
-
-      if (instances.length > 0) {
-        const first = instances[0];
-        const client = createGatewayClient({
-          url: first.gatewayUrl,
-          token: first.token,
-          onStatusChange: (status) => {
-            useStore.getState().setConnectionStatus(status);
-          },
-        });
-
-        try {
-          await client.connect();
-          if (!cancelled) {
-            useStore.getState().setCurrentInstance(first.id);
-            setShowWizard(false);
-            setChecking(false);
-          }
-          return;
-        } catch {
-          client.disconnect();
-        }
-      }
-
-      if (!cancelled) {
-        setShowWizard(true);
-        setChecking(false);
-      }
-    };
-
-    initialize();
-
-    return () => {
-      cancelled = true;
-    };
+    if (instances.length > 0) {
+      setShowWizard(false);
+    } else {
+      setShowWizard(true);
+    }
+    setChecking(false);
   }, []);
 
   return (

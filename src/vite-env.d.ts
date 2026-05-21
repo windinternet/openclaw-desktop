@@ -8,10 +8,22 @@ interface Window {
       electron: string;
     };
     discover: {
-      scan: () => Promise<{ url: string; name?: string; version?: string }[]>;
+      scan: () => Promise<{ url: string; name?: string; version?: string; host?: string; ip?: string; authMode?: string; token?: string }[]>;
     };
     config: {
       getUserDataPath: () => Promise<string>;
+    };
+    device: {
+      signChallenge: (params: { nonce: string; token: string; clientId: string }) => Promise<{
+        deviceId: string;
+        publicKey: string;
+        signature: string;
+        signedAt: number;
+        nonce: string;
+      }>;
+    };
+    install: {
+      run: () => Promise<void>;
     };
   };
 }

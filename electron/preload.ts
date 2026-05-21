@@ -12,4 +12,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   config: {
     getUserDataPath: () => ipcRenderer.invoke('config:getPath'),
   },
+  device: {
+    signChallenge: (params: { nonce: string; token: string; clientId: string }) =>
+      ipcRenderer.invoke('device:signChallenge', params),
+  },
+  install: {
+    run: () => ipcRenderer.invoke('install:openclaw'),
+  },
 })

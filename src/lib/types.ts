@@ -18,6 +18,10 @@ export interface DiscoveredInstance {
   url: string;
   name?: string;
   version?: string;
+  host?: string;
+  ip?: string;
+  authMode?: string;
+  token?: string;
 }
 
 // ── Frame protocol types ────────────────────────────────────────────

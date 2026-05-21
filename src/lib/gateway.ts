@@ -62,7 +62,14 @@ export interface GatewayClient {
 export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
   const wsUrl = normalizeGatewayUrl(opts.url);
   const token = opts.token ?? '';
-  const clientId = opts.clientId ?? 'cli';
+  console.log('[GatewayClient] createGatewayClient:', {
+    wsUrl,
+    hasToken: !!token,
+    tokenLength: token.length,
+    tokenPreview: token ? token.slice(0, 8) + '...' : '(empty)',
+    clientId: opts.clientId ?? 'openclaw-tui',
+  });
+  const clientId = opts.clientId ?? 'openclaw-tui';
   const clientVersion = opts.clientVersion ?? '0.1.0';
   const platform = opts.platform ?? detectPlatform();
   const locale = opts.locale ?? 'en-US';
@@ -78,6 +85,7 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
   let reconnectDelay = 1000;
   let helloData: HelloOk | null = null;
   let tickIntervalMs = 30000;
+  let connectNonce: string | null = null;
 
   let statusCallback: ((status: ConnectionStatus) => void) | null = opts.onStatusChange ?? null;
   let eventCallback: ((event: EventFrame) => void) | null = opts.onEvent ?? null;
@@ -140,7 +148,15 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
     ws.send(JSON.stringify(data));
   }
 
-  function sendConnect(): void {
+  function sendConnect(device?: { id: string; publicKey: string; signature: string; signedAt: number; nonce: string }): void {
+    const auth = token ? { token } : undefined;
+    console.log('[GatewayClient] sendConnect:', {
+      hasDevice: !!device,
+      hasAuth: !!auth,
+      hasToken: !!token,
+      tokenPreview: token ? token.slice(0, 8) + '...' : '(empty)',
+      clientId,
+    });
     const frame = {
       type: 'req',
       id: 'c1',
@@ -148,21 +164,58 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
       params: {
         minProtocol: 3,
         maxProtocol: 4,
-        client: { id: clientId, version: clientVersion, platform, mode: 'cli' },
+        client: { id: clientId, version: clientVersion, platform, mode: 'ui' },
         role: 'operator',
         scopes: ['operator.read', 'operator.write'],
-        auth: token ? { token } : undefined,
+        auth,
         locale,
         userAgent: `${clientId}/${clientVersion}`,
+        ...(device ? { device } : {}),
       },
     };
     sendFrame(frame);
+  }
+
+  async function handleDeviceChallenge(): Promise<void> {
+    const nonce = connectNonce;
+    if (!nonce) return;
+
+    console.log('[GatewayClient] handleDeviceChallenge:', {
+      nonce: nonce?.slice(0, 12) + '...',
+      hasToken: !!token,
+      tokenPreview: token ? token.slice(0, 8) + '...' : '(empty)',
+      clientId,
+    });
+
+    const isElectron = typeof window !== 'undefined' && 'electronAPI' in window;
+    if (!isElectron) {
+      failConnectHandshake('Device signing unavailable outside Electron');
+      return;
+    }
+
+    try {
+      const result = await window.electronAPI.device.signChallenge({
+        nonce,
+        token,
+        clientId,
+      });
+      sendConnect({
+        id: result.deviceId,
+        publicKey: result.publicKey,
+        signature: result.signature,
+        signedAt: result.signedAt,
+        nonce: result.nonce,
+      });
+    } catch (err) {
+      failConnectHandshake(err instanceof Error ? err.message : 'Device signing failed');
+    }
   }
 
   function handleResFrame(f: Record<string, unknown>): void {
     const id = String(f.id ?? '');
 
     if (id === 'c1' && connectResolve !== null) {
+      console.log('[GatewayClient] connect response:', { ok: f.ok, error: f.error });
       if (connectTimer !== null) {
         clearTimeout(connectTimer);
         connectTimer = null;
@@ -211,6 +264,21 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
 
     if (eventFrame.event === 'tick') {
       resetTickTimer();
+      return;
+    }
+
+    if (eventFrame.event === 'connect.challenge') {
+      const payload = eventFrame.payload as { nonce?: unknown } | undefined;
+      const nonce = payload && typeof payload.nonce === 'string' ? payload.nonce : null;
+      if (!nonce || nonce.trim().length === 0) {
+        failConnectHandshake('connect challenge missing nonce');
+        return;
+      }
+      connectNonce = nonce.trim();
+      handleDeviceChallenge().catch((err) => {
+        failConnectHandshake(err instanceof Error ? err.message : 'Device challenge failed');
+      });
+      return;
     }
 
     eventCallback?.(eventFrame);
@@ -287,13 +355,7 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
     }
 
     ws.onopen = () => {
-      try {
-        sendConnect();
-      } catch {
-        failConnectHandshake('Failed to send connect frame');
-        return;
-      }
-
+      console.log('[GatewayClient] WebSocket opened, waiting for challenge...');
       connectTimer = setTimeout(() => {
         connectTimer = null;
         failConnectHandshake('Connection handshake timeout');

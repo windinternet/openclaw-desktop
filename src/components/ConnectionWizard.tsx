@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   Button,
@@ -11,11 +11,11 @@ import {
   Toast,
   Input,
 } from '@douyinfe/semi-ui';
-import { IconSearch, IconLink, IconPlay, IconTickCircle, IconClose } from '@douyinfe/semi-icons';
+import { IconSearch, IconLink, IconPlay, IconTickCircle, IconClose, IconDownload } from '@douyinfe/semi-icons';
 import { useStore, createGatewayClient } from '../lib';
 import type { DiscoveredInstance } from '../lib';
 
-const { Text, Paragraph } = Typography;
+const { Text } = Typography;
 
 interface ConnectionWizardProps {
   onConnected: (instanceId: string) => void;
@@ -47,8 +47,18 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const [installing, setInstalling] = useState(false);
+  const [scannedOnce, setScannedOnce] = useState(false);
 
   const isElectron = typeof window !== 'undefined' && 'electronAPI' in window;
+
+  useEffect(() => {
+    if (isElectron) {
+      handleScan();
+    } else {
+      setScannedOnce(true);
+    }
+  }, []);
 
   const handleScan = async () => {
     setDiscovering(true);
@@ -59,6 +69,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
       if (!isElectron) {
         setDiscoverError('自动发现仅 Electron 环境可用');
         setDiscovering(false);
+        setScannedOnce(true);
         return;
       }
       const results = await window.electronAPI.discover.scan();
@@ -68,6 +79,20 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
       setDiscoverError(message);
     } finally {
       setDiscovering(false);
+      setScannedOnce(true);
+    }
+  };
+
+  const handleInstall = async () => {
+    if (!isElectron) return;
+    setInstalling(true);
+    try {
+      await window.electronAPI.install.run();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '安装启动失败';
+      Toast.error(message);
+    } finally {
+      setInstalling(false);
     }
   };
 
@@ -94,6 +119,13 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
   };
 
   const doConnect = async (url: string, token: string, name?: string) => {
+    console.log('[ConnectionWizard] doConnect called:', {
+      url,
+      hasToken: !!token,
+      tokenLength: token.length,
+      tokenPreview: token ? token.slice(0, 8) + '...' : '(empty)',
+      name,
+    });
     setConnecting(true);
     const instanceName = name ?? deriveName(url);
     try {
@@ -129,7 +161,15 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
   };
 
   const handleConnectDiscovered = async (instance: DiscoveredInstance) => {
-    await doConnect(instance.url, '', instance.name || instance.version);
+    console.log('[ConnectionWizard] handleConnectDiscovered instance:', {
+      url: instance.url,
+      hasToken: !!instance.token,
+      tokenPreview: instance.token ? instance.token.slice(0, 8) + '...' : '(empty)',
+      name: instance.name,
+      version: instance.version,
+    });
+    const token = instance.token || '';
+    await doConnect(instance.url, token, instance.name || instance.version);
   };
 
   const handleManualConnect = async () => {
@@ -194,20 +234,9 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
             />
           )}
 
-          {isElectron && !discovering && discovered.length === 0 && !discoverError && (
-            <div style={{ textAlign: 'center', padding: '12px 0' }}>
-              <Paragraph spacing="extended">
-                扫描本地网络中正在运行的 OpenClaw 实例。
-              </Paragraph>
-              <Button
-                icon={<IconSearch />}
-                theme="solid"
-                type="primary"
-                onClick={handleScan}
-                block
-              >
-                开始扫描
-              </Button>
+          {isElectron && !discovering && discovered.length === 0 && !discoverError && !scannedOnce && (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 0' }}>
+              <Spin size="large" />
             </div>
           )}
 
@@ -271,14 +300,24 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
                   }}
                 >
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <Text strong>{inst.name || inst.url}</Text>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <Text strong>{inst.name || inst.host || inst.url}</Text>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                       <Text type="tertiary" size="small">
                         {inst.url}
                       </Text>
                       {inst.version && (
                         <Tag size="small" color="blue">
                           v{inst.version}
+                        </Tag>
+                      )}
+                      {inst.ip && (
+                        <Tag size="small" color="indigo">
+                          {inst.ip}
+                        </Tag>
+                      )}
+                      {inst.token && (
+                        <Tag size="small" color="green">
+                          Token
                         </Tag>
                       )}
                     </div>
@@ -301,13 +340,27 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
             </div>
           )}
 
-          {!discovering && discovered.length === 0 && discoverError === null && isElectron && (
+          {!discovering && discovered.length === 0 && discoverError === null && isElectron && scannedOnce && (
             <Empty
-              title="未发现本地实例"
+              title="未发现 OpenClaw 实例"
               description={
                 <Space vertical align="center">
-                  <Text type="secondary">未在本地网络中发现 OpenClaw 实例。</Text>
-                  <Button size="small" onClick={() => setMode('manual')}>
+                  <Text type="secondary">本机未安装 OpenClaw 或 Gateway 未启动。</Text>
+                  <Space>
+                    <Button
+                      icon={<IconDownload />}
+                      theme="solid"
+                      type="primary"
+                      loading={installing}
+                      onClick={handleInstall}
+                    >
+                      安装 OpenClaw
+                    </Button>
+                    <Button size="small" onClick={handleScan}>
+                      重新扫描
+                    </Button>
+                  </Space>
+                  <Button size="small" theme="borderless" onClick={() => setMode('manual')}>
                     手动输入
                   </Button>
                 </Space>
