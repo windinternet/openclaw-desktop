@@ -1,14 +1,14 @@
-import { useState } from 'react'
-import { Layout, Nav, Avatar, Button, SideSheet } from '@douyinfe/semi-ui'
-import { IconHome, IconSetting, IconTerminal, IconGithubLogo } from '@douyinfe/semi-icons'
-import ChatView from './components/ChatView'
-import WelcomeView from './components/WelcomeView'
+import { useState } from 'react';
+import { Layout, Nav, Avatar, Button } from '@douyinfe/semi-ui';
+import { IconHome, IconSetting, IconTerminal, IconGithubLogo } from '@douyinfe/semi-icons';
+import ChatView from './components/ChatView';
+import WelcomeView from './components/WelcomeView';
 
-const { Sider, Content } = Layout
+const { Sider, Content } = Layout;
 
 function App() {
-  const [activeTab, setActiveTab] = useState('home')
-  const [showWelcome, setShowWelcome] = useState(true)
+  const [_activeTab, setActiveTab] = useState('home');
+  const [showWelcome, setShowWelcome] = useState(true);
 
   return (
     <Layout style={{ height: '100vh' }}>
@@ -17,11 +17,15 @@ function App() {
           mode="vertical"
           defaultSelectedKeys={['home']}
           onSelect={({ itemKey }) => {
-            setActiveTab(itemKey)
-            if (itemKey === 'home') setShowWelcome(true)
+            setActiveTab(String(itemKey));
+            if (itemKey === 'home') setShowWelcome(true);
           }}
           header={{
-            logo: <Avatar size="small" style={{ backgroundColor: 'rgb(var(--semi-blue-5))' }}>🦐</Avatar>,
+            logo: (
+              <Avatar size="small" style={{ backgroundColor: 'rgb(var(--semi-blue-5))' }}>
+                🦐
+              </Avatar>
+            ),
             text: 'OpenClaw',
           }}
           footer={
@@ -48,14 +52,10 @@ function App() {
           flexDirection: 'column',
         }}
       >
-        {showWelcome ? (
-          <WelcomeView onConnect={() => setShowWelcome(false)} />
-        ) : (
-          <ChatView />
-        )}
+        {showWelcome ? <WelcomeView onConnect={() => setShowWelcome(false)} /> : <ChatView />}
       </Content>
     </Layout>
-  )
+  );
 }
 
-export default App
+export default App;

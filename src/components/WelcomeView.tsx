@@ -1,10 +1,10 @@
-import { Button, Typography, Space, Card, Tag } from '@douyinfe/semi-ui'
-import { IconPlus, IconHandle, IconGithubLogo } from '@douyinfe/semi-icons'
+import { Button, Typography, Space, Card, Tag } from '@douyinfe/semi-ui';
+import { IconPlus, IconHandle } from '@douyinfe/semi-icons';
 
-const { Title, Paragraph, Text } = Typography
+const { Title, Paragraph, Text } = Typography;
 
 interface WelcomeViewProps {
-  onConnect: () => void
+  onConnect: () => void;
 }
 
 export default function WelcomeView({ onConnect }: WelcomeViewProps) {
@@ -67,5 +67,5 @@ export default function WelcomeView({ onConnect }: WelcomeViewProps) {
         </Card>
       </Space>
     </div>
-  )
+  );
 }

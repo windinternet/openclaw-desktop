@@ -1,14 +1,15 @@
-import { useState } from 'react'
-import { Input, Avatar, Typography, Tag } from '@douyinfe/semi-ui'
-import { IconSend } from '@douyinfe/semi-icons'
+import { useState } from 'react';
+import type { CSSProperties } from 'react';
+import { Input, Avatar, Typography, Tag } from '@douyinfe/semi-ui';
+import { IconSend } from '@douyinfe/semi-icons';
 
-const { Text } = Typography
+const { Text } = Typography;
 
 interface Message {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  time: string
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  time: string;
 }
 
 export default function ChatView() {
@@ -19,24 +20,28 @@ export default function ChatView() {
       content: '你好！我是你的 OpenClaw AI 助手。有什么可以帮你的？',
       time: '10:00',
     },
-  ])
-  const [input, setInput] = useState('')
+  ]);
+  const [input, setInput] = useState('');
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Header */}
       <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          padding: '12px 20px',
-          borderBottom: '1px solid var(--semi-color-border)',
-          backgroundColor: 'var(--semi-color-bg-1)',
-          WebkitAppRegion: 'drag',
-        }}
+        style={
+          {
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            padding: '12px 20px',
+            borderBottom: '1px solid var(--semi-color-border)',
+            backgroundColor: 'var(--semi-color-bg-1)',
+            WebkitAppRegion: 'drag',
+          } as CSSProperties
+        }
       >
-        <Avatar size="small" color="blue">🦐</Avatar>
+        <Avatar size="small" color="blue">
+          🦐
+        </Avatar>
         <div>
           <Text strong>OpenClaw</Text>
           <div>
@@ -67,10 +72,7 @@ export default function ChatView() {
               style={{
                 padding: '10px 14px',
                 borderRadius: 8,
-                backgroundColor:
-                  msg.role === 'user'
-                    ? 'var(--semi-color-primary)'
-                    : 'var(--semi-color-fill-0)',
+                backgroundColor: msg.role === 'user' ? 'var(--semi-color-primary)' : 'var(--semi-color-fill-0)',
                 color: msg.role === 'user' ? '#fff' : 'var(--semi-color-text-0)',
               }}
             >
@@ -94,11 +96,11 @@ export default function ChatView() {
           onChange={setInput}
           suffix={<IconSend style={{ color: 'var(--semi-color-primary)', cursor: 'pointer' }} />}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') setInput('')
+            if (e.key === 'Enter') setInput('');
           }}
           size="large"
         />
       </div>
     </div>
-  )
+  );
 }
