@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, ipcMain, net } from 'electron'
 import path from 'node:path'
 
 const isDev = !app.isPackaged
@@ -29,6 +29,43 @@ function createWindow() {
     win.loadFile(path.join(__dirname, '../dist/index.html'))
   }
 }
+
+ipcMain.handle('discover:scan', async () => {
+  const ports = [3000, 3001, 3456, 4000, 5173, 8080, 8088, 9000, 11434]
+  const results: { url: string; name?: string; version?: string }[] = []
+
+  const checks = ports
+    .filter((p) => p !== 5173) // skip Vite dev server
+    .map(async (port) => {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 2000)
+      try {
+        const url = `http://localhost:${port}`
+        const res = await net.fetch(`${url}/api/health`, {
+          signal: controller.signal,
+        })
+        if (res.ok) {
+          const data = await res.json().catch(() => ({})) as any
+          results.push({
+            url,
+            name: data.name || data.service,
+            version: data.version,
+          })
+        }
+      } catch {
+        // port unreachable or timed out – skip
+      } finally {
+        clearTimeout(timeout)
+      }
+    })
+
+  await Promise.allSettled(checks)
+  return results
+})
+
+ipcMain.handle('config:getPath', () => {
+  return app.getPath('userData')
+})
 
 app.whenReady().then(createWindow)
 
