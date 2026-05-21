@@ -2,10 +2,10 @@
 
 interface Window {
   electronAPI: {
-    platform: string
+    platform: string;
     versions: {
-      node: string
-      electron: string
-    }
-  }
+      node: string;
+      electron: string;
+    };
+  };
 }
