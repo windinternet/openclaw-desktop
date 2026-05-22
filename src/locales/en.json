@@ -63,6 +63,11 @@
     "connected": "Connected",
     "placeholder": "Send a message to OpenClaw..."
   },
+  "workspace": {
+    "title": "Workspaces",
+    "empty": "No workspaces",
+    "add": "Add Workspace"
+  },
   "common": {
     "loading": "Loading..."
   },

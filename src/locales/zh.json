@@ -63,6 +63,11 @@
     "connected": "已连接",
     "placeholder": "给 OpenClaw 发消息…"
   },
+  "workspace": {
+    "title": "工作区",
+    "empty": "暂无工作区",
+    "add": "添加工作区"
+  },
   "common": {
     "loading": "加载中…"
   },

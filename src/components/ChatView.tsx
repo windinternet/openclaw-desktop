@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { Input, Avatar, Typography, Tag } from '@douyinfe/semi-ui';
 import { IconSend } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
+import { useStore } from '../lib';
 
 const { Text } = Typography;
 
@@ -13,8 +14,13 @@ interface Message {
   time: string;
 }
 
-export default function ChatView() {
+interface ChatViewProps {
+  instanceId: string;
+}
+
+export default function ChatView({ instanceId }: ChatViewProps) {
   const { t } = useTranslation();
+  const instance = useStore((s) => s.instances.find((i) => i.id === instanceId));
   const [messages] = useState<Message[]>([
     {
       id: '1',
@@ -45,7 +51,7 @@ export default function ChatView() {
           🦐
         </Avatar>
         <div>
-          <Text strong>OpenClaw</Text>
+          <Text strong>{instance?.name || 'OpenClaw'}</Text>
           <div>
             <Tag size="small" color="green" style={{ margin: 0 }}>
               {t('chat.connected')}
