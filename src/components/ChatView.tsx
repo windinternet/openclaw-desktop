@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Input, Avatar, Typography, Tag } from '@douyinfe/semi-ui';
 import { IconSend } from '@douyinfe/semi-icons';
+import { useTranslation } from 'react-i18next';
 
 const { Text } = Typography;
 
@@ -13,11 +14,12 @@ interface Message {
 }
 
 export default function ChatView() {
+  const { t } = useTranslation();
   const [messages] = useState<Message[]>([
     {
       id: '1',
       role: 'assistant',
-      content: '你好！我是你的 OpenClaw AI 助手。有什么可以帮你的？',
+      content: t('chat.greeting'),
       time: '10:00',
     },
   ]);
@@ -46,7 +48,7 @@ export default function ChatView() {
           <Text strong>OpenClaw</Text>
           <div>
             <Tag size="small" color="green" style={{ margin: 0 }}>
-              已连接
+              {t('chat.connected')}
             </Tag>
           </div>
         </div>
@@ -91,7 +93,7 @@ export default function ChatView() {
         }}
       >
         <Input
-          placeholder="给 OpenClaw 发消息…"
+          placeholder={t('chat.placeholder')}
           value={input}
           onChange={setInput}
           suffix={<IconSend style={{ color: 'var(--semi-color-primary)', cursor: 'pointer' }} />}

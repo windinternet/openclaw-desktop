@@ -1,0 +1,80 @@
+{
+  "app": {
+    "title": "OpenClaw Desktop",
+    "subtitle": "精美易用的 OpenClaw 桌面客户端"
+  },
+  "nav": {
+    "home": "首页",
+    "sessions": "会话",
+    "settings": "设置",
+    "openclaw": "OpenClaw"
+  },
+  "wizard": {
+    "title": "欢迎使用 OpenClaw",
+    "subtitle": "让我们来配置您的工作空间",
+    "stepTheme": "外观",
+    "stepLanguage": "语言",
+    "stepConnection": "连接",
+    "themeTitle": "选择主题",
+    "themeDesc": "选择您偏好的外观模式和主题色",
+    "lightMode": "浅色",
+    "darkMode": "深色",
+    "autoMode": "自动",
+    "themeColor": "主题色",
+    "languageTitle": "选择语言",
+    "languageDesc": "选择您偏好的界面语言",
+    "connectionTitle": "连接到 OpenClaw 实例",
+    "connectionDesc": "配置与 OpenClaw Gateway 的连接",
+    "next": "下一步",
+    "back": "上一步",
+    "finish": "开始使用"
+  },
+  "connection": {
+    "autoDiscover": "自动发现",
+    "manualInput": "手动输入",
+    "autoTitle": "自动发现",
+    "manualTitle": "手动连接",
+    "electronOnly": "仅 Electron 环境可用",
+    "electronOnlyDesc": "自动发现功能需要在 Electron 桌面应用中运行。",
+    "scanning": "正在扫描本地实例…",
+    "rescan": "重新扫描",
+    "foundInstances": "发现 {{count}} 个本地实例",
+    "connect": "连接",
+    "noInstances": "未发现 OpenClaw 实例",
+    "noInstancesDesc": "本机未安装 OpenClaw 或 Gateway 未启动。",
+    "installOpenClaw": "安装 OpenClaw",
+    "manualInputAlt": "手动输入",
+    "gatewayUrl": "网关地址",
+    "gatewayUrlPlaceholder": "例如 http://localhost:8080",
+    "instanceName": "连接名称",
+    "instanceNamePlaceholder": "为此连接命名，例如：公司服务器",
+    "tokenKey": "Token / API Key",
+    "tokenPlaceholder": "输入 Token 或 API Key",
+    "testConnection": "测试连接",
+    "testSuccess": "连接成功",
+    "testFailed": "连接失败",
+    "pleaseFillFields": "请填写网关地址和 Token",
+    "scanFailed": "扫描失败",
+    "connectFailed": "连接失败",
+    "installing": "正在安装 OpenClaw..."
+  },
+  "chat": {
+    "greeting": "你好！我是你的 OpenClaw AI 助手。有什么可以帮你的？",
+    "connected": "已连接",
+    "placeholder": "给 OpenClaw 发消息…"
+  },
+  "common": {
+    "loading": "加载中…"
+  },
+  "errors": {
+    "deviceSigning": "设备签名在 Electron 外部不可用",
+    "deviceChallenge": "设备认证失败",
+    "handshakeTimeout": "连接握手超时",
+    "websocketError": "WebSocket 错误",
+    "connectionClosed": "连接已关闭",
+    "connectionRejected": "连接被拒绝",
+    "notConnected": "未连接",
+    "requestTimeout": "请求超时: {{method}}",
+    "sendFailed": "发送失败"
+  }
+}

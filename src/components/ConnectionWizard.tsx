@@ -12,6 +12,7 @@ import {
   Input,
 } from '@douyinfe/semi-ui';
 import { IconSearch, IconLink, IconPlay, IconTickCircle, IconClose, IconDownload } from '@douyinfe/semi-icons';
+import { useTranslation } from 'react-i18next';
 import { useStore, createGatewayClient } from '../lib';
 import type { DiscoveredInstance } from '../lib';
 
@@ -37,6 +38,7 @@ function deriveName(url: string): string {
 }
 
 export default function ConnectionWizard({ onConnected }: ConnectionWizardProps) {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<'auto' | 'manual'>('auto');
   const [discovering, setDiscovering] = useState(false);
   const [discovered, setDiscovered] = useState<DiscoveredInstance[]>([]);
@@ -67,7 +69,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
 
     try {
       if (!isElectron) {
-        setDiscoverError('自动发现仅 Electron 环境可用');
+        setDiscoverError(t('connection.electronOnly'));
         setDiscovering(false);
         setScannedOnce(true);
         return;
@@ -75,7 +77,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
       const results = await window.electronAPI.discover.scan();
       setDiscovered(results);
     } catch (err) {
-      const message = err instanceof Error ? err.message : '扫描失败';
+      const message = err instanceof Error ? err.message : t('connection.scanFailed');
       setDiscoverError(message);
     } finally {
       setDiscovering(false);
@@ -98,7 +100,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
 
   const handleTest = async () => {
     if (!manualUrl.trim() || !manualToken.trim()) {
-      Toast.warning('请填写网关地址和 Token');
+      Toast.warning(t('connection.pleaseFillFields'));
       return;
     }
     setTesting(true);
@@ -111,7 +113,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
       const result = await client.testConnection();
       setTestResult(result);
     } catch (err) {
-      const message = err instanceof Error ? err.message : '测试失败';
+      const message = err instanceof Error ? err.message : t('connection.testFailed');
       setTestResult({ success: false, error: message });
     } finally {
       setTesting(false);
@@ -119,15 +121,9 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
   };
 
   const doConnect = async (url: string, token: string, name?: string) => {
-    console.log('[ConnectionWizard] doConnect called:', {
-      url,
-      hasToken: !!token,
-      tokenLength: token.length,
-      tokenPreview: token ? token.slice(0, 8) + '...' : '(empty)',
-      name,
-    });
+    console.log('[ConnectionWizard] doConnect called:', { url, hasToken: !!token, name });
     setConnecting(true);
-    const instanceName = name ?? deriveName(url);
+    const fallbackName = name ?? deriveName(url);
     try {
       const client = createGatewayClient({
         url,
@@ -137,23 +133,60 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
         },
       });
 
-      await client.connect();
+      const hello = await client.connect();
+      const serverVersion = hello.server?.version;
+      const methods = hello.features?.methods ?? [];
+      let instanceName = serverVersion ? `OpenClaw v${serverVersion}` : fallbackName;
+      let assistantName: string | undefined;
+      let avatarUrl: string | undefined;
+
+      console.log('[ConnectionWizard] connected, methods:', methods);
+
+      try {
+        if (methods.includes('assistant.info') || methods.includes('assistant.get')) {
+          const method = methods.includes('assistant.info') ? 'assistant.info' : 'assistant.get';
+          const info = await client.request<Record<string, unknown>>(method);
+          console.log('[ConnectionWizard] assistant info:', info);
+          assistantName = typeof info?.displayName === 'string' ? info.displayName
+            : typeof info?.name === 'string' ? info.name : undefined;
+          avatarUrl = typeof info?.avatarUrl === 'string' ? info.avatarUrl
+            : typeof info?.avatar === 'string' ? info.avatar : undefined;
+        }
+      } catch {
+        console.log('[ConnectionWizard] assistant info not available');
+      }
+
+      try {
+        if (methods.includes('server.info') || methods.includes('meta')) {
+          const method = methods.includes('server.info') ? 'server.info' : 'meta';
+          const info = await client.request<Record<string, unknown>>(method);
+          console.log('[ConnectionWizard] server info:', info);
+          const nodeName = typeof info?.name === 'string' ? info.name
+            : typeof info?.hostname === 'string' ? info.hostname : undefined;
+          if (nodeName) instanceName = nodeName;
+        }
+      } catch {
+        console.log('[ConnectionWizard] server info not available');
+      }
 
       useStore.getState().addInstance({
         name: instanceName,
         gatewayUrl: url,
         token,
+        serverVersion,
+        assistantName,
+        avatarUrl,
       });
 
-      const state = useStore.getState();
-      const instances = state.instances;
-      const newInstance = instances[instances.length - 1];
+      client.disconnect();
 
-      useStore.getState().setCurrentInstance(newInstance.id);
-
-      onConnected(newInstance.id);
+      const instance = useStore.getState().instances.find((i) => i.gatewayUrl === url);
+      if (instance) {
+        useStore.getState().setCurrentInstance(instance.id);
+        onConnected(instance.id);
+      }
     } catch (err) {
-      const message = err instanceof Error ? err.message : '连接失败';
+      const message = err instanceof Error ? err.message : t('connection.connectFailed');
       Toast.error(message);
     } finally {
       setConnecting(false);
@@ -174,7 +207,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
 
   const handleManualConnect = async () => {
     if (!manualUrl.trim() || !manualToken.trim()) {
-      Toast.warning('请填写网关地址和 Token');
+      Toast.warning(t('connection.pleaseFillFields'));
       return;
     }
     await doConnect(manualUrl.trim(), manualToken.trim());
@@ -205,7 +238,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
           }}
           size="small"
         >
-          自动发现
+          {t('connection.autoDiscover')}
         </Button>
         <Button
           theme={mode === 'manual' ? 'solid' : 'light'}
@@ -213,7 +246,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
           onClick={() => setMode('manual')}
           size="small"
         >
-          手动输入
+          {t('connection.manualInput')}
         </Button>
       </Space>
 
@@ -223,14 +256,14 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
           title={
             <Space>
               <IconSearch />
-              <span>自动发现</span>
+              <span>{t('connection.autoTitle')}</span>
             </Space>
           }
         >
           {!isElectron && (
             <Empty
-              title="仅 Electron 环境可用"
-              description="自动发现功能需要在 Electron 桌面应用中运行。"
+              title={t('connection.electronOnly')}
+              description={t('connection.electronOnlyDesc')}
             />
           )}
 
@@ -251,7 +284,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
               }}
             >
               <Spin size="large" />
-              <Text type="secondary">正在扫描本地实例…</Text>
+              <Text type="secondary">{t('connection.scanning')}</Text>
             </div>
           )}
 
@@ -269,7 +302,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
                 {discoverError}
               </Tag>
               <Button onClick={handleScan} size="small">
-                重新扫描
+                {t('connection.rescan')}
               </Button>
             </div>
           )}
@@ -283,7 +316,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
               }}
             >
               <Text type="secondary" size="small">
-                发现 {discovered.length} 个本地实例
+                {t('connection.foundInstances', { count: discovered.length })}
               </Text>
               <Divider margin="8px" />
               {discovered.map((inst) => (
@@ -330,22 +363,22 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
                     loading={connecting}
                     onClick={() => handleConnectDiscovered(inst)}
                   >
-                    连接
+                    {t('connection.connect')}
                   </Button>
                 </div>
               ))}
               <Button onClick={handleScan} size="small" style={{ alignSelf: 'center' }}>
-                重新扫描
+                {t('connection.rescan')}
               </Button>
             </div>
           )}
 
           {!discovering && discovered.length === 0 && discoverError === null && isElectron && scannedOnce && (
             <Empty
-              title="未发现 OpenClaw 实例"
+              title={t('connection.noInstances')}
               description={
                 <Space vertical align="center">
-                  <Text type="secondary">本机未安装 OpenClaw 或 Gateway 未启动。</Text>
+                  <Text type="secondary">{t('connection.noInstancesDesc')}</Text>
                   <Space>
                     <Button
                       icon={<IconDownload />}
@@ -354,14 +387,14 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
                       loading={installing}
                       onClick={handleInstall}
                     >
-                      安装 OpenClaw
+                      {t('connection.installOpenClaw')}
                     </Button>
                     <Button size="small" onClick={handleScan}>
-                      重新扫描
+                      {t('connection.rescan')}
                     </Button>
                   </Space>
                   <Button size="small" theme="borderless" onClick={() => setMode('manual')}>
-                    手动输入
+                    {t('connection.manualInputAlt')}
                   </Button>
                 </Space>
               }
@@ -376,17 +409,17 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
           title={
             <Space>
               <IconPlay />
-              <span>手动连接</span>
+              <span>{t('connection.manualTitle')}</span>
             </Space>
           }
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
               <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 4 }}>
-                网关地址
+                {t('connection.gatewayUrl')}
               </Text>
               <Input
-                placeholder="例如 http://localhost:8080"
+                placeholder={t('connection.gatewayUrlPlaceholder')}
                 value={manualUrl}
                 onChange={(v: string) => {
                   setManualUrl(v);
@@ -399,10 +432,10 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
 
             <div>
               <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 4 }}>
-                Token / API Key
+                {t('connection.tokenKey')}
               </Text>
               <Input
-                placeholder="输入 Token 或 API Key"
+                placeholder={t('connection.tokenPlaceholder')}
                 value={manualToken}
                 onChange={(v: string) => {
                   setManualToken(v);
@@ -423,7 +456,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
                 disabled={!manualUrl.trim() || !manualToken.trim() || connecting}
                 block
               >
-                测试连接
+                {t('connection.testConnection')}
               </Button>
 
               {testResult && (
@@ -443,7 +476,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
                     <>
                       <IconTickCircle style={{ color: 'var(--semi-color-success)' }} />
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <Text style={{ color: 'var(--semi-color-success)' }}>连接成功</Text>
+                        <Text style={{ color: 'var(--semi-color-success)' }}>{t('connection.testSuccess')}</Text>
                         {testResult.version && (
                           <Tag size="small" color="green">
                             v{testResult.version}
@@ -455,7 +488,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
                     <>
                       <IconClose style={{ color: 'var(--semi-color-danger)' }} />
                       <Text style={{ color: 'var(--semi-color-danger)' }}>
-                        {testResult.error || '连接失败'}
+                        {testResult.error || t('connection.testFailed')}
                       </Text>
                     </>
                   )}
@@ -474,7 +507,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
                 onClick={handleManualConnect}
                 block
               >
-                连接
+                {t('connection.connect')}
               </Button>
             </div>
           </div>

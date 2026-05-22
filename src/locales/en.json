@@ -1,0 +1,80 @@
+{
+  "app": {
+    "title": "OpenClaw Desktop",
+    "subtitle": "Beautiful and easy-to-use OpenClaw desktop client"
+  },
+  "nav": {
+    "home": "Home",
+    "sessions": "Sessions",
+    "settings": "Settings",
+    "openclaw": "OpenClaw"
+  },
+  "wizard": {
+    "title": "Welcome to OpenClaw",
+    "subtitle": "Let's set up your workspace",
+    "stepTheme": "Appearance",
+    "stepLanguage": "Language",
+    "stepConnection": "Connect",
+    "themeTitle": "Choose Your Theme",
+    "themeDesc": "Select your preferred appearance mode and accent color",
+    "lightMode": "Light",
+    "darkMode": "Dark",
+    "autoMode": "Auto",
+    "themeColor": "Accent Color",
+    "languageTitle": "Choose Language",
+    "languageDesc": "Select your preferred UI language",
+    "connectionTitle": "Connect to OpenClaw Instance",
+    "connectionDesc": "Configure your connection to an OpenClaw Gateway",
+    "next": "Next",
+    "back": "Back",
+    "finish": "Get Started"
+  },
+  "connection": {
+    "autoDiscover": "Auto Discover",
+    "manualInput": "Manual Input",
+    "autoTitle": "Auto Discover",
+    "manualTitle": "Manual Connection",
+    "electronOnly": "Electron Only",
+    "electronOnlyDesc": "Auto discovery requires running in the Electron desktop app.",
+    "scanning": "Scanning local instances...",
+    "rescan": "Rescan",
+    "foundInstances": "Found {{count}} local instances",
+    "connect": "Connect",
+    "noInstances": "No OpenClaw instances found",
+    "noInstancesDesc": "OpenClaw is not installed or Gateway is not running.",
+    "installOpenClaw": "Install OpenClaw",
+    "manualInputAlt": "Manual Input",
+    "gatewayUrl": "Gateway URL",
+    "gatewayUrlPlaceholder": "e.g. http://localhost:8080",
+    "instanceName": "Connection Name",
+    "instanceNamePlaceholder": "Name this connection, e.g. Office Server",
+    "tokenKey": "Token / API Key",
+    "tokenPlaceholder": "Enter Token or API Key",
+    "testConnection": "Test Connection",
+    "testSuccess": "Connection successful",
+    "testFailed": "Connection failed",
+    "pleaseFillFields": "Please fill in the gateway URL and Token",
+    "scanFailed": "Scan failed",
+    "connectFailed": "Connection failed",
+    "installing": "Installing OpenClaw..."
+  },
+  "chat": {
+    "greeting": "Hello! I'm your OpenClaw AI assistant. How can I help you?",
+    "connected": "Connected",
+    "placeholder": "Send a message to OpenClaw..."
+  },
+  "common": {
+    "loading": "Loading..."
+  },
+  "errors": {
+    "deviceSigning": "Device signing unavailable outside Electron",
+    "deviceChallenge": "Device challenge failed",
+    "handshakeTimeout": "Connection handshake timeout",
+    "websocketError": "WebSocket error",
+    "connectionClosed": "Connection closed",
+    "connectionRejected": "Connection rejected",
+    "notConnected": "Not connected",
+    "requestTimeout": "Request timeout: {{method}}",
+    "sendFailed": "Send failed"
+  }
+}

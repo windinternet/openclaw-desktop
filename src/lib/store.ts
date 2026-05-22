@@ -58,12 +58,20 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   addInstance: (config) => {
-    const instance: InstanceConfig = {
-      ...config,
-      id: generateId(),
-      lastConnectedAt: Date.now(),
-    };
     set((state) => {
+      const existing = state.instances.find((i) => i.gatewayUrl === config.gatewayUrl);
+      if (existing) {
+        const instances = state.instances.map((i) =>
+          i.id === existing.id ? { ...i, ...config, lastConnectedAt: Date.now() } : i,
+        );
+        writeToStorage(instances);
+        return { instances };
+      }
+      const instance: InstanceConfig = {
+        ...config,
+        id: generateId(),
+        lastConnectedAt: Date.now(),
+      };
       const instances = [...state.instances, instance];
       writeToStorage(instances);
       return { instances };

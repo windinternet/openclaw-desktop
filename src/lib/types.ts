@@ -4,6 +4,9 @@ export interface InstanceConfig {
   gatewayUrl: string;
   token: string;
   lastConnectedAt?: number;
+  serverVersion?: string;
+  assistantName?: string;
+  avatarUrl?: string;
 }
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
