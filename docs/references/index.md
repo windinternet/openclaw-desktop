@@ -60,6 +60,15 @@
 | Vitest 官方文档 | 测试框架 | https://vitest.dev/ |
 | Testing Library React | 组件测试库 | https://testing-library.com/docs/react-testing-library/intro |
 
+## UI 组件库
+
+| 资源 | 说明 | 链接 |
+|------|------|------|
+| Semi Design 参考 | 设计令牌、组件 API、编码规范（v2.74） | `semi-design.md` |
+| Semi Design 官方文档 | 完整组件文档 | https://semi.design/zh-CN |
+| Semi Design 图标库 | 图标搜索 | https://semi.design/zh-CN/basic/icon |
+| Semi DSM 主题编辑器 | 自定义主题 | https://semi.design/dsm |
+
 ## OpenClaw 平台
 
 | 资源 | 说明 | 链接 |
