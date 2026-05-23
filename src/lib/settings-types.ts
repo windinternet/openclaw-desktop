@@ -22,6 +22,7 @@ export interface AppSettings {
   themeMode: ThemeMode;
   themeColor: string;
   locale: SupportedLocale;
+  userDisplayName: string;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -29,4 +30,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   themeMode: 'dark',
   themeColor: 'blue',
   locale: 'zh-CN',
+  userDisplayName: '',
 };

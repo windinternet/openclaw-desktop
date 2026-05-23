@@ -7,6 +7,30 @@ export interface InstanceConfig {
   serverVersion?: string;
   assistantName?: string;
   avatarUrl?: string;
+  /** Per-instance connection status, tracked independently of the global status */
+  connectionStatus?: ConnectionStatus;
+  /** User identity fetched from the OpenClaw Agent's USER.md via Gateway RPC */
+  gatewayUser?: GatewayUser;
+  /** True when this instance has completed work while the user was away (used for red-dot indicator) */
+  hasPendingActivity?: boolean;
+  /** Timestamp of the last activity event (session completion, workflow finish, etc.) */
+  lastActivityAt?: number;
+}
+
+export interface SessionInfo {
+  key: string;
+  title?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  status?: string;
+}
+
+export interface GatewayUser {
+  name: string;
+  whatToCall: string;
+  timezone?: string;
+  os?: string;
+  notes?: string;
 }
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';

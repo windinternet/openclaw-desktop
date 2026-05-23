@@ -48,6 +48,7 @@ describe('applyTheme', () => {
       themeMode: 'dark',
       themeColor: 'purple',
       locale: 'zh-CN',
+      userDisplayName: '',
     });
 
     expect(body.style.getPropertyValue('--semi-color-primary')).toBe('#722ED1');

@@ -4,10 +4,34 @@
     "subtitle": "Beautiful and easy-to-use OpenClaw desktop client"
   },
   "nav": {
-    "home": "Home",
+    "sectionOverview": "Overview",
+    "sectionTools": "Tools",
+    "sectionCollaboration": "Collaboration",
+    "dashboard": "Dashboard",
+    "search": "Search",
+    "newSession": "New Session",
+    "extensions": "Extensions",
+    "tasks": "Tasks",
+    "kanban": "Kanban",
+    "teams": "Teams",
+    "office": "Office 3D",
+    "memory": "Memory",
     "sessions": "Sessions",
     "settings": "Settings",
-    "openclaw": "OpenClaw"
+    "openclaw": "OpenClaw",
+    "themeToggle": "Toggle Theme",
+    "openGitHub": "Open GitHub"
+  },
+  "page": {
+    "dashboardDesc": "System metrics and quick navigation",
+    "searchDesc": "Search across all sessions and data",
+    "newSessionDesc": "Start a new chat session",
+    "extensionsDesc": "Manage skills and plugins",
+    "tasksDesc": "Scheduled tasks and automation",
+    "kanbanDesc": "Visual task board",
+    "teamsDesc": "Manage Agent teams",
+    "officeDesc": "3D virtual office",
+    "memoryDesc": "Browse and manage memory"
   },
   "wizard": {
     "title": "Welcome to OpenClaw",
@@ -67,6 +91,19 @@
     "title": "Workspaces",
     "empty": "No workspaces",
     "add": "Add Workspace"
+  },
+  "instance": {
+    "drawerTitle": "Instances",
+    "connectNew": "Connect New",
+    "switch": "Switch Instance",
+    "statusConnected": "Connected",
+    "statusDisconnected": "Disconnected",
+    "statusConnecting": "Connecting",
+    "statusError": "Error",
+    "addNew": "Add Instance",
+    "empty": "No instances yet",
+    "deleteConfirm": "Remove this instance?",
+    "current": "Current"
   },
   "common": {
     "loading": "Loading..."

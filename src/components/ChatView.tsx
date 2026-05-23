@@ -1,11 +1,8 @@
-import { useState } from 'react';
-import type { CSSProperties } from 'react';
-import { Input, Avatar, Typography, Tag } from '@douyinfe/semi-ui';
+import { useState, useEffect, useRef } from 'react';
+import { Input, Avatar } from '@douyinfe/semi-ui';
 import { IconSend } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
-
-const { Text } = Typography;
 
 interface Message {
   id: string;
@@ -16,11 +13,23 @@ interface Message {
 
 interface ChatViewProps {
   instanceId: string;
+  sessionKey?: string;
 }
 
 export default function ChatView({ instanceId }: ChatViewProps) {
   const { t } = useTranslation();
-  const instance = useStore((s) => s.instances.find((i) => i.id === instanceId));
+  const isCurrent = useStore((s) => s.currentInstanceId === instanceId);
+  const wasCurrentRef = useRef(isCurrent);
+
+  useEffect(() => {
+    if (wasCurrentRef.current && !isCurrent) {
+      const timer = setTimeout(() => {
+        useStore.getState().markInstanceActivity(instanceId);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+    wasCurrentRef.current = isCurrent;
+  }, [isCurrent, instanceId]);
   const [messages] = useState<Message[]>([
     {
       id: '1',
@@ -33,33 +42,6 @@ export default function ChatView({ instanceId }: ChatViewProps) {
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header */}
-      <div
-        style={
-          {
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            padding: '12px 20px',
-            borderBottom: '1px solid var(--semi-color-border)',
-            backgroundColor: 'var(--semi-color-bg-1)',
-            WebkitAppRegion: 'drag',
-          } as CSSProperties
-        }
-      >
-        <Avatar size="small" color="blue">
-          🦐
-        </Avatar>
-        <div>
-          <Text strong>{instance?.name || 'OpenClaw'}</Text>
-          <div>
-            <Tag size="small" color="green" style={{ margin: 0 }}>
-              {t('chat.connected')}
-            </Tag>
-          </div>
-        </div>
-      </div>
-
       {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
         {messages.map((msg) => (

@@ -4,10 +4,34 @@
     "subtitle": "精美易用的 OpenClaw 桌面客户端"
   },
   "nav": {
-    "home": "首页",
+    "sectionOverview": "总览",
+    "sectionTools": "工具",
+    "sectionCollaboration": "协作",
+    "dashboard": "仪表盘",
+    "search": "搜索",
+    "newSession": "新会话",
+    "extensions": "扩展",
+    "tasks": "任务",
+    "kanban": "看板",
+    "teams": "团队",
+    "office": "3D 办公室",
+    "memory": "记忆",
     "sessions": "会话",
     "settings": "设置",
-    "openclaw": "OpenClaw"
+    "openclaw": "OpenClaw",
+    "themeToggle": "切换主题",
+    "openGitHub": "打开 GitHub"
+  },
+  "page": {
+    "dashboardDesc": "系统指标与快捷导航",
+    "searchDesc": "搜索所有会话和数据",
+    "newSessionDesc": "开启新的对话会话",
+    "extensionsDesc": "管理技能和插件",
+    "tasksDesc": "定时任务与自动化",
+    "kanbanDesc": "可视化任务看板",
+    "teamsDesc": "管理 Agent 团队",
+    "officeDesc": "3D 虚拟办公室",
+    "memoryDesc": "浏览和管理记忆"
   },
   "wizard": {
     "title": "欢迎使用 OpenClaw",
@@ -67,6 +91,19 @@
     "title": "工作区",
     "empty": "暂无工作区",
     "add": "添加工作区"
+  },
+  "instance": {
+    "drawerTitle": "实例列表",
+    "connectNew": "连接新实例",
+    "switch": "切换实例",
+    "statusConnected": "已连接",
+    "statusDisconnected": "未连接",
+    "statusConnecting": "连接中",
+    "statusError": "错误",
+    "addNew": "添加实例",
+    "empty": "暂无实例",
+    "deleteConfirm": "确定要移除此实例吗？",
+    "current": "当前"
   },
   "common": {
     "loading": "加载中…"

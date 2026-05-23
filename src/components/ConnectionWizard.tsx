@@ -178,13 +178,15 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
         avatarUrl,
       });
 
-      client.disconnect();
-
       const instance = useStore.getState().instances.find((i) => i.gatewayUrl === url);
       if (instance) {
         useStore.getState().setCurrentInstance(instance.id);
         onConnected(instance.id);
       }
+
+      useStore.getState().fetchGatewayUserForCurrent();
+
+      client.disconnect();
     } catch (err) {
       const message = err instanceof Error ? err.message : t('connection.connectFailed');
       Toast.error(message);

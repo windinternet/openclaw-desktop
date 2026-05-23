@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import '@douyinfe/semi-ui/lib/es/_base/base.css';
+import './styles/global.css';
 import { I18nextProvider } from 'react-i18next';
 import i18n from './i18n';
 import ThemeProvider from './components/ThemeProvider';

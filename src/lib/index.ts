@@ -3,6 +3,8 @@ export type {
   ConnectionStatus,
   ConnectionState,
   DiscoveredInstance,
+  SessionInfo,
+  GatewayUser,
   RequestFrame,
   ResponseFrame,
   EventFrame,
