@@ -145,3 +145,4 @@ vite.config.ts.timestamp-*
 .vite/
 .idea/
 yarn.lock
+scripts/*.mjs
