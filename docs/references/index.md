@@ -60,6 +60,15 @@
 | Vitest 官方文档 | 测试框架 | https://vitest.dev/ |
 | Testing Library React | 组件测试库 | https://testing-library.com/docs/react-testing-library/intro |
 
+## OpenClaw 平台
+
+| 资源 | 说明 | 链接 |
+|------|------|------|
+| OpenClaw 平台参考 | 平台架构、概念、API、SDK 综合参考 | `openclaw-platform.md` |
+| OpenClaw 官方文档 | 官方完整文档 | https://docs.openclaw.ai |
+| OpenClaw 文档索引 | LLM 可读的完整文档索引 | https://docs.openclaw.ai/llms.txt |
+| OpenClaw App SDK | npm 包 `@openclaw/sdk` | https://www.npmjs.com/package/@openclaw/sdk |
+
 ## 本仓库文档
 
 | 文档 | 说明 |

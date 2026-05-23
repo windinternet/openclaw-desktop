@@ -1,16 +1,46 @@
 export type {
+  // Connection & Instance
   InstanceConfig,
   ConnectionStatus,
   ConnectionState,
   DiscoveredInstance,
-  SessionInfo,
+  // User
   GatewayUser,
+  // Agent
+  AgentInfo,
+  AgentIdentity,
+  // Model
+  ModelInfo,
+  // Session & Chat
+  SessionInfo,
+  SessionMessage,
+  ChatSendParams,
+  ChatSendResult,
+  ChatEventPayload,
+  // Cron
+  CronJob,
+  CronRun,
+  // Tool & Skill
+  ToolInfo,
+  SkillInfo,
+  // Workspace
+  WorkspaceFile,
+  WorkspaceFileContent,
+  // Health & Status
+  GatewayHealth,
+  GatewayStatus,
+  // Kanban & Office
+  KanbanColumn,
+  KanbanCard,
+  OfficeAgent,
+  // Search
+  SearchResult,
+  // Protocol Frames
   RequestFrame,
   ResponseFrame,
   EventFrame,
   GatewayError,
   HelloOk,
-  ChatEventPayload,
   GatewayClientOptions,
 } from './types';
 export { useStore } from './store';

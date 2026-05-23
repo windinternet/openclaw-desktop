@@ -18,6 +18,7 @@ import {
   IconSun,
   IconMoon,
   IconSetting,
+  IconFolderStroked,
 } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
@@ -31,10 +32,12 @@ const ROUTE_MAP: Record<string, string> = {
   'new-session': '/new-session',
   extensions: '/extensions',
   tasks: '/tasks',
+  workspace: '/workspace',
   kanban: '/kanban',
   teams: '/teams',
   office: '/office',
   memory: '/memory',
+  settings: '/settings',
 };
 
 interface SidebarProps {
@@ -236,7 +239,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
           theme="borderless"
           onClick={toggleTheme}
         />
-        <Button icon={<IconSetting size="small" />} size="small" theme="borderless" />
+        <Button icon={<IconSetting size="small" />} size="small" theme="borderless" onClick={() => navigate('/settings')} />
         <Button icon={<IconGithubLogo size="small" />} size="small" theme="borderless" onClick={openGitHub} />
       </div>
     </div>
@@ -262,6 +265,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
       <NavSectionLabel label={t('nav.sectionTools')} />
       <Nav.Item itemKey="extensions" text={t('nav.extensions')} icon={<IconPuzzle />} />
       <Nav.Item itemKey="tasks" text={t('nav.tasks')} icon={<IconCheckList />} />
+      <Nav.Item itemKey="workspace" text={t('nav.workspace') || '工作区'} icon={<IconFolderStroked />} />
       <Nav.Item itemKey="kanban" text={t('nav.kanban')} icon={<IconKanban />} />
 
       <NavSectionLabel label={t('nav.sectionCollaboration')} />
