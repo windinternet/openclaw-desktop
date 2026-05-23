@@ -12,9 +12,10 @@ import type {
   WorkspaceFile,
   GatewayHealth,
   GatewayStatus,
+  GatewayUser,
 } from './types';
 import { createGatewayClient, type GatewayClient } from './gateway';
-import { fetchGatewayUser } from './user';
+import { fetchGatewayUser, fetchUserProfile } from './user';
 
 const STORAGE_KEY = 'openclaw-instances';
 const CURRENT_INSTANCE_KEY = 'openclaw-current-instance';
@@ -118,6 +119,7 @@ export const useStore = create<StoreState>((set, get) => ({
   connectionStatus: 'disconnected',
   connectionError: null,
   activeClient: null,
+  retryCount: 0,
 
   sessions: [],
   agents: [],
@@ -235,26 +237,41 @@ export const useStore = create<StoreState>((set, get) => ({
     const instance = state.instances.find((i) => i.id === state.currentInstanceId);
     if (!instance) return;
 
-    state.disconnectGateway();
+    // 丢弃旧连接
+    const oldClient = get().activeClient;
+    if (oldClient) {
+      try { oldClient.disconnect(); } catch {}
+    }
+
+    set({ connectionStatus: 'connecting', connectionError: null, activeClient: null, retryCount: 0 });
 
     const client = createGatewayClient({
       url: instance.gatewayUrl,
       token: instance.token,
-      clientId: 'openclaw-desktop',
+      onStatusChange: (status: ConnectionStatus) => {
+        const s = get();
+        if (s.activeClient !== client) return; // 旧 client 的回调忽略
+        if (status === 'connected') {
+          set({ connectionStatus: 'connected', connectionError: null, retryCount: 0 });
+          get().refreshAll();
+        } else if (status === 'error') {
+          set({ connectionStatus: 'error', connectionError: '网关连接错误' });
+        } else if (status === 'disconnected') {
+          set({ connectionStatus: 'disconnected' });
+        } else if (status === 'connecting') {
+          set({ connectionStatus: 'connecting' });
+        }
+      },
     });
 
+    set({ activeClient: client });
+
     try {
-      set({ connectionStatus: 'connecting' });
       await client.connect();
-      set({
-        activeClient: client,
-        connectionStatus: 'connected',
-        connectionError: null,
-      });
-      // 连接成功后预加载核心数据
-      get().refreshAll();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Connection failed';
+      // 连接握手失败（包括设备签名/认证错误）：断开并停止重试，避免无限循环
+      try { client.disconnect(); } catch {}
       set({ connectionStatus: 'error', connectionError: msg, activeClient: null });
     }
   },
@@ -263,7 +280,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const { activeClient } = get();
     if (activeClient) {
       activeClient.disconnect();
-      set({ activeClient: null, connectionStatus: 'disconnected' });
+      set({ activeClient: null, connectionStatus: 'disconnected', retryCount: 0 });
     }
   },
 
@@ -311,8 +328,8 @@ export const useStore = create<StoreState>((set, get) => ({
     const client = getClient(get());
     if (!client) return;
     try {
-      const data = await client.request<ModelInfo[]>('models.list', { view: 'configured' });
-      set({ models: Array.isArray(data) ? data : [] });
+      const data = await client.request<{ models?: ModelInfo[] } | ModelInfo[]>('models.list', { view: 'configured' });
+      set({ models: Array.isArray(data) ? data : (data?.models ?? []) });
     } catch (err) {
       console.error('[fetchModels]', err);
     }
@@ -403,7 +420,15 @@ export const useStore = create<StoreState>((set, get) => ({
     const instance = state.instances.find((i) => i.id === state.currentInstanceId);
     if (!instance) return;
 
-    const user = await fetchGatewayUser(instance.gatewayUrl, instance.token);
+    let user: GatewayUser | null = null;
+
+    const activeClient = getClient(state);
+    if (activeClient) {
+      user = await fetchUserProfile(activeClient, 'main');
+    } else {
+      user = await fetchGatewayUser(instance.gatewayUrl, instance.token);
+    }
+
     if (!user) return;
 
     set((s) => {

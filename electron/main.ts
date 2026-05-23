@@ -8,6 +8,11 @@ import crypto from 'node:crypto'
 
 const execFileAsync = promisify(execFile)
 
+// === 开发调试：开启 CDP 远程调试端口，供 Playwright 等工具连接运行时 Chromium ===
+if (!app.isPackaged) {
+  app.commandLine.appendSwitch('remote-debugging-port', '9222')
+}
+
 const isDev = !app.isPackaged
 
 function createWindow() {
