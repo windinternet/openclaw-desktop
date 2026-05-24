@@ -32,6 +32,7 @@ html, body, #root {
 .semi-navigation-vertical .semi-navigation-list-wrapper {
     flex: 3 1 0% !important;
     overflow-y: auto !important;
+    padding-top: 0 !important;
 }
 
 .semi-navigation-vertical .semi-navigation-footer {
@@ -57,16 +58,45 @@ html, body, #root {
 }
 
 /* ── Nav: Icon Gradient Colors ─────────────────────────────────── */
-.semi-icon-pie_chart_2_stroked svg path { fill: url(#ig-dashboard) !important; }
-.semi-icon-search              svg path { fill: url(#ig-search)     !important; }
-.semi-icon-plus_circle         svg path { fill: url(#ig-new-session)!important; }
-.semi-icon-puzzle              svg path { fill: url(#ig-extensions) !important; }
-.semi-icon-check_list          svg path { fill: url(#ig-tasks)      !important; }
-.semi-icon-folder_stroked      svg path { fill: url(#ig-workspace)  !important; }
-.semi-icon-kanban              svg path { fill: url(#ig-kanban)     !important; }
-.semi-icon-user_group          svg path { fill: url(#ig-teams)      !important; }
-.semi-icon-desktop             svg path { fill: url(#ig-office)     !important; }
-.semi-icon-bookmark            svg path { fill: url(#ig-memory)     !important; }
+.semi-icon-pie_chart_2_stroked svg path {
+    fill: url("#ig-dashboard") !important;
+}
+
+.semi-icon-search svg path {
+    fill: url("#ig-search") !important;
+}
+
+.semi-icon-plus_circle svg path {
+    fill: url("#ig-new-session") !important;
+}
+
+.semi-icon-puzzle svg path {
+    fill: url("#ig-extensions") !important;
+}
+
+.semi-icon-check_list svg path {
+    fill: url("#ig-tasks") !important;
+}
+
+.semi-icon-folder_stroked svg path {
+    fill: url("#ig-workspace") !important;
+}
+
+.semi-icon-kanban svg path {
+    fill: url("#ig-kanban") !important;
+}
+
+.semi-icon-user_group svg path {
+    fill: url("#ig-teams") !important;
+}
+
+.semi-icon-desktop svg path {
+    fill: url("#ig-office") !important;
+}
+
+.semi-icon-bookmark svg path {
+    fill: url("#ig-memory") !important;
+}
 
 /* ── Layout: Remove Sider default border ────────────────────────── */
 .semi-layout-sider {
@@ -80,4 +110,8 @@ html, body, #root {
 
 .semi-navigation-vertical .semi-navigation-header-list-outer {
     height: unset !important;
+}
+
+.semi-navigation-vertical .semi-navigation-header {
+    padding: 8px 0 0 !important;
 }

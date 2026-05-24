@@ -306,6 +306,24 @@ export const useStore = create<StoreState>((set, get) => ({
     try {
       const data = await client.request<{ sessions?: SessionInfo[] } | SessionInfo[]>('sessions.list');
       const list = Array.isArray(data) ? data : data?.sessions ?? [];
+
+      // 批量拉 preview 提取标题
+      if (list.length > 0) {
+        const keys = list.map((s) => s.key);
+        try {
+          const previewRes = await client.request<{ previews?: { key: string; items?: { role: string; text?: string }[] }[] }>('sessions.preview', { keys });
+          const previews = previewRes?.previews ?? [];
+          for (const p of previews) {
+            const session = list.find((s) => s.key === p.key);
+            if (!session || session.title) continue;
+            const firstText = p.items?.find((i) => i.role === 'user' || i.role === 'assistant')?.text;
+            if (firstText) {
+              session.title = firstText.replace(/[\n\r]/g, ' ').slice(0, 40);
+            }
+          }
+        } catch { /* preview 静默失败 */ }
+      }
+
       set({ sessions: list as SessionInfo[] });
     } catch (err) {
       console.error('[fetchSessions]', err);

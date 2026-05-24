@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Nav, Avatar, Button, Typography } from '@douyinfe/semi-ui';
+import { InfiniteLoader, AutoSizer } from 'react-virtualized';
+import VList from 'react-virtualized/dist/commonjs/List';
 import {
   IconGithubLogo,
   IconPlus,
@@ -219,21 +221,84 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
     hideTimer.current = setTimeout(() => setShowPopover(false), 150);
   }, []);
 
+  const formatSessionName = (s: typeof sessions[0]): string => {
+    if (s.title) return s.title;
+    const key = s.key || '';
+    // 主会话
+    if (key === 'agent:main:main') return '主会话';
+    // 飞书
+    if (key.includes(':feishu:direct:')) return '飞书私聊';
+    if (key.includes(':feishu:group:')) return '飞书群聊';
+    // WebChat
+    if (key.includes(':webchat:') || s.origin?.surface === 'webchat') return 'WebChat';
+    // 定时任务
+    if (key.includes(':cron:')) return '定时任务';
+    // Dashboard 会话 → 取 ID 后 8 位
+    if (key.includes(':dashboard:')) {
+      const parts = key.split(':');
+      const id = parts[parts.length - 1]?.slice(-8);
+      return id ? `Dashboard #${id}` : 'Dashboard 会话';
+    }
+    // 兜底：取最后一段
+    const parts = key.split(':');
+    return parts[parts.length - 1]?.slice(0, 14) || key;
+  };
+
+  const formatRelativeTime = (ts?: number): string => {
+    if (!ts) return '';
+    const diff = Date.now() - ts;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return '刚刚';
+    if (mins < 60) return `${mins}分钟前`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}小时前`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}天前`;
+    return new Date(ts).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+  };
+
+  const currentSessionKey = location.pathname.startsWith('/chat/') ? location.pathname.replace('/chat/', '') : null;
+
   const footer = (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', height: '100%' }}>
       {sessions.length > 0 ? (
-        <div style={{ flex: 1, overflowY: 'auto', borderTop: '1px solid var(--semi-color-border)' }}>
-          <div style={{ padding: '10px 24px 6px', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--semi-color-text-2)', userSelect: 'none' }}>
-            {t('nav.sessions')}
-          </div>
-          {sessions.map((s) => (
-            <div key={s.key} role="button" tabIndex={0} onClick={() => navigate(`/chat/${s.key}`)}
-              style={{ margin: '0 8px', padding: '7px 16px', borderRadius: 6, cursor: 'pointer', fontSize: 13, lineHeight: '18px', color: 'var(--semi-color-text-0)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', transition: 'background-color 0.15s ease' }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.backgroundColor = 'var(--semi-color-fill-0)'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent'; }}>
-              {s.title || s.key}
-            </div>
-          ))}
+        <div style={{ flex: 1, borderTop: '1px solid var(--semi-color-border)' }}>
+          <InfiniteLoader isRowLoaded={({ index }) => index < sessions.length} loadMoreRows={() => Promise.resolve()} rowCount={sessions.length}>
+            {({ onRowsRendered, registerChild }) => (
+              <AutoSizer>
+                {({ width, height }) => (
+                  <VList ref={registerChild} className="semi-light-scrollbar" height={height} onRowsRendered={onRowsRendered}
+                    rowCount={sessions.length} rowHeight={44} width={width}
+                    rowRenderer={({ index, key, style }) => {
+                      const s = sessions[index];
+                      if (!s) return null;
+                      const isCurrent = s.key === currentSessionKey;
+                      const isActive = s.status && s.status !== 'done' && s.status !== 'idle';
+                      const isDone = s.status === 'done';
+                      return (
+                        <div key={key} style={{ ...style, padding: '0 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                          backgroundColor: isCurrent ? 'var(--semi-color-primary-light-default)' : 'transparent',
+                        }} onClick={() => navigate(`/chat/${encodeURIComponent(s.key)}`)}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                            backgroundColor: isActive ? 'var(--semi-color-success)' : isDone ? 'var(--semi-color-primary)' : 'transparent',
+                            animation: isActive ? 'session-pulse 1.5s ease-in-out infinite' : 'none',
+                          }} />
+                          <span style={{ flex: 1, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--semi-color-text-0)' }}>
+                            {formatSessionName(s)}
+                          </span>
+                          {s.updatedAt && (
+                            <span style={{ fontSize: 10, color: 'var(--semi-color-text-2)', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                              {formatRelativeTime(s.updatedAt)}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    }}
+                  />
+                )}
+              </AutoSizer>
+            )}
+          </InfiniteLoader>
         </div>
       ) : (
         <div style={{ padding: '12px 24px', borderTop: '1px solid var(--semi-color-border)', textAlign: 'center', flex: '1 1 auto' }}>
@@ -318,6 +383,12 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
         </div>,
         document.body
       )}
+      <style>{`
+        @keyframes session-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+      `}</style>
   </>
   );
 }
