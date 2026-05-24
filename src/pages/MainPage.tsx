@@ -79,7 +79,6 @@ export default function MainPage() {
           position: 'relative',
         }}
       >
-        <div style={{ height: 36, flexShrink: 0, WebkitAppRegion: 'drag' } as React.CSSProperties} />
         <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <ContentBackground />
           <Outlet />
