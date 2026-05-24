@@ -83,7 +83,7 @@ export default function SessionChatPage() {
       try {
         let data: unknown;
         try {
-          data = await activeClient.request('sessions.history', { key: activeSessionKey });
+          data = await activeClient.request('chat.history', { sessionKey: activeSessionKey });
         } catch {
           data = await activeClient.request('sessions.preview', { keys: [activeSessionKey] });
         }

@@ -258,7 +258,7 @@ ipcMain.handle('device:signChallenge', async (_event, params: { nonce: string; t
     clientId: params.clientId,
     clientMode: 'ui',
     role: 'operator',
-    scopes: ['operator.read', 'operator.write', 'operator.admin'],
+    scopes: ['operator.read', 'operator.write'],
     signedAtMs,
     token: params.token,
     nonce: params.nonce,

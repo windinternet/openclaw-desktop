@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { decodeSessionKeyParam, extractSessionMessageItems, extractSessionMessageText } from '../lib/session-content';
 
 describe('session content helpers', () => {
@@ -29,5 +30,12 @@ describe('session content helpers', () => {
     expect(extractSessionMessageItems({ previews: [{ items: [{ role: 'assistant', text: '预览回复' }] }] })).toEqual([
       { role: 'assistant', text: '预览回复' },
     ]);
+  });
+
+  it('documents that the session page loads full chat history before preview', () => {
+    const source = readFileSync('src/pages/SessionChatPage.tsx', 'utf8');
+
+    expect(source).toContain("activeClient.request('chat.history', { sessionKey: activeSessionKey })");
+    expect(source).not.toContain("activeClient.request('sessions.history'");
   });
 });
