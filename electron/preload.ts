@@ -12,6 +12,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   config: {
     getUserDataPath: () => ipcRenderer.invoke('config:getPath'),
   },
+  notifications: {
+    show: (params: { title: string; body: string }) => ipcRenderer.invoke('notification:show', params),
+  },
   device: {
     signChallenge: (params: { nonce: string; token: string; clientId: string }) =>
       ipcRenderer.invoke('device:signChallenge', params),

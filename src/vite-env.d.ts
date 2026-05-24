@@ -13,6 +13,9 @@ interface Window {
     config: {
       getUserDataPath: () => Promise<string>;
     };
+    notifications: {
+      show: (params: { title: string; body: string }) => Promise<boolean>;
+    };
     device: {
       signChallenge: (params: { nonce: string; token: string; clientId: string }) => Promise<{
         deviceId: string;

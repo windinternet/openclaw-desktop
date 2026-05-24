@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, Notification } from 'electron'
 import path from 'node:path'
 import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
@@ -244,6 +244,16 @@ ipcMain.handle('discover:scan', async () => {
 
 ipcMain.handle('config:getPath', () => {
   return app.getPath('userData')
+})
+
+ipcMain.handle('notification:show', (_event, params: { title?: string; body?: string }) => {
+  if (!Notification.isSupported()) return false
+  new Notification({
+    title: params.title || 'OpenClaw',
+    body: params.body || '',
+    silent: true,
+  }).show()
+  return true
 })
 
 ipcMain.handle('device:signChallenge', async (_event, params: { nonce: string; token: string; clientId: string }) => {
