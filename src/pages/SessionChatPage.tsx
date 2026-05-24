@@ -3,7 +3,15 @@ import { useParams } from 'react-router-dom';
 import { AIChatDialogue, AIChatInput, Toast } from '@douyinfe/semi-ui';
 import { useStore } from '../lib';
 import type { EventFrame } from '../lib/types';
-import { decodeSessionKeyParam, extractSessionMessageItems, extractSessionMessageText } from '../lib/session-content';
+import {
+  decodeSessionKeyParam,
+  extractSessionMessageItems,
+  parseHistoryMessageToContentItems,
+  parseToolEventToContentItem,
+  isToolCompleted,
+  extractToolOutputText,
+} from '../lib/session-content';
+import type { ChatContentItem } from '../lib/session-content';
 import { isAssistantCompletionEvent } from '../lib/assistant-completion-notifier';
 
 const { Configure } = AIChatInput;
@@ -32,6 +40,63 @@ function extractMessageText(content: unknown): string {
     return (c.text as string) || (c.content as string) || (c.value as string) || extractMessageText(c.children) || '';
   }
   return String(content);
+}
+
+/**
+ * 在流式消息的 content 数组中，追加或更新文本块。
+ * - 如果最后一项是 text message 类型，则追加以减少内容块碎片
+ * - 否则新增一个 text message 块
+ */
+function appendTextToContent(contentArr: ChatContentItem[], delta: string): ChatContentItem[] {
+  const last = contentArr[contentArr.length - 1];
+  if (last && last.type === 'message') {
+    return [
+      ...contentArr.slice(0, -1),
+      {
+        ...last,
+        content: [
+          ...last.content,
+          { type: 'output_text' as const, text: delta },
+        ],
+      },
+    ];
+  }
+  return [
+    ...contentArr,
+    {
+      type: 'message',
+      content: [{ type: 'output_text' as const, text: delta }],
+    },
+  ];
+}
+
+/**
+ * 在流式消息的 content 数组中，找到最后一个 text message 块并追加文本。
+ * 如果最后一个不是 text message，则新增。
+ */
+function appendDeltaToLastText(contentArr: ChatContentItem[], delta: string): ChatContentItem[] {
+  for (let i = contentArr.length - 1; i >= 0; i--) {
+    const item = contentArr[i];
+    if (item.type === 'message') {
+      const updatedContent = [...item.content];
+      const lastText = updatedContent[updatedContent.length - 1];
+      if (lastText && lastText.type === 'output_text') {
+        updatedContent[updatedContent.length - 1] = { ...lastText, text: lastText.text + delta };
+      } else {
+        updatedContent.push({ type: 'output_text', text: delta });
+      }
+      return [...contentArr.slice(0, i), { ...item, content: updatedContent }, ...contentArr.slice(i + 1)];
+    }
+  }
+  return appendTextToContent(contentArr, delta);
+}
+
+/** AIChatDialogue 的 roleConfig 中支持的 role */
+const KNOWN_ROLES = new Set(['user', 'assistant', 'system']);
+
+function normalizeRole(role: unknown): string {
+  if (typeof role === 'string' && KNOWN_ROLES.has(role)) return role;
+  return 'assistant';
 }
 
 export default function SessionChatPage() {
@@ -77,6 +142,7 @@ export default function SessionChatPage() {
     return () => clearTimeout(timer);
   }, [chats]);
 
+  /* ── 加载历史消息 ── */
   useEffect(() => {
     if (!activeSessionKey || !activeClient || connectionStatus !== 'connected') return;
     let cancelled = false;
@@ -89,17 +155,20 @@ export default function SessionChatPage() {
           data = await activeClient.request('sessions.preview', { keys: [activeSessionKey] });
         }
         if (cancelled) return;
-        const items = extractSessionMessageItems(data);
+        const rawItems = extractSessionMessageItems(data);
         setChats(
-          items
-            .filter((m: any) => m.role === 'user' || m.role === 'assistant')
-            .map((m: any) => ({
+          rawItems.map((m: any) => {
+            const contentItems = parseHistoryMessageToContentItems(m);
+            return {
               id: generateIdempotencyKey(),
-              role: m.role,
-              content: extractSessionMessageText(m),
-              createAt: m.timestamp,
-              status: m.role === 'assistant' && (m.status === 'in_progress' || m.status === 'running') ? 'completed' : (m.status || 'completed'),
-            })),
+              role: normalizeRole(m.role),
+              content: contentItems,
+              createAt: m.timestamp || m.createdAt,
+              status: m.role === 'assistant' && (m.status === 'in_progress' || m.status === 'running')
+                ? 'completed'
+                : (m.status || 'completed'),
+            };
+          }),
         );
       } catch {
         if (!cancelled) setChats([]);
@@ -110,6 +179,7 @@ export default function SessionChatPage() {
     };
   }, [activeSessionKey, activeClient, connectionStatus]);
 
+  /* ── 实时事件处理 ── */
   useEffect(() => {
     if (!activeClient || !activeSessionKey) return;
     const handleEvent = (frame: EventFrame) => {
@@ -125,6 +195,7 @@ export default function SessionChatPage() {
       const runId = (p.runId ?? p.run_id ?? 'streaming') as string;
 
       if (stream === 'assistant') {
+        // ── 文本流式回复 ──
         setGenerating(true);
         if (genTimeoutRef.current) { clearTimeout(genTimeoutRef.current); genTimeoutRef.current = null; }
         const data = p.data as Record<string, unknown> | undefined;
@@ -132,11 +203,99 @@ export default function SessionChatPage() {
         if (!delta) return;
         setChats((prev) => {
           const last = prev[prev.length - 1];
-          if (last && last.id === runId)
-            return [...prev.slice(0, -1), { ...last, content: last.content + delta }];
-          return [...prev, { id: runId, role: 'assistant', content: delta, status: 'in_progress', createAt: Date.now() }];
+          if (last && last.id === runId && last.role === 'assistant') {
+            // 已有流式消息：直接拼接纯文本内容到最后一个 text block
+            if (Array.isArray(last.content)) {
+              return [
+                ...prev.slice(0, -1),
+                { ...last, content: appendDeltaToLastText(last.content as ChatContentItem[], delta) },
+              ];
+            }
+            // 兼容旧纯字符串 content
+            return [...prev.slice(0, -1), { ...last, content: (last.content || '') + delta }];
+          }
+          // 新流式消息：创建 ContentItem[] 格式
+          return [
+            ...prev,
+            {
+              id: runId,
+              role: 'assistant',
+              content: appendTextToContent([], delta),
+              status: 'in_progress',
+              createAt: Date.now(),
+            },
+          ];
         });
         streamingIdRef.current = runId;
+      } else if (stream === 'tool') {
+        // ── 工具调用事件 ──
+        setGenerating(true);
+        if (genTimeoutRef.current) { clearTimeout(genTimeoutRef.current); genTimeoutRef.current = null; }
+        const data = p.data as Record<string, unknown> | undefined;
+        const phase = p.phase as string | undefined;
+        const toolItem = parseToolEventToContentItem(data, phase);
+
+        setChats((prev) => {
+          const last = prev[prev.length - 1];
+
+          if (toolItem) {
+            // 找到或创建当前 run 的流式消息
+            if (last && last.id === runId && last.role === 'assistant' && Array.isArray(last.content)) {
+              // 检查是否已有同名工具调用块需要更新（如状态变化）
+              const existingIdx = last.content.findIndex(
+                (c: ChatContentItem) => c.type === 'function_call' && c.name === toolItem.name && c.call_id === toolItem.call_id,
+              );
+              let newContent: ChatContentItem[];
+              if (existingIdx >= 0) {
+                newContent = [...last.content];
+                newContent[existingIdx] = { ...toolItem, status: toolItem.status || 'completed' };
+              } else {
+                newContent = [...last.content, toolItem];
+              }
+              return [...prev.slice(0, -1), { ...last, content: newContent }];
+            }
+
+            // 或创建新消息附带工具调用
+            return [
+              ...prev,
+              {
+                id: runId,
+                role: 'assistant',
+                content: [toolItem],
+                status: isToolCompleted(data) ? 'completed' : 'in_progress',
+                createAt: Date.now(),
+              },
+            ];
+          }
+
+          // 工具调用结果附着
+          if (isToolCompleted(data)) {
+            const outputText = extractToolOutputText(data);
+            if (outputText && last && last.role === 'assistant') {
+              if (Array.isArray(last.content)) {
+                const content = last.content as ChatContentItem[];
+                return [
+                  ...prev.slice(0, -1),
+                  {
+                    ...last,
+                    content: appendTextToContent(content, outputText),
+                    status: 'completed',
+                  },
+                ];
+              }
+              return [
+                ...prev.slice(0, -1),
+                { ...last, content: (last.content || '') + outputText, status: 'completed' },
+              ];
+            }
+            // 完成最后流式消息
+            if (last && last.status === 'in_progress') {
+              return [...prev.slice(0, -1), { ...last, status: 'completed' }];
+            }
+          }
+
+          return prev;
+        });
       } else if (stream === 'lifecycle') {
         const data = p.data as Record<string, unknown> | undefined;
         const phase = (p.phase ?? data?.phase ?? p.state) as string | undefined;
@@ -146,9 +305,25 @@ export default function SessionChatPage() {
           endGeneration('completed', runId);
         } else if (phase === 'start' || phase === 'running') {
           setGenerating(true);
+          // 开始新 Stream 时创建占位消息
+          if (phase === 'start') {
+            setChats((prev) => {
+              const last = prev[prev.length - 1];
+              if (last && last.id === runId) return prev;
+              return [
+                ...prev,
+                {
+                  id: runId,
+                  role: 'assistant',
+                  content: [] as ChatContentItem[],
+                  status: 'in_progress',
+                  createAt: Date.now(),
+                },
+              ];
+            });
+            streamingIdRef.current = runId;
+          }
         }
-      } else if (stream === 'tool') {
-        setGenerating(true);
       }
     };
     prevEventRef.current = activeClient.onEvent;
@@ -232,7 +407,11 @@ export default function SessionChatPage() {
   }, [activeClient, activeSessionKey, endGeneration]);
 
   const roleConfig = useMemo(
-    () => ({ user: { name: 'You', avatar: '👤' }, assistant: { name: 'AI', avatar: '🤖' } }),
+    () => ({
+      user: { name: 'You', avatar: '👤' },
+      assistant: { name: 'AI', avatar: '🤖' },
+      system: { name: 'System', avatar: '🛎️' },
+    }),
     [],
   );
 
