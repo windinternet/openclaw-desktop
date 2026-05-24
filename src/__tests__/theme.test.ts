@@ -49,6 +49,7 @@ describe('applyTheme', () => {
       themeColor: 'purple',
       locale: 'zh-CN',
       userDisplayName: '',
+      aiCompletionSound: 'mixkit-message-pop-alert-2354.mp3',
     });
 
     expect(body.style.getPropertyValue('--semi-color-primary')).toBe('#722ED1');

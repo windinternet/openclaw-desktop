@@ -23,6 +23,7 @@ export interface AppSettings {
   themeColor: string;
   locale: SupportedLocale;
   userDisplayName: string;
+  aiCompletionSound: string;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -31,4 +32,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   themeColor: 'blue',
   locale: 'zh-CN',
   userDisplayName: '',
+  aiCompletionSound: 'mixkit-message-pop-alert-2354.mp3',
 };
