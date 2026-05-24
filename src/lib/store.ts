@@ -16,6 +16,7 @@ import type {
 } from './types';
 import { createGatewayClient, type GatewayClient } from './gateway';
 import { fetchGatewayUser, fetchUserProfile } from './user';
+import { isAssistantCompletionEvent, notifyAssistantCompletion } from './assistant-completion-notifier';
 
 const STORAGE_KEY = 'openclaw-instances';
 const CURRENT_INSTANCE_KEY = 'openclaw-current-instance';
@@ -248,6 +249,13 @@ export const useStore = create<StoreState>((set, get) => ({
     const client = createGatewayClient({
       url: instance.gatewayUrl,
       token: instance.token,
+      onEvent: (event) => {
+        const state = get();
+        notifyAssistantCompletion(event, state.sessions);
+        if (isAssistantCompletionEvent(event)) {
+          get().fetchSessions();
+        }
+      },
       onStatusChange: (status: ConnectionStatus) => {
         const s = get();
         if (s.activeClient !== client) return; // 旧 client 的回调忽略
