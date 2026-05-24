@@ -686,7 +686,47 @@ style={{ backgroundColor: 'var(--semi-color-bg-0)' }}  // 暗色下自动变黑
 </div>
 ```
 
-### 5.4 常见类型错误避免
+### 5.5 AIChatInput 内容格式（重要）
+
+AIChatInput 的 `onMessageSend` 回调传递的内容格式为：
+
+```typescript
+{
+  inputContents: [
+    { type: "text", text: "用户输入的文本" },
+    // ...可能有多个块
+  ],
+  attachments: [
+    { uid: string, name: string, url: string, status: string, ... }
+  ],
+  references: [
+    { id: string, type: string, content: string, ... }
+  ],
+  setup: {
+    model: "model-id",
+    thinking: "medium"
+  }
+}
+```
+
+**解析文本的正确方式**：
+```typescript
+function extractMessageText(content: unknown): string {
+  if (!content) return '';
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) return content.map(extractMessageText).join('');
+  if (typeof content === 'object') {
+    const c = content as Record<string, unknown>;
+    // AIChatInput 特有: inputContents 数组
+    if (Array.isArray(c.inputContents)) return extractMessageText(c.inputContents);
+    // tiptap 格式 fallback
+    return (c.text as string) || (c.content as string) || String(c.children || '');
+  }
+  return String(content);
+}
+```
+
+### 5.6 常见类型错误避免
 
 | 错误写法 | 正确写法 | 原因 |
 |---------|---------|------|

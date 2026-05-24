@@ -63,6 +63,7 @@ export default function MainPage() {
           height: '100%',
         }}
       >
+        <div style={{ height: 36, WebkitAppRegion: 'drag' } as React.CSSProperties} />
         <Sidebar
           onAddInstance={() => setAddModalVisible(true)}
           onOpenDrawer={() => setDrawerVisible(true)}
@@ -78,7 +79,8 @@ export default function MainPage() {
           position: 'relative',
         }}
       >
-        <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ height: 36, flexShrink: 0, WebkitAppRegion: 'drag' } as React.CSSProperties} />
+        <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <ContentBackground />
           <Outlet />
         </div>

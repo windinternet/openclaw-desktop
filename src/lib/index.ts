@@ -17,6 +17,7 @@ export type {
   ChatSendParams,
   ChatSendResult,
   ChatEventPayload,
+  AgentEventPayload,
   // Cron
   CronJob,
   CronRun,

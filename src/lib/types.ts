@@ -135,6 +135,25 @@ export interface ChatEventPayload {
   errorKind?: string;
 }
 
+/**
+ * Gateway agent 事件负载（gateway 用 event: "agent" 发送流式回复）
+ * 
+ * stream === "assistant" → data.delta 为增量文本
+ * stream === "lifecycle" → phase: "end" | "error" 表示结束
+ * stream === "tool" → 工具调用事件
+ */
+export interface AgentEventPayload {
+  runId: string;
+  stream: 'assistant' | 'lifecycle' | 'tool';
+  sessionKey?: string;
+  seq?: number;
+  ts?: number;
+  /** assistant 流: { text: 累计文本, delta: 增量文本 } */
+  data?: { text?: string; delta?: string; content?: string };
+  /** lifecycle 流: "start" | "end" | "error" */
+  phase?: string;
+}
+
 // ── Cron ───────────────────────────────────────────────────────────
 
 /** cron.list RPC 返回的定时任务 */
