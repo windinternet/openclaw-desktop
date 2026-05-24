@@ -22,6 +22,21 @@ import type { AgentInfo } from '../lib/types';
 
 const { Title, Text } = Typography;
 
+// ── Data helpers ───────────────────────────────────────────────────
+
+function agentModelString(model: unknown): string {
+  if (typeof model === 'string') return model;
+  if (model && typeof model === 'object' && 'primary' in model) {
+    return String((model as Record<string, unknown>).primary ?? '');
+  }
+  return '';
+}
+
+function agentNameString(name: unknown): string {
+  if (typeof name === 'string') return name;
+  return '';
+}
+
 // ── Status helpers ─────────────────────────────────────────────────
 
 function getAgentStatusColor(status?: string): 'green' | 'orange' | 'red' | 'grey' {
@@ -123,7 +138,7 @@ function AgentCard({ agent, expanded, onToggle }: AgentCardProps) {
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {agent.name || agent.id}
+                  {agentNameString(agent.name) || agent.id}
                 </Text>
                 <Text
                   type="tertiary"
@@ -162,7 +177,7 @@ function AgentCard({ agent, expanded, onToggle }: AgentCardProps) {
               borderTop: '1px solid var(--semi-color-border)',
             }}
           >
-            {agent.workspace || agent.model || agent.thinking ? (
+            {agent.workspace || agentModelString(agent.model) || agent.thinking ? (
               <Descriptions
                 data={[
                   {
@@ -179,7 +194,7 @@ function AgentCard({ agent, expanded, onToggle }: AgentCardProps) {
                         <IconBox size="small" /> Model
                       </span>
                     ),
-                    value: agent.model || '—',
+                    value: agentModelString(agent.model) || '—',
                   },
                   {
                     key: (
@@ -187,7 +202,7 @@ function AgentCard({ agent, expanded, onToggle }: AgentCardProps) {
                         <IconBulb size="small" /> Thinking
                       </span>
                     ),
-                    value: agent.thinking || '—',
+                    value: String(agent.thinking || '—'),
                   },
                 ]}
                 row

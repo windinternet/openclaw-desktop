@@ -53,6 +53,7 @@ export default function SessionChatPage() {
   const patchThinkingRef = useRef('');
   const sendingRef = useRef(false);
   const genTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (urlSessionKey) setActiveSessionKey(decodeURIComponent(urlSessionKey));
@@ -61,6 +62,20 @@ export default function SessionChatPage() {
   useEffect(() => {
     if (!chatModel && models.length > 0) setChatModel(models[0].id);
   }, [models, chatModel]);
+
+  useEffect(() => {
+    if (chats.length === 0) return;
+    const timer = setTimeout(() => {
+      if (chatContainerRef.current) {
+        const scrollable = chatContainerRef.current.querySelector<HTMLDivElement>(
+          '[class*="semi-aiChat-dialogue"]'
+        );
+        const target = scrollable ?? chatContainerRef.current;
+        target.scrollTop = target.scrollHeight;
+      }
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [chats]);
 
   useEffect(() => {
     if (!activeSessionKey || !activeClient || connectionStatus !== 'connected') return;
@@ -249,7 +264,7 @@ export default function SessionChatPage() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: '16px 16px 0' }}>
+      <div ref={chatContainerRef} style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '16px 16px 0' }}>
         <AIChatDialogue
           chats={chats}
           roleConfig={roleConfig}

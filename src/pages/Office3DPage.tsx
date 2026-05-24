@@ -17,6 +17,23 @@ import type { AgentInfo } from '../lib/types';
 
 const { Title, Text } = Typography;
 
+// ── Data helpers ──────────────────────────────────────────────────
+
+/** agent.model may be string | { primary: string; fallback?: string; ... } */
+function agentModelString(model: unknown): string {
+  if (typeof model === 'string') return model;
+  if (model && typeof model === 'object' && 'primary' in model) {
+    return String((model as Record<string, unknown>).primary ?? '');
+  }
+  return '';
+}
+
+/** agent.name may be string | undefined */
+function agentNameString(name: unknown): string {
+  if (typeof name === 'string') return name;
+  return '';
+}
+
 // ── Status helpers ─────────────────────────────────────────────────
 
 function getAgentBadgeType(status?: string): 'success' | 'warning' | 'danger' | 'tertiary' {
@@ -206,6 +223,8 @@ interface AgentStatusItemProps {
 function AgentStatusItem({ agent }: AgentStatusItemProps) {
   const badgeType = getAgentBadgeType(agent.status);
   const statusLabel = getAgentStatusLabel(agent.status);
+  const displayName = agentNameString(agent.name) || agent.id;
+  const displayModel = agentModelString(agent.model);
 
   return (
     <div
@@ -233,11 +252,11 @@ function AgentStatusItem({ agent }: AgentStatusItemProps) {
             whiteSpace: 'nowrap',
           }}
         >
-          {agent.name || agent.id}
+          {displayName}
         </Text>
-        {agent.model && (
+        {displayModel && (
           <Text type="tertiary" size="small" style={{ fontSize: 11 }}>
-            {agent.model}
+            {displayModel}
           </Text>
         )}
       </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   Button,
@@ -27,6 +27,11 @@ import { useStore } from '../lib';
 import type { CronJob, CronRun } from '../lib/types';
 
 const { Title, Text } = Typography;
+
+function agentNameString(name: unknown): string {
+  if (typeof name === 'string') return name;
+  return '';
+}
 
 function formatTime(ts?: number): string {
   if (!ts) return '-';
@@ -203,7 +208,7 @@ export default function TasksPage() {
     [fetchCronRuns],
   );
 
-  const columns = [
+  const columns = useMemo(() => [
     {
       title: '标题',
       dataIndex: 'title',
@@ -250,7 +255,7 @@ export default function TasksPage() {
       render: (val: string | undefined) => {
         if (!val) return <Text type="tertiary">-</Text>;
         const agent = agents.find((a) => a.id === val);
-        return <Text size="small">{agent?.name || agent?.id || val}</Text>;
+        return <Text size="small">{agentNameString(agent?.name) || agent?.id || val}</Text>;
       },
     },
     {
@@ -330,7 +335,7 @@ export default function TasksPage() {
         </Space>
       ),
     },
-  ];
+  ], [agents, handleToggle, handleRunNow, runningJobs, handleDelete]);
 
   const cronFormFields = (isEdit: boolean) => (
     <>
@@ -360,7 +365,7 @@ export default function TasksPage() {
       >
         {agents.map((a) => (
           <Form.Select.Option key={a.id} value={a.id}>
-            {a.name || a.id}
+            {agentNameString(a.name) || a.id}
           </Form.Select.Option>
         ))}
       </Form.Select>

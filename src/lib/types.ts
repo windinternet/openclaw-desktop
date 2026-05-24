@@ -45,13 +45,19 @@ export interface GatewayUser {
 
 // ── Agent ──────────────────────────────────────────────────────────
 
+/** agents.list RPC 返回的模型配置（可能是对象而非纯字符串） */
+export interface AgentModelConfig {
+  primary: string;
+  fallback?: string;
+}
+
 /** agents.list RPC 返回的 Agent 条目 */
 export interface AgentInfo {
   id: string;
   name?: string;
   default?: boolean;
   workspace?: string;
-  model?: string;
+  model?: string | AgentModelConfig;
   thinking?: string;
   status?: 'idle' | 'running' | 'error';
   sessionCount?: number;

@@ -23,6 +23,11 @@ import type { KanbanCard, KanbanColumn } from '../lib/types';
 
 const { Title, Text } = Typography;
 
+function agentNameString(name: unknown): string {
+  if (typeof name === 'string') return name;
+  return '';
+}
+
 const STORAGE_KEY = 'openclaw-kanban';
 const COLUMN_DEFS = [
   { id: 'todo', title: '待办', icon: '📋' },
@@ -383,7 +388,7 @@ export default function KanbanPage() {
   const getAgentName = (agentId?: string): string | undefined => {
     if (!agentId) return undefined;
     const agent = agents.find((a: AgentInfo) => a.id === agentId);
-    return agent?.name || agent?.id;
+    return agentNameString(agent?.name) || agent?.id;
   };
 
   const cardCounts = columns.reduce(
@@ -592,7 +597,7 @@ export default function KanbanPage() {
           >
             {agents.map((a: AgentInfo) => (
               <Form.Select.Option key={a.id} value={a.id}>
-                {a.name || a.id}
+                {agentNameString(a.name) || a.id}
               </Form.Select.Option>
             ))}
           </Form.Select>

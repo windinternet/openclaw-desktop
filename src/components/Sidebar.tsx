@@ -257,6 +257,21 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
     return new Date(ts).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
   };
 
+  const getSessionStatusColor = (status?: string): string => {
+    switch (status) {
+      case 'active':
+        return 'var(--semi-color-success)';
+      case 'idle':
+        return 'var(--semi-color-warning)';
+      case 'completed':
+        return 'var(--semi-color-primary)';
+      case 'archived':
+        return 'var(--semi-color-text-2)';
+      default:
+        return 'transparent';
+    }
+  };
+
   const currentSessionKey = location.pathname.startsWith('/chat/') ? location.pathname.replace('/chat/', '') : null;
 
   const footer = (
@@ -274,18 +289,26 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
                       if (!s) return null;
                       const isCurrent = s.key === currentSessionKey;
                       const isActive = s.status === 'active';
-                      const isDone = s.status === 'completed';
+                      const statusColor = getSessionStatusColor(s.status);
                       return (
-                        <div key={key} style={{ ...style, padding: '0 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                        <div key={key} style={{ ...style, padding: '0 0', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
                           backgroundColor: isCurrent ? 'var(--semi-color-primary-light-default)' : 'transparent',
                         }} onClick={() => navigate(`/chat/${encodeURIComponent(s.key)}`)}>
                           <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                            backgroundColor: isActive ? 'var(--semi-color-success)' : isDone ? 'var(--semi-color-primary)' : 'transparent',
+                            backgroundColor: statusColor,
                             animation: isActive ? 'session-pulse 1.5s ease-in-out infinite' : 'none',
                           }} />
-                          <span style={{ flex: 1, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--semi-color-text-0)' }}>
+                          <span style={{ flex: 1, fontSize: isCurrent ? 14 : 13, fontWeight: isCurrent ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isCurrent ? 'var(--semi-color-primary)' : 'var(--semi-color-text-0)' }}>
                             {formatSessionName(s)}
                           </span>
+                          {s.status && (
+                            <span style={{
+                              width: 12, height: 12, borderRadius: '50%', flexShrink: 0,
+                              border: `2px solid ${statusColor}`,
+                              backgroundColor: isActive ? 'transparent' : statusColor,
+                              animation: isActive ? 'session-spin 1s linear infinite' : 'none',
+                            }} />
+                          )}
                           {s.updatedAt && (
                             <span style={{ fontSize: 10, color: 'var(--semi-color-text-2)', flexShrink: 0, whiteSpace: 'nowrap' }}>
                               {formatRelativeTime(s.updatedAt)}
@@ -306,27 +329,27 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
         </div>
       )}
       <div style={{ width: '100%', borderTop: '1px solid var(--semi-color-border)' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', padding: '10px 16px 6px', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', padding: '10px 0 0 0', gap: 8 }}>
           <Avatar size="extra-small" src={currentInstance?.avatarUrl || undefined}
             style={{ flexShrink: 0, backgroundColor: currentInstance?.avatarUrl ? 'transparent' : 'var(--semi-color-primary-light-default)' }}>
             {currentInstance?.name?.charAt(0).toUpperCase() ?? <IconServer />}
           </Avatar>
           <div ref={triggerRef} onMouseEnter={showPopup} onMouseLeave={hidePopup}
             style={{ flex: 1, minWidth: 0, overflow: 'hidden', cursor: hasPopover ? 'default' : undefined }}>
-            <Text ellipsis size="small" style={{ display: 'block', color: 'var(--semi-color-text-0)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {displayName}
-            </Text>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Text ellipsis size="small" style={{ flex: 1, minWidth: 0, color: 'var(--semi-color-text-0)', fontWeight: 600 }}>
+                {displayName}
+              </Text>
+              <Button icon={themeMode === 'dark' ? <IconSun size="small" /> : <IconMoon size="small" />} size="small" theme="borderless" onClick={toggleTheme} />
+              <Button icon={<IconSetting size="small" />} size="small" theme="borderless" onClick={() => navigate('/settings')} />
+              <Button icon={<IconGithubLogo size="small" />} size="small" theme="borderless" onClick={openGitHub} />
+            </div>
             {bioLine && (
               <div style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', fontSize: 11, lineHeight: '16px', marginTop: 2, color: 'var(--semi-color-text-2)', wordBreak: 'break-all' }}>
                 {bioLine}
               </div>
             )}
           </div>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-evenly', padding: '4px 0 2px' }}>
-          <Button icon={themeMode === 'dark' ? <IconSun size="small" /> : <IconMoon size="small" />} size="small" theme="borderless" onClick={toggleTheme} />
-          <Button icon={<IconSetting size="small" />} size="small" theme="borderless" onClick={() => navigate('/settings')} />
-          <Button icon={<IconGithubLogo size="small" />} size="small" theme="borderless" onClick={openGitHub} />
         </div>
       </div>
     </div>
@@ -387,6 +410,10 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
         @keyframes session-pulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.3; }
+        }
+        @keyframes session-spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
         }
       `}</style>
   </>

@@ -21,6 +21,11 @@ import type { WorkspaceFile, WorkspaceFileContent } from '../lib/types';
 
 const { Title, Text } = Typography;
 
+function agentNameString(name: unknown): string {
+  if (typeof name === 'string') return name;
+  return '';
+}
+
 const BOOTSTRAP_FILES = new Set(['AGENTS.md', 'SOUL.md', 'USER.md', 'GEMINI.md', 'CLAUDE.md']);
 
 function formatSize(bytes?: number): string {
@@ -369,7 +374,7 @@ export default function WorkspacePage() {
               .filter((a) => a.id !== 'main')
               .map((a) => (
                 <Select.Option key={a.id} value={a.id}>
-                  {a.name || a.id}
+                  {agentNameString(a.name) || a.id}
                 </Select.Option>
               ))}
           </Select>
