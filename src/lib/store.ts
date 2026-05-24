@@ -243,7 +243,7 @@ export const useStore = create<StoreState>((set, get) => ({
       try { oldClient.disconnect(); } catch {}
     }
 
-    set({ connectionStatus: 'connecting', connectionError: null, activeClient: null, retryCount: 0 });
+    set({ connectionStatus: 'connecting', connectionError: null, activeClient: null });
 
     const client = createGatewayClient({
       url: instance.gatewayUrl,
@@ -252,7 +252,7 @@ export const useStore = create<StoreState>((set, get) => ({
         const s = get();
         if (s.activeClient !== client) return; // 旧 client 的回调忽略
         if (status === 'connected') {
-          set({ connectionStatus: 'connected', connectionError: null, retryCount: 0 });
+          set({ connectionStatus: 'connected', connectionError: null });
           get().refreshAll();
         } else if (status === 'error') {
           set({ connectionStatus: 'error', connectionError: '网关连接错误' });
@@ -280,7 +280,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const { activeClient } = get();
     if (activeClient) {
       activeClient.disconnect();
-      set({ activeClient: null, connectionStatus: 'disconnected', retryCount: 0 });
+      set({ activeClient: null, connectionStatus: 'disconnected' });
     }
   },
 

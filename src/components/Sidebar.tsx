@@ -230,7 +230,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
     if (key.includes(':feishu:direct:')) return '飞书私聊';
     if (key.includes(':feishu:group:')) return '飞书群聊';
     // WebChat
-    if (key.includes(':webchat:') || s.origin?.surface === 'webchat') return 'WebChat';
+    if (key.includes(':webchat:') || (s as any).origin?.surface === 'webchat') return 'WebChat';
     // 定时任务
     if (key.includes(':cron:')) return '定时任务';
     // Dashboard 会话 → 取 ID 后 8 位
@@ -273,8 +273,8 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
                       const s = sessions[index];
                       if (!s) return null;
                       const isCurrent = s.key === currentSessionKey;
-                      const isActive = s.status && s.status !== 'done' && s.status !== 'idle';
-                      const isDone = s.status === 'done';
+                      const isActive = s.status === 'active';
+                      const isDone = s.status === 'completed';
                       return (
                         <div key={key} style={{ ...style, padding: '0 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
                           backgroundColor: isCurrent ? 'var(--semi-color-primary-light-default)' : 'transparent',
