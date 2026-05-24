@@ -4,6 +4,7 @@ import { AIChatDialogue, AIChatInput, Toast } from '@douyinfe/semi-ui';
 import { useStore } from '../lib';
 import type { EventFrame } from '../lib/types';
 import { decodeSessionKeyParam, extractSessionMessageItems, extractSessionMessageText } from '../lib/session-content';
+import { isAssistantCompletionEvent } from '../lib/assistant-completion-notifier';
 
 const { Configure } = AIChatInput;
 
@@ -112,6 +113,7 @@ export default function SessionChatPage() {
   useEffect(() => {
     if (!activeClient || !activeSessionKey) return;
     const handleEvent = (frame: EventFrame) => {
+      prevEventRef.current?.(frame);
       if (frame.event !== 'agent') return;
       const p = frame.payload as Record<string, unknown> | undefined;
       if (!p) return;
@@ -138,7 +140,13 @@ export default function SessionChatPage() {
       } else if (stream === 'lifecycle') {
         const data = p.data as Record<string, unknown> | undefined;
         const phase = (p.phase ?? data?.phase ?? p.state) as string | undefined;
-        endGeneration(phase === 'error' ? 'failed' : 'completed', runId);
+        if (phase === 'error') {
+          endGeneration('failed', runId);
+        } else if (isAssistantCompletionEvent(frame)) {
+          endGeneration('completed', runId);
+        } else if (phase === 'start' || phase === 'running') {
+          setGenerating(true);
+        }
       } else if (stream === 'tool') {
         setGenerating(true);
       }
