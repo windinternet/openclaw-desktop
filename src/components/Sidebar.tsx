@@ -26,6 +26,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
 import { useSettingsStore } from '../lib/settings-store';
+import { decodeSessionKeyParam } from '../lib/session-content';
 
 const { Text } = Typography;
 
@@ -272,7 +273,9 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
     }
   };
 
-  const currentSessionKey = location.pathname.startsWith('/chat/') ? location.pathname.replace('/chat/', '') : null;
+  const currentSessionKey = location.pathname.startsWith('/chat/')
+    ? decodeSessionKeyParam(location.pathname.replace('/chat/', ''))
+    : null;
 
   const footer = (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -291,14 +294,12 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
                       const isActive = s.status === 'active';
                       const statusColor = getSessionStatusColor(s.status);
                       return (
-                        <div key={key} style={{ ...style, padding: '0 0', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                        <div key={key} style={{ ...style, padding: '0 0 0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
                           backgroundColor: isCurrent ? 'var(--semi-color-primary-light-default)' : 'transparent',
+                          borderLeft: isCurrent ? '3px solid var(--semi-color-primary)' : '3px solid transparent',
+                          boxShadow: isCurrent ? 'inset 0 0 0 1px var(--semi-color-primary-light-active)' : 'none',
                         }} onClick={() => navigate(`/chat/${encodeURIComponent(s.key)}`)}>
-                          <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                            backgroundColor: statusColor,
-                            animation: isActive ? 'session-pulse 1.5s ease-in-out infinite' : 'none',
-                          }} />
-                          <span style={{ flex: 1, fontSize: isCurrent ? 14 : 13, fontWeight: isCurrent ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isCurrent ? 'var(--semi-color-primary)' : 'var(--semi-color-text-0)' }}>
+                          <span style={{ flex: 1, fontSize: isCurrent ? 14 : 13, fontWeight: isCurrent ? 700 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isCurrent ? 'var(--semi-color-primary)' : 'var(--semi-color-text-0)' }}>
                             {formatSessionName(s)}
                           </span>
                           {s.status && (
@@ -407,10 +408,6 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
         document.body
       )}
       <style>{`
-        @keyframes session-pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.3; }
-        }
         @keyframes session-spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }

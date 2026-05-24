@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { AIChatDialogue, AIChatInput, Toast } from '@douyinfe/semi-ui';
 import { useStore } from '../lib';
 import type { EventFrame } from '../lib/types';
+import { decodeSessionKeyParam, extractSessionMessageItems, extractSessionMessageText } from '../lib/session-content';
 
 const { Configure } = AIChatInput;
 
@@ -39,7 +40,7 @@ export default function SessionChatPage() {
   const models = useStore((s) => s.models);
 
   const [activeSessionKey, setActiveSessionKey] = useState<string | undefined>(
-    urlSessionKey ? decodeURIComponent(urlSessionKey) : undefined,
+    decodeSessionKeyParam(urlSessionKey),
   );
   const [chats, setChats] = useState<any[]>([]);
   const [generating, setGenerating] = useState(false);
@@ -56,7 +57,7 @@ export default function SessionChatPage() {
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (urlSessionKey) setActiveSessionKey(decodeURIComponent(urlSessionKey));
+    if (urlSessionKey) setActiveSessionKey(decodeSessionKeyParam(urlSessionKey));
   }, [urlSessionKey]);
 
   useEffect(() => {
@@ -67,9 +68,7 @@ export default function SessionChatPage() {
     if (chats.length === 0) return;
     const timer = setTimeout(() => {
       if (chatContainerRef.current) {
-        const scrollable = chatContainerRef.current.querySelector<HTMLDivElement>(
-          '[class*="semi-aiChat-dialogue"]'
-        );
+        const scrollable = chatContainerRef.current.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list');
         const target = scrollable ?? chatContainerRef.current;
         target.scrollTop = target.scrollHeight;
       }
@@ -82,16 +81,21 @@ export default function SessionChatPage() {
     let cancelled = false;
     (async () => {
       try {
-        const data = await activeClient.request<any>('sessions.preview', { keys: [activeSessionKey] });
+        let data: unknown;
+        try {
+          data = await activeClient.request('sessions.history', { key: activeSessionKey });
+        } catch {
+          data = await activeClient.request('sessions.preview', { keys: [activeSessionKey] });
+        }
         if (cancelled) return;
-        const items = data?.previews?.[0]?.items ?? [];
+        const items = extractSessionMessageItems(data);
         setChats(
           items
             .filter((m: any) => m.role === 'user' || m.role === 'assistant')
             .map((m: any) => ({
               id: generateIdempotencyKey(),
               role: m.role,
-              content: m.text || m.content || '',
+              content: extractSessionMessageText(m),
               createAt: m.timestamp,
               status: m.role === 'assistant' && (m.status === 'in_progress' || m.status === 'running') ? 'completed' : (m.status || 'completed'),
             })),
@@ -264,7 +268,7 @@ export default function SessionChatPage() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div ref={chatContainerRef} style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '16px 16px 0' }}>
+      <div ref={chatContainerRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: '16px 16px 0' }}>
         <AIChatDialogue
           chats={chats}
           roleConfig={roleConfig}
