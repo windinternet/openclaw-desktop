@@ -158,7 +158,24 @@
     "connected": "已连接",
     "disconnected": "未连接",
     "serverVersion": "服务器版本",
-    "reset": "重置设置"
+    "reset": "重置设置",
+    "alertSounds": {
+      "bellsEcho": "警铃回声",
+      "quickChime": "快速鸣响",
+      "arcadeBonus": "街机奖励",
+      "gameBonus": "游戏奖励",
+      "bubblePop": "气泡弹出",
+      "confirmationTone": "确认音",
+      "digitalTone": "数字提示",
+      "dryPop": "清脆弹出",
+      "gameSuccess": "成功提醒",
+      "guitarAlert": "吉他提醒",
+      "longPop": "长弹出音",
+      "messagePop": "消息提醒",
+      "interfaceBack": "返回音效",
+      "interfaceRemove": "移除音效",
+      "interfaceStart": "开始音效"
+    }
   },
   "extensions": {
     "skills": "技能",

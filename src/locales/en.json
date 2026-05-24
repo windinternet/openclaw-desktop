@@ -158,7 +158,24 @@
     "connected": "Connected",
     "disconnected": "Disconnected",
     "serverVersion": "Server Version",
-    "reset": "Reset Settings"
+    "reset": "Reset Settings",
+    "alertSounds": {
+      "bellsEcho": "Alert Bells Echo",
+      "quickChime": "Quick Chime",
+      "arcadeBonus": "Arcade Bonus",
+      "gameBonus": "Game Bonus",
+      "bubblePop": "Bubble Pop",
+      "confirmationTone": "Confirmation Tone",
+      "digitalTone": "Digital Tone",
+      "dryPop": "Dry Pop",
+      "gameSuccess": "Game Success",
+      "guitarAlert": "Guitar Alert",
+      "longPop": "Long Pop",
+      "messagePop": "Message Pop",
+      "interfaceBack": "Interface Back",
+      "interfaceRemove": "Interface Remove",
+      "interfaceStart": "Interface Start"
+    }
   },
   "extensions": {
     "skills": "Skills",
