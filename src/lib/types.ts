@@ -143,10 +143,10 @@ export interface ChatEventPayload {
 
 /**
  * Gateway agent 事件负载（gateway 用 event: "agent" 发送流式回复）
- * 
+ *
  * stream === "assistant" → data.delta 为增量文本
  * stream === "lifecycle" → phase: "end" | "error" 表示结束
- * stream === "tool" → 工具调用事件
+ * stream === "tool" → data 包含工具调用信息
  */
 export interface AgentEventPayload {
   runId: string;
@@ -154,9 +154,31 @@ export interface AgentEventPayload {
   sessionKey?: string;
   seq?: number;
   ts?: number;
-  /** assistant 流: { text: 累计文本, delta: 增量文本 } */
-  data?: { text?: string; delta?: string; content?: string };
-  /** lifecycle 流: "start" | "end" | "error" */
+  /**
+   * assistant 流: { text: 累计文本, delta: 增量文本, content: 备选文本 }
+   * tool 流: { toolName?, toolInput?, toolOutput?, toolStatus?, type?, name?, arguments?, output?, status? }
+   */
+  data?: {
+    text?: string;
+    delta?: string;
+    content?: string;
+    /** tool 流: 工具名称 */
+    toolName?: string;
+    name?: string;
+    /** tool 流: 工具输入参数（JSON 字符串或对象） */
+    toolInput?: unknown;
+    arguments?: string;
+    /** tool 流: 工具输出结果 */
+    toolOutput?: unknown;
+    output?: unknown;
+    result?: string;
+    /** tool 流: 工具执行状态 */
+    toolStatus?: string;
+    status?: string;
+    /** 通用类型标记 */
+    type?: string;
+  };
+  /** lifecycle 流: "start" | "end" | "error"；tool 流也可能携带 phase */
   phase?: string;
 }
 
