@@ -17,6 +17,13 @@ export interface InstanceConfig {
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
+export interface GatewayRetryInfo {
+  attempt: number;
+  delayMs: number;
+  nextRetryAt: number;
+  reason: string;
+}
+
 export interface ConnectionState {
   currentInstanceId: string | null;
   status: ConnectionStatus;
@@ -324,6 +331,7 @@ export interface GatewayClientOptions {
   connectTimeoutMs?: number;
   onEvent?: (event: EventFrame) => void;
   onStatusChange?: (status: ConnectionStatus) => void;
+  onRetry?: (info: GatewayRetryInfo | null) => void;
   onHelloOk?: (hello: HelloOk) => void;
 }
 

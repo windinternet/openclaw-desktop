@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -6,7 +7,6 @@ import {
   Col,
   Tag,
   Button,
-  Spin,
   Empty,
   List,
   Badge,
@@ -67,12 +67,17 @@ function getStatusTagColor(status: string): 'green' | 'orange' | 'blue' | 'grey'
   }
 }
 
+function formatRetryDelay(delayMs: number): string {
+  const seconds = Math.max(1, Math.ceil(delayMs / 1000));
+  return seconds >= 60 ? `${Math.ceil(seconds / 60)}m` : `${seconds}s`;
+}
+
 // ── Stat Card ──────────────────────────────────────────────────────
 
 interface StatCardProps {
   title: string;
   value: string | number;
-  icon: React.ReactNode;
+  icon: ReactNode;
   accentColor: string;
 }
 
@@ -131,10 +136,10 @@ export default function DashboardPage() {
   const sessions = useStore((s) => s.sessions);
   const health = useStore((s) => s.health);
   const connectionStatus = useStore((s) => s.connectionStatus);
+  const connectionRetry = useStore((s) => s.connectionRetry);
 
   const isLoading = connectionStatus === 'connecting';
   const isConnected = connectionStatus === 'connected';
-  const isDisconnected = connectionStatus === 'disconnected' || connectionStatus === 'error';
 
   const activeAgentCount = useMemo(
     () => agents.filter((a) => a.status === 'running' || a.status === 'idle').length,
@@ -169,7 +174,9 @@ export default function DashboardPage() {
     isConnected ? 'success' : isLoading ? 'warning' : 'danger';
   const statusLabel = isConnected
     ? t('instance.statusConnected')
-    : isLoading
+    : connectionRetry
+      ? `重试中 · 第 ${connectionRetry.attempt} 次`
+      : isLoading
       ? t('instance.statusConnecting')
       : t('instance.statusDisconnected');
 
@@ -234,6 +241,11 @@ export default function DashboardPage() {
               {health.status}
             </Tag>
           )}
+          {connectionRetry && (
+            <Tag size="small" color="orange" style={{ marginLeft: 4 }}>
+              {formatRetryDelay(connectionRetry.delayMs)} 后重试
+            </Tag>
+          )}
         </div>
         <Button
           icon={<IconRefresh />}
@@ -244,19 +256,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* ── Loading State ───────────────────────────────────── */}
-      {isLoading ? (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            height: 300,
-          }}
-        >
-          <Spin size="large" tip="Connecting to Gateway..." />
-        </div>
-      ) : isDisconnected ? (
+      {!isConnected ? (
         /* ── Disconnected State ─────────────────────────────── */
         <div
           style={{

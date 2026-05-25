@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import type { ComponentClass, CSSProperties, MouseEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Nav, Avatar, Button, Typography } from '@douyinfe/semi-ui';
@@ -44,6 +45,34 @@ const ROUTE_MAP: Record<string, string> = {
   settings: '/settings',
 };
 
+interface InfiniteLoaderViewProps {
+  isRowLoaded: (params: { index: number }) => boolean;
+  loadMoreRows: () => Promise<unknown>;
+  rowCount: number;
+  children: (params: {
+    onRowsRendered: (params: unknown) => void;
+    registerChild: (ref: unknown) => void;
+  }) => ReactNode;
+}
+
+interface AutoSizerViewProps {
+  children: (size: { width: number; height: number }) => ReactNode;
+}
+
+interface VListViewProps {
+  className?: string;
+  height: number;
+  onRowsRendered: (params: unknown) => void;
+  rowCount: number;
+  rowHeight: number;
+  width: number;
+  rowRenderer: (params: { index: number; key: string; style: CSSProperties }) => ReactNode;
+}
+
+const InfiniteLoaderView = InfiniteLoader as unknown as ComponentClass<InfiniteLoaderViewProps>;
+const AutoSizerView = AutoSizer as unknown as ComponentClass<AutoSizerViewProps>;
+const VListView = VList as unknown as ComponentClass<VListViewProps>;
+
 interface SidebarProps {
   onAddInstance: () => void;
   onOpenDrawer: () => void;
@@ -80,6 +109,9 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
   const userDisplayName = useSettingsStore((s) => s.settings.userDisplayName);
   const sessions = useStore((s) => s.sessions);
   const connectionStatus = useStore((s) => s.connectionStatus);
+  const connectionError = useStore((s) => s.connectionError);
+  const connectionRetry = useStore((s) => s.connectionRetry);
+  const [relativeNow] = useState(() => Date.now());
 
   useEffect(() => {
     useStore.getState().fetchSessions();
@@ -110,29 +142,6 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
   const openGitHub = () => {
     window.open('https://github.com/windinternet/openclaw-desktop', '_blank');
   };
-
-  const instanceAvatar = currentInstance ? (
-    <Avatar
-      size="small"
-      src={currentInstance.avatarUrl || undefined}
-      style={{
-        flexShrink: 0,
-        backgroundColor: currentInstance.avatarUrl ? 'transparent' : 'rgb(var(--semi-blue-5))',
-      }}
-    >
-      {currentInstance.name?.charAt(0).toUpperCase() ?? <IconServer />}
-    </Avatar>
-  ) : (
-    <Avatar
-      size="small"
-      style={{
-        flexShrink: 0,
-        backgroundColor: 'var(--semi-color-primary-light-default)',
-      }}
-    >
-      <IconServer size="small" />
-    </Avatar>
-  );
 
   const instanceHeaderText = (
     <div
@@ -165,7 +174,9 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
   const gatewayUser = currentInstance?.gatewayUser;
   const displayName = connectionStatus === 'connected'
     ? (gatewayUser?.whatToCall || userDisplayName || currentInstance?.name || 'Operator')
-    : connectionStatus === 'connecting'
+    : connectionRetry
+      ? '重试中…'
+      : connectionStatus === 'connecting'
       ? '连接中…'
       : connectionStatus === 'error'
         ? '连接失败'
@@ -193,10 +204,140 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
 
   const triggerRef = useRef<HTMLDivElement>(null);
   const [showPopover, setShowPopover] = useState(false);
-  const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
+  const [popoverStyle, setPopoverStyle] = useState<CSSProperties>({});
   const hideTimer = useRef<ReturnType<typeof setTimeout>>();
+  const connectionTriggerRef = useRef<HTMLDivElement>(null);
+  const [showConnectionPopover, setShowConnectionPopover] = useState(false);
+  const [connectionPopoverStyle, setConnectionPopoverStyle] = useState<CSSProperties>({});
+  const connectionHideTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  const calcPopover = useCallback((e?: React.MouseEvent) => {
+  const connectionIndicator = (() => {
+    if (connectionRetry) {
+      return {
+        color: 'var(--semi-color-warning)',
+        label: '重试中',
+      };
+    }
+    switch (connectionStatus) {
+      case 'connected':
+        return { color: 'var(--semi-color-success)', label: '已连接' };
+      case 'connecting':
+        return { color: 'var(--semi-color-info)', label: '连接中' };
+      case 'error':
+        return { color: 'var(--semi-color-danger)', label: '连接失败' };
+      default:
+        return { color: 'var(--semi-color-text-2)', label: '未连接' };
+    }
+  })();
+
+  const retryDelayText = connectionRetry
+    ? `${Math.max(1, Math.ceil(connectionRetry.delayMs / 1000))} 秒`
+    : '';
+
+  const connectionPopoverContent = (
+    <div style={{ width: 260, fontSize: 13, lineHeight: 1.6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <Text strong>Gateway</Text>
+        <span
+          style={{
+            color: connectionIndicator.color,
+            fontSize: 12,
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {connectionIndicator.label}
+        </span>
+      </div>
+      {currentInstance?.name && (
+        <div style={{ marginTop: 8, color: 'var(--semi-color-text-1)' }}>
+          {currentInstance.name}
+        </div>
+      )}
+      {currentInstance?.gatewayUrl && (
+        <div style={{ color: 'var(--semi-color-text-2)', wordBreak: 'break-all' }}>
+          {currentInstance.gatewayUrl}
+        </div>
+      )}
+      {connectionRetry && (
+        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--semi-color-border)', color: 'var(--semi-color-text-1)' }}>
+          第 {connectionRetry.attempt} 次重试约 {retryDelayText} 后开始
+        </div>
+      )}
+      {(connectionError || connectionRetry?.reason) && (
+        <div style={{ marginTop: 8, color: 'var(--semi-color-danger)' }}>
+          {connectionRetry?.reason ?? connectionError}
+        </div>
+      )}
+    </div>
+  );
+
+  const calcConnectionPopover = useCallback(() => {
+    if (!connectionTriggerRef.current) return;
+    const rect = connectionTriggerRef.current.getBoundingClientRect();
+    const pw = 284;
+    const left = Math.min(rect.left, window.innerWidth - pw - 8);
+    const top = Math.max(8, rect.bottom + 8);
+    setConnectionPopoverStyle({ position: 'fixed', left, top });
+  }, []);
+
+  const showConnectionPopup = useCallback(() => {
+    if (connectionHideTimer.current) clearTimeout(connectionHideTimer.current);
+    calcConnectionPopover();
+    setShowConnectionPopover(true);
+  }, [calcConnectionPopover]);
+
+  const hideConnectionPopup = useCallback(() => {
+    connectionHideTimer.current = setTimeout(() => setShowConnectionPopover(false), 150);
+  }, []);
+
+  const instanceAvatar = (
+    <div
+      ref={connectionTriggerRef}
+      onMouseEnter={showConnectionPopup}
+      onMouseLeave={hideConnectionPopup}
+      style={{ position: 'relative', display: 'inline-flex', flexShrink: 0, cursor: 'default' }}
+    >
+      {currentInstance ? (
+        <Avatar
+          size="small"
+          src={currentInstance.avatarUrl || undefined}
+          style={{
+            flexShrink: 0,
+            backgroundColor: currentInstance.avatarUrl ? 'transparent' : 'rgb(var(--semi-blue-5))',
+          }}
+        >
+          {currentInstance.name?.charAt(0).toUpperCase() ?? <IconServer />}
+        </Avatar>
+      ) : (
+        <Avatar
+          size="small"
+          style={{
+            flexShrink: 0,
+            backgroundColor: 'var(--semi-color-primary-light-default)',
+          }}
+        >
+          <IconServer size="small" />
+        </Avatar>
+      )}
+      <span
+        aria-label={connectionIndicator.label}
+        style={{
+          position: 'absolute',
+          right: -1,
+          bottom: -1,
+          width: 10,
+          height: 10,
+          borderRadius: '50%',
+          backgroundColor: connectionIndicator.color,
+          border: '2px solid var(--semi-color-bg-1)',
+          pointerEvents: 'none',
+        }}
+      />
+    </div>
+  );
+
+  const calcPopover = useCallback((e?: MouseEvent) => {
     if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
     const vw = window.innerWidth;
@@ -211,7 +352,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
     setPopoverStyle({ position: 'fixed', left: Math.min(left, vw - pw - 8), top: Math.max(8, top) });
   }, []);
 
-  const showPopup = useCallback((e: React.MouseEvent) => {
+  const showPopup = useCallback((e: MouseEvent) => {
     if (!hasPopover) return;
     if (hideTimer.current) clearTimeout(hideTimer.current);
     calcPopover(e);
@@ -231,7 +372,8 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
     if (key.includes(':feishu:direct:')) return '飞书私聊';
     if (key.includes(':feishu:group:')) return '飞书群聊';
     // WebChat
-    if (key.includes(':webchat:') || (s as any).origin?.surface === 'webchat') return 'WebChat';
+    const origin = (s as { origin?: { surface?: string } }).origin;
+    if (key.includes(':webchat:') || origin?.surface === 'webchat') return 'WebChat';
     // 定时任务
     if (key.includes(':cron:')) return '定时任务';
     // Dashboard 会话 → 取 ID 后 8 位
@@ -247,7 +389,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
 
   const formatRelativeTime = (ts?: number): string => {
     if (!ts) return '';
-    const diff = Date.now() - ts;
+    const diff = relativeNow - ts;
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return '刚刚';
     if (mins < 60) return `${mins}分钟前`;
@@ -281,11 +423,11 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', height: '100%' }}>
       {sessions.length > 0 ? (
         <div style={{ flex: 1, borderTop: '1px solid var(--semi-color-border)' }}>
-          <InfiniteLoader isRowLoaded={({ index }) => index < sessions.length} loadMoreRows={() => Promise.resolve()} rowCount={sessions.length}>
+          <InfiniteLoaderView isRowLoaded={({ index }) => index < sessions.length} loadMoreRows={() => Promise.resolve()} rowCount={sessions.length}>
             {({ onRowsRendered, registerChild }) => (
-              <AutoSizer>
+              <AutoSizerView>
                 {({ width, height }) => (
-                  <VList ref={registerChild} className="semi-light-scrollbar" height={height} onRowsRendered={onRowsRendered}
+                  <VListView ref={registerChild} className="semi-light-scrollbar" height={height} onRowsRendered={onRowsRendered}
                     rowCount={sessions.length} rowHeight={44} width={width}
                     rowRenderer={({ index, key, style }) => {
                       const s = sessions[index];
@@ -320,9 +462,9 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
                     }}
                   />
                 )}
-              </AutoSizer>
+              </AutoSizerView>
             )}
-          </InfiniteLoader>
+          </InfiniteLoaderView>
         </div>
       ) : (
         <div style={{ padding: '12px 24px', borderTop: '1px solid var(--semi-color-border)', textAlign: 'center', flex: '1 1 auto' }}>
@@ -403,6 +545,14 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
         <div style={popoverStyle} onMouseEnter={showPopup} onMouseLeave={hidePopup}>
           <div style={{ background: 'var(--semi-color-bg-3)', borderRadius: 8, padding: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.15)', maxWidth: 280, maxHeight: 'calc(100vh - 24px)', overflow: 'auto' }}>
             {popoverContent}
+          </div>
+        </div>,
+        document.body
+      )}
+      {showConnectionPopover && createPortal(
+        <div style={connectionPopoverStyle} onMouseEnter={showConnectionPopup} onMouseLeave={hideConnectionPopup}>
+          <div style={{ background: 'var(--semi-color-bg-3)', borderRadius: 8, padding: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.15)', maxWidth: 284, maxHeight: 'calc(100vh - 24px)', overflow: 'auto' }}>
+            {connectionPopoverContent}
           </div>
         </div>,
         document.body

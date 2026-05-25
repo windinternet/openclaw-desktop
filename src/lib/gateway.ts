@@ -4,6 +4,7 @@ import type {
   EventFrame,
   GatewayClientOptions,
   GatewayError,
+  GatewayRetryInfo,
 } from './types';
 
 interface PendingEntry {
@@ -56,6 +57,7 @@ export interface GatewayClient {
   request<T = unknown>(method: string, params?: unknown): Promise<T>;
   testConnection(): Promise<{ success: boolean; version?: string; error?: string }>;
   onStatusChange: ((status: ConnectionStatus) => void) | null;
+  onRetry: ((info: GatewayRetryInfo | null) => void) | null;
   onEvent: ((event: EventFrame) => void) | null;
 }
 
@@ -83,11 +85,14 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
   let tickTimer: ReturnType<typeof setTimeout> | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let reconnectDelay = 1000;
+  let reconnectAttempt = 0;
+  let lastCloseReason = 'Connection closed';
   let helloData: HelloOk | null = null;
   let tickIntervalMs = 30000;
   let connectNonce: string | null = null;
 
   let statusCallback: ((status: ConnectionStatus) => void) | null = opts.onStatusChange ?? null;
+  let retryCallback: ((info: GatewayRetryInfo | null) => void) | null = opts.onRetry ?? null;
   let eventCallback: ((event: EventFrame) => void) | null = opts.onEvent ?? null;
   let helloCallback: ((hello: HelloOk) => void) | null = opts.onHelloOk ?? null;
 
@@ -225,7 +230,9 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
         helloData = payload;
         tickIntervalMs = payload.policy?.tickIntervalMs ?? 30000;
         reconnectDelay = 1000;
+        reconnectAttempt = 0;
         setStatus('connected');
+        retryCallback?.(null);
         resetTickTimer();
         helloCallback?.(payload);
         connectResolve(payload);
@@ -322,13 +329,21 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
     if (intentionalClose) return;
     if (reconnectTimer !== null) return;
 
+    const delayMs = reconnectDelay;
+    reconnectAttempt += 1;
+    retryCallback?.({
+      attempt: reconnectAttempt,
+      delayMs,
+      nextRetryAt: Date.now() + delayMs,
+      reason: lastCloseReason,
+    });
     setStatus('connecting');
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
       doConnect();
-    }, reconnectDelay);
+    }, delayMs);
 
-    reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+    reconnectDelay = Math.min(delayMs * 2, 30000);
   }
 
   function doConnect(): void {
@@ -370,23 +385,26 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
     };
 
     ws.onerror = () => {
+      lastCloseReason = 'WebSocket error';
       setStatus('error');
-      failConnectHandshake('WebSocket error');
     };
 
     ws.onclose = () => {
       stopTickTimer();
       rejectAllPending();
-      failConnectHandshake('Connection closed');
 
       ws = null;
 
       if (intentionalClose) {
         setStatus('disconnected');
         helloData = null;
+        retryCallback?.(null);
         return;
       }
 
+      if (lastCloseReason !== 'WebSocket error') {
+        lastCloseReason = 'Connection closed';
+      }
       setStatus('disconnected');
       helloData = null;
       scheduleReconnect();
@@ -420,6 +438,8 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
     }
 
     helloData = null;
+    reconnectAttempt = 0;
+    retryCallback?.(null);
     setStatus('disconnected');
   }
 
@@ -496,6 +516,12 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
     },
     set onStatusChange(cb: ((status: ConnectionStatus) => void) | null) {
       statusCallback = cb;
+    },
+    get onRetry() {
+      return retryCallback;
+    },
+    set onRetry(cb: ((info: GatewayRetryInfo | null) => void) | null) {
+      retryCallback = cb;
     },
     get onEvent() {
       return eventCallback;

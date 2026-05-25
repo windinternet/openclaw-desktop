@@ -72,6 +72,7 @@ export function applyTheme(settings: AppSettings): void {
     '--semi-color-primary-light-active': lighten(baseColor, 0.8),
   }).forEach(([name, value]) => {
     document.body.style.setProperty(name, value);
+    document.documentElement.style.setProperty(name, value);
   });
 }
 

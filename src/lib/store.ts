@@ -13,6 +13,7 @@ import type {
   GatewayHealth,
   GatewayStatus,
   GatewayUser,
+  GatewayRetryInfo,
 } from './types';
 import { createGatewayClient, type GatewayClient } from './gateway';
 import { fetchGatewayUser, fetchUserProfile } from './user';
@@ -57,6 +58,7 @@ interface StoreState {
   currentInstanceId: string | null;
   connectionStatus: ConnectionStatus;
   connectionError: string | null;
+  connectionRetry: GatewayRetryInfo | null;
   activeClient: GatewayClient | null;
 
   // ── Gateway Data (for current instance) ──
@@ -119,8 +121,8 @@ export const useStore = create<StoreState>((set, get) => ({
   currentInstanceId: null,
   connectionStatus: 'disconnected',
   connectionError: null,
+  connectionRetry: null,
   activeClient: null,
-  retryCount: 0,
 
   sessions: [],
   agents: [],
@@ -241,10 +243,10 @@ export const useStore = create<StoreState>((set, get) => ({
     // 丢弃旧连接
     const oldClient = get().activeClient;
     if (oldClient) {
-      try { oldClient.disconnect(); } catch {}
+      try { oldClient.disconnect(); } catch { /* ignore stale client cleanup failure */ }
     }
 
-    set({ connectionStatus: 'connecting', connectionError: null, activeClient: null });
+    set({ connectionStatus: 'connecting', connectionError: null, connectionRetry: null, activeClient: null });
 
     const client = createGatewayClient({
       url: instance.gatewayUrl,
@@ -260,7 +262,7 @@ export const useStore = create<StoreState>((set, get) => ({
         const s = get();
         if (s.activeClient !== client) return; // 旧 client 的回调忽略
         if (status === 'connected') {
-          set({ connectionStatus: 'connected', connectionError: null });
+          set({ connectionStatus: 'connected', connectionError: null, connectionRetry: null });
           get().refreshAll();
         } else if (status === 'error') {
           set({ connectionStatus: 'error', connectionError: '网关连接错误' });
@@ -269,6 +271,15 @@ export const useStore = create<StoreState>((set, get) => ({
         } else if (status === 'connecting') {
           set({ connectionStatus: 'connecting' });
         }
+      },
+      onRetry: (info) => {
+        const s = get();
+        if (s.activeClient !== client) return;
+        set({
+          connectionRetry: info,
+          connectionError: info?.reason ?? null,
+          connectionStatus: info ? 'connecting' : s.connectionStatus,
+        });
       },
     });
 
@@ -279,8 +290,8 @@ export const useStore = create<StoreState>((set, get) => ({
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Connection failed';
       // 连接握手失败（包括设备签名/认证错误）：断开并停止重试，避免无限循环
-      try { client.disconnect(); } catch {}
-      set({ connectionStatus: 'error', connectionError: msg, activeClient: null });
+      try { client.disconnect(); } catch { /* ignore failed cleanup after rejected handshake */ }
+      set({ connectionStatus: 'error', connectionError: msg, connectionRetry: null, activeClient: null });
     }
   },
 
@@ -288,7 +299,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const { activeClient } = get();
     if (activeClient) {
       activeClient.disconnect();
-      set({ activeClient: null, connectionStatus: 'disconnected' });
+      set({ activeClient: null, connectionStatus: 'disconnected', connectionRetry: null });
     }
   },
 
