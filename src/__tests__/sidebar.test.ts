@@ -20,4 +20,26 @@ describe('Sidebar session list', () => {
     expect(source).toContain('fontWeight: isCurrent ? 700 : 400');
     expect(source).toContain("color: isCurrent ? 'var(--semi-color-primary)' : 'var(--semi-color-text-0)'");
   });
+
+  it('anchors the user info popover bottom near the mouse', () => {
+    const source = readFileSync('src/components/Sidebar.tsx', 'utf8');
+
+    expect(source).toContain('const bottom = vh - mouseY + 10;');
+    expect(source).toContain('bottom: Math.max(8, bottom)');
+    expect(source).toContain('onMouseMove={movePopup}');
+    expect(source).toContain('onMouseEnter={keepPopupOpen}');
+    expect(source).not.toContain('const top = vh - gapFromBottom - 300;');
+  });
+
+  it('keeps the macOS top inset inside Sidebar so Nav owns the full sider height', () => {
+    const sidebarSource = readFileSync('src/components/Sidebar.tsx', 'utf8');
+    const mainPageSource = readFileSync('src/pages/MainPage.tsx', 'utf8');
+
+    expect(sidebarSource).toContain('const SIDEBAR_MACOS_TOP_INSET = 30;');
+    expect(sidebarSource).toContain('const sidebarTopInset = isMacOS ? SIDEBAR_MACOS_TOP_INSET : 0;');
+    expect(sidebarSource).toContain("style={{ flex: 1, paddingTop: sidebarTopInset, boxSizing: 'border-box' }}");
+    expect(sidebarSource).toContain("WebkitAppRegion: 'drag'");
+    expect(mainPageSource).not.toContain('paddingTop: isMacOS ? 30 : 0');
+    expect(mainPageSource).not.toContain("WebkitAppRegion: 'drag'");
+  });
 });

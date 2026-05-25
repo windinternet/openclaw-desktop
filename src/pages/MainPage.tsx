@@ -1,4 +1,3 @@
-import type {CSSProperties} from 'react';
 import {useEffect, useRef, useState} from 'react';
 import {Layout, Modal, Toast} from '@douyinfe/semi-ui';
 import {Outlet} from 'react-router-dom';
@@ -25,8 +24,6 @@ export default function MainPage() {
     const prevStatusRef = useRef<string | null>(null);
     const prevRetryAttemptRef = useRef(0);
     const lastErrorToastRef = useRef(0);
-
-    const isMacOS = typeof window !== 'undefined' && window.electronAPI?.platform === 'darwin';
 
     useEffect(() => {
         if (!currentId && instances.length > 0) {
@@ -84,10 +81,8 @@ export default function MainPage() {
                     display: 'flex',
                     flexDirection: 'column',
                     height: '100%',
-                    paddingTop: isMacOS ? 30 : 0,
                 }}
             >
-                <div style={{height: 36, WebkitAppRegion: 'drag'} as CSSProperties}/>
                 <Sidebar
                     onAddInstance={() => setAddModalVisible(true)}
                     onOpenDrawer={() => setDrawerVisible(true)}

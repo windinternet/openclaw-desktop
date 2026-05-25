@@ -78,6 +78,9 @@ interface SidebarProps {
   onOpenDrawer: () => void;
 }
 
+const SIDEBAR_MACOS_TOP_INSET = 30;
+const SIDEBAR_DRAG_HEIGHT = 36;
+
 function NavSectionLabel({ label }: { label: string }) {
   return (
     <li
@@ -112,6 +115,8 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
   const connectionError = useStore((s) => s.connectionError);
   const connectionRetry = useStore((s) => s.connectionRetry);
   const [relativeNow] = useState(() => Date.now());
+  const isMacOS = typeof window !== 'undefined' && window.electronAPI?.platform === 'darwin';
+  const sidebarTopInset = isMacOS ? SIDEBAR_MACOS_TOP_INSET : 0;
 
   useEffect(() => {
     useStore.getState().fetchSessions();
@@ -345,11 +350,10 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
     const pw = 280;
     // 左：对齐导航菜单左内间距 24px
     const left = 24;
-    // 上：鼠标距底部距离 + 10px
+    // 下：贴近鼠标上方 10px，避免短内容因固定高度估算漂得太远
     const mouseY = e?.clientY ?? rect.bottom;
-    const gapFromBottom = vh - mouseY + 10;
-    const top = vh - gapFromBottom - 300;
-    setPopoverStyle({ position: 'fixed', left: Math.min(left, vw - pw - 8), top: Math.max(8, top) });
+    const bottom = vh - mouseY + 10;
+    setPopoverStyle({ position: 'fixed', left: Math.min(left, vw - pw - 8), bottom: Math.max(8, bottom) });
   }, []);
 
   const showPopup = useCallback((e: MouseEvent) => {
@@ -358,6 +362,18 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
     calcPopover(e);
     setShowPopover(true);
   }, [hasPopover, calcPopover]);
+
+  const movePopup = useCallback((e: MouseEvent) => {
+    if (!hasPopover) return;
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    calcPopover(e);
+    setShowPopover(true);
+  }, [hasPopover, calcPopover]);
+
+  const keepPopupOpen = useCallback(() => {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    setShowPopover(true);
+  }, []);
 
   const hidePopup = useCallback(() => {
     hideTimer.current = setTimeout(() => setShowPopover(false), 150);
@@ -479,7 +495,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
             style={{ flexShrink: 0, backgroundColor: currentInstance?.avatarUrl ? 'transparent' : 'var(--semi-color-primary-light-default)' }}>
             {currentInstance?.name?.charAt(0).toUpperCase() ?? <IconServer />}
           </Avatar>
-          <div ref={triggerRef} onMouseEnter={showPopup} onMouseLeave={hidePopup}
+          <div ref={triggerRef} onMouseEnter={showPopup} onMouseMove={movePopup} onMouseLeave={hidePopup}
             style={{ flex: 1, minWidth: 0, overflow: 'hidden', cursor: hasPopover ? 'default' : undefined }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <Text ellipsis size="small" style={{ flex: 1, minWidth: 0, color: 'var(--semi-color-text-0)', fontWeight: 600 }}>
@@ -516,35 +532,48 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
           <linearGradient id="ig-memory" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#eab308"/><stop offset="100%" stopColor="#fde047"/></linearGradient>
         </defs>
       </svg>
-    <Nav
-      mode="vertical"
-      selectedKeys={[activeKey]}
-      onSelect={handleSelect}
-      style={{ flex: 1 }}
-      header={{
-        logo: instanceAvatar,
-        text: instanceHeaderText,
-      }}
-      footer={footer}
-    >
-      <NavSectionLabel label={t('nav.sectionOverview')} />
-      <Nav.Item itemKey="dashboard" text={t('nav.dashboard')} icon={<IconPieChart2Stroked />} />
-      <Nav.Item itemKey="search" text={t('nav.search')} icon={<IconSearch />} />
-      <Nav.Item itemKey="new-session" text={t('nav.newSession')} icon={<IconPlusCircle />} />
+    <div style={{ position: 'relative', display: 'flex', flex: 1, minHeight: 0 }}>
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: SIDEBAR_DRAG_HEIGHT,
+          WebkitAppRegion: 'drag',
+          zIndex: 1,
+        } as CSSProperties}
+      />
+      <Nav
+        mode="vertical"
+        selectedKeys={[activeKey]}
+        onSelect={handleSelect}
+        style={{ flex: 1, paddingTop: sidebarTopInset, boxSizing: 'border-box' }}
+        header={{
+          logo: instanceAvatar,
+          text: instanceHeaderText,
+        }}
+        footer={footer}
+      >
+        <NavSectionLabel label={t('nav.sectionOverview')} />
+        <Nav.Item itemKey="dashboard" text={t('nav.dashboard')} icon={<IconPieChart2Stroked />} />
+        <Nav.Item itemKey="search" text={t('nav.search')} icon={<IconSearch />} />
+        <Nav.Item itemKey="new-session" text={t('nav.newSession')} icon={<IconPlusCircle />} />
 
-      <NavSectionLabel label={t('nav.sectionTools')} />
-      <Nav.Item itemKey="extensions" text={t('nav.extensions')} icon={<IconPuzzle />} />
-      <Nav.Item itemKey="tasks" text={t('nav.tasks')} icon={<IconCheckList />} />
-      <Nav.Item itemKey="workspace" text={t('nav.workspace') || '工作区'} icon={<IconFolderStroked />} />
-      <Nav.Item itemKey="kanban" text={t('nav.kanban')} icon={<IconKanban />} />
+        <NavSectionLabel label={t('nav.sectionTools')} />
+        <Nav.Item itemKey="extensions" text={t('nav.extensions')} icon={<IconPuzzle />} />
+        <Nav.Item itemKey="tasks" text={t('nav.tasks')} icon={<IconCheckList />} />
+        <Nav.Item itemKey="workspace" text={t('nav.workspace') || '工作区'} icon={<IconFolderStroked />} />
+        <Nav.Item itemKey="kanban" text={t('nav.kanban')} icon={<IconKanban />} />
 
-      <NavSectionLabel label={t('nav.sectionCollaboration')} />
-      <Nav.Item itemKey="teams" text={t('nav.teams')} icon={<IconUserGroup />} />
-      <Nav.Item itemKey="office" text={t('nav.office')} icon={<IconDesktop />} />
-      <Nav.Item itemKey="memory" text={t('nav.memory')} icon={<IconBookmark />} />
-    </Nav>
+        <NavSectionLabel label={t('nav.sectionCollaboration')} />
+        <Nav.Item itemKey="teams" text={t('nav.teams')} icon={<IconUserGroup />} />
+        <Nav.Item itemKey="office" text={t('nav.office')} icon={<IconDesktop />} />
+        <Nav.Item itemKey="memory" text={t('nav.memory')} icon={<IconBookmark />} />
+      </Nav>
+    </div>
       {showPopover && createPortal(
-        <div style={popoverStyle} onMouseEnter={showPopup} onMouseLeave={hidePopup}>
+        <div style={popoverStyle} onMouseEnter={keepPopupOpen} onMouseLeave={hidePopup}>
           <div style={{ background: 'var(--semi-color-bg-3)', borderRadius: 8, padding: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.15)', maxWidth: 280, maxHeight: 'calc(100vh - 24px)', overflow: 'auto' }}>
             {popoverContent}
           </div>
