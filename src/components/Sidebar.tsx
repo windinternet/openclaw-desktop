@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import type { ComponentClass, CSSProperties, MouseEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Nav, Avatar, Button, Typography } from '@douyinfe/semi-ui';
+import { Nav, Avatar, Button, Spin, Typography } from '@douyinfe/semi-ui';
 import { InfiniteLoader, AutoSizer } from 'react-virtualized';
 import VList from 'react-virtualized/dist/commonjs/List';
 import {
@@ -445,12 +445,14 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
                             {formatSessionName(s)}
                           </span>
                           {s.status && (
-                            <span style={{
-                              width: 12, height: 12, borderRadius: '50%', flexShrink: 0,
-                              border: `2px solid ${statusColor}`,
-                              backgroundColor: isActive ? 'transparent' : statusColor,
-                              animation: isActive ? 'session-spin 1s linear infinite' : 'none',
-                            }} />
+                            isActive ? (
+                              <Spin size="small" />
+                            ) : (
+                              <span style={{
+                                width: 12, height: 12, borderRadius: '50%', flexShrink: 0,
+                                backgroundColor: statusColor,
+                              }} />
+                            )
                           )}
                           {s.updatedAt && (
                             <span style={{ fontSize: 10, color: 'var(--semi-color-text-2)', flexShrink: 0, whiteSpace: 'nowrap' }}>
@@ -557,12 +559,6 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
         </div>,
         document.body
       )}
-      <style>{`
-        @keyframes session-spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
   </>
   );
 }

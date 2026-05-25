@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import { AIChatDialogue, AIChatInput, Toast } from '@douyinfe/semi-ui';
 import { useStore } from '../lib';
 import type { EventFrame } from '../lib/types';
@@ -94,6 +94,14 @@ function appendDeltaToLastText(contentArr: ChatContentItem[], delta: string): Ch
 /** AIChatDialogue 的 roleConfig 中支持的 role */
 const KNOWN_ROLES = new Set(['user', 'assistant', 'system']);
 
+interface ChatLocationState {
+  initialMessage?: {
+    content: unknown;
+    model?: string;
+    thinking?: string;
+  };
+}
+
 function normalizeRole(role: unknown): string {
   if (typeof role === 'string' && KNOWN_ROLES.has(role)) return role;
   return 'assistant';
@@ -101,6 +109,7 @@ function normalizeRole(role: unknown): string {
 
 export default function SessionChatPage() {
   const { sessionKey: urlSessionKey } = useParams<{ sessionKey: string }>();
+  const location = useLocation();
   const activeClient = useStore((s) => s.activeClient);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const models = useStore((s) => s.models);
@@ -121,10 +130,21 @@ export default function SessionChatPage() {
   const sendingRef = useRef(false);
   const genTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const initialMessageSentRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (urlSessionKey) setActiveSessionKey(decodeSessionKeyParam(urlSessionKey));
   }, [urlSessionKey]);
+
+  useEffect(() => {
+    setChats([]);
+    sendingRef.current = false;
+    streamingIdRef.current = null;
+    if (genTimeoutRef.current) {
+      clearTimeout(genTimeoutRef.current);
+      genTimeoutRef.current = null;
+    }
+  }, [activeSessionKey]);
 
   useEffect(() => {
     if (!chatModel && models.length > 0) setChatModel(models[0].id);
@@ -156,20 +176,19 @@ export default function SessionChatPage() {
         }
         if (cancelled) return;
         const rawItems = extractSessionMessageItems(data);
-        setChats(
-          rawItems.map((m: any) => {
-            const contentItems = parseHistoryMessageToContentItems(m);
-            return {
-              id: generateIdempotencyKey(),
-              role: normalizeRole(m.role),
-              content: contentItems,
-              createAt: m.timestamp || m.createdAt,
-              status: m.role === 'assistant' && (m.status === 'in_progress' || m.status === 'running')
-                ? 'completed'
-                : (m.status || 'completed'),
-            };
-          }),
-        );
+        const loadedChats = rawItems.map((m: any) => {
+          const contentItems = parseHistoryMessageToContentItems(m);
+          return {
+            id: generateIdempotencyKey(),
+            role: normalizeRole(m.role),
+            content: contentItems,
+            createAt: m.timestamp || m.createdAt,
+            status: m.role === 'assistant' && (m.status === 'in_progress' || m.status === 'running')
+              ? 'completed'
+              : (m.status || 'completed'),
+          };
+        });
+        setChats((prev) => (loadedChats.length === 0 && prev.length > 0 ? prev : loadedChats));
       } catch {
         if (!cancelled) setChats([]);
       }
@@ -333,18 +352,20 @@ export default function SessionChatPage() {
     };
   }, [activeClient, activeSessionKey]);
 
-  const patchSessionConfig = useCallback(async () => {
-    if (!activeClient || !activeSessionKey || !chatModel) return;
-    if (patchAppliedRef.current && patchModelRef.current === chatModel && patchThinkingRef.current === chatThinking) return;
+  const patchSessionConfig = useCallback(async (options?: { model?: string; thinking?: string }) => {
+    const model = options?.model || chatModel;
+    const thinking = options?.thinking ?? chatThinking;
+    if (!activeClient || !activeSessionKey || !model) return;
+    if (patchAppliedRef.current && patchModelRef.current === model && patchThinkingRef.current === thinking) return;
     try {
       await activeClient.request('sessions.patch', {
         key: activeSessionKey,
-        model: chatModel,
-        thinking: chatThinking !== 'off' ? chatThinking : undefined,
+        model,
+        thinking: thinking !== 'off' ? thinking : undefined,
       });
       patchAppliedRef.current = true;
-      patchModelRef.current = chatModel;
-      patchThinkingRef.current = chatThinking;
+      patchModelRef.current = model;
+      patchThinkingRef.current = thinking;
     } catch {}
   }, [activeClient, activeSessionKey, chatModel, chatThinking]);
 
@@ -368,7 +389,7 @@ export default function SessionChatPage() {
   }, []);
 
   const handleSend = useCallback(
-    async (_content: unknown) => {
+    async (_content: unknown, options?: { model?: string; thinking?: string }) => {
       if (!activeClient || !activeSessionKey || sendingRef.current) return;
       const message = extractMessageText(_content);
       if (!message.trim()) return;
@@ -383,7 +404,7 @@ export default function SessionChatPage() {
       ]);
 
       try {
-        await patchSessionConfig();
+        await patchSessionConfig(options);
         await activeClient.request('chat.send', {
           message: message.trim(),
           sessionKey: activeSessionKey,
@@ -397,6 +418,27 @@ export default function SessionChatPage() {
     },
     [activeClient, activeSessionKey, patchSessionConfig],
   );
+
+  useEffect(() => {
+    if (!activeSessionKey || !activeClient || connectionStatus !== 'connected') return;
+    const state = location.state as ChatLocationState | null;
+    const initialMessage = state?.initialMessage;
+    if (!initialMessage) return;
+
+    const message = extractMessageText(initialMessage.content).trim();
+    if (!message) return;
+
+    const sentKey = `${activeSessionKey}:${message}`;
+    if (initialMessageSentRef.current === sentKey) return;
+    initialMessageSentRef.current = sentKey;
+
+    if (initialMessage.model) setChatModel(initialMessage.model);
+    if (initialMessage.thinking) setChatThinking(initialMessage.thinking);
+    void handleSend(initialMessage.content, {
+      model: initialMessage.model,
+      thinking: initialMessage.thinking,
+    });
+  }, [activeClient, activeSessionKey, connectionStatus, handleSend, location.state]);
 
   const handleStop = useCallback(async () => {
     if (!activeClient || !activeSessionKey) return;

@@ -3,6 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { AIChatInput, Typography, Toast } from '@douyinfe/semi-ui';
 import { IconPlusCircle } from '@douyinfe/semi-icons';
 import { useStore } from '../lib';
+import {
+  buildNewSessionNavigationTarget,
+  buildNewSessionCreateParams,
+  resolveCreatedSessionKey,
+} from '../lib/new-session';
 
 const { Configure } = AIChatInput;
 const { Title, Text } = Typography;
@@ -32,21 +37,33 @@ export default function NewSessionPage() {
     if (!selectedModel && models.length > 0) setSelectedModel(models[0].id);
   }, [models, selectedModel]);
 
-  const handleSend = useCallback(async () => {
+  const handleSend = useCallback(async (content: unknown) => {
     if (!activeClient || connectionStatus !== 'connected') { Toast.error('未连接'); return; }
     if (!selectedModel && models.length > 0) { Toast.warning('请选择模型'); return; }
     const agent = agents.find((a) => a.default) ?? agents[0];
+    const createParams = buildNewSessionCreateParams({
+      agentId: agent?.id ?? 'main',
+      model: selectedModel || models[0]?.id,
+      thinking: thinkingLevel,
+      content,
+    });
+
     setCreating(true);
     try {
-      const result = await activeClient.request<{ key: string }>('sessions.create', {
-        agentId: agent?.id ?? 'main',
+      const result = await activeClient.request<{ key?: string; sessionKey?: string }>(
+        'sessions.create',
+        createParams.request,
+      );
+      const sessionKey = resolveCreatedSessionKey(result, createParams.key);
+      const target = buildNewSessionNavigationTarget({
+        sessionKey,
+        content,
         model: selectedModel || models[0]?.id,
+        thinking: thinkingLevel,
       });
-      if (result?.key) {
-        useStore.getState().fetchSessions();
-        Toast.success('会话已创建');
-        navigate(`/chat/${result.key}`);
-      }
+      useStore.getState().fetchSessions();
+      Toast.success('会话已创建');
+      navigate(target.to, target.state ? { state: target.state } : undefined);
     } catch (err) {
       Toast.error(err instanceof Error ? err.message : '创建失败');
     } finally {
@@ -87,7 +104,7 @@ export default function NewSessionPage() {
         <div style={{ width: '100%', maxWidth: 640, padding: '20px 40px' }}>
           <AIChatInput
             key={modelOptions.length}
-            placeholder="输入会话标题（可选）"
+            placeholder="输入第一条消息"
             generating={creating}
             uploadProps={{ action: '' }}
             renderConfigureArea={renderConfig}

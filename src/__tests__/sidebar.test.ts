@@ -6,7 +6,9 @@ describe('Sidebar session list', () => {
     const source = readFileSync('src/components/Sidebar.tsx', 'utf8');
 
     expect(source).not.toMatch(/<span\s+style=\{\{\s*width:\s*6,\s*height:\s*6,[\s\S]*?backgroundColor:\s*statusColor/);
-    expect(source).toMatch(/width:\s*12,\s*height:\s*12,[\s\S]*?border:\s*`2px solid \$\{statusColor\}`/);
+    expect(source).toContain("isActive ? (");
+    expect(source).toContain('<Spin size="small" />');
+    expect(source).toMatch(/width:\s*12,\s*height:\s*12,[\s\S]*?backgroundColor:\s*statusColor/);
   });
 
   it('emphasizes the active session title', () => {
