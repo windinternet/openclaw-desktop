@@ -15,6 +15,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   notifications: {
     show: (params: { title: string; body: string }) => ipcRenderer.invoke('notification:show', params),
   },
+  marketplace: {
+    search: (params: unknown) => ipcRenderer.invoke('marketplace:search', params),
+  },
   device: {
     signChallenge: (params: { nonce: string; token: string; clientId: string }) =>
       ipcRenderer.invoke('device:signChallenge', params),

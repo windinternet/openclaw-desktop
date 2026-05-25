@@ -9,6 +9,9 @@ import type {
   CronRun,
   ToolInfo,
   SkillInfo,
+  SkillMarketplaceInstallResult,
+  SkillMarketplaceSearchParams,
+  SkillMarketplaceSkill,
   WorkspaceFile,
   GatewayHealth,
   GatewayStatus,
@@ -16,6 +19,9 @@ import type {
   GatewayRetryInfo,
 } from './types';
 import { createGatewayClient, type GatewayClient } from './gateway';
+import {
+  fetchSkillMarketplaceSkills,
+} from './skill-marketplace';
 import { fetchGatewayUser, fetchUserProfile } from './user';
 import { isAssistantCompletionEvent, notifyAssistantCompletion } from './assistant-completion-notifier';
 
@@ -68,6 +74,7 @@ interface StoreState {
   cronJobs: CronJob[];
   tools: ToolInfo[];
   skills: SkillInfo[];
+  skillMarketplaceResults: SkillMarketplaceSkill[];
   workspaceFiles: WorkspaceFile[];
   health: GatewayHealth | null;
   gatewayStatus: GatewayStatus | null;
@@ -96,6 +103,8 @@ interface StoreState {
   fetchCronRuns: (jobId: string) => Promise<CronRun[]>;
   fetchTools: () => Promise<void>;
   fetchSkills: () => Promise<void>;
+  searchSkillMarketplace: (params: SkillMarketplaceSearchParams) => Promise<SkillMarketplaceSkill[]>;
+  installMarketplaceSkill: (skill: SkillMarketplaceSkill) => Promise<SkillMarketplaceInstallResult>;
   fetchWorkspaceFiles: (agentId?: string) => Promise<void>;
   fetchHealth: () => Promise<void>;
   fetchGatewayStatus: () => Promise<void>;
@@ -130,6 +139,7 @@ export const useStore = create<StoreState>((set, get) => ({
   cronJobs: [],
   tools: [],
   skills: [],
+  skillMarketplaceResults: [],
   workspaceFiles: [],
   health: null,
   gatewayStatus: null,
@@ -417,6 +427,30 @@ export const useStore = create<StoreState>((set, get) => ({
     } catch (err) {
       console.error('[fetchSkills]', err);
     }
+  },
+
+  searchSkillMarketplace: async (params) => {
+    const results = await (typeof window !== 'undefined' && window.electronAPI?.marketplace
+      ? window.electronAPI.marketplace.search(params)
+      : fetchSkillMarketplaceSkills(params));
+    set({ skillMarketplaceResults: results });
+    return results;
+  },
+
+  installMarketplaceSkill: async (skill) => {
+    const client = getClient(get());
+    if (!client) throw new Error('Not connected');
+    const result = await client.request<SkillMarketplaceInstallResult>('skills.market.install', {
+      sourceId: skill.sourceId,
+      source: skill.sourceId,
+      id: skill.id,
+      slug: skill.slug,
+      name: skill.name,
+      version: skill.version,
+      installSpec: skill.installSpec,
+    });
+    await get().fetchSkills();
+    return result;
   },
 
   fetchWorkspaceFiles: async (agentId: string = 'main') => {

@@ -16,6 +16,9 @@ interface Window {
     notifications: {
       show: (params: { title: string; body: string }) => Promise<boolean>;
     };
+    marketplace: {
+      search: (params: import('./lib/types').SkillMarketplaceSearchParams) => Promise<import('./lib/types').SkillMarketplaceSkill[]>;
+    };
     device: {
       signChallenge: (params: { nonce: string; token: string; clientId: string }) => Promise<{
         deviceId: string;

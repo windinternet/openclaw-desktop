@@ -1,10 +1,12 @@
 import { app, BrowserWindow, ipcMain, Notification } from 'electron'
 import path from 'node:path'
-import { execFile, spawn } from 'node:child_process'
+import { execFile, execFileSync, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
 import { readFileSync } from 'node:fs'
 import os from 'node:os'
 import crypto from 'node:crypto'
+import { fetchSkillMarketplaceSkills } from '../src/lib/skill-marketplace'
+import type { SkillMarketplaceSearchParams } from '../src/lib/types'
 
 const execFileAsync = promisify(execFile)
 
@@ -256,6 +258,10 @@ ipcMain.handle('notification:show', (_event, params: { title?: string; body?: st
   return true
 })
 
+ipcMain.handle('marketplace:search', async (_event, params: SkillMarketplaceSearchParams) => {
+  return fetchSkillMarketplaceSkills(params)
+})
+
 ipcMain.handle('device:signChallenge', async (_event, params: { nonce: string; token: string; clientId: string }) => {
   const identity = loadDeviceIdentity()
   if (!identity) {
@@ -300,9 +306,11 @@ function findTerminal(): string | null {
   ]
   for (const cmd of candidates) {
     try {
-      const { stdout } = require('node:child_process').execSync(`which ${cmd} 2>/dev/null || command -v ${cmd} 2>/dev/null`, { encoding: 'utf8' })
+      const stdout = execFileSync('sh', ['-lc', `which ${cmd} 2>/dev/null || command -v ${cmd} 2>/dev/null`], { encoding: 'utf8' })
       if (stdout.trim()) return cmd
-    } catch {}
+    } catch {
+      // Try the next terminal candidate.
+    }
   }
   return null
 }

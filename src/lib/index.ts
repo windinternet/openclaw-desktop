@@ -24,6 +24,12 @@ export type {
   // Tool & Skill
   ToolInfo,
   SkillInfo,
+  SkillMarketplaceSourceId,
+  SkillMarketplaceSource,
+  SkillMarketplaceSkill,
+  SkillMarketplaceSearchResponse,
+  SkillMarketplaceSearchParams,
+  SkillMarketplaceInstallResult,
   // Workspace
   WorkspaceFile,
   WorkspaceFileContent,
@@ -47,6 +53,14 @@ export type {
 export { useStore } from './store';
 export { createGatewayClient } from './gateway';
 export type { GatewayClient } from './gateway';
+export {
+  DEFAULT_SKILL_MARKETPLACE_SOURCE_ID,
+  SKILL_MARKETPLACE_SOURCES,
+  createSkillMarketplaceSearchUrl,
+  fetchSkillMarketplaceSkills,
+  getSkillMarketplaceSource,
+  normalizeSkillMarketplaceSearchResponse,
+} from './skill-marketplace';
 
 export type {
   ThemeMode,

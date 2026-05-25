@@ -239,6 +239,60 @@ export interface SkillInfo {
   eligible: boolean;
 }
 
+export type SkillMarketplaceSourceId = 'skillhub' | 'clawhub';
+
+export interface SkillMarketplaceSource {
+  id: SkillMarketplaceSourceId;
+  name: string;
+  url: string;
+  detailBaseUrl: string;
+  description: string;
+  recommended: boolean;
+  defaultSort: 'recommended' | 'downloads';
+}
+
+export interface SkillMarketplaceSkill {
+  id: string;
+  slug?: string;
+  name: string;
+  description?: string;
+  version?: string;
+  author?: string;
+  category?: string;
+  downloads?: number;
+  stars?: number;
+  sourceId: SkillMarketplaceSourceId;
+  sourceName: string;
+  reviewed?: boolean;
+  safety?: string;
+  installSpec?: string;
+  detailUrl?: string;
+}
+
+export type SkillMarketplaceSearchResponse =
+  | SkillMarketplaceSkill[]
+  | {
+      skills?: unknown[];
+      items?: unknown[];
+      results?: unknown[];
+    }
+  | unknown[]
+  | null
+  | undefined;
+
+export interface SkillMarketplaceSearchParams {
+  sourceId: SkillMarketplaceSourceId;
+  query?: string;
+  limit?: number;
+  sort?: 'recommended' | 'downloads';
+}
+
+export interface SkillMarketplaceInstallResult {
+  installed?: boolean;
+  message?: string;
+  skill?: SkillInfo;
+}
+
 // ── Workspace ──────────────────────────────────────────────────────
 
 /** agents.files.list RPC 返回的文件信息 */
