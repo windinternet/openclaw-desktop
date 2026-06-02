@@ -75,6 +75,7 @@ export interface AgentIdentity {
   agentId: string;
   name?: string;
   emoji?: string;
+  avatar?: string;
   description?: string;
 }
 
@@ -98,6 +99,7 @@ export interface ModelInfo {
 export interface SessionInfo {
   key: string;
   sessionKey?: string;
+  label?: string | null;
   title?: string;
   agentId?: string;
   status?: 'active' | 'idle' | 'completed' | 'archived';

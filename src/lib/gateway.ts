@@ -171,7 +171,7 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
         maxProtocol: 4,
         client: { id: clientId, version: clientVersion, platform, mode: 'ui' },
         role: 'operator',
-        scopes: ['operator.read', 'operator.write'],
+        scopes: ['operator.read', 'operator.write', 'operator.admin'],
         auth,
         locale,
         userAgent: `${clientId}/${clientVersion}`,
