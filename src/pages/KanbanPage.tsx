@@ -105,7 +105,7 @@ function getKanbanColumnPanelStyle(status: string): KanbanColumnPanelStyle {
     overflow: 'hidden',
     backgroundColor: 'rgba(var(--semi-white), 0.88)',
     border: '1px solid rgba(var(--semi-grey-4-rgb), 0.68)',
-    boxShadow: '0 14px 34px rgba(15, 23, 42, 0.10)',
+    boxShadow: '0 0px 10px rgba(0, 0, 0, 0.18)',
     backdropFilter: 'blur(10px)',
   };
   const baseHeader: CSSProperties = {
@@ -125,7 +125,7 @@ function getKanbanColumnPanelStyle(status: string): KanbanColumnPanelStyle {
       return {
         card: {
           ...baseCard,
-          boxShadow: `${baseCard.boxShadow}, inset 0 4px 0 rgba(var(--semi-blue-5-rgb), 0.82)`,
+          borderTop: '4px solid var(--semi-color-primary)',
         },
         header: {
           ...baseHeader,
@@ -137,7 +137,7 @@ function getKanbanColumnPanelStyle(status: string): KanbanColumnPanelStyle {
       return {
         card: {
           ...baseCard,
-          boxShadow: `${baseCard.boxShadow}, inset 0 4px 0 rgba(var(--semi-amber-5-rgb), 0.80)`,
+          borderTop: '4px solid var(--semi-color-warning)',
         },
         header: {
           ...baseHeader,
@@ -149,7 +149,7 @@ function getKanbanColumnPanelStyle(status: string): KanbanColumnPanelStyle {
       return {
         card: {
           ...baseCard,
-          boxShadow: `${baseCard.boxShadow}, inset 0 4px 0 rgba(var(--semi-purple-5-rgb), 0.80)`,
+          borderTop: '4px solid var(--semi-color-tertiary)',
         },
         header: {
           ...baseHeader,
@@ -161,7 +161,7 @@ function getKanbanColumnPanelStyle(status: string): KanbanColumnPanelStyle {
       return {
         card: {
           ...baseCard,
-          boxShadow: `${baseCard.boxShadow}, inset 0 4px 0 rgba(var(--semi-green-5-rgb), 0.78)`,
+          borderTop: '4px solid var(--semi-color-success)',
         },
         header: {
           ...baseHeader,
@@ -628,7 +628,7 @@ export default function KanbanPage() {
         style={{
           flex: 1,
           overflow: 'auto',
-          padding: '0 24px 24px',
+          padding: '10px 24px 24px',
           display: 'grid',
           gridTemplateColumns: 'repeat(4, 1fr)',
           gap: 16,
