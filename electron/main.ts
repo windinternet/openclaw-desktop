@@ -7,6 +7,7 @@ import os from 'node:os'
 import crypto from 'node:crypto'
 import { fetchSkillMarketplaceSkills } from '../src/lib/skill-marketplace'
 import type { SkillMarketplaceSearchParams } from '../src/lib/types'
+import { registerLocalFileStorageHandlers } from './local-storage'
 
 const execFileAsync = promisify(execFile)
 
@@ -261,6 +262,8 @@ ipcMain.handle('notification:show', (_event, params: { title?: string; body?: st
 ipcMain.handle('marketplace:search', async (_event, params: SkillMarketplaceSearchParams) => {
   return fetchSkillMarketplaceSkills(params)
 })
+
+registerLocalFileStorageHandlers()
 
 ipcMain.handle('device:signChallenge', async (_event, params: { nonce: string; token: string; clientId: string }) => {
   const identity = loadDeviceIdentity()

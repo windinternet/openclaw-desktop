@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
 import type { AgentInfo } from '../lib/types';
 import type { KanbanCard, KanbanColumn } from '../lib/types';
+import { loadInstanceData, saveInstanceData } from '../lib/local-persistence';
 
 const { Title, Text } = Typography;
 
@@ -30,7 +31,6 @@ function agentNameString(name: unknown): string {
   return '';
 }
 
-const STORAGE_KEY = 'openclaw-kanban';
 const COLUMN_DEFS = [
   { id: 'todo', title: '待办', icon: '📋' },
   { id: 'in_progress', title: '进行中', icon: '🔄' },
@@ -307,23 +307,7 @@ function getColumnAccent(status: string): string {
 
 // ── Persistence ───────────────────────────────────────────────────────
 
-function loadColumns(): KanbanColumn[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed: KanbanColumn[] = JSON.parse(raw);
-      // ensure all 4 columns exist
-      const columnMap = new Map(parsed.map((c) => [c.id, c]));
-      return COLUMN_DEFS.map((def) => {
-        const existing = columnMap.get(def.id);
-        return existing
-          ? { ...existing, title: def.title }
-          : { id: def.id, title: def.title, cards: [] };
-      });
-    }
-  } catch {
-    // fall through
-  }
+function createDefaultColumns(): KanbanColumn[] {
   return COLUMN_DEFS.map((def) => ({
     id: def.id,
     title: def.title,
@@ -331,8 +315,15 @@ function loadColumns(): KanbanColumn[] {
   }));
 }
 
-function saveColumns(columns: KanbanColumn[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(columns));
+function normalizeColumns(columns: KanbanColumn[] | null): KanbanColumn[] {
+  if (!columns) return createDefaultColumns();
+  const columnMap = new Map(columns.map((c) => [c.id, c]));
+  return COLUMN_DEFS.map((def) => {
+    const existing = columnMap.get(def.id);
+    return existing
+      ? { ...existing, title: def.title }
+      : { id: def.id, title: def.title, cards: [] };
+  });
 }
 
 function generateCardId(): string {
@@ -445,17 +436,51 @@ function KanbanCardItem({ card, agentName, onDelete, onDragStart }: KanbanCardIt
 export default function KanbanPage() {
   const { t } = useTranslation();
   const agents = useStore((s) => s.agents);
+  const currentInstanceId = useStore((s) => s.currentInstanceId);
 
-  const [columns, setColumns] = useState<KanbanColumn[]>(() => loadColumns());
+  const [columns, setColumns] = useState<KanbanColumn[]>(() => createDefaultColumns());
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [addTargetColumn, setAddTargetColumn] = useState<string>('todo');
   const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
   const dragSourceRef = useRef<{ cardId: string; sourceStatus: string } | null>(null);
+  const loadedInstanceRef = useRef<string | null>(null);
 
-  // Persist on change
+  // Hydrate board for the active OpenClaw instance. React state remains the responsive source.
   useEffect(() => {
-    saveColumns(columns);
-  }, [columns]);
+    let cancelled = false;
+    loadedInstanceRef.current = null;
+
+    if (!currentInstanceId) {
+      Promise.resolve().then(() => {
+        if (!cancelled) setColumns(createDefaultColumns());
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    loadInstanceData<KanbanColumn[]>(currentInstanceId, 'kanban')
+      .then((storedColumns) => {
+        if (cancelled) return;
+        setColumns(normalizeColumns(storedColumns));
+        loadedInstanceRef.current = currentInstanceId;
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setColumns(createDefaultColumns());
+        loadedInstanceRef.current = currentInstanceId;
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentInstanceId]);
+
+  // Persist on change without blocking in-memory updates.
+  useEffect(() => {
+    if (!currentInstanceId || loadedInstanceRef.current !== currentInstanceId) return;
+    saveInstanceData(currentInstanceId, 'kanban', columns);
+  }, [columns, currentInstanceId]);
 
   // ── Drag & Drop handlers ─────────────────────────────────────────
 

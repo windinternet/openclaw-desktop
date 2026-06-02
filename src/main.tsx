@@ -7,26 +7,27 @@ import i18n from './i18n';
 import ThemeProvider from './components/ThemeProvider';
 import { useSettingsStore } from './lib/settings-store';
 import { useStore } from './lib';
+import { loadAppSnapshot } from './lib/local-persistence';
 import App from './App';
 
-useSettingsStore.getState().loadSettings();
-useStore.getState().loadInstances();
+async function bootstrap() {
+  const snapshot = await loadAppSnapshot();
+  useSettingsStore.getState().hydrateSettings(snapshot.settings);
+  useStore.getState().hydrateInstances(snapshot.instances, snapshot.currentInstanceId);
 
-const loadedSettings = useSettingsStore.getState().settings;
-console.log('[main.tsx] settings loaded:', JSON.stringify(loadedSettings));
-console.log('[main.tsx] localStorage openclaw-settings raw:', localStorage.getItem('openclaw-settings'));
-console.log('[main.tsx] localStorage openclaw-instances raw:', localStorage.getItem('openclaw-instances'));
+  const { locale } = snapshot.settings;
+  i18n.changeLanguage(locale);
+  document.documentElement.setAttribute('lang', locale);
 
-const { locale } = loadedSettings;
-i18n.changeLanguage(locale);
-document.documentElement.setAttribute('lang', locale);
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <I18nextProvider i18n={i18n}>
+        <ThemeProvider>
+          <App />
+        </ThemeProvider>
+      </I18nextProvider>
+    </React.StrictMode>,
+  );
+}
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <I18nextProvider i18n={i18n}>
-      <ThemeProvider>
-        <App />
-      </ThemeProvider>
-    </I18nextProvider>
-  </React.StrictMode>,
-);
+void bootstrap();

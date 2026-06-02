@@ -85,9 +85,9 @@ connect-src 'self' wss://*.openclaw.ai;
 
 | 数据类型 | 存储方式 | 安全要求 |
 |---------|---------|---------|
-| Token / 凭证 | 计划使用 electron-store 或系统密钥链 | 加密存储，不应明文持久化 |
-| 会话历史 | 本地文件或 IndexedDB | 不含敏感认证信息 |
-| 配置 | JSON 文件 | 默认值不含密钥 |
+| Token / 凭证 | 当前由 Electron 主进程受控文件保存，后续迁移到系统密钥链 | 不进入渲染进程 localStorage，不输出日志 |
+| 会话历史 | Gateway 为事实源，Desktop 仅做实例级本地缓存 | 不含敏感认证信息 |
+| 配置 | Electron 主进程 JSON 文件 | 默认值不含密钥，按实例命名空间隔离 |
 
 ### 日志安全
 

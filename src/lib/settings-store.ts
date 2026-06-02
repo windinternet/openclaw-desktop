@@ -1,41 +1,13 @@
 import { create } from 'zustand';
 import type { AppSettings } from './settings-types';
 import { DEFAULT_SETTINGS } from './settings-types';
-
-const STORAGE_KEY = 'openclaw-settings';
-
-function readFromStorage(): AppSettings {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_SETTINGS };
-    const parsed: unknown = JSON.parse(raw);
-    if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      typeof (parsed as Record<string, unknown>).initialized === 'boolean' &&
-      typeof (parsed as Record<string, unknown>).themeMode === 'string' &&
-      typeof (parsed as Record<string, unknown>).themeColor === 'string' &&
-      typeof (parsed as Record<string, unknown>).locale === 'string'
-    ) {
-      return {
-        ...DEFAULT_SETTINGS,
-        ...(parsed as AppSettings),
-      };
-    }
-    return { ...DEFAULT_SETTINGS };
-  } catch {
-    return { ...DEFAULT_SETTINGS };
-  }
-}
-
-function writeToStorage(settings: AppSettings): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-}
+import { loadAppSnapshot, saveSettings } from './local-persistence';
 
 interface SettingsStoreState {
   settings: AppSettings;
 
-  loadSettings: () => void;
+  hydrateSettings: (settings: AppSettings) => void;
+  loadSettings: () => Promise<void>;
   updateSettings: (partial: Partial<AppSettings>) => void;
   resetSettings: () => void;
   isInitialized: () => boolean;
@@ -45,21 +17,26 @@ interface SettingsStoreState {
 export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
   settings: { ...DEFAULT_SETTINGS },
 
-  loadSettings: () => {
-    set({ settings: readFromStorage() });
+  hydrateSettings: (settings) => {
+    set({ settings: { ...DEFAULT_SETTINGS, ...settings } });
+  },
+
+  loadSettings: async () => {
+    const snapshot = await loadAppSnapshot();
+    set({ settings: snapshot.settings });
   },
 
   updateSettings: (partial) => {
     set((state) => {
       const settings = { ...state.settings, ...partial };
-      writeToStorage(settings);
+      saveSettings(settings);
       return { settings };
     });
   },
 
   resetSettings: () => {
     const settings = { ...DEFAULT_SETTINGS };
-    writeToStorage(settings);
+    saveSettings(settings);
     set({ settings });
   },
 
@@ -70,7 +47,7 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
   markInitialized: () => {
     set((state) => {
       const settings = { ...state.settings, initialized: true };
-      writeToStorage(settings);
+      saveSettings(settings);
       return { settings };
     });
   },

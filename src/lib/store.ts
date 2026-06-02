@@ -25,38 +25,15 @@ import {
 } from './skill-marketplace';
 import { fetchGatewayUser, fetchUserProfile } from './user';
 import { isAssistantCompletionEvent, notifyAssistantCompletion } from './assistant-completion-notifier';
-
-const STORAGE_KEY = 'openclaw-instances';
-const CURRENT_INSTANCE_KEY = 'openclaw-current-instance';
+import {
+  loadAppSnapshot,
+  removePersistedInstance,
+  saveCurrentInstanceId,
+  saveInstances,
+} from './local-persistence';
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
-}
-
-function readFromStorage(): InstanceConfig[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      return parsed.filter(
-        (item): item is InstanceConfig =>
-          typeof item === 'object' &&
-          item !== null &&
-          typeof (item as Record<string, unknown>).id === 'string' &&
-          typeof (item as Record<string, unknown>).name === 'string' &&
-          typeof (item as Record<string, unknown>).gatewayUrl === 'string' &&
-          typeof (item as Record<string, unknown>).token === 'string',
-      );
-    }
-    return [];
-  } catch {
-    return [];
-  }
-}
-
-function writeToStorage(instances: InstanceConfig[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(instances));
 }
 
 interface StoreState {
@@ -82,7 +59,8 @@ interface StoreState {
   agentIdentity: AgentIdentity | null;
 
   // ── Instance CRUD ──
-  loadInstances: () => void;
+  hydrateInstances: (instances: InstanceConfig[], currentInstanceId: string | null) => void;
+  loadInstances: () => Promise<void>;
   addInstance: (config: Omit<InstanceConfig, 'id' | 'lastConnectedAt'>) => void;
   removeInstance: (id: string) => void;
   setCurrentInstance: (id: string | null) => void;
@@ -152,9 +130,18 @@ export const useStore = create<StoreState>((set, get) => ({
 
   // ── Instance CRUD ──
 
-  loadInstances: () => {
-    const instances = readFromStorage();
-    const savedCurrentId = localStorage.getItem(CURRENT_INSTANCE_KEY);
+  hydrateInstances: (instances, currentInstanceId) => {
+    const validCurrentInstanceId =
+      currentInstanceId && instances.some((i) => i.id === currentInstanceId)
+        ? currentInstanceId
+        : null;
+    set({ instances, currentInstanceId: validCurrentInstanceId });
+  },
+
+  loadInstances: async () => {
+    const snapshot = await loadAppSnapshot();
+    const instances = snapshot.instances;
+    const savedCurrentId = snapshot.currentInstanceId;
     const currentInstanceId =
       savedCurrentId && instances.some((i) => i.id === savedCurrentId)
         ? savedCurrentId
@@ -169,7 +156,7 @@ export const useStore = create<StoreState>((set, get) => ({
         const instances = state.instances.map((i) =>
           i.id === existing.id ? { ...i, ...config, lastConnectedAt: Date.now() } : i,
         );
-        writeToStorage(instances);
+        saveInstances(instances);
         return { instances };
       }
       const instance: InstanceConfig = {
@@ -178,7 +165,7 @@ export const useStore = create<StoreState>((set, get) => ({
         lastConnectedAt: Date.now(),
       };
       const instances = [...state.instances, instance];
-      writeToStorage(instances);
+      saveInstances(instances);
       return { instances };
     });
   },
@@ -186,7 +173,9 @@ export const useStore = create<StoreState>((set, get) => ({
   removeInstance: (id) => {
     set((state) => {
       const instances = state.instances.filter((i) => i.id !== id);
-      writeToStorage(instances);
+      saveInstances(instances);
+      removePersistedInstance(id);
+      if (state.currentInstanceId === id) saveCurrentInstanceId(null);
       return {
         instances,
         currentInstanceId: state.currentInstanceId === id ? null : state.currentInstanceId,
@@ -196,15 +185,16 @@ export const useStore = create<StoreState>((set, get) => ({
 
   setCurrentInstance: (id) => {
     if (id) {
-      localStorage.setItem(CURRENT_INSTANCE_KEY, id);
-      set((state) => ({
-        currentInstanceId: id,
-        instances: state.instances.map((i) =>
+      saveCurrentInstanceId(id);
+      set((state) => {
+        const instances = state.instances.map((i) =>
           i.id === id ? { ...i, hasPendingActivity: false } : i,
-        ),
-      }));
+        );
+        saveInstances(instances);
+        return { currentInstanceId: id, instances };
+      });
     } else {
-      localStorage.removeItem(CURRENT_INSTANCE_KEY);
+      saveCurrentInstanceId(null);
       set({ currentInstanceId: null });
     }
   },
@@ -224,7 +214,7 @@ export const useStore = create<StoreState>((set, get) => ({
           ? { ...i, hasPendingActivity: true, lastActivityAt: Date.now() }
           : i,
       );
-      writeToStorage(instances);
+      saveInstances(instances);
       return { instances };
     });
   },
@@ -234,7 +224,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const instances = state.instances.map((i) =>
         i.id === id ? { ...i, hasPendingActivity: false } : i,
       );
-      writeToStorage(instances);
+      saveInstances(instances);
       return { instances };
     });
   },
@@ -514,7 +504,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const instances = s.instances.map((i) =>
         i.id === instance.id ? { ...i, gatewayUser: user } : i,
       );
-      writeToStorage(instances);
+      saveInstances(instances);
       return { instances };
     });
   },
@@ -551,7 +541,7 @@ export const useStore = create<StoreState>((set, get) => ({
           const instances = s.instances.map((i) =>
             i.id === instance.id ? { ...i, assistantName: assistantName ?? i.assistantName, avatarUrl: avatarUrl ?? i.avatarUrl } : i,
           );
-          writeToStorage(instances);
+          saveInstances(instances);
           return { instances };
         });
       }
@@ -630,4 +620,6 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 }));
 
-if (typeof window !== 'undefined') (window as any).__store = useStore;
+if (typeof window !== 'undefined') {
+  (window as unknown as { __store?: typeof useStore }).__store = useStore;
+}

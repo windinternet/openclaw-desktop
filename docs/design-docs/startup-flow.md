@@ -9,7 +9,7 @@
 应用启动
   │
   ├─ 检查本地是否有已保存的实例配置
-  │   └─ (localStorage / IndexedDB 中保存的 gatewayUrl + token)
+  │   └─ Electron 主进程文件存储中保存的实例索引 + 凭证摘要
   │
   ├─ [有已保存实例] → 尝试连接 → 
   │   ├─ 成功 → 进入主界面，加载该实例
@@ -53,8 +53,13 @@
 - 不阻断用户操作，保持当前页面可见
 - 重连成功后自动恢复
 
+## 本地存储
+
+- 采用 `docs/design-docs/local-instance-storage.md` 定义的响应式内存层 + Electron 文件后端。
+- 启动时先 hydrate Zustand store；运行中先更新内存状态，再异步持久化。
+- 旧 `localStorage` 数据仅作为一次性迁移来源，迁移后应清理。
+
 ## 待定
 
-- [ ] 存储使用 localStorage 还是 IndexedDB
 - [ ] 切换入口 UI 位置
 - [ ] 自动发现的具体实现方式
