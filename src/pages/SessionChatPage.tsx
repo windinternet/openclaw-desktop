@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useLocation, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AIChatDialogue, AIChatInput, Toast } from '@douyinfe/semi-ui';
 import { useStore } from '../lib';
 import type { EventFrame } from '../lib/types';
@@ -110,9 +110,12 @@ function normalizeRole(role: unknown): string {
 export default function SessionChatPage() {
   const { sessionKey: urlSessionKey } = useParams<{ sessionKey: string }>();
   const location = useLocation();
+  const navigate = useNavigate();
   const activeClient = useStore((s) => s.activeClient);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const models = useStore((s) => s.models);
+  const agentIdentity = useStore((s) => s.agentIdentity);
+  const agents = useStore((s) => s.agents);
 
   const [activeSessionKey, setActiveSessionKey] = useState<string | undefined>(
     decodeSessionKeyParam(urlSessionKey),
@@ -131,13 +134,18 @@ export default function SessionChatPage() {
   const genTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const initialMessageSentRef = useRef<string | null>(null);
+  const prevActiveSessionKeyRef = useRef<string | undefined>();
 
   useEffect(() => {
     if (urlSessionKey) setActiveSessionKey(decodeSessionKeyParam(urlSessionKey));
   }, [urlSessionKey]);
 
   useEffect(() => {
-    setChats([]);
+    if (prevActiveSessionKeyRef.current !== activeSessionKey) {
+      setChats([]);
+      initialMessageSentRef.current = null;
+    }
+    prevActiveSessionKeyRef.current = activeSessionKey;
     sendingRef.current = false;
     streamingIdRef.current = null;
     if (genTimeoutRef.current) {
@@ -188,9 +196,14 @@ export default function SessionChatPage() {
               : (m.status || 'completed'),
           };
         });
-        setChats((prev) => (loadedChats.length === 0 && prev.length > 0 ? prev : loadedChats));
+        setChats((prev) => {
+          if (loadedChats.length === 0) return prev;
+          const loadedIds = new Set(loadedChats.map((c: { id: string }) => c.id));
+          const uniquePrev = prev.filter((c: { id: string }) => !loadedIds.has(c.id));
+          return [...loadedChats, ...uniquePrev];
+        });
       } catch {
-        if (!cancelled) setChats([]);
+        if (!cancelled) setChats((prev) => (prev.length > 0 ? prev : []));
       }
     })();
     return () => {
@@ -438,7 +451,9 @@ export default function SessionChatPage() {
       model: initialMessage.model,
       thinking: initialMessage.thinking,
     });
-  }, [activeClient, activeSessionKey, connectionStatus, handleSend, location.state]);
+
+    navigate(window.location.hash, { replace: true, state: null });
+  }, [activeClient, activeSessionKey, connectionStatus, handleSend, location.state, navigate]);
 
   const handleStop = useCallback(async () => {
     if (!activeClient || !activeSessionKey) return;
@@ -451,15 +466,23 @@ export default function SessionChatPage() {
   const roleConfig = useMemo(
     () => ({
       user: { name: 'You', avatar: '👤' },
-      assistant: { name: 'AI', avatar: '🤖' },
+      assistant: { name: agentIdentity?.name || 'AI', avatar: agentIdentity?.emoji || '🤖' },
       system: { name: 'System', avatar: '🛎️' },
     }),
-    [],
+    [agentIdentity],
   );
 
   const renderConfig = useCallback(
-    () => (
+    () => {
+      const currentAgentId = activeSessionKey?.split(':')?.[1] || 'main';
+      return (
       <>
+        <Configure.Select
+          field="agent"
+          label="Agent"
+          optionList={agents.filter(a => a.id).map((a) => ({ value: a.id, label: a.name || a.id }))}
+          initValue={currentAgentId}
+        />
         <Configure.Select
           field="model"
           optionList={models.map((m) => ({ value: m.id, label: m.alias || m.name || m.id }))}
@@ -477,8 +500,8 @@ export default function SessionChatPage() {
           initValue={chatThinking}
         />
       </>
-    ),
-    [models, chatModel, chatThinking],
+    )},
+    [agents, models, chatModel, chatThinking, activeSessionKey],
   );
 
   const handleConfigChange = useCallback((_v: any, changed: any) => {
