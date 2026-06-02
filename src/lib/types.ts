@@ -416,7 +416,12 @@ export interface OfficeAgent {
   agentId: string;
   name: string;
   emoji?: string;
-  status: 'online' | 'busy' | 'idle' | 'offline';
+  status: 'online' | 'busy' | 'idle' | 'offline' | 'error';
+  zone: 'work' | 'meeting' | 'lounge';
+  behavior: 'working' | 'presenting' | 'listening' | 'resting' | 'offline' | 'stuck';
+  color: string;
+  model?: string;
+  slotId?: string;
   position: { x: number; y: number; z: number };
   currentTask?: string;
 }
