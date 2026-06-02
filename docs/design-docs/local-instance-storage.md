@@ -38,6 +38,10 @@ userData/
         metadata.json
         credential.json
         kanban.json
+        ai-action-runs.json
+        agent-team-profile.json
+        office-profile.json
+        office-layout-instructions.json
 ```
 
 当前文件职责：
@@ -49,6 +53,10 @@ userData/
 | `metadata.json` | 助手名、头像、Gateway 用户画像等实例元数据 |
 | `credential.json` | 当前短期保存 token；后续应替换为系统密钥链 |
 | `kanban.json` | 当前实例的本地看板 |
+| `ai-action-runs.json` | AI Action Center 的动作记录、状态、计划、审批和对应 Gateway session/run 映射 |
+| `agent-team-profile.json` | Agent 团队的本地扩展画像、虚拟公司角色资料和自然语言编排记录 |
+| `office-profile.json` | 3D 办公室展示资料，如公司名、前台问候语等 |
+| `office-layout-instructions.json` | 未来自然语言调整办公室布局的指令记录和应用结果 |
 
 ## 数据流
 

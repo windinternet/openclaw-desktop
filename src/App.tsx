@@ -8,6 +8,7 @@ import NewSessionPage from './pages/NewSessionPage';
 import ExtensionsPage from './pages/ExtensionsPage';
 import SettingsPage from './pages/SettingsPage';
 import TasksPage from './pages/TasksPage';
+import ActionCenterPage from './pages/ActionCenterPage';
 import WorkspacePage from './pages/WorkspacePage';
 import KanbanPage from './pages/KanbanPage';
 import TeamsPage from './pages/TeamsPage';
@@ -36,6 +37,7 @@ function App() {
           <Route path="extensions" element={<ExtensionsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="tasks" element={<TasksPage />} />
+          <Route path="actions" element={<ActionCenterPage />} />
           <Route path="workspace" element={<WorkspacePage />} />
           <Route path="kanban" element={<KanbanPage />} />
           <Route path="teams" element={<TeamsPage />} />

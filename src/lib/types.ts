@@ -79,6 +79,91 @@ export interface AgentIdentity {
   description?: string;
 }
 
+export type AgentProfileSource = 'gateway' | 'local';
+
+export type AgentOfficeZone = 'work' | 'meeting' | 'lounge';
+
+export interface AgentLocalProfile {
+  agentId: string;
+  displayName?: string;
+  role?: string;
+  personality?: string;
+  cognition?: string;
+  memorySummary?: string;
+  officeTitle?: string;
+  officeZone?: AgentOfficeZone;
+  color?: string;
+  source: AgentProfileSource;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface AgentTeamInstruction {
+  id: string;
+  text: string;
+  status: 'draft' | 'applied';
+  createdAt: number;
+  appliedAt?: number;
+  summary?: string;
+  agentId?: string;
+}
+
+export interface AgentTeamProfile {
+  schemaVersion: number;
+  companyName?: string;
+  mission?: string;
+  operatingModel?: string;
+  agents: Record<string, AgentLocalProfile>;
+  instructions: AgentTeamInstruction[];
+}
+
+// ── AI Action Center ───────────────────────────────────────────────
+
+export type AiActionRunStatus =
+  | 'draft'
+  | 'planning'
+  | 'awaiting_approval'
+  | 'running'
+  | 'done'
+  | 'failed'
+  | 'cancelled';
+
+export type AiActionExecutionMode =
+  | 'isolated-session'
+  | 'domain-thread'
+  | 'subagent-tree'
+  | 'local-bridge';
+
+export interface AiActionApproval {
+  id: string;
+  title: string;
+  risk: 'low' | 'medium' | 'high';
+  status: 'pending' | 'approved' | 'rejected';
+  requestedAt: number;
+  decidedAt?: number;
+  reason?: string;
+}
+
+export interface AiActionRun {
+  id: string;
+  type: string;
+  sourcePage: string;
+  instanceId: string;
+  agentId: string;
+  status: AiActionRunStatus;
+  executionMode: AiActionExecutionMode;
+  input: string;
+  plan?: string;
+  resultSummary?: string;
+  error?: string;
+  gatewaySessionKey?: string;
+  gatewayRunId?: string;
+  childSessionKeys?: string[];
+  approvals?: AiActionApproval[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 // ── Model ──────────────────────────────────────────────────────────
 
 /** models.list RPC 返回的模型条目 */
@@ -381,6 +466,10 @@ export interface GatewayClientOptions {
   token?: string;
   clientId?: string;
   clientVersion?: string;
+  clientMode?: 'ui' | 'node';
+  role?: 'operator' | 'node';
+  scopes?: string[];
+  capabilities?: string[];
   platform?: string;
   locale?: string;
   requestTimeoutMs?: number;
@@ -424,6 +513,20 @@ export interface OfficeAgent {
   slotId?: string;
   position: { x: number; y: number; z: number };
   currentTask?: string;
+}
+
+export interface OfficeProfile {
+  companyName: string;
+  receptionGreeting: string;
+}
+
+export interface OfficeLayoutInstruction {
+  id: string;
+  text: string;
+  status: 'draft' | 'applied' | 'failed';
+  createdAt: number;
+  appliedAt?: number;
+  summary?: string;
 }
 
 // ── Search ─────────────────────────────────────────────────────────

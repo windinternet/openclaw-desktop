@@ -33,7 +33,14 @@ interface Window {
       saveInstanceData: (instanceId: string, key: string, value: unknown) => Promise<void>;
     };
     device: {
-      signChallenge: (params: { nonce: string; token: string; clientId: string }) => Promise<{
+      signChallenge: (params: {
+        nonce: string;
+        token: string;
+        clientId: string;
+        clientMode?: string;
+        role?: string;
+        scopes?: string[];
+      }) => Promise<{
         deviceId: string;
         publicKey: string;
         signature: string;

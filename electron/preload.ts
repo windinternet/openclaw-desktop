@@ -30,7 +30,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('storage:saveInstanceData', instanceId, key, value),
   },
   device: {
-    signChallenge: (params: { nonce: string; token: string; clientId: string }) =>
+    signChallenge: (params: {
+      nonce: string;
+      token: string;
+      clientId: string;
+      clientMode?: string;
+      role?: string;
+      scopes?: string[];
+    }) =>
       ipcRenderer.invoke('device:signChallenge', params),
   },
   install: {

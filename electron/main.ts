@@ -265,7 +265,14 @@ ipcMain.handle('marketplace:search', async (_event, params: SkillMarketplaceSear
 
 registerLocalFileStorageHandlers()
 
-ipcMain.handle('device:signChallenge', async (_event, params: { nonce: string; token: string; clientId: string }) => {
+ipcMain.handle('device:signChallenge', async (_event, params: {
+  nonce: string;
+  token: string;
+  clientId: string;
+  clientMode?: string;
+  role?: string;
+  scopes?: string[];
+}) => {
   const identity = loadDeviceIdentity()
   if (!identity) {
     throw new Error('No device identity found')
@@ -275,9 +282,9 @@ ipcMain.handle('device:signChallenge', async (_event, params: { nonce: string; t
   const payload = buildDeviceAuthPayloadV3({
     deviceId: identity.deviceId,
     clientId: params.clientId,
-    clientMode: 'ui',
-    role: 'operator',
-    scopes: ['operator.read', 'operator.write'],
+    clientMode: params.clientMode || 'ui',
+    role: params.role || 'operator',
+    scopes: params.scopes && params.scopes.length > 0 ? params.scopes : ['operator.read', 'operator.write'],
     signedAtMs,
     token: params.token,
     nonce: params.nonce,

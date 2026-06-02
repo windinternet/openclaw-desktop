@@ -19,6 +19,7 @@ import {
   IconUserGroup,
   IconDesktop,
   IconBookmark,
+  IconBolt,
   IconSun,
   IconMoon,
   IconSetting,
@@ -28,6 +29,7 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
 import { useSettingsStore } from '../lib/settings-store';
 import { decodeSessionKeyParam } from '../lib/session-content';
+import { filterUserVisibleSessions } from '../lib/ai-action-center';
 
 const { Text } = Typography;
 
@@ -37,6 +39,7 @@ const ROUTE_MAP: Record<string, string> = {
   'new-session': '/new-session',
   extensions: '/extensions',
   tasks: '/tasks',
+  actions: '/actions',
   workspace: '/workspace',
   kanban: '/kanban',
   teams: '/teams',
@@ -112,6 +115,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
   const userDisplayName = useSettingsStore((s) => s.settings.userDisplayName);
   const agentIdentity = useStore((s) => s.agentIdentity);
   const sessions = useStore((s) => s.sessions);
+  const visibleSessions = filterUserVisibleSessions(sessions);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const connectionError = useStore((s) => s.connectionError);
   const connectionRetry = useStore((s) => s.connectionRetry);
@@ -496,16 +500,16 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
 
   const footer = (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {sessions.length > 0 ? (
+      {visibleSessions.length > 0 ? (
         <div style={{ flex: 1, borderTop: '1px solid var(--semi-color-border)' }}>
-          <InfiniteLoaderView isRowLoaded={({ index }) => index < sessions.length} loadMoreRows={() => Promise.resolve()} rowCount={sessions.length}>
+          <InfiniteLoaderView isRowLoaded={({ index }) => index < visibleSessions.length} loadMoreRows={() => Promise.resolve()} rowCount={visibleSessions.length}>
             {({ onRowsRendered, registerChild }) => (
               <AutoSizerView>
                 {({ width, height }) => (
                   <VListView ref={registerChild} className="semi-light-scrollbar" height={height} onRowsRendered={onRowsRendered}
-                    rowCount={sessions.length} rowHeight={44} width={width}
+                    rowCount={visibleSessions.length} rowHeight={44} width={width}
                     rowRenderer={({ index, key, style }) => {
-                      const s = sessions[index];
+                      const s = visibleSessions[index];
                       if (!s) return null;
                       const isCurrent = s.key === currentSessionKey;
                       const isActive = s.status === 'active';
@@ -639,6 +643,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
         <NavSectionLabel label={t('nav.sectionTools')} />
         <Nav.Item itemKey="extensions" text={t('nav.extensions')} icon={<IconPuzzle />} />
         <Nav.Item itemKey="tasks" text={t('nav.tasks')} icon={<IconCheckList />} />
+        <Nav.Item itemKey="actions" text={t('nav.actions')} icon={<IconBolt />} />
         <Nav.Item itemKey="workspace" text={t('nav.workspace') || '工作区'} icon={<IconFolderStroked />} />
         <Nav.Item itemKey="kanban" text={t('nav.kanban')} icon={<IconKanban />} />
 

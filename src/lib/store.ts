@@ -21,6 +21,10 @@ import type {
 } from './types';
 import { createGatewayClient, type GatewayClient } from './gateway';
 import {
+  connectDesktopBridgeToGateway,
+  disconnectDesktopBridge,
+} from './desktop-bridge';
+import {
   fetchSkillMarketplaceSkills,
 } from './skill-marketplace';
 import { fetchGatewayUser, fetchUserProfile } from './user';
@@ -251,6 +255,7 @@ export const useStore = create<StoreState>((set, get) => ({
     if (oldClient) {
       try { oldClient.disconnect(); } catch { /* ignore stale client cleanup failure */ }
     }
+    disconnectDesktopBridge();
 
     set({ connectionStatus: 'connecting', connectionError: null, connectionRetry: null, activeClient: null });
 
@@ -270,10 +275,14 @@ export const useStore = create<StoreState>((set, get) => ({
         if (status === 'connected') {
           set({ connectionStatus: 'connected', connectionError: null, connectionRetry: null });
           get().refreshAll();
+          void connectDesktopBridgeToGateway(instance).catch((err) => {
+            void err;
+          });
         } else if (status === 'error') {
           set({ connectionStatus: 'error', connectionError: '网关连接错误' });
         } else if (status === 'disconnected') {
           set({ connectionStatus: 'disconnected' });
+          disconnectDesktopBridge();
         } else if (status === 'connecting') {
           set({ connectionStatus: 'connecting' });
         }
@@ -303,6 +312,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   disconnectGateway: () => {
     const { activeClient } = get();
+    disconnectDesktopBridge();
     if (activeClient) {
       activeClient.disconnect();
       set({ activeClient: null, connectionStatus: 'disconnected', connectionRetry: null });

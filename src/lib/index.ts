@@ -9,6 +9,13 @@ export type {
   // Agent
   AgentInfo,
   AgentIdentity,
+  AgentLocalProfile,
+  AgentTeamInstruction,
+  AgentTeamProfile,
+  AiActionRun,
+  AiActionRunStatus,
+  AiActionExecutionMode,
+  AiActionApproval,
   // Model
   ModelInfo,
   // Session & Chat
@@ -40,6 +47,8 @@ export type {
   KanbanColumn,
   KanbanCard,
   OfficeAgent,
+  OfficeProfile,
+  OfficeLayoutInstruction,
   // Search
   SearchResult,
   // Protocol Frames
@@ -70,3 +79,23 @@ export type {
 } from './settings-types';
 export { PRESET_THEME_COLORS, DEFAULT_SETTINGS } from './settings-types';
 export { useSettingsStore } from './settings-store';
+export {
+  AI_ACTION_RUNS_STORAGE_KEY,
+  DESKTOP_ACTION_LABEL_PREFIX,
+  DESKTOP_ACTION_PEER_PREFIX,
+  DESKTOP_THREAD_PEER_PREFIX,
+  buildAiActionDomainThreadKey,
+  buildAiActionGatewaySessionCreateRequest,
+  buildAiActionSessionKey,
+  buildAiActionSessionLabel,
+  createAiActionRun,
+  executeAiActionRunWithGateway,
+  filterUserVisibleSessions,
+  isDesktopManagedSession,
+  normalizeAiActionRuns,
+} from './ai-action-center';
+export {
+  DESKTOP_BRIDGE_CAPABILITIES,
+  connectDesktopBridgeToGateway,
+  disconnectDesktopBridge,
+} from './desktop-bridge';

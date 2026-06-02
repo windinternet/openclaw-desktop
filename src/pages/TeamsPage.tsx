@@ -1,28 +1,91 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import type { CSSProperties } from 'react';
 import {
-  Card,
-  Tag,
   Button,
-  Spin,
-  Empty,
-  Typography,
+  Card,
   Descriptions,
+  Empty,
+  Input,
+  Modal,
+  Select,
+  Space,
+  Spin,
+  Tabs,
+  Tag,
+  TextArea,
   Toast,
+  Typography,
 } from '@douyinfe/semi-ui';
 import {
-  IconRefresh,
-  IconServer,
-  IconBox,
   IconAppCenter,
+  IconBox,
   IconBulb,
+  IconEdit,
+  IconFile,
+  IconPlus,
+  IconRefresh,
+  IconSave,
+  IconSend,
+  IconServer,
+  IconUserGroup,
 } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
+import {
+  AGENT_TEAM_PROFILE_STORAGE_KEY,
+  createAgentFromNaturalLanguage,
+  createEmptyAgentTeamProfile,
+  createInstruction,
+  mergeAgentTeamMembers,
+  normalizeAgentTeamProfile,
+  shouldCreateAgentFromInstruction,
+  upsertAgentProfile,
+  type AgentTeamMember,
+} from '../lib/agent-team';
+import {
+  AI_ACTION_RUNS_STORAGE_KEY,
+  createAiActionRun,
+  executeAiActionRunWithGateway,
+  normalizeAiActionRuns,
+} from '../lib/ai-action-center';
+import { loadInstanceData, saveInstanceData } from '../lib/local-persistence';
 import { useStore } from '../lib';
-import type { AgentInfo } from '../lib/types';
+import type {
+  AiActionRun,
+  AgentLocalProfile,
+  AgentOfficeZone,
+  AgentTeamProfile,
+  WorkspaceFile,
+  WorkspaceFileContent,
+} from '../lib/types';
 
 const { Title, Text } = Typography;
 
-// ── Data helpers ───────────────────────────────────────────────────
+const TEAM_PANEL_STYLE: CSSProperties = {
+  borderRadius: 8,
+  border: '1px solid var(--semi-color-border)',
+  background: 'var(--semi-color-bg-1)',
+};
+
+const PROFILE_COLORS = ['#2563eb', '#059669', '#d97706', '#7c3aed', '#dc2626', '#0891b2'];
+
+const BOOTSTRAP_FILES = new Set(['AGENTS.md', 'SOUL.md', 'USER.md', 'GEMINI.md', 'CLAUDE.md']);
+
+interface ProfileDraft {
+  displayName: string;
+  role: string;
+  personality: string;
+  cognition: string;
+  memorySummary: string;
+  officeTitle: string;
+  officeZone: AgentOfficeZone;
+  color: string;
+}
+
+interface QuickAgentDraft {
+  displayName: string;
+  role: string;
+  personality: string;
+}
 
 function agentModelString(model: unknown): string {
   if (typeof model === 'string') return model;
@@ -37,8 +100,6 @@ function agentNameString(name: unknown): string {
   return '';
 }
 
-// ── Status helpers ─────────────────────────────────────────────────
-
 function getAgentStatusColor(status?: string): 'green' | 'orange' | 'red' | 'grey' {
   switch (status) {
     case 'running':
@@ -52,226 +113,795 @@ function getAgentStatusColor(status?: string): 'green' | 'orange' | 'red' | 'gre
   }
 }
 
-function getAgentStatusSemiColor(status?: string): string {
-  switch (status) {
-    case 'running':
-      return 'var(--semi-color-success)';
-    case 'idle':
-      return 'var(--semi-color-primary)';
-    case 'error':
-      return 'var(--semi-color-danger)';
-    default:
-      return 'var(--semi-color-text-2)';
-  }
-}
-
 function getAgentStatusLabel(status?: string): string {
   return status ?? 'unknown';
 }
 
-// ── Agent Card ─────────────────────────────────────────────────────
-
-interface AgentCardProps {
-  agent: AgentInfo;
-  expanded: boolean;
-  onToggle: () => void;
+function formatSize(bytes?: number): string {
+  if (bytes === undefined || bytes === null) return '-';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function AgentCard({ agent, expanded, onToggle }: AgentCardProps) {
-  const tagColor = getAgentStatusColor(agent.status);
-  const semiColor = getAgentStatusSemiColor(agent.status);
-  const statusLabel = getAgentStatusLabel(agent.status);
+function formatTime(ts?: number): string {
+  if (!ts) return '-';
+  const d = new Date(ts);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
+function isTextFile(name: string): boolean {
+  const ext = name.split('.').pop()?.toLowerCase();
+  if (!ext) return true;
+  return new Set([
+    'md',
+    'txt',
+    'json',
+    'yaml',
+    'yml',
+    'toml',
+    'xml',
+    'js',
+    'ts',
+    'jsx',
+    'tsx',
+    'py',
+    'rb',
+    'go',
+    'rs',
+    'java',
+    'sh',
+    'bash',
+    'zsh',
+    'env',
+    'cfg',
+    'conf',
+    'ini',
+    'css',
+    'scss',
+    'less',
+    'html',
+    'svg',
+    'log',
+    'out',
+    'mdx',
+  ]).has(ext);
+}
+
+function profileDraftFromMember(member: AgentTeamMember): ProfileDraft {
+  return {
+    displayName: member.profile.displayName ?? agentNameString(member.agent.name) ?? member.agent.id,
+    role: member.profile.role ?? '',
+    personality: member.profile.personality ?? '',
+    cognition: member.profile.cognition ?? '',
+    memorySummary: member.profile.memorySummary ?? '',
+    officeTitle: member.profile.officeTitle ?? '',
+    officeZone: member.profile.officeZone ?? 'work',
+    color: member.profile.color ?? PROFILE_COLORS[0],
+  };
+}
+
+function createGatewayAgentId(name: string, existingIds: Set<string>): string {
+  const base = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'agent';
+  let id = base;
+  let index = 2;
+  while (existingIds.has(id)) {
+    id = `${base}-${index}`;
+    index += 1;
+  }
+  return id;
+}
+
+function buildQuickAgentProfile(values: QuickAgentDraft, profile: AgentTeamProfile): AgentLocalProfile {
+  const timestamp = Date.now();
+  const displayName = values.displayName.trim() || '新 Agent';
+  return {
+    agentId: createGatewayAgentId(displayName, new Set(Object.keys(profile.agents))),
+    displayName,
+    role: values.role.trim(),
+    personality: values.personality.trim(),
+    officeTitle: values.role.trim().slice(0, 24),
+    officeZone: 'work',
+    color: PROFILE_COLORS[timestamp % PROFILE_COLORS.length],
+    source: 'gateway',
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+}
+
+function buildAgentActionPrompt(options: {
+  mode: 'compose' | 'create';
+  input: string;
+  desiredProfile?: AgentLocalProfile;
+}): string {
+  const profileBlock = options.desiredProfile
+    ? [
+        `目标 Agent ID: ${options.desiredProfile.agentId}`,
+        `展示名称: ${options.desiredProfile.displayName || options.desiredProfile.agentId}`,
+        `角色/职责: ${options.desiredProfile.role || '待 OpenClaw 根据指令补全'}`,
+        `人格摘要: ${options.desiredProfile.personality || '待 OpenClaw 根据指令补全'}`,
+        `办公室头衔: ${options.desiredProfile.officeTitle || options.desiredProfile.role || 'Agent'}`,
+        `办公室区域: ${options.desiredProfile.officeZone || 'work'}`,
+      ].join('\n')
+    : '无预设画像，请根据用户指令生成计划。';
+
+  return [
+    '你是 OpenClaw Desktop 的 AI Action Center 执行会话。',
+    '目标：通过 OpenClaw Gateway 的真实能力创建或编排 Agent 团队，而不是只生成 Desktop 本地草稿。',
+    '请优先使用当前 Gateway 暴露的 Agent / Session / Tool / MCP / Node 能力；如缺少直接创建 Agent 的工具，请输出最小可执行计划、需要的 Gateway 注册能力和阻塞点。',
+    'Desktop 会把职位 title、称呼、办公室区域、人格/认知摘要等扩展资料保存在本地 profile，Gateway Agent 仍是团队成员事实源。',
+    `动作类型: ${options.mode === 'create' ? '创建 Gateway Agent' : '编排 Gateway Agent 团队'}`,
+    '本地扩展画像:',
+    profileBlock,
+    '用户指令:',
+    options.input.trim(),
+    '输出要求：先给出将要调用或需要调用的 Gateway 能力，再给出创建/更新结果；如果需要用户审批，请明确风险和审批项。',
+  ].join('\n\n');
+}
+
+function AgentRosterItem({
+  member,
+  selected,
+  onSelect,
+}: {
+  member: AgentTeamMember;
+  selected: boolean;
+  onSelect: () => void;
+}) {
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onToggle}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onToggle(); }}
-      style={{ cursor: 'pointer' }}
+    <button
+      type="button"
+      onClick={onSelect}
+      style={{
+        ...TEAM_PANEL_STYLE,
+        width: '100%',
+        padding: 14,
+        cursor: 'pointer',
+        textAlign: 'left',
+        background: selected ? 'var(--semi-color-primary-light-default)' : 'var(--semi-color-bg-1)',
+        borderColor: selected ? 'var(--semi-color-primary)' : 'var(--semi-color-border)',
+      }}
     >
-      <Card
-        style={{
-          borderRadius: 12,
-          backgroundColor: 'var(--semi-color-bg-1)',
-          border: '1px solid var(--semi-color-border)',
-          transition: 'box-shadow 0.2s, border-color 0.2s',
-        }}
-        bodyStyle={{ padding: 0 }}
-      >
-        {/* Main row */}
-        <div style={{ padding: '16px 20px' }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 16,
-            }}
-          >
-            {/* Avatar + Name/ID */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, minWidth: 0 }}>
-              <div
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 10,
-                  backgroundColor: semiColor + '18',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: semiColor,
-                  flexShrink: 0,
-                }}
-              >
-                <IconServer size="large" />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <Text
-                  style={{
-                    fontWeight: 600,
-                    fontSize: 15,
-                    color: 'var(--semi-color-text-0)',
-                    display: 'block',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {agentNameString(agent.name) || agent.id}
-                </Text>
-                <Text
-                  type="tertiary"
-                  size="small"
-                  style={{
-                    display: 'block',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    fontFamily: 'monospace',
-                    fontSize: 12,
-                  }}
-                >
-                  {agent.id}
-                </Text>
-              </div>
-            </div>
-
-            {/* Tags */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-              <Tag color={tagColor} size="small" style={{ textTransform: 'capitalize' }}>
-                {statusLabel}
-              </Tag>
-              <Tag type="light" size="small">
-                {agent.sessionCount ?? 0} sessions
-              </Tag>
-            </div>
-          </div>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <div
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 8,
+            background: `${member.profile.color ?? PROFILE_COLORS[0]}1f`,
+            color: member.profile.color ?? PROFILE_COLORS[0],
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <IconServer />
         </div>
-
-        {/* Expanded details */}
-        {expanded && (
-          <div
-            style={{
-              padding: '0 20px 16px',
-              borderTop: '1px solid var(--semi-color-border)',
-            }}
-          >
-            {agent.workspace || agentModelString(agent.model) || agent.thinking ? (
-              <Descriptions
-                data={[
-                  {
-                    key: (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <IconAppCenter size="small" /> Workspace
-                      </span>
-                    ),
-                    value: agent.workspace || '—',
-                  },
-                  {
-                    key: (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <IconBox size="small" /> Model
-                      </span>
-                    ),
-                    value: agentModelString(agent.model) || '—',
-                  },
-                  {
-                    key: (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <IconBulb size="small" /> Thinking
-                      </span>
-                    ),
-                    value: String(agent.thinking || '—'),
-                  },
-                ]}
-                row
-                size="small"
-                style={{ marginTop: 14 }}
-              />
-            ) : (
-              <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 14 }}>
-                No additional details available
-              </Text>
-            )}
-            {agent.default && (
-              <Tag
-                color="blue"
-                size="small"
-                style={{ marginTop: 10 }}
-              >
-                Default Agent
-              </Tag>
-            )}
-          </div>
-        )}
-      </Card>
-    </div>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <Text strong style={{ display: 'block' }} ellipsis>
+            {member.profile.displayName || agentNameString(member.agent.name) || member.agent.id}
+          </Text>
+          <Text type="tertiary" size="small" ellipsis style={{ display: 'block' }}>
+            {member.profile.role || member.agent.workspace || member.agent.id}
+          </Text>
+        </div>
+        <Tag color={member.source === 'local' ? 'blue' : getAgentStatusColor(member.agent.status)} size="small">
+          {member.source === 'local' ? 'local' : getAgentStatusLabel(member.agent.status)}
+        </Tag>
+      </div>
+    </button>
   );
 }
-
-// ── Agents Page ────────────────────────────────────────────────────
 
 export default function TeamsPage() {
   const { t } = useTranslation();
 
   const agents = useStore((s) => s.agents);
   const connectionStatus = useStore((s) => s.connectionStatus);
+  const currentInstanceId = useStore((s) => s.currentInstanceId);
+  const activeClient = useStore((s) => s.activeClient);
 
-  const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
+  const [teamProfile, setTeamProfile] = useState<AgentTeamProfile>(() => createEmptyAgentTeamProfile());
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [composerText, setComposerText] = useState('');
+  const [composerModalVisible, setComposerModalVisible] = useState(false);
+  const [quickModalVisible, setQuickModalVisible] = useState(false);
+  const [actionSubmitting, setActionSubmitting] = useState(false);
+  const [quickDraft, setQuickDraft] = useState<QuickAgentDraft>({
+    displayName: '',
+    role: '',
+    personality: '',
+  });
+  const [profileDrafts, setProfileDrafts] = useState<Record<string, ProfileDraft>>({});
+  const [files, setFiles] = useState<WorkspaceFile[]>([]);
+  const [filesLoading, setFilesLoading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<WorkspaceFile | null>(null);
+  const [fileContent, setFileContent] = useState('');
+  const [fileLoading, setFileLoading] = useState(false);
 
-  const isLoading = connectionStatus === 'connecting';
-  const isDisconnected =
-    connectionStatus === 'disconnected' || connectionStatus === 'error';
+  const members = useMemo(() => mergeAgentTeamMembers(agents, teamProfile), [agents, teamProfile]);
+  const selectedMember = members.find((member) => member.agent.id === selectedAgentId) ?? members[0] ?? null;
+  const currentProfileDraft = useMemo(
+    () =>
+      selectedMember
+        ? profileDrafts[selectedMember.agent.id] ?? profileDraftFromMember(selectedMember)
+        : {
+            displayName: '',
+            role: '',
+            personality: '',
+            cognition: '',
+            memorySummary: '',
+            officeTitle: '',
+            officeZone: 'work' as AgentOfficeZone,
+            color: PROFILE_COLORS[0],
+          },
+    [profileDrafts, selectedMember],
+  );
+  const isLoading = profileLoading;
+  const isConnected = connectionStatus === 'connected';
+  const gatewayAgentCount = members.filter((member) => member.source === 'gateway').length;
+  const pendingProfileCount = Object.keys(teamProfile.agents).filter(
+    (agentId) => !agents.some((agent) => agent.id === agentId),
+  ).length;
+
+  const persistProfile = useCallback(
+    (nextProfile: AgentTeamProfile) => {
+      setTeamProfile(nextProfile);
+      if (currentInstanceId) {
+        saveInstanceData(currentInstanceId, AGENT_TEAM_PROFILE_STORAGE_KEY, nextProfile);
+      }
+    },
+    [currentInstanceId],
+  );
+
+  const upsertActionRun = useCallback(
+    async (run: AiActionRun) => {
+      if (!currentInstanceId) return;
+      const stored = await loadInstanceData<AiActionRun[]>(
+        currentInstanceId,
+        AI_ACTION_RUNS_STORAGE_KEY,
+      );
+      const runs = normalizeAiActionRuns(stored);
+      const exists = runs.some((item) => item.id === run.id);
+      const nextRuns = exists
+        ? runs.map((item) => (item.id === run.id ? run : item))
+        : [run, ...runs];
+      saveInstanceData(currentInstanceId, AI_ACTION_RUNS_STORAGE_KEY, nextRuns);
+    },
+    [currentInstanceId],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProfile() {
+      if (!currentInstanceId) {
+        setTeamProfile(createEmptyAgentTeamProfile());
+        return;
+      }
+      setProfileLoading(true);
+      try {
+        const stored = await loadInstanceData<AgentTeamProfile>(
+          currentInstanceId,
+          AGENT_TEAM_PROFILE_STORAGE_KEY,
+        );
+        if (!cancelled) setTeamProfile(normalizeAgentTeamProfile(stored));
+      } finally {
+        if (!cancelled) setProfileLoading(false);
+      }
+    }
+
+    loadProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentInstanceId]);
+
+  const updateCurrentProfileDraft = useCallback(
+    (updates: Partial<ProfileDraft>) => {
+      if (!selectedMember) return;
+      setProfileDrafts((drafts) => ({
+        ...drafts,
+        [selectedMember.agent.id]: {
+          ...(drafts[selectedMember.agent.id] ?? profileDraftFromMember(selectedMember)),
+          ...updates,
+        },
+      }));
+    },
+    [selectedMember],
+  );
+
+  const handleSelectAgent = useCallback((agentId: string) => {
+    setSelectedAgentId(agentId);
+    setFiles([]);
+    setSelectedFile(null);
+    setFileContent('');
+  }, []);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       await useStore.getState().fetchAgents();
-      Toast.success('Agents refreshed');
+      Toast.success('Agents 已刷新');
     } catch {
-      Toast.error('Failed to refresh agents');
+      Toast.error('刷新 Agents 失败');
     } finally {
       setRefreshing(false);
     }
   }, []);
 
-  const handleToggleAgent = (agentId: string) => {
-    setExpandedAgent((prev) => (prev === agentId ? null : agentId));
+  const handleSaveProfile = useCallback(() => {
+    if (!selectedMember) return;
+    const timestamp = Date.now();
+    const nextAgentProfile: AgentLocalProfile = {
+      ...selectedMember.profile,
+      agentId: selectedMember.agent.id,
+      displayName: currentProfileDraft.displayName.trim() || selectedMember.agent.id,
+      role: currentProfileDraft.role.trim(),
+      personality: currentProfileDraft.personality.trim(),
+      cognition: currentProfileDraft.cognition.trim(),
+      memorySummary: currentProfileDraft.memorySummary.trim(),
+      officeTitle: currentProfileDraft.officeTitle.trim(),
+      officeZone: currentProfileDraft.officeZone,
+      color: currentProfileDraft.color,
+      source: selectedMember.source,
+      createdAt: selectedMember.profile.createdAt || timestamp,
+      updatedAt: timestamp,
+    };
+    persistProfile(upsertAgentProfile(teamProfile, nextAgentProfile));
+    Toast.success('Agent 本地画像已保存');
+  }, [currentProfileDraft, persistProfile, selectedMember, teamProfile]);
+
+  const handleCompose = useCallback(async () => {
+    const text = composerText.trim();
+    if (!text) {
+      Toast.warning('先写一句你想怎样编排团队');
+      return;
+    }
+    if (!currentInstanceId) {
+      Toast.error('缺少当前实例，无法记录 ActionRun');
+      return;
+    }
+
+    setActionSubmitting(true);
+    const actionRun = createAiActionRun({
+      type: 'agent_team_compose',
+      sourcePage: 'teams',
+      instanceId: currentInstanceId,
+      agentId: selectedMember?.agent.id || agents.find((agent) => agent.default)?.id || agents[0]?.id || 'main',
+      input: text,
+      executionMode: 'isolated-session',
+    });
+    let nextProfile = teamProfile;
+    let desiredProfile: AgentLocalProfile | undefined;
+    if (shouldCreateAgentFromInstruction(text)) {
+      const parsedProfile = createAgentFromNaturalLanguage(text);
+      desiredProfile = {
+        ...parsedProfile,
+        agentId: createGatewayAgentId(
+          parsedProfile.displayName ?? parsedProfile.agentId,
+          new Set(Object.keys(nextProfile.agents)),
+        ),
+        source: 'gateway',
+      };
+      nextProfile = upsertAgentProfile(nextProfile, desiredProfile);
+      nextProfile = {
+        ...nextProfile,
+        instructions: [createInstruction(text, desiredProfile.agentId), ...nextProfile.instructions],
+      };
+    } else {
+      nextProfile = {
+        ...nextProfile,
+        instructions: [createInstruction(text), ...nextProfile.instructions],
+      };
+    }
+
+    persistProfile(nextProfile);
+    await upsertActionRun({ ...actionRun, status: 'planning', updatedAt: Date.now() });
+    try {
+      if (!activeClient || connectionStatus !== 'connected') {
+        throw new Error('未连接 Gateway，无法执行团队编排');
+      }
+      const updatedRun = await executeAiActionRunWithGateway(activeClient, actionRun, {
+        title: 'Agent 团队编排',
+        prompt: buildAgentActionPrompt({
+          mode: shouldCreateAgentFromInstruction(text) ? 'create' : 'compose',
+          input: text,
+          desiredProfile,
+        }),
+      });
+      await upsertActionRun(updatedRun);
+      useStore.getState().fetchSessions();
+      Toast.success('已提交到 Gateway 执行会话');
+      setComposerText('');
+      setComposerModalVisible(false);
+    } catch (err) {
+      await upsertActionRun({
+        ...actionRun,
+        status: 'failed',
+        error: err instanceof Error ? err.message : 'Gateway 执行失败',
+        updatedAt: Date.now(),
+      });
+      Toast.error(err instanceof Error ? err.message : 'Gateway 执行失败');
+    } finally {
+      setActionSubmitting(false);
+    }
+  }, [
+    activeClient,
+    agents,
+    connectionStatus,
+    composerText,
+    currentInstanceId,
+    persistProfile,
+    selectedMember,
+    teamProfile,
+    upsertActionRun,
+  ]);
+
+  const handleQuickAdd = useCallback(async () => {
+    if (!quickDraft.displayName.trim()) {
+      Toast.warning('请填写 Agent 名称');
+      return;
+    }
+    if (!currentInstanceId) {
+      Toast.error('缺少当前实例，无法记录 ActionRun');
+      return;
+    }
+
+    setActionSubmitting(true);
+    const desiredProfile = buildQuickAgentProfile(quickDraft, teamProfile);
+    const input = `创建 Gateway Agent：${desiredProfile.displayName}${desiredProfile.role ? `，角色：${desiredProfile.role}` : ''}`;
+    const instruction = createInstruction(input, desiredProfile.agentId);
+    persistProfile({
+      ...upsertAgentProfile(teamProfile, desiredProfile),
+      instructions: [instruction, ...teamProfile.instructions],
+    });
+    const actionRun = createAiActionRun({
+      type: 'gateway_agent_create',
+      sourcePage: 'teams',
+      instanceId: currentInstanceId,
+      agentId: agents.find((agent) => agent.default)?.id || agents[0]?.id || 'main',
+      input,
+      executionMode: 'isolated-session',
+    });
+    await upsertActionRun({ ...actionRun, status: 'planning', updatedAt: Date.now() });
+    try {
+      if (!activeClient || connectionStatus !== 'connected') {
+        throw new Error('未连接 Gateway，无法创建 Agent');
+      }
+      const updatedRun = await executeAiActionRunWithGateway(activeClient, actionRun, {
+        title: '创建 Gateway Agent',
+        prompt: buildAgentActionPrompt({
+          mode: 'create',
+          input,
+          desiredProfile,
+        }),
+      });
+      await upsertActionRun(updatedRun);
+      useStore.getState().fetchSessions();
+      useStore.getState().fetchAgents();
+      setQuickDraft({ displayName: '', role: '', personality: '' });
+      setQuickModalVisible(false);
+      Toast.success('已提交到 Gateway 创建 Agent');
+    } catch (err) {
+      await upsertActionRun({
+        ...actionRun,
+        status: 'failed',
+        error: err instanceof Error ? err.message : 'Gateway 执行失败',
+        updatedAt: Date.now(),
+      });
+      Toast.error(err instanceof Error ? err.message : 'Gateway 执行失败');
+    } finally {
+      setActionSubmitting(false);
+    }
+  }, [
+    activeClient,
+    agents,
+    connectionStatus,
+    currentInstanceId,
+    persistProfile,
+    quickDraft,
+    teamProfile,
+    upsertActionRun,
+  ]);
+
+  const loadFiles = useCallback(async () => {
+    if (!selectedMember || !activeClient || selectedMember.source === 'local') return;
+    setFilesLoading(true);
+    setSelectedFile(null);
+    setFileContent('');
+    try {
+      const data = await activeClient.request<WorkspaceFile[]>('agents.files.list', {
+        agentId: selectedMember.agent.id,
+      });
+      setFiles(Array.isArray(data) ? data : []);
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : '读取 Agent 文件列表失败');
+    } finally {
+      setFilesLoading(false);
+    }
+  }, [activeClient, selectedMember]);
+
+  const loadFileContent = useCallback(
+    async (file: WorkspaceFile) => {
+      if (!selectedMember || !activeClient || selectedMember.source === 'local') return;
+      if (!isTextFile(file.name)) {
+        Toast.warning('仅支持查看文本文件');
+        return;
+      }
+      setSelectedFile(file);
+      setFileLoading(true);
+      setFileContent('');
+      try {
+        const result = await activeClient.request<WorkspaceFileContent>('agents.files.get', {
+          agentId: selectedMember.agent.id,
+          name: file.name,
+        });
+        setFileContent(result.content ?? '');
+      } catch (err) {
+        Toast.error(err instanceof Error ? err.message : '读取文件失败');
+      } finally {
+        setFileLoading(false);
+      }
+    },
+    [activeClient, selectedMember],
+  );
+
+  const renderOverview = () => {
+    if (!selectedMember) return <Empty description="请选择 Agent" />;
+    const agent = selectedMember.agent;
+    return (
+      <div style={{ display: 'grid', gap: 16 }}>
+        <Descriptions
+          data={[
+            { key: 'Agent ID', value: agent.id },
+            { key: '来源', value: selectedMember.source === 'gateway' ? 'OpenClaw Gateway' : '本地草稿' },
+            { key: '状态', value: getAgentStatusLabel(agent.status) },
+            { key: '会话数', value: String(agent.sessionCount ?? 0) },
+            { key: 'Workspace', value: agent.workspace || '—' },
+            { key: 'Model', value: agentModelString(agent.model) || '—' },
+            { key: 'Thinking', value: String(agent.thinking || '—') },
+          ]}
+          row
+          size="small"
+        />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
+          <div style={TEAM_PANEL_STYLE}>
+            <div style={{ padding: 14 }}>
+              <Text type="tertiary" size="small">角色</Text>
+              <Text strong style={{ display: 'block', marginTop: 6 }}>
+                {selectedMember.profile.role || '待补充'}
+              </Text>
+            </div>
+          </div>
+          <div style={TEAM_PANEL_STYLE}>
+            <div style={{ padding: 14 }}>
+              <Text type="tertiary" size="small">办公室头衔</Text>
+              <Text strong style={{ display: 'block', marginTop: 6 }}>
+                {selectedMember.profile.officeTitle || 'Agent'}
+              </Text>
+            </div>
+          </div>
+          <div style={TEAM_PANEL_STYLE}>
+            <div style={{ padding: 14 }}>
+              <Text type="tertiary" size="small">办公室区域</Text>
+              <Text strong style={{ display: 'block', marginTop: 6 }}>
+                {selectedMember.profile.officeZone || 'work'}
+              </Text>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
-  // ── Render ───────────────────────────────────────────────────────
+  const renderProfileEditor = () => (
+    <div style={{ display: 'grid', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+        <Input
+          prefix={<IconServer />}
+          placeholder="展示名称"
+          value={currentProfileDraft.displayName}
+          onChange={(value) => updateCurrentProfileDraft({ displayName: value })}
+        />
+        <Input
+          prefix={<IconAppCenter />}
+          placeholder="角色 / 职责"
+          value={currentProfileDraft.role}
+          onChange={(value) => updateCurrentProfileDraft({ role: value })}
+        />
+        <Input
+          prefix={<IconUserGroup />}
+          placeholder="办公室头衔"
+          value={currentProfileDraft.officeTitle}
+          onChange={(value) => updateCurrentProfileDraft({ officeTitle: value })}
+        />
+        <Select
+          value={currentProfileDraft.officeZone}
+          onChange={(value) =>
+            updateCurrentProfileDraft({ officeZone: String(value) as AgentOfficeZone })
+          }
+        >
+          <Select.Option value="work">工作区</Select.Option>
+          <Select.Option value="meeting">会议区</Select.Option>
+          <Select.Option value="lounge">休闲区</Select.Option>
+        </Select>
+      </div>
+
+      <TextArea
+        placeholder="人格：这个 Agent 的沟通风格、偏好和边界"
+        rows={3}
+        value={currentProfileDraft.personality}
+        onChange={(value) => updateCurrentProfileDraft({ personality: value })}
+      />
+      <TextArea
+        placeholder="认知：它看问题的原则、方法论和判断标准"
+        rows={3}
+        value={currentProfileDraft.cognition}
+        onChange={(value) => updateCurrentProfileDraft({ cognition: value })}
+      />
+      <TextArea
+        placeholder="记忆摘要：长期职责、重要偏好、已知上下文"
+        rows={3}
+        value={currentProfileDraft.memorySummary}
+        onChange={(value) => updateCurrentProfileDraft({ memorySummary: value })}
+      />
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <Text type="tertiary" size="small">颜色</Text>
+        {PROFILE_COLORS.map((color) => (
+          <button
+            key={color}
+            type="button"
+            title={color}
+            onClick={() => updateCurrentProfileDraft({ color })}
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 11,
+              border: currentProfileDraft.color === color ? '2px solid var(--semi-color-text-0)' : '1px solid transparent',
+              background: color,
+              cursor: 'pointer',
+            }}
+          />
+        ))}
+        <Button icon={<IconSave />} type="primary" theme="solid" onClick={handleSaveProfile}>
+          保存画像
+        </Button>
+      </div>
+    </div>
+  );
+
+  const renderFiles = () => {
+    if (!selectedMember) return <Empty description="请选择 Agent" />;
+    if (selectedMember.source === 'local') {
+      return <Empty description="本地草稿 Agent 尚未接入 Gateway，暂无远端文件" />;
+    }
+    if (!isConnected) return <Empty description="请先连接到 Gateway" />;
+
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: '300px minmax(0, 1fr)', gap: 14, minHeight: 360 }}>
+        <div style={{ ...TEAM_PANEL_STYLE, overflow: 'hidden' }}>
+          <div
+            style={{
+              padding: 12,
+              borderBottom: '1px solid var(--semi-color-border)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <Text strong>Agent 文件</Text>
+            <Button icon={<IconRefresh />} size="small" loading={filesLoading} onClick={loadFiles} />
+          </div>
+          <div style={{ maxHeight: 420, overflow: 'auto' }}>
+            {filesLoading ? (
+              <div style={{ padding: 24, textAlign: 'center' }}>
+                <Spin />
+              </div>
+            ) : files.length === 0 ? (
+              <Empty description="暂无文件，点击刷新读取" style={{ padding: 24 }} />
+            ) : (
+              files.map((file) => (
+                <button
+                  key={file.name}
+                  type="button"
+                  onClick={() => loadFileContent(file)}
+                  style={{
+                    width: '100%',
+                    border: 0,
+                    borderBottom: '1px solid var(--semi-color-border)',
+                    background:
+                      selectedFile?.name === file.name ? 'var(--semi-color-primary-light-default)' : 'transparent',
+                    padding: '10px 12px',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Space>
+                    <IconFile />
+                    <Text ellipsis style={{ maxWidth: 160 }}>
+                      {file.name}
+                    </Text>
+                    {BOOTSTRAP_FILES.has(file.name) && <Tag size="small" color="blue">启动</Tag>}
+                  </Space>
+                  <Text type="tertiary" size="small" style={{ display: 'block', marginLeft: 22 }}>
+                    {formatSize(file.size)} · {formatTime(file.modifiedAt)}
+                  </Text>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+        <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {selectedFile && (
+            <Text strong>
+              {selectedFile.name}
+            </Text>
+          )}
+          <pre
+            style={{
+              ...TEAM_PANEL_STYLE,
+              margin: 0,
+              flex: 1,
+              minHeight: 360,
+              padding: 14,
+              overflow: 'auto',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
+              fontSize: 13,
+              lineHeight: 1.6,
+              color: 'var(--semi-color-text-0)',
+            }}
+          >
+            {fileLoading ? '读取中...' : fileContent || '选择一个文本文件查看内容'}
+          </pre>
+        </div>
+      </div>
+    );
+  };
+
+  const renderInstructions = () => (
+    <div style={{ display: 'grid', gap: 10 }}>
+      {teamProfile.instructions.length === 0 ? (
+        <Empty description="还没有自然语言编排记录" />
+      ) : (
+        teamProfile.instructions.map((instruction) => (
+          <div key={instruction.id} style={{ ...TEAM_PANEL_STYLE, padding: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+              <Text strong>{instruction.summary || '团队编排草稿'}</Text>
+              <Tag color={instruction.status === 'applied' ? 'green' : 'orange'} size="small">
+                {instruction.status === 'applied' ? '已记录画像' : '草稿'}
+              </Tag>
+            </div>
+            <Text style={{ display: 'block', marginTop: 8, whiteSpace: 'pre-wrap' }}>{instruction.text}</Text>
+            <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 8 }}>
+              {formatTime(instruction.createdAt)}
+              {instruction.agentId ? ` · ${instruction.agentId}` : ''}
+            </Text>
+          </div>
+        ))
+      )}
+    </div>
+  );
 
   return (
     <div style={{ height: '100%', overflow: 'auto', padding: 24 }}>
-      {/* ── Header ──────────────────────────────────────────── */}
       <div
         style={{
           display: 'flex',
           alignItems: 'flex-start',
           justifyContent: 'space-between',
-          marginBottom: 24,
+          marginBottom: 18,
           gap: 16,
         }}
       >
@@ -279,118 +909,180 @@ export default function TeamsPage() {
           <Title heading={3} style={{ margin: 0 }}>
             Agents
           </Title>
-          <Text type="tertiary">{t('page.teamsDesc')}</Text>
+          <Text type="tertiary">{t('page.teamsDesc')} · 虚拟公司与 Agent 本地画像</Text>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          <Button
-            icon={<IconRefresh />}
-            onClick={handleRefresh}
-            loading={refreshing}
-            style={{ borderRadius: 8, fontWeight: 500 }}
-          >
-            Refresh
+        <Space>
+          <Button icon={<IconRefresh />} onClick={handleRefresh} loading={refreshing}>
+            刷新
           </Button>
-        </div>
+          <Button icon={<IconSend />} onClick={() => setComposerModalVisible(true)}>
+            自然语言编排
+          </Button>
+          <Button icon={<IconPlus />} type="primary" theme="solid" onClick={() => setQuickModalVisible(true)}>
+            创建 Agent
+          </Button>
+        </Space>
       </div>
 
-      {/* ── Loading State ───────────────────────────────────── */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+        <Tag color="blue">{members.length} 个团队成员</Tag>
+        <Tag color="green">{gatewayAgentCount} 个 Gateway Agent</Tag>
+        <Tag color="orange">{pendingProfileCount} 个待绑定本地画像</Tag>
+        <Tag color={isConnected ? 'green' : 'grey'}>{isConnected ? 'Gateway 已连接' : 'Gateway 未连接'}</Tag>
+      </div>
+
       {isLoading ? (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            height: 300,
-          }}
-        >
-          <Spin size="large" tip="Connecting..." />
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>
+          <Spin size="large" tip="加载团队资料..." />
         </div>
-      ) : isDisconnected ? (
-        /* ── Disconnected State ─────────────────────────────── */
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            height: 300,
-          }}
-        >
-          <Empty description="Not connected to Gateway" />
-        </div>
-      ) : agents.length === 0 ? (
-        /* ── Empty State ────────────────────────────────────── */
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            height: 300,
-          }}
-        >
-          <Empty
-            description="No agents found"
-            style={{ textAlign: 'center' }}
-          >
-            <Button
-              type="primary"
-              theme="solid"
-              onClick={handleRefresh}
-              style={{ marginTop: 12, borderRadius: 8 }}
-            >
-              Refresh
+      ) : members.length === 0 ? (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>
+          <Empty description="还没有从 Gateway 读取到 Agent">
+            <Button type="primary" theme="solid" onClick={() => setQuickModalVisible(true)}>
+              创建 Gateway Agent
             </Button>
           </Empty>
         </div>
       ) : (
-        /* ── Agent Cards ────────────────────────────────────── */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* Summary bar */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 16,
-              padding: '0 4px 8px',
-            }}
-          >
-            <Text type="tertiary" size="small">
-              {agents.length} agent{agents.length !== 1 ? 's' : ''} configured
-            </Text>
-            <Text type="tertiary" size="small">
-              ·
-            </Text>
-            <Text type="tertiary" size="small">
-              {agents.filter((a) => a.status === 'running').length} running
-            </Text>
-            <Text type="tertiary" size="small">
-              ·
-            </Text>
-            <Text type="tertiary" size="small">
-              {agents.filter((a) => a.status === 'idle').length} idle
-            </Text>
-            {agents.some((a) => a.status === 'error') && (
-              <>
-                <Text type="tertiary" size="small">
-                  ·
-                </Text>
-                <Text type="tertiary" size="small" style={{ color: 'var(--semi-color-danger)' }}>
-                  {agents.filter((a) => a.status === 'error').length} error
-                </Text>
-              </>
-            )}
+        <div style={{ display: 'grid', gridTemplateColumns: '340px minmax(0, 1fr)', gap: 16, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gap: 10 }}>
+            {members.map((member) => (
+              <AgentRosterItem
+                key={member.agent.id}
+                member={member}
+                selected={selectedMember?.agent.id === member.agent.id}
+                onSelect={() => handleSelectAgent(member.agent.id)}
+              />
+            ))}
           </div>
 
-          {/* Cards */}
-          {agents.map((agent) => (
-            <AgentCard
-              key={agent.id}
-              agent={agent}
-              expanded={expandedAgent === agent.id}
-              onToggle={() => handleToggleAgent(agent.id)}
-            />
-          ))}
+          <Card style={TEAM_PANEL_STYLE} bodyStyle={{ padding: 18 }}>
+            {selectedMember ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                    <div
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: 8,
+                        background: `${selectedMember.profile.color ?? PROFILE_COLORS[0]}1f`,
+                        color: selectedMember.profile.color ?? PROFILE_COLORS[0],
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <IconServer size="large" />
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <Title heading={4} style={{ margin: 0 }} ellipsis>
+                        {selectedMember.profile.displayName || agentNameString(selectedMember.agent.name) || selectedMember.agent.id}
+                      </Title>
+                      <Text type="tertiary" ellipsis style={{ display: 'block' }}>
+                        {selectedMember.profile.role || selectedMember.agent.id}
+                      </Text>
+                    </div>
+                  </div>
+                  <Space>
+                    {selectedMember.agent.default && <Tag color="blue">Default</Tag>}
+                    <Tag color={selectedMember.source === 'local' ? 'blue' : getAgentStatusColor(selectedMember.agent.status)}>
+                      {selectedMember.source === 'local' ? 'local draft' : getAgentStatusLabel(selectedMember.agent.status)}
+                    </Tag>
+                  </Space>
+                </div>
+
+                <Tabs style={{ marginTop: 16 }}>
+                  <Tabs.TabPane
+                    tab={<span><IconBulb /> 概览</span>}
+                    itemKey="overview"
+                  >
+                    {renderOverview()}
+                  </Tabs.TabPane>
+                  <Tabs.TabPane
+                    tab={<span><IconEdit /> 本地画像</span>}
+                    itemKey="profile"
+                  >
+                    {renderProfileEditor()}
+                  </Tabs.TabPane>
+                  <Tabs.TabPane
+                    tab={<span><IconFile /> Agent 文件</span>}
+                    itemKey="files"
+                  >
+                    {renderFiles()}
+                  </Tabs.TabPane>
+                  <Tabs.TabPane
+                    tab={<span><IconBox /> 编排记录</span>}
+                    itemKey="instructions"
+                  >
+                    {renderInstructions()}
+                  </Tabs.TabPane>
+                </Tabs>
+              </>
+            ) : (
+              <Empty description="请选择 Agent" />
+            )}
+          </Card>
         </div>
       )}
+
+      <Modal
+        title="自然语言编排 Agent 团队"
+        visible={composerModalVisible}
+        onCancel={() => setComposerModalVisible(false)}
+        onOk={handleCompose}
+        okText="提交 Gateway"
+        cancelText="取消"
+        confirmLoading={actionSubmitting}
+        width={680}
+      >
+        <div style={{ display: 'grid', gap: 12 }}>
+          <TextArea
+            rows={6}
+            value={composerText}
+            onChange={setComposerText}
+            placeholder="例如：新增一个产品 Agent，角色：负责把用户想法整理成规格；性格：温和但会追问关键约束"
+          />
+          <Text type="tertiary" size="small">
+            将创建 ActionRun，并在隔离 Gateway 会话中调用 OpenClaw 执行；本地仅保存职位、称呼、办公室区域等扩展画像。
+          </Text>
+        </div>
+      </Modal>
+
+      <Modal
+        title="创建 Gateway Agent"
+        visible={quickModalVisible}
+        onCancel={() => setQuickModalVisible(false)}
+        onOk={handleQuickAdd}
+        okText="提交 Gateway"
+        cancelText="取消"
+        confirmLoading={actionSubmitting}
+      >
+        <div style={{ display: 'grid', gap: 12 }}>
+          <Input
+            prefix={<IconServer />}
+            placeholder="Agent 名称"
+            value={quickDraft.displayName}
+            onChange={(value) => setQuickDraft((draft) => ({ ...draft, displayName: value }))}
+          />
+          <Input
+            prefix={<IconAppCenter />}
+            placeholder="角色 / 职责"
+            value={quickDraft.role}
+            onChange={(value) => setQuickDraft((draft) => ({ ...draft, role: value }))}
+          />
+          <TextArea
+            rows={3}
+            placeholder="人格摘要"
+            value={quickDraft.personality}
+            onChange={(value) => setQuickDraft((draft) => ({ ...draft, personality: value }))}
+          />
+          <Text type="tertiary" size="small">
+            Desktop 会把这些资料作为本地扩展画像保存，并通过 AI Action Center 提交 Gateway 创建真实 Agent。
+          </Text>
+        </div>
+      </Modal>
     </div>
   );
 }

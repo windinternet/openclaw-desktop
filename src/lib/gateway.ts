@@ -73,6 +73,10 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
   });
   const clientId = opts.clientId ?? 'openclaw-tui';
   const clientVersion = opts.clientVersion ?? '0.1.0';
+  const clientMode = opts.clientMode ?? 'ui';
+  const role = opts.role ?? 'operator';
+  const scopes = opts.scopes ?? ['operator.read', 'operator.write', 'operator.admin'];
+  const capabilities = opts.capabilities ?? [];
   const platform = opts.platform ?? detectPlatform();
   const locale = opts.locale ?? 'en-US';
   const requestTimeoutMs = opts.requestTimeoutMs ?? 30000;
@@ -169,12 +173,13 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
       params: {
         minProtocol: 3,
         maxProtocol: 4,
-        client: { id: clientId, version: clientVersion, platform, mode: 'ui' },
-        role: 'operator',
-        scopes: ['operator.read', 'operator.write', 'operator.admin'],
+        client: { id: clientId, version: clientVersion, platform, mode: clientMode },
+        role,
+        scopes,
         auth,
         locale,
         userAgent: `${clientId}/${clientVersion}`,
+        ...(capabilities.length > 0 ? { capabilities } : {}),
         ...(device ? { device } : {}),
       },
     };
@@ -203,6 +208,9 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
         nonce,
         token,
         clientId,
+        clientMode,
+        role,
+        scopes,
       });
       sendConnect({
         id: result.deviceId,

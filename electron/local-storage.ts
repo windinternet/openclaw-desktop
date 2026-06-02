@@ -6,7 +6,13 @@ import type { InstanceConfig, GatewayUser } from '../src/lib/types'
 import { readJsonFile, updateJsonFile, writeJsonFile } from './json-file-store'
 
 const SCHEMA_VERSION = 1
-const INSTANCE_DATA_KEYS = new Set(['kanban'])
+const INSTANCE_DATA_KEYS = new Set([
+  'kanban',
+  'office-profile',
+  'office-layout-instructions',
+  'agent-team-profile',
+  'ai-action-runs',
+])
 
 interface StoredAppState {
   schemaVersion: number

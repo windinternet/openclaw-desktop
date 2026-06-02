@@ -16,12 +16,15 @@ class FakeWebSocket {
   onerror: WebSocketHandler = null;
   onclose: WebSocketHandler = null;
   onmessage: ((event: MessageEvent) => void) | null = null;
+  sent: string[] = [];
 
   constructor(readonly url: string) {
     FakeWebSocket.instances.push(this);
   }
 
-  send(): void {}
+  send(data: string): void {
+    this.sent.push(data);
+  }
 
   close(): void {
     this.readyState = FakeWebSocket.CLOSED;
@@ -80,6 +83,58 @@ describe('Gateway retry state', () => {
     await expect(Promise.race([connectPromise, Promise.resolve('still pending')])).resolves.toBe(
       'still pending',
     );
+    client.disconnect();
+  });
+
+  it('can connect as a Gateway node with declared desktop capabilities', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        platform: 'darwin',
+        device: {
+          signChallenge: vi.fn(async () => ({
+            deviceId: 'desktop-device',
+            publicKey: 'public-key',
+            signature: 'signature',
+            signedAt: 1,
+            nonce: 'nonce-1',
+          })),
+        },
+      },
+    });
+
+    const client = createGatewayClient({
+      url: 'ws://127.0.0.1:18789',
+      token: 'token',
+      clientId: 'openclaw-desktop-node',
+      clientMode: 'node',
+      role: 'node',
+      scopes: ['node.read', 'node.write'],
+      capabilities: ['desktop.ai_action', 'desktop.local_bridge'],
+    });
+
+    void client.connect();
+    const socket = FakeWebSocket.instances[0];
+    socket.readyState = FakeWebSocket.OPEN;
+    socket.onopen?.();
+    socket.onmessage?.({
+      data: JSON.stringify({
+        type: 'event',
+        event: 'connect.challenge',
+        payload: { nonce: 'nonce-1' },
+      }),
+    } as MessageEvent);
+    await Promise.resolve();
+
+    const frame = JSON.parse(socket.sent[0]);
+    expect(frame.params.client).toMatchObject({
+      id: 'openclaw-desktop-node',
+      mode: 'node',
+    });
+    expect(frame.params.role).toBe('node');
+    expect(frame.params.scopes).toEqual(['node.read', 'node.write']);
+    expect(frame.params.capabilities).toEqual(['desktop.ai_action', 'desktop.local_bridge']);
+
     client.disconnect();
   });
 });
