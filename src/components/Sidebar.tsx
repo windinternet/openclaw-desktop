@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { ComponentClass, CSSProperties, MouseEvent, ReactNode } from 'react';
+import type { ComponentClass, CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Nav, Avatar, Button, Spin, Typography } from '@douyinfe/semi-ui';
+import { Nav, Avatar, Button, Spin, Typography, Input, Toast } from '@douyinfe/semi-ui';
 import { InfiniteLoader, AutoSizer } from 'react-virtualized';
 import VList from 'react-virtualized/dist/commonjs/List';
 import {
@@ -110,6 +110,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
   const currentInstance = instances.find((i) => i.id === currentId);
   const themeMode = useSettingsStore((s) => s.settings.themeMode);
   const userDisplayName = useSettingsStore((s) => s.settings.userDisplayName);
+  const agentIdentity = useStore((s) => s.agentIdentity);
   const sessions = useStore((s) => s.sessions);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const connectionError = useStore((s) => s.connectionError);
@@ -148,28 +149,42 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
     window.open('https://github.com/windinternet/openclaw-desktop', '_blank');
   };
 
+  const assistantName = currentInstance?.assistantName;
+  const instanceName = currentInstance?.name;
+
   const instanceHeaderText = (
     <div
       style={{
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
+        alignItems: 'flex-start',
         flex: 1,
         minWidth: 0,
-        gap: 4,
       }}
     >
-      <Text
-        ellipsis
-        style={{
-          fontWeight: 600,
-          color: 'var(--semi-color-text-0)',
-          minWidth: 0,
-        }}
-      >
-        {currentInstance?.name ?? t('nav.openclaw')}
-      </Text>
-      <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <Text
+          ellipsis
+          style={{
+            fontWeight: 600,
+            color: 'var(--semi-color-text-0)',
+            fontSize: 14,
+            display: 'block',
+          }}
+        >
+          {assistantName || agentIdentity?.name || instanceName || t('nav.openclaw')}
+        </Text>
+        {assistantName && instanceName && (
+          <Text
+            ellipsis
+            type="tertiary"
+            size="small"
+            style={{ display: 'block', lineHeight: '16px' }}
+          >
+            {instanceName}
+          </Text>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: 2, flexShrink: 0, marginLeft: 8 }}>
         <Button icon={<IconPlus />} size="small" theme="borderless" onClick={onAddInstance} />
         <Button icon={<IconBranch />} size="small" theme="borderless" onClick={onOpenDrawer} />
       </div>
@@ -215,6 +230,12 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
   const [showConnectionPopover, setShowConnectionPopover] = useState(false);
   const [connectionPopoverStyle, setConnectionPopoverStyle] = useState<CSSProperties>({});
   const connectionHideTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState('');
+  const editingValueRef = useRef('');
+  const committedRef = useRef(false);
+  const inputInstanceRef = useRef<{ focus?: () => void; select?: () => void } | null>(null);
 
   const connectionIndicator = (() => {
     if (connectionRetry) {
@@ -380,6 +401,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
   }, []);
 
   const formatSessionName = (s: typeof sessions[0]): string => {
+    if (s.label) return s.label;
     if (s.title) return s.title;
     const key = s.key || '';
     // 主会话
@@ -416,6 +438,43 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
     return new Date(ts).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
   };
 
+  const patchSessionLabel = useStore((s) => s.patchSessionLabel);
+
+  const startEditing = useCallback((s: typeof sessions[0]) => {
+    setEditingKey(s.key);
+    setEditingValue(s.label ?? '');
+    editingValueRef.current = s.label ?? '';
+    committedRef.current = false;
+    requestAnimationFrame(() => {
+      const inst = inputInstanceRef.current;
+      if (inst) {
+        inst.focus?.();
+        (inst as unknown as HTMLInputElement).select?.();
+      }
+    });
+  }, []);
+
+  const commitEdit = useCallback(() => {
+    if (committedRef.current) return;
+    committedRef.current = true;
+
+    const key = editingKey;
+    const value = editingValueRef.current.trim();
+    setEditingKey(null);
+    setEditingValue('');
+    if (!key) return;
+
+    patchSessionLabel(key, value || null).catch((err) => {
+      Toast.error(`标签保存失败: ${err instanceof Error ? err.message : '未知错误'}`);
+      useStore.getState().fetchSessions();
+    });
+  }, [editingKey, patchSessionLabel]);
+
+  const cancelEdit = useCallback(() => {
+    setEditingKey(null);
+    setEditingValue('');
+  }, []);
+
   const getSessionStatusColor = (status?: string): string => {
     switch (status) {
       case 'active':
@@ -450,17 +509,34 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
                       if (!s) return null;
                       const isCurrent = s.key === currentSessionKey;
                       const isActive = s.status === 'active';
+                      const isEditing = editingKey === s.key;
                       const statusColor = getSessionStatusColor(s.status);
                       return (
                         <div key={key} style={{ ...style, padding: '0 0 0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
                           backgroundColor: isCurrent ? 'var(--semi-color-primary-light-default)' : 'transparent',
                           borderLeft: isCurrent ? '3px solid var(--semi-color-primary)' : '3px solid transparent',
                           boxShadow: isCurrent ? 'inset 0 0 0 1px var(--semi-color-primary-light-active)' : 'none',
-                        }} onClick={() => navigate(`/chat/${encodeURIComponent(s.key)}`)}>
-                          <span style={{ flex: 1, fontSize: isCurrent ? 14 : 13, fontWeight: isCurrent ? 700 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isCurrent ? 'var(--semi-color-primary)' : 'var(--semi-color-text-0)' }}>
-                            {formatSessionName(s)}
-                          </span>
-                          {s.status && (
+                        }}
+                          onClick={() => { if (!isEditing) navigate(`/chat/${encodeURIComponent(s.key)}`); }}
+                          onDoubleClick={(e) => { e.stopPropagation(); startEditing(s); }}>
+                          {isEditing ? (
+                            <Input
+                              ref={(inst) => { inputInstanceRef.current = inst as typeof inputInstanceRef.current; }}
+                              size="small"
+                              value={editingValue}
+                              onChange={(val) => { setEditingValue(val); editingValueRef.current = val; }}
+                              onEnterPress={commitEdit}
+                              onBlur={commitEdit}
+                              onKeyDown={(e: ReactKeyboardEvent) => { if (e.key === 'Escape') cancelEdit(); }}
+                              style={{ flex: 1, minWidth: 0 }}
+                              maxLength={512}
+                            />
+                          ) : (
+                            <span style={{ flex: 1, fontSize: isCurrent ? 14 : 13, fontWeight: isCurrent ? 700 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isCurrent ? 'var(--semi-color-primary)' : 'var(--semi-color-text-0)' }}>
+                              {formatSessionName(s)}
+                            </span>
+                          )}
+                          {!isEditing && s.status && (
                             isActive ? (
                               <Spin size="small" />
                             ) : (
@@ -470,7 +546,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
                               }} />
                             )
                           )}
-                          {s.updatedAt && (
+                          {!isEditing && s.updatedAt && (
                             <span style={{ fontSize: 10, color: 'var(--semi-color-text-2)', flexShrink: 0, whiteSpace: 'nowrap' }}>
                               {formatRelativeTime(s.updatedAt)}
                             </span>

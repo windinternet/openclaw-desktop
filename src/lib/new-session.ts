@@ -5,6 +5,7 @@ export interface NewSessionCreateParams {
     agentId: string;
     key: string;
     model?: string;
+    label?: string;
   };
   agentId: string;
   key: string;
@@ -49,6 +50,7 @@ export function buildNewSessionCreateParams(options: {
       agentId: options.agentId,
       key: sessionKey,
       model: options.model,
+      label: title || undefined,
     },
     agentId: options.agentId,
     key: sessionKey,
