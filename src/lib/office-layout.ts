@@ -12,28 +12,35 @@ interface OfficeSlot {
   position: OfficeAgent['position'];
 }
 
+export const OFFICE_ROOM_BOUNDS = {
+  minX: -10,
+  maxX: 10,
+  minZ: -6.6,
+  maxZ: 7.4,
+};
+
 const WORK_SLOTS: OfficeSlot[] = [
-  { id: 'work-1', position: { x: 3.2, y: 0.45, z: -1.4 } },
-  { id: 'work-2', position: { x: 4.6, y: 0.45, z: -1.4 } },
-  { id: 'work-3', position: { x: 3.2, y: 0.45, z: 0.1 } },
-  { id: 'work-4', position: { x: 4.6, y: 0.45, z: 0.1 } },
-  { id: 'work-5', position: { x: 3.2, y: 0.45, z: 1.6 } },
-  { id: 'work-6', position: { x: 4.6, y: 0.45, z: 1.6 } },
+  { id: 'work-1', position: { x: 5.0, y: 0.34, z: 1.1 } },
+  { id: 'work-2', position: { x: 7.0, y: 0.34, z: 1.1 } },
+  { id: 'work-3', position: { x: 5.0, y: 0.34, z: 3.0 } },
+  { id: 'work-4', position: { x: 7.0, y: 0.34, z: 3.0 } },
+  { id: 'work-5', position: { x: 5.0, y: 0.34, z: 4.9 } },
+  { id: 'work-6', position: { x: 7.0, y: 0.34, z: 4.9 } },
 ];
 
 const MEETING_SLOTS: OfficeSlot[] = [
-  { id: 'meeting-presenter', position: { x: 0.4, y: 0.45, z: 2.2 } },
-  { id: 'meeting-1', position: { x: -0.9, y: 0.45, z: 1.4 } },
-  { id: 'meeting-2', position: { x: 0.9, y: 0.45, z: 1.3 } },
-  { id: 'meeting-3', position: { x: -0.5, y: 0.45, z: 3.0 } },
-  { id: 'meeting-4', position: { x: 1.4, y: 0.45, z: 2.9 } },
+  { id: 'meeting-presenter', position: { x: -1.0, y: 0.34, z: 3.8 } },
+  { id: 'meeting-1', position: { x: -2.4, y: 0.34, z: 2.6 } },
+  { id: 'meeting-2', position: { x: 0.8, y: 0.34, z: 2.6 } },
+  { id: 'meeting-3', position: { x: -2.3, y: 0.34, z: 5.1 } },
+  { id: 'meeting-4', position: { x: 0.9, y: 0.34, z: 5.0 } },
 ];
 
 const LOUNGE_SLOTS: OfficeSlot[] = [
-  { id: 'lounge-1', position: { x: -3.4, y: 0.45, z: -1.4 } },
-  { id: 'lounge-2', position: { x: -4.7, y: 0.45, z: -1.0 } },
-  { id: 'lounge-3', position: { x: -3.8, y: 0.45, z: 0.4 } },
-  { id: 'lounge-4', position: { x: -5.0, y: 0.45, z: 0.8 } },
+  { id: 'lounge-1', position: { x: -6.4, y: 0.34, z: 2.2 } },
+  { id: 'lounge-2', position: { x: -8.0, y: 0.34, z: 2.8 } },
+  { id: 'lounge-3', position: { x: -6.6, y: 0.34, z: 4.5 } },
+  { id: 'lounge-4', position: { x: -8.1, y: 0.34, z: 5.2 } },
 ];
 
 function slotForZone(zone: OfficeZone, index: number): OfficeSlot {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assignOfficeLayout, getMovementProfile } from '../lib/office-layout';
+import { OFFICE_ROOM_BOUNDS, assignOfficeLayout, getMovementProfile } from '../lib/office-layout';
 import type { OfficeAgent } from '../lib/types';
 
 function officeAgent(agentId: string, zone: OfficeAgent['zone'], behavior: OfficeAgent['behavior']): OfficeAgent {
@@ -28,11 +28,27 @@ describe('office layout', () => {
       slotId: a.slotId,
       position: a.position,
     }))).toEqual([
-      { agentId: 'worker', slotId: 'work-1', position: { x: 3.2, y: 0.45, z: -1.4 } },
-      { agentId: 'speaker', slotId: 'meeting-presenter', position: { x: 0.4, y: 0.45, z: 2.2 } },
-      { agentId: 'listener', slotId: 'meeting-1', position: { x: -0.9, y: 0.45, z: 1.4 } },
-      { agentId: 'sleeper', slotId: 'lounge-1', position: { x: -3.4, y: 0.45, z: -1.4 } },
+      { agentId: 'worker', slotId: 'work-1', position: { x: 5.0, y: 0.34, z: 1.1 } },
+      { agentId: 'speaker', slotId: 'meeting-presenter', position: { x: -1.0, y: 0.34, z: 3.8 } },
+      { agentId: 'listener', slotId: 'meeting-1', position: { x: -2.4, y: 0.34, z: 2.6 } },
+      { agentId: 'sleeper', slotId: 'lounge-1', position: { x: -6.4, y: 0.34, z: 2.2 } },
     ]);
+  });
+
+  it('keeps assigned slots inside the room floor bounds', () => {
+    const laidOut = assignOfficeLayout([
+      officeAgent('worker', 'work', 'working'),
+      officeAgent('speaker', 'meeting', 'presenting'),
+      officeAgent('listener', 'meeting', 'listening'),
+      officeAgent('sleeper', 'lounge', 'resting'),
+    ]);
+
+    laidOut.forEach((agent) => {
+      expect(agent.position.x).toBeGreaterThan(OFFICE_ROOM_BOUNDS.minX);
+      expect(agent.position.x).toBeLessThan(OFFICE_ROOM_BOUNDS.maxX);
+      expect(agent.position.z).toBeGreaterThan(OFFICE_ROOM_BOUNDS.minZ);
+      expect(agent.position.z).toBeLessThan(OFFICE_ROOM_BOUNDS.maxZ);
+    });
   });
 
   it('uses expressive movement profiles for state transitions', () => {
