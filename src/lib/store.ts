@@ -4,6 +4,7 @@ import type {
   ConnectionStatus,
   SessionInfo,
   AgentInfo,
+  AgentIdentity,
   ModelInfo,
   CronJob,
   CronRun,
@@ -78,6 +79,7 @@ interface StoreState {
   workspaceFiles: WorkspaceFile[];
   health: GatewayHealth | null;
   gatewayStatus: GatewayStatus | null;
+  agentIdentity: AgentIdentity | null;
 
   // ── Instance CRUD ──
   loadInstances: () => void;
@@ -109,6 +111,8 @@ interface StoreState {
   fetchHealth: () => Promise<void>;
   fetchGatewayStatus: () => Promise<void>;
   fetchGatewayUserForCurrent: () => Promise<void>;
+  fetchAgentIdentity: (agentId?: string) => Promise<void>;
+  fetchAssistantInfo: () => Promise<void>;
 
   // ── Mutations ──
   createCronJob: (job: Omit<CronJob, 'id'>) => Promise<void>;
@@ -116,6 +120,7 @@ interface StoreState {
   removeCronJob: (id: string) => Promise<void>;
   toggleCronJob: (id: string, enabled: boolean) => Promise<void>;
   runCronJob: (id: string) => Promise<{ runId: string }>;
+  patchSessionLabel: (key: string, label: string | null) => Promise<void>;
 }
 
 function getClient(state: StoreState): GatewayClient | null {
@@ -143,6 +148,7 @@ export const useStore = create<StoreState>((set, get) => ({
   workspaceFiles: [],
   health: null,
   gatewayStatus: null,
+  agentIdentity: null,
 
   // ── Instance CRUD ──
 
@@ -324,6 +330,8 @@ export const useStore = create<StoreState>((set, get) => ({
       get().fetchHealth(),
       get().fetchGatewayStatus(),
       get().fetchGatewayUserForCurrent(),
+      get().fetchAgentIdentity(),
+      get().fetchAssistantInfo(),
     ]);
   },
 
@@ -511,6 +519,47 @@ export const useStore = create<StoreState>((set, get) => ({
     });
   },
 
+  fetchAgentIdentity: async (agentId: string = 'main') => {
+    const client = getClient(get());
+    if (!client) return;
+    try {
+      const data = await client.request<AgentIdentity>('agent.identity.get', { agentId });
+      console.log('[fetchAgentIdentity]', JSON.stringify(data));
+      set({ agentIdentity: data });
+    } catch (err) {
+      console.error('[fetchAgentIdentity]', err);
+    }
+  },
+
+  fetchAssistantInfo: async () => {
+    const state = get();
+    const client = getClient(state);
+    if (!client) return;
+    const instance = state.instances.find((i) => i.id === state.currentInstanceId);
+    if (!instance) return;
+
+    try {
+      type AssistantInfo = { displayName?: string; name?: string; avatarUrl?: string; avatar?: string };
+      const info = await client.request<AssistantInfo>('assistant.info').catch(() =>
+        client.request<AssistantInfo>('assistant.get')
+      );
+      console.log('[fetchAssistantInfo]', JSON.stringify(info));
+      const assistantName = info?.displayName || info?.name;
+      const avatarUrl = info?.avatarUrl || info?.avatar;
+      if (assistantName || avatarUrl) {
+        set((s) => {
+          const instances = s.instances.map((i) =>
+            i.id === instance.id ? { ...i, assistantName: assistantName ?? i.assistantName, avatarUrl: avatarUrl ?? i.avatarUrl } : i,
+          );
+          writeToStorage(instances);
+          return { instances };
+        });
+      }
+    } catch (err) {
+      console.error('[fetchAssistantInfo]', err);
+    }
+  },
+
   // ── Mutations ──
 
   createCronJob: async (job) => {
@@ -566,4 +615,19 @@ export const useStore = create<StoreState>((set, get) => ({
     if (!client) throw new Error('Not connected');
     return client.request<{ runId: string }>('cron.run', { id });
   },
+
+  patchSessionLabel: async (key, label) => {
+    const client = getClient(get());
+    if (!client) throw new Error('未连接 Gateway');
+
+    set((state) => ({
+      sessions: state.sessions.map((s) =>
+        s.key === key ? { ...s, label } : s,
+      ),
+    }));
+
+    await client.request('sessions.patch', { key, label });
+  },
 }));
+
+if (typeof window !== 'undefined') (window as any).__store = useStore;
