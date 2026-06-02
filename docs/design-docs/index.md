@@ -11,5 +11,5 @@
 | `startup-flow.md` | ✅ 活跃 | 启动流程与实例连接 |
 | `local-instance-storage.md` | ✅ 活跃 | 响应式内存层 + Electron 文件后端的实例级本地存储 |
 | `kanban.md` | 🔄 进行中 | 事件驱动 Agent 工作流看板 |
-| `3d-office.md` | 🔄 进行中 | 3D 虚拟办公室渲染 |
+| `3d-office.md` | ✅ 已确认 | 沉浸式 2.5D Three.js 办公室与 Agent 行为设计 |
 | `multi-instance.md` | 🔄 进行中 | 多实例管理与标签页切换 |
