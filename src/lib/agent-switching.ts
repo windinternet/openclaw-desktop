@@ -15,6 +15,12 @@ export interface SessionsSpawnInvokeRequest {
   };
 }
 
+export interface TimelineExcerptEntry {
+  role: string;
+  agentId?: string;
+  contentText: string;
+}
+
 export function buildAgentHandoffPrompt(targetAgentName: string): string {
   return [
     `请为即将接手此对话的 Agent「${targetAgentName}」生成一份结构化交接摘要。`,
@@ -39,6 +45,14 @@ export function buildContextualUserMessage(summary: string, userMessage: string)
     USER_MESSAGE_START,
     userMessage.trim(),
   ].join('\n');
+}
+
+export function buildRecentTimelineExcerpt(entries: TimelineExcerptEntry[], limit = 20): string {
+  return entries
+    .slice(-limit)
+    .map((entry) => `[${entry.role}${entry.agentId ? `:${entry.agentId}` : ''}] ${entry.contentText.trim()}`)
+    .filter((line) => !line.endsWith('] '))
+    .join('\n');
 }
 
 export function buildSessionsSpawnRequest(

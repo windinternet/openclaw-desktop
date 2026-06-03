@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import type { GatewayClient } from '../lib/gateway';
 import type { EventFrame } from '../lib/types';
 import {
   buildAgentHandoffPrompt,
   buildContextualUserMessage,
+  buildRecentTimelineExcerpt,
   buildSessionsSpawnRequest,
   extractChildSessionKey,
   getAgentIdFromSessionKey,
@@ -25,6 +27,18 @@ describe('agent switching helpers', () => {
 
     expect(message.indexOf('已经完成调研')).toBeLessThan(message.indexOf('继续实现'));
     expect(message).toContain('OPENCLAW_DESKTOP_CONTEXT_SUMMARY');
+  });
+
+  it('builds a bounded recent timeline excerpt as a handoff fallback', () => {
+    const excerpt = buildRecentTimelineExcerpt([
+      { role: 'user', agentId: 'a', contentText: '第一条' },
+      { role: 'assistant', agentId: 'a', contentText: '第二条' },
+      { role: 'assistant', agentId: 'b', contentText: '第三条' },
+    ], 2);
+
+    expect(excerpt).not.toContain('第一条');
+    expect(excerpt).toContain('[assistant:a] 第二条');
+    expect(excerpt).toContain('[assistant:b] 第三条');
   });
 
   it('builds a sessions_spawn tools.invoke request from the root session', () => {
@@ -115,5 +129,15 @@ describe('agent switching helpers', () => {
       'tools.invoke',
       buildSessionsSpawnRequest('agent:a:dashboard:root', 'b'),
     );
+  });
+
+  it('documents both agent switching strategies in the session page', () => {
+    const source = readFileSync('src/pages/SessionChatPage.tsx', 'utf8');
+
+    expect(source).toContain("strategy === 'new-session'");
+    expect(source).toContain("activeClient.request<{ key?: string; sessionKey?: string }>(");
+    expect(source).toContain('spawnAgentChildSession(activeClient, rootSessionKey, targetAgentId)');
+    expect(source).toContain('savePendingSummary(currentInstanceId');
+    expect(source).toContain('setActiveSessionKey(destinationSessionKey)');
   });
 });

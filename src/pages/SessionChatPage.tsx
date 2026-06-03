@@ -1,18 +1,54 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AIChatDialogue, AIChatInput, Toast } from '@douyinfe/semi-ui';
+import type { RenderContentProps } from '@douyinfe/semi-ui/lib/es/chat/interface';
 import { useStore } from '../lib';
 import type { EventFrame } from '../lib/types';
 import {
   decodeSessionKeyParam,
+  extractSessionMessageText,
   extractSessionMessageItems,
   parseHistoryMessageToContentItems,
+  parseContextualUserMessage,
   parseToolEventToContentItem,
   isToolCompleted,
   extractToolOutputText,
 } from '../lib/session-content';
 import type { ChatContentItem } from '../lib/session-content';
 import { isAssistantCompletionEvent } from '../lib/assistant-completion-notifier';
+import AgentSelectOption from '../components/AgentSelectOption';
+import ContextSummary from '../components/ContextSummary';
+import {
+  buildAgentRoleConfig,
+  getAgentDisplayName,
+  getAgentRoleKey,
+} from '../lib/agent-presentation';
+import { resolveAgentSwitchStrategy } from '../lib/agent-switch-settings';
+import { useSettingsStore } from '../lib/settings-store';
+import {
+  appendLogicalTimelineEntries,
+  consumePendingSummary,
+  findSubagentMappingByChildSessionKey,
+  getLogicalTimeline,
+  getPendingSummary,
+  getSubagentMapping,
+  loadAgentSwitchState,
+  savePendingSummary,
+  saveSubagentMapping,
+} from '../lib/agent-switch-persistence';
+import {
+  buildAgentHandoffPrompt,
+  buildContextualUserMessage,
+  buildRecentTimelineExcerpt,
+  getAgentIdFromSessionKey,
+  requestAgentHandoffSummary,
+  spawnAgentChildSession,
+} from '../lib/agent-switching';
+import {
+  buildNewSessionCreateParams,
+  getChatRoute,
+  resolveCreatedSessionKey,
+} from '../lib/new-session';
 
 const { Configure } = AIChatInput;
 
@@ -91,9 +127,6 @@ function appendDeltaToLastText(contentArr: ChatContentItem[], delta: string): Ch
   return appendTextToContent(contentArr, delta);
 }
 
-/** AIChatDialogue 的 roleConfig 中支持的 role */
-const KNOWN_ROLES = new Set(['user', 'assistant', 'system']);
-
 interface ChatLocationState {
   initialMessage?: {
     content: unknown;
@@ -102,9 +135,58 @@ interface ChatLocationState {
   };
 }
 
-function normalizeRole(role: unknown): string {
-  if (typeof role === 'string' && KNOWN_ROLES.has(role)) return role;
-  return 'assistant';
+interface DisplayChat {
+  id: string;
+  role: string;
+  content: string | ChatContentItem[];
+  createAt: number;
+  status: string;
+  sourceSessionKey: string;
+  agentId?: string;
+  contextSummary?: string;
+}
+
+function getMessageRole(role: unknown, sessionKey: string): string {
+  if (role === 'user' || role === 'system') return role;
+  return getAgentRoleKey(getAgentIdFromSessionKey(sessionKey) || 'main');
+}
+
+function getSessionKey(session: { key?: string; sessionKey?: string }): string {
+  return session.key || session.sessionKey || '';
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null ? value as Record<string, unknown> : {};
+}
+
+function getHistoryMessageId(sessionKey: string, message: unknown, index: number): string {
+  const record = asRecord(message);
+  return String(record.id ?? record.runId ?? record.run_id ?? `${sessionKey}:${record.timestamp ?? record.createdAt ?? index}:${index}`);
+}
+
+function buildDisplayChat(sessionKey: string, message: unknown, index: number): DisplayChat {
+  const record = asRecord(message);
+  const parsedContext = record.role === 'user' ? parseContextualUserMessage(record) : null;
+  const contentSource = parsedContext ? { ...record, content: parsedContext.userMessage } : record;
+  const agentId = getAgentIdFromSessionKey(sessionKey);
+  return {
+    id: getHistoryMessageId(sessionKey, record, index),
+    role: getMessageRole(record.role, sessionKey),
+    content: parseHistoryMessageToContentItems(contentSource),
+    createAt: Number(record.timestamp || record.createdAt || Date.now()),
+    status: record.role === 'assistant' && (record.status === 'in_progress' || record.status === 'running')
+      ? 'completed'
+      : String(record.status || 'completed'),
+    sourceSessionKey: sessionKey,
+    agentId,
+    contextSummary: parsedContext?.summary,
+  };
+}
+
+function mergeChats(chats: DisplayChat[]): DisplayChat[] {
+  const byId = new Map<string, DisplayChat>();
+  for (const chat of chats) byId.set(`${chat.sourceSessionKey}:${chat.id}`, chat);
+  return [...byId.values()].sort((a, b) => a.createAt - b.createAt);
 }
 
 export default function SessionChatPage() {
@@ -114,18 +196,24 @@ export default function SessionChatPage() {
   const activeClient = useStore((s) => s.activeClient);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const models = useStore((s) => s.models);
-  const agentIdentity = useStore((s) => s.agentIdentity);
   const agents = useStore((s) => s.agents);
-
-  const [activeSessionKey, setActiveSessionKey] = useState<string | undefined>(
-    decodeSessionKeyParam(urlSessionKey),
+  const sessions = useStore((s) => s.sessions);
+  const currentInstanceId = useStore((s) => s.currentInstanceId);
+  const currentInstance = useStore(
+    (s) => s.instances.find((instance) => instance.id === s.currentInstanceId) ?? null,
   );
-  const [chats, setChats] = useState<any[]>([]);
+  const globalAgentSwitchStrategy = useSettingsStore((s) => s.settings.agentSwitchStrategy);
+
+  const initialSessionKey = decodeSessionKeyParam(urlSessionKey);
+  const [rootSessionKey, setRootSessionKey] = useState<string | undefined>(initialSessionKey);
+  const [activeSessionKey, setActiveSessionKey] = useState<string | undefined>(initialSessionKey);
+  const [relatedSessionKeys, setRelatedSessionKeys] = useState<string[]>(initialSessionKey ? [initialSessionKey] : []);
+  const [chats, setChats] = useState<DisplayChat[]>([]);
   const [generating, setGenerating] = useState(false);
+  const [switchingAgent, setSwitchingAgent] = useState(false);
   const [chatModel, setChatModel] = useState('');
   const [chatThinking, setChatThinking] = useState('medium');
 
-  const prevEventRef = useRef<((event: EventFrame) => void) | null>(null);
   const streamingIdRef = useRef<string | null>(null);
   const patchAppliedRef = useRef(false);
   const patchModelRef = useRef('');
@@ -134,28 +222,52 @@ export default function SessionChatPage() {
   const genTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const initialMessageSentRef = useRef<string | null>(null);
-  const prevActiveSessionKeyRef = useRef<string | undefined>();
+  const prevRootSessionKeyRef = useRef<string | undefined>();
 
   useEffect(() => {
-    if (urlSessionKey) setActiveSessionKey(decodeSessionKeyParam(urlSessionKey));
+    if (!urlSessionKey) return;
+    const decoded = decodeSessionKeyParam(urlSessionKey);
+    queueMicrotask(() => {
+      setRootSessionKey(decoded);
+      setActiveSessionKey(decoded);
+      setRelatedSessionKeys(decoded ? [decoded] : []);
+    });
   }, [urlSessionKey]);
 
   useEffect(() => {
-    if (prevActiveSessionKeyRef.current !== activeSessionKey) {
+    if (prevRootSessionKeyRef.current !== rootSessionKey) {
       setChats([]);
       initialMessageSentRef.current = null;
     }
-    prevActiveSessionKeyRef.current = activeSessionKey;
+    prevRootSessionKeyRef.current = rootSessionKey;
     sendingRef.current = false;
     streamingIdRef.current = null;
     if (genTimeoutRef.current) {
       clearTimeout(genTimeoutRef.current);
       genTimeoutRef.current = null;
     }
-  }, [activeSessionKey]);
+  }, [rootSessionKey]);
 
   useEffect(() => {
-    if (!chatModel && models.length > 0) setChatModel(models[0].id);
+    if (!currentInstanceId || !rootSessionKey) return;
+    let cancelled = false;
+    void loadAgentSwitchState(currentInstanceId).then((state) => {
+      if (cancelled) return;
+      const keys = [
+        rootSessionKey,
+        ...Object.values(state.subagentMappings)
+          .filter((mapping) => mapping.rootSessionKey === rootSessionKey)
+          .map((mapping) => mapping.childSessionKey),
+      ];
+      setRelatedSessionKeys([...new Set(keys)]);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentInstanceId, rootSessionKey]);
+
+  useEffect(() => {
+    if (!chatModel && models.length > 0) queueMicrotask(() => setChatModel(models[0].id));
   }, [models, chatModel]);
 
   useEffect(() => {
@@ -170,38 +282,43 @@ export default function SessionChatPage() {
     return () => clearTimeout(timer);
   }, [chats]);
 
+  useEffect(() => {
+    if (!currentInstanceId || !rootSessionKey || chats.length === 0) return;
+    appendLogicalTimelineEntries(
+      currentInstanceId,
+      rootSessionKey,
+      chats.map((chat) => ({
+        id: `${chat.sourceSessionKey}:${chat.id}`,
+        rootSessionKey,
+        sourceSessionKey: chat.sourceSessionKey,
+        agentId: chat.agentId,
+        role: chat.role === 'user' || chat.role === 'system' ? chat.role : 'assistant',
+        timestamp: chat.createAt,
+        contentText: extractSessionMessageText(chat.content),
+        runId: chat.id,
+      })),
+    );
+  }, [chats, currentInstanceId, rootSessionKey]);
+
   /* ── 加载历史消息 ── */
   useEffect(() => {
-    if (!activeSessionKey || !activeClient || connectionStatus !== 'connected') return;
+    if (!rootSessionKey || !activeClient || connectionStatus !== 'connected') return;
     let cancelled = false;
     (async () => {
       try {
-        let data: unknown;
-        try {
-          data = await activeClient.request('chat.history', { sessionKey: activeSessionKey });
-        } catch {
-          data = await activeClient.request('sessions.preview', { keys: [activeSessionKey] });
-        }
+        const sessionKeys = [...new Set([rootSessionKey, ...relatedSessionKeys])];
+        const histories = await Promise.all(sessionKeys.map(async (sessionKey) => {
+          let data: unknown;
+          try {
+            data = await activeClient.request('chat.history', { sessionKey });
+          } catch {
+            data = await activeClient.request('sessions.preview', { keys: [sessionKey] });
+          }
+          return extractSessionMessageItems(data).map((message, index) => buildDisplayChat(sessionKey, message, index));
+        }));
         if (cancelled) return;
-        const rawItems = extractSessionMessageItems(data);
-        const loadedChats = rawItems.map((m: any) => {
-          const contentItems = parseHistoryMessageToContentItems(m);
-          return {
-            id: generateIdempotencyKey(),
-            role: normalizeRole(m.role),
-            content: contentItems,
-            createAt: m.timestamp || m.createdAt,
-            status: m.role === 'assistant' && (m.status === 'in_progress' || m.status === 'running')
-              ? 'completed'
-              : (m.status || 'completed'),
-          };
-        });
-        setChats((prev) => {
-          if (loadedChats.length === 0) return prev;
-          const loadedIds = new Set(loadedChats.map((c: { id: string }) => c.id));
-          const uniquePrev = prev.filter((c: { id: string }) => !loadedIds.has(c.id));
-          return [...loadedChats, ...uniquePrev];
-        });
+        const loadedChats = mergeChats(histories.flat());
+        setChats((prev) => mergeChats([...loadedChats, ...prev]));
       } catch {
         if (!cancelled) setChats((prev) => (prev.length > 0 ? prev : []));
       }
@@ -209,60 +326,88 @@ export default function SessionChatPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeSessionKey, activeClient, connectionStatus]);
+  }, [rootSessionKey, relatedSessionKeys, activeClient, connectionStatus]);
+
+  const endGeneration = useCallback((status: string, runId?: string) => {
+    setGenerating(false);
+    sendingRef.current = false;
+    if (genTimeoutRef.current) { clearTimeout(genTimeoutRef.current); genTimeoutRef.current = null; }
+    const sid = runId || streamingIdRef.current || 'done';
+    setChats((prev) => {
+      const last = prev[prev.length - 1];
+      if (last && last.id === sid)
+        return [...prev.slice(0, -1), { ...last, status }];
+      return prev;
+    });
+    streamingIdRef.current = null;
+    useStore.getState().fetchSessions();
+  }, []);
 
   /* ── 实时事件处理 ── */
   useEffect(() => {
-    if (!activeClient || !activeSessionKey) return;
+    if (!activeClient || !rootSessionKey) return;
     const handleEvent = (frame: EventFrame) => {
-      prevEventRef.current?.(frame);
       if (frame.event !== 'agent') return;
       const p = frame.payload as Record<string, unknown> | undefined;
       if (!p) return;
 
       const evtSessionKey = (p.sessionKey ?? p.session_key) as string | undefined;
-      if (evtSessionKey && evtSessionKey !== activeSessionKey) return;
+      const sourceSessionKey = evtSessionKey || activeSessionKey || rootSessionKey;
+      if (!relatedSessionKeys.includes(sourceSessionKey) && sourceSessionKey !== activeSessionKey) return;
+      const assistantRole = getAgentRoleKey(getAgentIdFromSessionKey(sourceSessionKey) || 'main');
+      const isActiveLensEvent = sourceSessionKey === activeSessionKey;
 
       const stream = (p.stream ?? p.state ?? p.phase) as string | undefined;
       const runId = (p.runId ?? p.run_id ?? 'streaming') as string;
 
       if (stream === 'assistant') {
         // ── 文本流式回复 ──
-        setGenerating(true);
-        if (genTimeoutRef.current) { clearTimeout(genTimeoutRef.current); genTimeoutRef.current = null; }
+        if (isActiveLensEvent) {
+          setGenerating(true);
+          if (genTimeoutRef.current) { clearTimeout(genTimeoutRef.current); genTimeoutRef.current = null; }
+        }
         const data = p.data as Record<string, unknown> | undefined;
         const delta = (data?.delta ?? data?.text ?? data?.content ?? '') as string;
         if (!delta) return;
         setChats((prev) => {
-          const last = prev[prev.length - 1];
-          if (last && last.id === runId && last.role === 'assistant') {
+          const existingIndex = prev.findIndex((chat) => chat.id === runId && chat.sourceSessionKey === sourceSessionKey);
+          const existing = existingIndex >= 0 ? prev[existingIndex] : undefined;
+          if (existing) {
             // 已有流式消息：直接拼接纯文本内容到最后一个 text block
-            if (Array.isArray(last.content)) {
-              return [
-                ...prev.slice(0, -1),
-                { ...last, content: appendDeltaToLastText(last.content as ChatContentItem[], delta) },
-              ];
+            if (Array.isArray(existing.content)) {
+              const next = [...prev];
+              next[existingIndex] = {
+                ...existing,
+                content: appendDeltaToLastText(existing.content as ChatContentItem[], delta),
+              };
+              return next;
             }
             // 兼容旧纯字符串 content
-            return [...prev.slice(0, -1), { ...last, content: (last.content || '') + delta }];
+            const next = [...prev];
+            next[existingIndex] = { ...existing, content: String(existing.content || '') + delta };
+            return next;
           }
           // 新流式消息：创建 ContentItem[] 格式
           return [
             ...prev,
             {
               id: runId,
-              role: 'assistant',
+              role: assistantRole,
               content: appendTextToContent([], delta),
               status: 'in_progress',
               createAt: Date.now(),
+              sourceSessionKey,
+              agentId: getAgentIdFromSessionKey(sourceSessionKey),
             },
           ];
         });
         streamingIdRef.current = runId;
       } else if (stream === 'tool') {
         // ── 工具调用事件 ──
-        setGenerating(true);
-        if (genTimeoutRef.current) { clearTimeout(genTimeoutRef.current); genTimeoutRef.current = null; }
+        if (isActiveLensEvent) {
+          setGenerating(true);
+          if (genTimeoutRef.current) { clearTimeout(genTimeoutRef.current); genTimeoutRef.current = null; }
+        }
         const data = p.data as Record<string, unknown> | undefined;
         const phase = p.phase as string | undefined;
         const toolItem = parseToolEventToContentItem(data, phase);
@@ -272,7 +417,7 @@ export default function SessionChatPage() {
 
           if (toolItem) {
             // 找到或创建当前 run 的流式消息
-            if (last && last.id === runId && last.role === 'assistant' && Array.isArray(last.content)) {
+            if (last && last.id === runId && last.sourceSessionKey === sourceSessionKey && Array.isArray(last.content)) {
               // 检查是否已有同名工具调用块需要更新（如状态变化）
               const existingIdx = last.content.findIndex(
                 (c: ChatContentItem) => c.type === 'function_call' && c.name === toolItem.name && c.call_id === toolItem.call_id,
@@ -292,10 +437,12 @@ export default function SessionChatPage() {
               ...prev,
               {
                 id: runId,
-                role: 'assistant',
+                role: assistantRole,
                 content: [toolItem],
                 status: isToolCompleted(data) ? 'completed' : 'in_progress',
                 createAt: Date.now(),
+                sourceSessionKey,
+                agentId: getAgentIdFromSessionKey(sourceSessionKey),
               },
             ];
           }
@@ -303,7 +450,7 @@ export default function SessionChatPage() {
           // 工具调用结果附着
           if (isToolCompleted(data)) {
             const outputText = extractToolOutputText(data);
-            if (outputText && last && last.role === 'assistant') {
+            if (outputText && last && last.sourceSessionKey === sourceSessionKey) {
               if (Array.isArray(last.content)) {
                 const content = last.content as ChatContentItem[];
                 return [
@@ -332,11 +479,18 @@ export default function SessionChatPage() {
         const data = p.data as Record<string, unknown> | undefined;
         const phase = (p.phase ?? data?.phase ?? p.state) as string | undefined;
         if (phase === 'error') {
-          endGeneration('failed', runId);
+          if (isActiveLensEvent) endGeneration('failed', runId);
         } else if (isAssistantCompletionEvent(frame)) {
-          endGeneration('completed', runId);
+          if (isActiveLensEvent) endGeneration('completed', runId);
+          else {
+            setChats((prev) => prev.map((chat) => (
+              chat.id === runId && chat.sourceSessionKey === sourceSessionKey
+                ? { ...chat, status: 'completed' }
+                : chat
+            )));
+          }
         } else if (phase === 'start' || phase === 'running') {
-          setGenerating(true);
+          if (isActiveLensEvent) setGenerating(true);
           // 开始新 Stream 时创建占位消息
           if (phase === 'start') {
             setChats((prev) => {
@@ -346,10 +500,12 @@ export default function SessionChatPage() {
                 ...prev,
                 {
                   id: runId,
-                  role: 'assistant',
+                  role: assistantRole,
                   content: [] as ChatContentItem[],
                   status: 'in_progress',
                   createAt: Date.now(),
+                  sourceSessionKey,
+                  agentId: getAgentIdFromSessionKey(sourceSessionKey),
                 },
               ];
             });
@@ -358,12 +514,8 @@ export default function SessionChatPage() {
         }
       }
     };
-    prevEventRef.current = activeClient.onEvent;
-    activeClient.onEvent = handleEvent;
-    return () => {
-      if (activeClient) activeClient.onEvent = prevEventRef.current;
-    };
-  }, [activeClient, activeSessionKey]);
+    return activeClient.subscribeEvent(handleEvent);
+  }, [activeClient, activeSessionKey, rootSessionKey, relatedSessionKeys, endGeneration]);
 
   const patchSessionConfig = useCallback(async (options?: { model?: string; thinking?: string }) => {
     const model = options?.model || chatModel;
@@ -379,33 +531,26 @@ export default function SessionChatPage() {
       patchAppliedRef.current = true;
       patchModelRef.current = model;
       patchThinkingRef.current = thinking;
-    } catch {}
+    } catch {
+      // The session may not support model or thinking overrides.
+    }
   }, [activeClient, activeSessionKey, chatModel, chatThinking]);
 
   useEffect(() => {
     patchAppliedRef.current = false;
   }, [activeSessionKey]);
 
-  const endGeneration = useCallback((status: string, runId?: string) => {
-    setGenerating(false);
-    sendingRef.current = false;
-    if (genTimeoutRef.current) { clearTimeout(genTimeoutRef.current); genTimeoutRef.current = null; }
-    const sid = runId || streamingIdRef.current || 'done';
-    setChats((prev) => {
-      const last = prev[prev.length - 1];
-      if (last && last.id === sid)
-        return [...prev.slice(0, -1), { ...last, status }];
-      return prev;
-    });
-    streamingIdRef.current = null;
-    useStore.getState().fetchSessions();
-  }, []);
-
   const handleSend = useCallback(
     async (_content: unknown, options?: { model?: string; thinking?: string }) => {
       if (!activeClient || !activeSessionKey || sendingRef.current) return;
       const message = extractMessageText(_content);
       if (!message.trim()) return;
+      const pendingSummary = currentInstanceId
+        ? getPendingSummary(currentInstanceId, activeSessionKey)
+        : undefined;
+      const gatewayMessage = pendingSummary
+        ? buildContextualUserMessage(pendingSummary.summary, message.trim())
+        : message.trim();
 
       sendingRef.current = true;
       setGenerating(true);
@@ -413,23 +558,45 @@ export default function SessionChatPage() {
       genTimeoutRef.current = setTimeout(() => endGeneration('completed'), 300000);
       setChats((prev) => [
         ...prev,
-        { id: generateIdempotencyKey(), role: 'user', content: message.trim(), createAt: Date.now(), status: 'completed' },
+        {
+          id: generateIdempotencyKey(),
+          role: 'user',
+          content: message.trim(),
+          createAt: Date.now(),
+          status: 'completed',
+          sourceSessionKey: activeSessionKey,
+          agentId: getAgentIdFromSessionKey(activeSessionKey),
+          contextSummary: pendingSummary?.summary,
+        },
       ]);
 
       try {
         await patchSessionConfig(options);
         await activeClient.request('chat.send', {
-          message: message.trim(),
+          message: gatewayMessage,
           sessionKey: activeSessionKey,
           idempotencyKey: generateIdempotencyKey(),
         });
+        if (currentInstanceId && pendingSummary) {
+          consumePendingSummary(currentInstanceId, activeSessionKey);
+        }
+        if (currentInstanceId && rootSessionKey) {
+          const mapping = findSubagentMappingByChildSessionKey(currentInstanceId, activeSessionKey);
+          if (mapping) {
+            saveSubagentMapping(currentInstanceId, {
+              ...mapping,
+              lastSyncedTimelineIndex: chats.length + 1,
+              lastValidatedAt: Date.now(),
+            });
+          }
+        }
       } catch (err) {
         Toast.error(err instanceof Error ? err.message : '发送失败');
         setGenerating(false);
         sendingRef.current = false;
       }
     },
-    [activeClient, activeSessionKey, patchSessionConfig],
+    [activeClient, activeSessionKey, chats.length, currentInstanceId, endGeneration, patchSessionConfig, rootSessionKey],
   );
 
   useEffect(() => {
@@ -445,8 +612,10 @@ export default function SessionChatPage() {
     if (initialMessageSentRef.current === sentKey) return;
     initialMessageSentRef.current = sentKey;
 
-    if (initialMessage.model) setChatModel(initialMessage.model);
-    if (initialMessage.thinking) setChatThinking(initialMessage.thinking);
+    queueMicrotask(() => {
+      if (initialMessage.model) setChatModel(initialMessage.model);
+      if (initialMessage.thinking) setChatThinking(initialMessage.thinking);
+    });
     void handleSend(initialMessage.content, {
       model: initialMessage.model,
       thinking: initialMessage.thinking,
@@ -459,28 +628,165 @@ export default function SessionChatPage() {
     if (!activeClient || !activeSessionKey) return;
     try {
       await activeClient.request('chat.abort', { sessionKey: activeSessionKey });
-    } catch {}
+    } catch {
+      // The generation may have already completed.
+    }
     endGeneration('completed');
   }, [activeClient, activeSessionKey, endGeneration]);
 
-  const roleConfig = useMemo(
-    () => ({
-      user: { name: 'You', avatar: '👤' },
-      assistant: { name: agentIdentity?.name || 'AI', avatar: agentIdentity?.emoji || '🤖' },
-      system: { name: 'System', avatar: '🛎️' },
-    }),
-    [agentIdentity],
+  const roleConfig = useMemo(() => ({
+    user: { name: 'You', avatar: '👤' },
+    assistant: { name: 'AI', avatar: '🤖' },
+    system: { name: 'System', avatar: '🛎️' },
+    ...buildAgentRoleConfig(agents),
+  }), [agents]);
+
+  const agentOptions = useMemo(
+    () => agents.filter((agent) => agent.id).map((agent) => ({
+      value: agent.id,
+      label: <AgentSelectOption agent={agent} />,
+    })),
+    [agents],
   );
+
+  const handleAgentSwitch = useCallback(async (targetAgentId: string) => {
+    if (!activeClient || !activeSessionKey || !rootSessionKey || !currentInstanceId) return;
+    if (targetAgentId === getAgentIdFromSessionKey(activeSessionKey)) return;
+    if (generating || switchingAgent) {
+      Toast.warning('请等待当前回复完成后再切换 Agent');
+      return;
+    }
+
+    const targetAgent = agents.find((agent) => agent.id === targetAgentId);
+    const targetAgentName = getAgentDisplayName(targetAgent);
+    const strategy = resolveAgentSwitchStrategy(
+      globalAgentSwitchStrategy,
+      currentInstance?.agentSwitchStrategy,
+    );
+
+    const requestVisibleSummary = async (): Promise<string | undefined> => {
+      const prompt = buildAgentHandoffPrompt(targetAgentName);
+      setChats((prev) => [
+        ...prev,
+        {
+          id: generateIdempotencyKey(),
+          role: 'user',
+          content: prompt,
+          createAt: Date.now(),
+          status: 'completed',
+          sourceSessionKey: activeSessionKey,
+          agentId: getAgentIdFromSessionKey(activeSessionKey),
+        },
+      ]);
+      try {
+        return await requestAgentHandoffSummary(activeClient, activeSessionKey, targetAgentName);
+      } catch (error) {
+        Toast.warning(error instanceof Error ? error.message : '上下文摘要生成失败');
+        return undefined;
+      }
+    };
+
+    setSwitchingAgent(true);
+    try {
+      if (strategy === 'new-session') {
+        const summary = await requestVisibleSummary();
+        const createParams = buildNewSessionCreateParams({
+          agentId: targetAgentId,
+          model: chatModel || models[0]?.id,
+          content: `与 ${targetAgentName} 继续对话`,
+        });
+        const result = await activeClient.request<{ key?: string; sessionKey?: string }>(
+          'sessions.create',
+          createParams.request,
+        );
+        const destinationSessionKey = resolveCreatedSessionKey(result, createParams.key);
+        if (summary) {
+          savePendingSummary(currentInstanceId, {
+            destinationSessionKey,
+            sourceSessionKey: activeSessionKey,
+            targetAgentId,
+            summary,
+            createdAt: Date.now(),
+          });
+        }
+        await useStore.getState().fetchSessions();
+        navigate(getChatRoute(destinationSessionKey));
+        return;
+      }
+
+      const rootAgentId = getAgentIdFromSessionKey(rootSessionKey);
+      let destinationSessionKey = rootSessionKey;
+      let mapping = getSubagentMapping(currentInstanceId, rootSessionKey, targetAgentId);
+      if (targetAgentId !== rootAgentId) {
+        const mappingStillExists = !mapping || sessions.length === 0 || sessions.some(
+          (session) => getSessionKey(session) === mapping?.childSessionKey,
+        );
+        if (!mapping || !mappingStillExists) {
+          const childSessionKey = await spawnAgentChildSession(activeClient, rootSessionKey, targetAgentId);
+          mapping = {
+            rootSessionKey,
+            agentId: targetAgentId,
+            childSessionKey,
+            createdAt: Date.now(),
+            lastValidatedAt: Date.now(),
+            lastSyncedTimelineIndex: 0,
+          };
+          saveSubagentMapping(currentInstanceId, mapping);
+        }
+        destinationSessionKey = mapping.childSessionKey;
+      }
+
+      const timeline = getLogicalTimeline(currentInstanceId, rootSessionKey);
+      const destinationIsBehind = !mapping || (mapping.lastSyncedTimelineIndex ?? 0) < timeline.length;
+      if (destinationSessionKey !== activeSessionKey && destinationIsBehind && chats.length > 0) {
+        const generatedSummary = await requestVisibleSummary();
+        const fallbackSummary = buildRecentTimelineExcerpt(timeline);
+        const summary = generatedSummary || fallbackSummary;
+        if (summary) {
+          savePendingSummary(currentInstanceId, {
+            destinationSessionKey,
+            sourceSessionKey: activeSessionKey,
+            targetAgentId,
+            summary,
+            createdAt: Date.now(),
+          });
+        }
+      }
+
+      setRelatedSessionKeys((keys) => [...new Set([...keys, destinationSessionKey])]);
+      setActiveSessionKey(destinationSessionKey);
+      Toast.success(`已切换到 ${targetAgentName}`);
+    } catch (error) {
+      Toast.error(error instanceof Error ? error.message : '切换 Agent 失败');
+    } finally {
+      setSwitchingAgent(false);
+    }
+  }, [
+    activeClient,
+    activeSessionKey,
+    agents,
+    chatModel,
+    chats.length,
+    currentInstance,
+    currentInstanceId,
+    generating,
+    globalAgentSwitchStrategy,
+    models,
+    navigate,
+    rootSessionKey,
+    sessions,
+    switchingAgent,
+  ]);
 
   const renderConfig = useCallback(
     () => {
-      const currentAgentId = activeSessionKey?.split(':')?.[1] || 'main';
+      const currentAgentId = getAgentIdFromSessionKey(activeSessionKey || '') || 'main';
       return (
       <>
         <Configure.Select
           field="agent"
           label="Agent"
-          optionList={agents.filter(a => a.id).map((a) => ({ value: a.id, label: a.name || a.id }))}
+          optionList={agentOptions}
           initValue={currentAgentId}
         />
         <Configure.Select
@@ -501,14 +807,15 @@ export default function SessionChatPage() {
         />
       </>
     )},
-    [agents, models, chatModel, chatThinking, activeSessionKey],
+    [agentOptions, models, chatModel, chatThinking, activeSessionKey],
   );
 
-  const handleConfigChange = useCallback((_v: any, changed: any) => {
+  const handleConfigChange = useCallback((_v: Record<string, unknown> | undefined, changed: Record<string, unknown> | undefined) => {
     if (!changed) return;
-    if ('model' in changed) setChatModel(changed.model);
-    if ('thinking' in changed) setChatThinking(changed.thinking);
-  }, []);
+    if ('agent' in changed) void handleAgentSwitch(changed.agent as string);
+    if ('model' in changed) setChatModel(changed.model as string);
+    if ('thinking' in changed) setChatThinking(changed.thinking as string);
+  }, [handleAgentSwitch]);
 
   if (!activeSessionKey) {
     return (
@@ -524,6 +831,16 @@ export default function SessionChatPage() {
         <AIChatDialogue
           chats={chats}
           roleConfig={roleConfig}
+          chatBoxRenderConfig={{
+            renderChatBoxContent: ({ message, defaultContent }: RenderContentProps) => (
+              <>
+                {typeof message?.contextSummary === 'string' && message.contextSummary && (
+                  <ContextSummary summary={message.contextSummary} />
+                )}
+                {defaultContent}
+              </>
+            ),
+          }}
           mode="bubble"
           align="leftRight"
           style={{ maxWidth: 820, margin: '0 auto', paddingBottom: 8 }}
@@ -532,7 +849,7 @@ export default function SessionChatPage() {
       <div style={{ flexShrink: 0, borderTop: '1px solid var(--semi-color-border)', padding: '8px 16px 12px' }}>
         <AIChatInput
           placeholder="输入消息…"
-          generating={generating}
+          generating={generating || switchingAgent}
           uploadProps={{ action: '' }}
           showUploadFile={false}
           showReference={false}

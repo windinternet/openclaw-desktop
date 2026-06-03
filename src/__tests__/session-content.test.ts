@@ -41,7 +41,7 @@ describe('session content helpers', () => {
   it('documents that the session page loads full chat history before preview', () => {
     const source = readFileSync('src/pages/SessionChatPage.tsx', 'utf8');
 
-    expect(source).toContain("activeClient.request('chat.history', { sessionKey: activeSessionKey })");
+    expect(source).toContain("activeClient.request('chat.history', { sessionKey })");
     expect(source).not.toContain("activeClient.request('sessions.history'");
   });
 
@@ -52,5 +52,14 @@ describe('session content helpers', () => {
       summary: '前序摘要',
       userMessage: '继续实现',
     });
+  });
+
+  it('documents actual agent identities and collapsed context summaries in the session page', () => {
+    const source = readFileSync('src/pages/SessionChatPage.tsx', 'utf8');
+
+    expect(source).toContain('getAgentRoleKey(getAgentIdFromSessionKey(sessionKey)');
+    expect(source).toContain('...buildAgentRoleConfig(agents)');
+    expect(source).toContain('<ContextSummary summary={message.contextSummary} />');
+    expect(source).toContain('<AgentSelectOption agent={agent} />');
   });
 });
