@@ -14,4 +14,4 @@
 | `agent-teams.md` | ✅ 活跃 | Agent 团队管理、本地扩展画像和自然语言编排草稿 |
 | `kanban.md` | 🔄 进行中 | 事件驱动 Agent 工作流看板 |
 | `3d-office.md` | ✅ 已确认 | 沉浸式 2.5D Three.js 办公室与 Agent 行为设计 |
-| `multi-instance.md` | 🔄 进行中 | 多实例管理与标签页切换 |
+| `multi-instance.md` | ✅ 活跃 | 多实例常驻连接、运行时隔离与后台活动 |

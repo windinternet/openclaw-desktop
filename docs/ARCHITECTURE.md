@@ -12,7 +12,7 @@
 | 本地实例存储 | `docs/design-docs/local-instance-storage.md` |
 | 看板 (Kanban) | `docs/design-docs/kanban.md`（🔄 设计中，文档暂缺） |
 | 3D 虚拟办公室 | `docs/design-docs/3d-office.md` |
-| 多实例管理 | `docs/design-docs/multi-instance.md`（🔄 设计中，文档暂缺） |
+| 多实例管理 | `docs/design-docs/multi-instance.md` |
 | 产品规格索引 | `docs/product-specs/index.md` |
 | 前端架构 | `docs/FRONTEND.md` |
 | 设计系统 | `docs/DESIGN.md` |
