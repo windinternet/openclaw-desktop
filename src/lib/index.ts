@@ -62,7 +62,13 @@ export type {
 export { useStore } from './store';
 export { createGatewayClient } from './gateway';
 export type { GatewayClient } from './gateway';
-export { fetchGatewayAgentFileContent, fetchGatewayAgentFiles, fetchGatewayAgents } from './gateway-agents';
+export {
+  fetchGatewayAgentFileContent,
+  fetchGatewayAgentFiles,
+  fetchGatewayAgents,
+  isMarkdownAgentFile,
+  saveGatewayAgentFileContent,
+} from './gateway-agents';
 export {
   DEFAULT_SKILL_MARKETPLACE_SOURCE_ID,
   SKILL_MARKETPLACE_SOURCES,

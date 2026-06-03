@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { fetchGatewayAgentFileContent, fetchGatewayAgentFiles, fetchGatewayAgents } from '../lib/gateway-agents';
+import {
+  fetchGatewayAgentFileContent,
+  fetchGatewayAgentFiles,
+  fetchGatewayAgents,
+  isMarkdownAgentFile,
+  saveGatewayAgentFileContent,
+} from '../lib/gateway-agents';
 
 describe('Gateway agents', () => {
   it('enriches agents.list entries with structured agent identities', async () => {
@@ -34,7 +40,7 @@ describe('Gateway agents', () => {
     const client = {
       request: async <T>(method: string): Promise<T> => {
         if (method === 'agents.files.list') {
-          return { files: [{ name: 'IDENTITY.md', size: 42 }] } as T;
+          return { files: [{ name: 'IDENTITY.md', size: 42, updatedAtMs: 1_700_000_000_000 }] } as T;
         }
         if (method === 'agents.files.get') {
           return { file: { name: 'IDENTITY.md', content: '# Identity' } } as T;
@@ -43,10 +49,46 @@ describe('Gateway agents', () => {
       },
     };
 
-    await expect(fetchGatewayAgentFiles(client, 'main')).resolves.toEqual([{ name: 'IDENTITY.md', size: 42 }]);
+    await expect(fetchGatewayAgentFiles(client, 'main')).resolves.toEqual([
+      { name: 'IDENTITY.md', size: 42, modifiedAt: 1_700_000_000_000 },
+    ]);
     await expect(fetchGatewayAgentFileContent(client, 'main', 'IDENTITY.md')).resolves.toMatchObject({
       name: 'IDENTITY.md',
       content: '# Identity',
     });
+  });
+
+  it('writes Agent file content through agents.files.set and returns the saved file', async () => {
+    const calls: Array<{ method: string; params?: unknown }> = [];
+    const client = {
+      request: async <T>(method: string, params?: unknown): Promise<T> => {
+        calls.push({ method, params });
+        return {
+          ok: true,
+          file: { name: 'SOUL.md', content: '# Updated soul', size: 14, updatedAtMs: 1_700_000_000_000 },
+        } as T;
+      },
+    };
+
+    const result = await saveGatewayAgentFileContent(client, 'main', 'SOUL.md', '# Updated soul');
+
+    expect(calls).toEqual([
+      {
+        method: 'agents.files.set',
+        params: { agentId: 'main', name: 'SOUL.md', content: '# Updated soul' },
+      },
+    ]);
+    expect(result).toMatchObject({
+      name: 'SOUL.md',
+      content: '# Updated soul',
+      size: 14,
+      modifiedAt: 1_700_000_000_000,
+    });
+  });
+
+  it('recognizes Markdown Agent files case-insensitively', () => {
+    expect(isMarkdownAgentFile('IDENTITY.md')).toBe(true);
+    expect(isMarkdownAgentFile('notes.MDX')).toBe(true);
+    expect(isMarkdownAgentFile('config.json')).toBe(false);
   });
 });
