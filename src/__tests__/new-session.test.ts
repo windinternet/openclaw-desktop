@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   buildNewSessionNavigationTarget,
   buildNewSessionCreateParams,
@@ -80,5 +81,14 @@ describe('new session creation params', () => {
     ).toEqual({
       to: '/chat/agent%3Amain%3Adashboard%3Anew',
     });
+  });
+
+  it('documents that the new session page uses the selected agent', () => {
+    const source = readFileSync('src/pages/NewSessionPage.tsx', 'utf8');
+
+    expect(source).toContain("const [selectedAgentId, setSelectedAgentId] = useState<string>('')");
+    expect(source).toContain('field="agent"');
+    expect(source).toContain('<AgentSelectOption agent={agent} />');
+    expect(source).toContain("agentId: selectedAgentId || agent?.id || 'main'");
   });
 });

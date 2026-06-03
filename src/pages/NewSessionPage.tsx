@@ -8,6 +8,7 @@ import {
   buildNewSessionCreateParams,
   resolveCreatedSessionKey,
 } from '../lib/new-session';
+import AgentSelectOption from '../components/AgentSelectOption';
 
 const { Configure } = AIChatInput;
 const { Title, Text } = Typography;
@@ -28,21 +29,31 @@ export default function NewSessionPage() {
   const connectionStatus = useStore((s) => s.connectionStatus);
 
   const [selectedModel, setSelectedModel] = useState<string>('');
+  const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [thinkingLevel, setThinkingLevel] = useState('medium');
   const [creating, setCreating] = useState(false);
 
   const modelOptions = models.map((m) => ({ value: m.id, label: m.alias || m.name || m.id }));
+  const agentOptions = agents.filter((agent) => agent.id).map((agent) => ({
+    value: agent.id,
+    label: <AgentSelectOption agent={agent} />,
+  }));
 
   useEffect(() => {
     if (!selectedModel && models.length > 0) setSelectedModel(models[0].id);
   }, [models, selectedModel]);
+
+  useEffect(() => {
+    if (selectedAgentId || agents.length === 0) return;
+    setSelectedAgentId((agents.find((agent) => agent.default) ?? agents[0]).id);
+  }, [agents, selectedAgentId]);
 
   const handleSend = useCallback(async (content: unknown) => {
     if (!activeClient || connectionStatus !== 'connected') { Toast.error('未连接'); return; }
     if (!selectedModel && models.length > 0) { Toast.warning('请选择模型'); return; }
     const agent = agents.find((a) => a.default) ?? agents[0];
     const createParams = buildNewSessionCreateParams({
-      agentId: agent?.id ?? 'main',
+      agentId: selectedAgentId || agent?.id || 'main',
       model: selectedModel || models[0]?.id,
       thinking: thinkingLevel,
       content,
@@ -69,17 +80,24 @@ export default function NewSessionPage() {
     } finally {
       setCreating(false);
     }
-  }, [activeClient, connectionStatus, models, agents, selectedModel, thinkingLevel, navigate]);
+  }, [activeClient, connectionStatus, models, agents, selectedAgentId, selectedModel, thinkingLevel, navigate]);
 
   const renderConfig = useCallback(() => (
     <>
+      <Configure.Select
+        field="agent"
+        label="Agent"
+        optionList={agentOptions}
+        initValue={selectedAgentId || agentOptions[0]?.value}
+      />
       <Configure.Select field="model" optionList={modelOptions} initValue={modelOptions[0]?.value} />
       <Configure.Select field="thinking" optionList={THINKING_OPTIONS} initValue={thinkingLevel} />
     </>
-  ), [modelOptions, thinkingLevel]);
+  ), [agentOptions, modelOptions, selectedAgentId, thinkingLevel]);
 
   const handleConfigChange = useCallback((_value: Record<string, unknown> | undefined, changed: Record<string, unknown> | undefined) => {
     if (!changed) return;
+    if ('agent' in changed) setSelectedAgentId(changed.agent as string);
     if ('model' in changed) setSelectedModel(changed.model as string);
     if ('thinking' in changed) setThinkingLevel(changed.thinking as string);
   }, []);
@@ -91,7 +109,7 @@ export default function NewSessionPage() {
           <IconPlusCircle size="extra-large" style={{ color: 'var(--semi-color-primary)' }} />
         </div>
         <Title heading={3} style={{ marginBottom: 8 }}>新会话</Title>
-        <Text type="tertiary">选择模型，开启新的对话</Text>
+        <Text type="tertiary">选择 Agent 和模型，开启新的对话</Text>
       </div>
 
       {connectionStatus !== 'connected' && (
@@ -103,7 +121,7 @@ export default function NewSessionPage() {
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ width: '100%', maxWidth: 640, padding: '20px 40px' }}>
           <AIChatInput
-            key={modelOptions.length}
+            key={`${agentOptions.length}:${modelOptions.length}`}
             placeholder="输入第一条消息"
             generating={creating}
             uploadProps={{ action: '' }}
