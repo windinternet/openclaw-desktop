@@ -279,3 +279,124 @@ body,
 .action-raw-response .action-markdown-viewer {
   margin-top: 0;
 }
+
+/* ── Agent File Workspace ─────────────────────────────────────── */
+.agent-file-workspace {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 12px;
+  height: min(68vh, 760px);
+  min-height: 560px;
+}
+
+.agent-file-list-panel,
+.agent-file-content-panel {
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+  flex-direction: column;
+  border: 1px solid var(--semi-color-border);
+  border-radius: 6px;
+  background: var(--semi-color-bg-1);
+}
+
+.agent-file-list-header,
+.agent-file-content-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--semi-color-border);
+}
+
+.agent-file-list {
+  flex: 1;
+  overflow: auto;
+}
+
+.agent-file-list-item {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--semi-color-border);
+  background: transparent;
+  color: var(--semi-color-text-0);
+  text-align: left;
+  cursor: pointer;
+}
+
+.agent-file-list-item:hover {
+  background: var(--semi-color-fill-0);
+}
+
+.agent-file-list-item.is-selected {
+  background: var(--semi-color-primary-light-default);
+}
+
+.agent-file-list-item-text {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.agent-file-content-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.agent-file-empty-state {
+  display: flex;
+  height: 100%;
+  min-height: 240px;
+  align-items: center;
+  justify-content: center;
+}
+
+.agent-file-markdown-preview,
+.agent-file-plain-preview {
+  height: 100%;
+  margin: 0;
+  padding: 20px 24px;
+  overflow: auto;
+}
+
+.agent-file-markdown-preview .action-markdown-viewer {
+  margin-top: 0;
+}
+
+.agent-file-plain-preview {
+  color: var(--semi-color-text-0);
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.agent-file-text-editor,
+.agent-file-text-editor textarea {
+  height: 100% !important;
+}
+
+.agent-file-text-editor textarea {
+  padding: 16px 18px;
+  border: 0;
+  border-radius: 0;
+  resize: none;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+@media (max-width: 1100px) {
+  .agent-file-workspace {
+    grid-template-columns: 190px minmax(0, 1fr);
+  }
+}

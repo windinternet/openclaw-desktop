@@ -46,10 +46,10 @@ import {
 import { createAiActionRun, executeAiActionRunWithGateway } from '../lib/ai-action-center';
 import { upsertAiActionRun } from '../lib/ai-action-run-store';
 import { buildAgentTeamComposePrompt, buildGatewayAgentCreatePrompt } from '../lib/ai-action-prompts';
-import { fetchGatewayAgentFileContent, fetchGatewayAgentFiles } from '../lib/gateway-agents';
 import { loadInstanceData, saveInstanceDataAwaited } from '../lib/local-persistence';
 import { useStore } from '../lib';
-import type { AiActionRun, AgentLocalProfile, AgentOfficeZone, AgentTeamProfile, WorkspaceFile } from '../lib/types';
+import AgentFilesPanel from '../components/AgentFilesPanel';
+import type { AiActionRun, AgentLocalProfile, AgentOfficeZone, AgentTeamProfile } from '../lib/types';
 
 const { Title, Text } = Typography;
 
@@ -60,17 +60,6 @@ const TEAM_PANEL_STYLE: CSSProperties = {
 };
 
 const PROFILE_COLORS = ['#2563eb', '#059669', '#d97706', '#7c3aed', '#dc2626', '#0891b2'];
-
-const BOOTSTRAP_FILES = new Set([
-  'AGENTS.md',
-  'SOUL.md',
-  'TOOLS.md',
-  'BOOTSTRAP.md',
-  'IDENTITY.md',
-  'USER.md',
-  'GEMINI.md',
-  'CLAUDE.md',
-]);
 
 interface ProfileDraft {
   displayName: string;
@@ -119,56 +108,11 @@ function getAgentStatusLabel(status?: string): string {
   return status ?? 'unknown';
 }
 
-function formatSize(bytes?: number): string {
-  if (bytes === undefined || bytes === null) return '-';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 function formatTime(ts?: number): string {
   if (!ts) return '-';
   const d = new Date(ts);
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function isTextFile(name: string): boolean {
-  const ext = name.split('.').pop()?.toLowerCase();
-  if (!ext) return true;
-  return new Set([
-    'md',
-    'txt',
-    'json',
-    'yaml',
-    'yml',
-    'toml',
-    'xml',
-    'js',
-    'ts',
-    'jsx',
-    'tsx',
-    'py',
-    'rb',
-    'go',
-    'rs',
-    'java',
-    'sh',
-    'bash',
-    'zsh',
-    'env',
-    'cfg',
-    'conf',
-    'ini',
-    'css',
-    'scss',
-    'less',
-    'html',
-    'svg',
-    'log',
-    'out',
-    'mdx',
-  ]).has(ext);
 }
 
 function profileDraftFromMember(member: AgentTeamMember): ProfileDraft {
@@ -296,12 +240,6 @@ export default function TeamsPage() {
     personality: '',
   });
   const [profileDrafts, setProfileDrafts] = useState<Record<string, ProfileDraft>>({});
-  const [files, setFiles] = useState<WorkspaceFile[]>([]);
-  const [filesLoading, setFilesLoading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<WorkspaceFile | null>(null);
-  const [fileContent, setFileContent] = useState('');
-  const [fileLoading, setFileLoading] = useState(false);
-
   const members = useMemo(() => mergeAgentTeamMembers(agents, teamProfile), [agents, teamProfile]);
   const selectedMember = members.find((member) => member.agent.id === selectedAgentId) ?? members[0] ?? null;
   const currentProfileDraft = useMemo(
@@ -398,9 +336,6 @@ export default function TeamsPage() {
 
   const handleSelectAgent = useCallback((agentId: string) => {
     setSelectedAgentId(agentId);
-    setFiles([]);
-    setSelectedFile(null);
-    setFileContent('');
   }, []);
 
   const handleRefresh = useCallback(async () => {
@@ -600,43 +535,6 @@ export default function TeamsPage() {
     upsertActionRun,
   ]);
 
-  const loadFiles = useCallback(async () => {
-    if (!selectedMember || !activeClient || selectedMember.source === 'local') return;
-    setFilesLoading(true);
-    setSelectedFile(null);
-    setFileContent('');
-    try {
-      const data = await fetchGatewayAgentFiles(activeClient, selectedMember.agent.id);
-      setFiles(data);
-    } catch (err) {
-      Toast.error(err instanceof Error ? err.message : '读取 Agent 文件列表失败');
-    } finally {
-      setFilesLoading(false);
-    }
-  }, [activeClient, selectedMember]);
-
-  const loadFileContent = useCallback(
-    async (file: WorkspaceFile) => {
-      if (!selectedMember || !activeClient || selectedMember.source === 'local') return;
-      if (!isTextFile(file.name)) {
-        Toast.warning('仅支持查看文本文件');
-        return;
-      }
-      setSelectedFile(file);
-      setFileLoading(true);
-      setFileContent('');
-      try {
-        const result = await fetchGatewayAgentFileContent(activeClient, selectedMember.agent.id, file.name);
-        setFileContent(result.content ?? '');
-      } catch (err) {
-        Toast.error(err instanceof Error ? err.message : '读取文件失败');
-      } finally {
-        setFileLoading(false);
-      }
-    },
-    [activeClient, selectedMember],
-  );
-
   const renderOverview = () => {
     if (!selectedMember) return <Empty description="请选择 Agent" />;
     const agent = selectedMember.agent;
@@ -778,88 +676,13 @@ export default function TeamsPage() {
     if (selectedMember.source === 'local') {
       return <Empty description="本地草稿 Agent 尚未接入 Gateway，暂无远端文件" />;
     }
-    if (!isConnected) return <Empty description="请先连接到 Gateway" />;
-
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: '300px minmax(0, 1fr)', gap: 14, minHeight: 360 }}>
-        <div style={{ ...TEAM_PANEL_STYLE, overflow: 'hidden' }}>
-          <div
-            style={{
-              padding: 12,
-              borderBottom: '1px solid var(--semi-color-border)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <Text strong>Agent 文件</Text>
-            <Button icon={<IconRefresh />} size="small" loading={filesLoading} onClick={loadFiles} />
-          </div>
-          <div style={{ maxHeight: 420, overflow: 'auto' }}>
-            {filesLoading ? (
-              <div style={{ padding: 24, textAlign: 'center' }}>
-                <Spin />
-              </div>
-            ) : files.length === 0 ? (
-              <Empty description="暂无文件，点击刷新读取" style={{ padding: 24 }} />
-            ) : (
-              files.map((file) => (
-                <button
-                  key={file.name}
-                  type="button"
-                  onClick={() => loadFileContent(file)}
-                  style={{
-                    width: '100%',
-                    border: 0,
-                    borderBottom: '1px solid var(--semi-color-border)',
-                    background:
-                      selectedFile?.name === file.name ? 'var(--semi-color-primary-light-default)' : 'transparent',
-                    padding: '10px 12px',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <Space>
-                    <IconFile />
-                    <Text ellipsis style={{ maxWidth: 160 }}>
-                      {file.name}
-                    </Text>
-                    {BOOTSTRAP_FILES.has(file.name) && (
-                      <Tag size="small" color="blue">
-                        启动
-                      </Tag>
-                    )}
-                  </Space>
-                  <Text type="tertiary" size="small" style={{ display: 'block', marginLeft: 22 }}>
-                    {formatSize(file.size)} · {formatTime(file.modifiedAt)}
-                  </Text>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-        <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {selectedFile && <Text strong>{selectedFile.name}</Text>}
-          <pre
-            style={{
-              ...TEAM_PANEL_STYLE,
-              margin: 0,
-              flex: 1,
-              minHeight: 360,
-              padding: 14,
-              overflow: 'auto',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
-              fontSize: 13,
-              lineHeight: 1.6,
-              color: 'var(--semi-color-text-0)',
-            }}
-          >
-            {fileLoading ? '读取中...' : fileContent || '选择一个文本文件查看内容'}
-          </pre>
-        </div>
-      </div>
+      <AgentFilesPanel
+        key={selectedMember.agent.id}
+        agentId={selectedMember.agent.id}
+        client={activeClient}
+        isConnected={isConnected}
+      />
     );
   };
 

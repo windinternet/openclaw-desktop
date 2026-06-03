@@ -93,9 +93,12 @@ src/prompts/ai-actions/agent-team-compose.md
 ```text
 agents.files.list({ agentId })
 agents.files.get({ agentId, name })
+agents.files.set({ agentId, name, content })
 ```
 
-它用于查看 Agent 的人格、认知、记忆和启动文件，包括 `IDENTITY.md`。Teams 兼容 Gateway 的裸数组/裸内容和 `{ files }` / `{ file }` 包装响应。由于团队成员只来自 Gateway，文件区不会为未创建的本地 profile 伪造远端文件。
+它用于查看和编辑 Agent 的人格、认知、记忆和启动文件，包括 `IDENTITY.md`。Markdown 文件默认使用安全的 Markdown 渲染器预览，也可以切换到纯文本编辑模式并显式保存；切换文件或刷新前必须保护未保存修改。文件内容是该区域的主要工作对象，因此布局使用窄文件列表和大内容区。
+
+Teams 兼容 Gateway 的裸数组/裸内容和 `{ files }` / `{ file }` 包装响应，并将 Gateway 的 `updatedAtMs` 归一化为 Desktop 的 `modifiedAt`。由于团队成员只来自 Gateway，文件区不会为未创建的本地 profile 伪造远端文件。
 
 ## 质量要求
 
