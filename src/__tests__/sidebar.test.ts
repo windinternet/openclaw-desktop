@@ -51,4 +51,13 @@ describe('Sidebar session list', () => {
     expect(source).toContain('lastActivityAt');
     expect(source).toContain('hasPendingActivity');
   });
+
+  it('keeps the instance drawer header below macOS window controls', () => {
+    const source = readFileSync('src/components/InstanceDrawer.tsx', 'utf8');
+
+    expect(source).toContain('const INSTANCE_DRAWER_MACOS_TOP_INSET = 30;');
+    expect(source).toContain("window.electronAPI?.platform === 'darwin'");
+    expect(source).toContain('const headerPaddingTop = isMacOS ? INSTANCE_DRAWER_MACOS_TOP_INSET + 16 : 16;');
+    expect(source).toContain('padding: `${headerPaddingTop}px 20px 16px`');
+  });
 });

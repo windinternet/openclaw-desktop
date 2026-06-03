@@ -5,6 +5,7 @@ import { IconServer, IconPlus, IconDeleteStroked, IconLink, IconPause } from '@d
 import { useStore } from '../lib';
 
 const { Text } = Typography;
+const INSTANCE_DRAWER_MACOS_TOP_INSET = 30;
 
 interface InstanceDrawerProps {
   visible: boolean;
@@ -40,6 +41,8 @@ export default function InstanceDrawer({ visible, onClose, onAddInstance }: Inst
   const instances = useStore((s) => s.instances);
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const instanceRuntimes = useStore((s) => s.instanceRuntimes);
+  const isMacOS = typeof window !== 'undefined' && window.electronAPI?.platform === 'darwin';
+  const headerPaddingTop = isMacOS ? INSTANCE_DRAWER_MACOS_TOP_INSET + 16 : 16;
 
   return (
     <SideSheet
@@ -47,7 +50,7 @@ export default function InstanceDrawer({ visible, onClose, onAddInstance }: Inst
       onCancel={onClose}
       placement="left"
       width={380}
-      headerStyle={{ padding: '16px 20px', borderBottom: '1px solid var(--semi-color-border)' }}
+      headerStyle={{ padding: `${headerPaddingTop}px 20px 16px`, borderBottom: '1px solid var(--semi-color-border)' }}
       title={<Text style={{ fontSize: 16, fontWeight: 600 }}>{t('instance.drawerTitle')}</Text>}
     >
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
