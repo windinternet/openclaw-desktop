@@ -43,6 +43,11 @@ function darken(hex: string, amount: number): string {
   return rgbToHex(r * (1 - amount), g * (1 - amount), b * (1 - amount));
 }
 
+function withAlpha(hex: string, alpha: number): string {
+  const { r, g, b } = hexToRgb(hex);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export function getEffectiveThemeMode(mode: ThemeMode): 'dark' | 'light' {
   if (mode === 'auto') {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -61,15 +66,25 @@ export function applyTheme(settings: AppSettings): void {
   }
 
   const baseColor = getColorValue(settings.themeColor);
+  const primaryLightColors =
+    effectiveMode === 'dark'
+      ? {
+          '--semi-color-primary-light-default': withAlpha(baseColor, 0.2),
+          '--semi-color-primary-light-hover': withAlpha(baseColor, 0.3),
+          '--semi-color-primary-light-active': withAlpha(baseColor, 0.4),
+        }
+      : {
+          '--semi-color-primary-light-default': lighten(baseColor, 0.9),
+          '--semi-color-primary-light-hover': lighten(baseColor, 0.85),
+          '--semi-color-primary-light-active': lighten(baseColor, 0.8),
+        };
 
   Object.entries({
     '--semi-color-primary': baseColor,
     '--semi-color-primary-hover': lighten(baseColor, 0.1),
     '--semi-color-primary-active': darken(baseColor, 0.1),
     '--semi-color-primary-disabled': lighten(baseColor, 0.4),
-    '--semi-color-primary-light-default': lighten(baseColor, 0.9),
-    '--semi-color-primary-light-hover': lighten(baseColor, 0.85),
-    '--semi-color-primary-light-active': lighten(baseColor, 0.8),
+    ...primaryLightColors,
   }).forEach(([name, value]) => {
     document.body.style.setProperty(name, value);
     document.documentElement.style.setProperty(name, value);
