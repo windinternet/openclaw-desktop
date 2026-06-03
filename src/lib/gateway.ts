@@ -56,6 +56,7 @@ export interface GatewayClient {
   getStatus(): ConnectionStatus;
   request<T = unknown>(method: string, params?: unknown): Promise<T>;
   testConnection(): Promise<{ success: boolean; version?: string; error?: string }>;
+  subscribeEvent(listener: (event: EventFrame) => void): () => void;
   onStatusChange: ((status: ConnectionStatus) => void) | null;
   onRetry: ((info: GatewayRetryInfo | null) => void) | null;
   onEvent: ((event: EventFrame) => void) | null;
@@ -98,6 +99,7 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
   let statusCallback: ((status: ConnectionStatus) => void) | null = opts.onStatusChange ?? null;
   let retryCallback: ((info: GatewayRetryInfo | null) => void) | null = opts.onRetry ?? null;
   let eventCallback: ((event: EventFrame) => void) | null = opts.onEvent ?? null;
+  const eventSubscribers = new Set<(event: EventFrame) => void>();
   let helloCallback: ((hello: HelloOk) => void) | null = opts.onHelloOk ?? null;
 
   let connectResolve: ((hello: HelloOk) => void) | null = null;
@@ -297,6 +299,7 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
     }
 
     eventCallback?.(eventFrame);
+    for (const listener of eventSubscribers) listener(eventFrame);
   }
 
   function handleMessage(event: MessageEvent): void {
@@ -519,6 +522,12 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
     getStatus,
     request,
     testConnection,
+    subscribeEvent(listener) {
+      eventSubscribers.add(listener);
+      return () => {
+        eventSubscribers.delete(listener);
+      };
+    },
     get onStatusChange() {
       return statusCallback;
     },

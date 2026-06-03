@@ -137,4 +137,34 @@ describe('Gateway retry state', () => {
 
     client.disconnect();
   });
+
+  it('notifies multiple event subscribers without replacing the legacy callback', () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+    const legacy = vi.fn();
+    const first = vi.fn();
+    const second = vi.fn();
+    const client = createGatewayClient({
+      url: 'ws://127.0.0.1:18789',
+      token: 'token',
+      onEvent: legacy,
+    });
+
+    void client.connect();
+    const socket = FakeWebSocket.instances[0];
+    const unsubscribeFirst = client.subscribeEvent(first);
+    client.subscribeEvent(second);
+
+    socket.onmessage?.({
+      data: JSON.stringify({ type: 'event', event: 'agent', payload: { runId: 'run-1' } }),
+    } as MessageEvent);
+    unsubscribeFirst();
+    socket.onmessage?.({
+      data: JSON.stringify({ type: 'event', event: 'agent', payload: { runId: 'run-2' } }),
+    } as MessageEvent);
+
+    expect(legacy).toHaveBeenCalledTimes(2);
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).toHaveBeenCalledTimes(2);
+    client.disconnect();
+  });
 });
