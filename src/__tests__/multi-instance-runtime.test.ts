@@ -243,6 +243,18 @@ describe('multi-instance gateway runtime', () => {
     });
   });
 
+  it('updates persisted instance preferences without replacing runtime state', () => {
+    useStore.getState().hydrateInstances([instanceA], instanceA.id);
+    const runtimeBefore = useStore.getState().instanceRuntimes[instanceA.id];
+
+    useStore.getState().updateInstancePreferences(instanceA.id, {
+      agentSwitchStrategy: 'subagent-session',
+    });
+
+    expect(useStore.getState().instances[0].agentSwitchStrategy).toBe('subagent-session');
+    expect(useStore.getState().instanceRuntimes[instanceA.id]).toBe(runtimeBefore);
+  });
+
   it('connects selected instances on demand and supports the all-instances startup setting', () => {
     const source = readFileSync('src/pages/MainPage.tsx', 'utf8');
 

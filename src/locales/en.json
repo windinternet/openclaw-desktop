@@ -159,6 +159,16 @@
     "connectionsDesc": "Configure multi-instance connection behavior",
     "connectAllInstancesOnStartup": "Connect all instances on startup",
     "connectAllInstancesOnStartupDesc": "When disabled, only the current instance connects at startup. Other instances stay connected after first use.",
+    "agentSwitching": "Agent Switching",
+    "agentSwitchingDesc": "Configure what happens when switching Agents in a conversation",
+    "agentSwitchStrategy": "Global default strategy",
+    "currentInstanceAgentSwitchStrategy": "Current instance override",
+    "agentSwitchStrategyOptions": {
+      "inherit": "Follow global",
+      "new-session": "Create a new visible session",
+      "subagent-session": "Use a child-session lens"
+    },
+    "subagentSessionLimitation": "Child-session mode is subject to OpenClaw sub-agent personality, memory, and tool-policy limits, so it may behave differently from a normal Agent session.",
     "about": "About",
     "appVersion": "App Version",
     "electronVersion": "Electron Version",

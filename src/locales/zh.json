@@ -159,6 +159,16 @@
     "connectionsDesc": "配置多实例连接策略",
     "connectAllInstancesOnStartup": "启动时连接全部实例",
     "connectAllInstancesOnStartupDesc": "关闭时只连接当前实例，其他实例在首次切换后保持常驻连接。",
+    "agentSwitching": "Agent 切换",
+    "agentSwitchingDesc": "配置会话中切换 Agent 时的行为",
+    "agentSwitchStrategy": "全局默认策略",
+    "currentInstanceAgentSwitchStrategy": "当前实例覆盖",
+    "agentSwitchStrategyOptions": {
+      "inherit": "跟随全局",
+      "new-session": "创建新的可见会话",
+      "subagent-session": "使用子会话切换镜头"
+    },
+    "subagentSessionLimitation": "子会话模式受 OpenClaw sub-agent 人格、记忆与工具策略限制，表现可能与普通 Agent 会话不同。",
     "about": "关于",
     "appVersion": "应用版本",
     "electronVersion": "Electron 版本",

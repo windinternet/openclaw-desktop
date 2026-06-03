@@ -116,6 +116,10 @@ interface StoreState {
   loadInstances: () => Promise<void>;
   addInstance: (config: Omit<InstanceConfig, 'id' | 'lastConnectedAt'>) => void;
   removeInstance: (id: string) => void;
+  updateInstancePreferences: (
+    id: string,
+    preferences: Pick<InstanceConfig, 'agentSwitchStrategy'>,
+  ) => void;
   setCurrentInstance: (id: string | null) => void;
   setConnectionStatus: (status: ConnectionStatus, error?: string) => void;
   getCurrentInstance: () => InstanceConfig | null;
@@ -320,6 +324,16 @@ export const useStore = create<StoreState>((set, get) => ({
         instanceRuntimes,
         ...runtimeToCurrentView(currentRuntime),
       };
+    });
+  },
+
+  updateInstancePreferences: (id, preferences) => {
+    set((state) => {
+      const instances = state.instances.map((instance) =>
+        instance.id === id ? { ...instance, ...preferences } : instance,
+      );
+      saveInstances(instances);
+      return { instances };
     });
   },
 

@@ -13,6 +13,7 @@ import {
 import { useSettingsStore } from '../lib/settings-store';
 import { PRESET_THEME_COLORS } from '../lib/settings-types';
 import type { ThemeMode, SupportedLocale } from '../lib/settings-types';
+import type { AgentSwitchStrategy, InstanceAgentSwitchStrategy } from '../lib/agent-switch-settings';
 import { useStore } from '../lib';
 
 const { Title, Text } = Typography;
@@ -28,6 +29,13 @@ const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
 const LOCALE_OPTIONS: { value: SupportedLocale; label: string }[] = [
   { value: 'zh-CN', label: '中文' },
   { value: 'en-US', label: 'English' },
+];
+
+const AGENT_SWITCH_OPTIONS: AgentSwitchStrategy[] = ['new-session', 'subagent-session'];
+const INSTANCE_AGENT_SWITCH_OPTIONS: InstanceAgentSwitchStrategy[] = [
+  'inherit',
+  'new-session',
+  'subagent-session',
 ];
 
 /* ── Section wrapper ── */
@@ -92,6 +100,10 @@ export default function SettingsPage() {
 
   const health = useStore((s) => s.health);
   const connectionStatus = useStore((s) => s.connectionStatus);
+  const currentInstance = useStore((s) =>
+    s.instances.find((instance) => instance.id === s.currentInstanceId) ?? null,
+  );
+  const updateInstancePreferences = useStore((s) => s.updateInstancePreferences);
 
   /* ── About info ── */
   const appVersion = '0.1.0';
@@ -285,6 +297,60 @@ export default function SettingsPage() {
               checked={settings.connectAllInstancesOnStartup}
               onChange={(checked: boolean) => updateSettings({ connectAllInstancesOnStartup: checked })}
             />
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          icon="🤖"
+          title={t('settings.agentSwitching')}
+          desc={t('settings.agentSwitchingDesc')}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <Text size="small" style={{ display: 'block', marginBottom: 8, color: 'var(--semi-color-text-1)' }}>
+                {t('settings.agentSwitchStrategy')}
+              </Text>
+              <Select
+                value={settings.agentSwitchStrategy}
+                onChange={(value: unknown) =>
+                  updateSettings({ agentSwitchStrategy: value as AgentSwitchStrategy })
+                }
+                style={{ width: 280 }}
+              >
+                {AGENT_SWITCH_OPTIONS.map((value) => (
+                  <Select.Option key={value} value={value}>
+                    {t(`settings.agentSwitchStrategyOptions.${value}`)}
+                  </Select.Option>
+                ))}
+              </Select>
+            </div>
+
+            <div>
+              <Text size="small" style={{ display: 'block', marginBottom: 8, color: 'var(--semi-color-text-1)' }}>
+                {t('settings.currentInstanceAgentSwitchStrategy')}
+              </Text>
+              <Select
+                disabled={!currentInstance}
+                value={currentInstance?.agentSwitchStrategy ?? 'inherit'}
+                onChange={(value: unknown) => {
+                  if (!currentInstance) return;
+                  updateInstancePreferences(currentInstance.id, {
+                    agentSwitchStrategy: value as InstanceAgentSwitchStrategy,
+                  });
+                }}
+                style={{ width: 280 }}
+              >
+                {INSTANCE_AGENT_SWITCH_OPTIONS.map((value) => (
+                  <Select.Option key={value} value={value}>
+                    {t(`settings.agentSwitchStrategyOptions.${value}`)}
+                  </Select.Option>
+                ))}
+              </Select>
+            </div>
+
+            <Text type="tertiary" size="small" style={{ display: 'block', maxWidth: 620 }}>
+              {t('settings.subagentSessionLimitation')}
+            </Text>
           </div>
         </SectionCard>
 
