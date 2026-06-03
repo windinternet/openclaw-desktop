@@ -1,10 +1,4 @@
-import type {
-  AgentInfo,
-  AgentLocalProfile,
-  AgentOfficeZone,
-  AgentTeamInstruction,
-  AgentTeamProfile,
-} from './types';
+import type { AgentInfo, AgentLocalProfile, AgentOfficeZone, AgentTeamInstruction, AgentTeamProfile } from './types';
 
 export const AGENT_TEAM_PROFILE_STORAGE_KEY = 'agent-team-profile';
 
@@ -30,6 +24,7 @@ function slugifyAgentId(input: string): string {
 }
 
 function fallbackName(agent: AgentInfo): string {
+  if (agent.identity?.name?.trim()) return agent.identity.name.trim();
   return typeof agent.name === 'string' && agent.name.trim() ? agent.name.trim() : agent.id;
 }
 
@@ -46,6 +41,104 @@ function defaultProfileForAgent(agent: AgentInfo, index: number): AgentLocalProf
     createdAt: timestamp,
     updatedAt: timestamp,
   };
+}
+
+function normalizeMatchValue(value: string | undefined): string {
+  return (value ?? '').trim().toLocaleLowerCase().replace(/\s+/g, '');
+}
+
+export function findGatewayAgentForProfile(agents: AgentInfo[], profile: AgentLocalProfile): AgentInfo | undefined {
+  const exact = agents.find((agent) => agent.id === profile.agentId);
+  if (exact) return exact;
+
+  const displayName = normalizeMatchValue(profile.displayName);
+  if (!displayName) return undefined;
+  const matches = agents.filter((agent) =>
+    [agent.name, agent.identity?.name].some((name) => normalizeMatchValue(name) === displayName),
+  );
+  return matches.length === 1 ? matches[0] : undefined;
+}
+
+export function bindAgentProfileToGatewayAgent(
+  profile: AgentTeamProfile,
+  localAgentId: string,
+  gatewayAgentId: string,
+): AgentTeamProfile {
+  const local = profile.agents[localAgentId];
+  if (!local) return profile;
+  const timestamp = now();
+  const agents = { ...profile.agents };
+  if (localAgentId !== gatewayAgentId) delete agents[localAgentId];
+  agents[gatewayAgentId] = {
+    ...local,
+    agentId: gatewayAgentId,
+    source: 'gateway',
+    bindingStatus: 'bound',
+    bindingError: undefined,
+    updatedAt: timestamp,
+  };
+  return {
+    ...profile,
+    agents,
+    instructions: profile.instructions.map((instruction) =>
+      instruction.agentId === localAgentId
+        ? {
+            ...instruction,
+            agentId: gatewayAgentId,
+            status: 'applied',
+            appliedAt: timestamp,
+            summary: `已绑定 Gateway Agent：${gatewayAgentId}`,
+          }
+        : instruction,
+    ),
+  };
+}
+
+export function markAgentProfileBindingFailed(
+  profile: AgentTeamProfile,
+  agentId: string,
+  error: string,
+): AgentTeamProfile {
+  const local = profile.agents[agentId];
+  if (!local) return profile;
+  const timestamp = now();
+  return {
+    ...profile,
+    agents: {
+      ...profile.agents,
+      [agentId]: {
+        ...local,
+        bindingStatus: 'failed',
+        bindingError: error,
+        updatedAt: timestamp,
+      },
+    },
+    instructions: profile.instructions.map((instruction) =>
+      instruction.agentId === agentId
+        ? {
+            ...instruction,
+            status: 'failed',
+            summary: error,
+          }
+        : instruction,
+    ),
+  };
+}
+
+export function reconcileAgentTeamProfileWithGateway(agents: AgentInfo[], profile: AgentTeamProfile): AgentTeamProfile {
+  let nextProfile = profile;
+  const boundAgentIds = new Set(
+    Object.keys(profile.agents).filter((agentId) => agents.some((agent) => agent.id === agentId)),
+  );
+
+  for (const [localAgentId, localProfile] of Object.entries(profile.agents)) {
+    const gatewayAgent = findGatewayAgentForProfile(agents, localProfile);
+    if (!gatewayAgent || boundAgentIds.has(gatewayAgent.id)) continue;
+    nextProfile = bindAgentProfileToGatewayAgent(nextProfile, localAgentId, gatewayAgent.id);
+    boundAgentIds.add(gatewayAgent.id);
+  }
+
+  return nextProfile;
 }
 
 export function createEmptyAgentTeamProfile(): AgentTeamProfile {
@@ -68,10 +161,7 @@ export function normalizeAgentTeamProfile(value: AgentTeamProfile | null | undef
   };
 }
 
-export function mergeAgentTeamMembers(
-  agents: AgentInfo[],
-  profile: AgentTeamProfile,
-): AgentTeamMember[] {
+export function mergeAgentTeamMembers(agents: AgentInfo[], profile: AgentTeamProfile): AgentTeamMember[] {
   return agents.map((agent, index) => {
     const local = profile.agents[agent.id];
     const base = defaultProfileForAgent(agent, index);
@@ -95,10 +185,14 @@ function extractName(text: string): string {
   const explicit = extractAfterLabel(text, ['名字', '名称', 'name', 'Agent']);
   if (explicit) return explicit;
 
-  const addMatch = text.match(/(?:添加|新增|招聘|创建|需要|加一个)\s*(?:一个)?\s*([^，。；;\n]{2,16}?)(?:Agent|智能体|助手|同事|工程师|设计师|经理|负责人)/);
+  const addMatch = text.match(
+    /(?:添加|新增|招聘|创建|需要|加一个)\s*(?:一个)?\s*([^，。；;\n]{2,16}?)(?:Agent|智能体|助手|同事|工程师|设计师|经理|负责人)/,
+  );
   if (addMatch?.[1]) return addMatch[1].trim();
 
-  const roleMatch = text.match(/(产品|前端|后端|全栈|测试|运维|设计|数据|增长|运营|研究|架构|项目|安全)(?:Agent|智能体|助手|同事|工程师|设计师|经理|负责人)/);
+  const roleMatch = text.match(
+    /(产品|前端|后端|全栈|测试|运维|设计|数据|增长|运营|研究|架构|项目|安全)(?:Agent|智能体|助手|同事|工程师|设计师|经理|负责人)/,
+  );
   if (roleMatch?.[0]) return roleMatch[0].trim();
 
   return '新 Agent';
@@ -137,11 +231,10 @@ export function createInstruction(text: string, agentId?: string): AgentTeamInst
   return {
     id: `instruction-${now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
     text: text.trim(),
-    status: agentId ? 'applied' : 'draft',
+    status: agentId ? 'pending' : 'draft',
     createdAt: now(),
-    appliedAt: agentId ? now() : undefined,
     agentId,
-    summary: agentId ? `已生成本地 Agent 草稿：${agentId}` : '已保存为团队编排草稿',
+    summary: agentId ? `等待绑定 Gateway Agent：${agentId}` : '已保存为团队编排草稿',
   };
 }
 
@@ -149,10 +242,7 @@ export function shouldCreateAgentFromInstruction(text: string): boolean {
   return /添加|新增|招聘|创建|需要|加一个|补一个/.test(text);
 }
 
-export function upsertAgentProfile(
-  profile: AgentTeamProfile,
-  agent: AgentLocalProfile,
-): AgentTeamProfile {
+export function upsertAgentProfile(profile: AgentTeamProfile, agent: AgentLocalProfile): AgentTeamProfile {
   return {
     ...profile,
     agents: {

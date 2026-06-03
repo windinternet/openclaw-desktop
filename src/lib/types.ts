@@ -68,6 +68,7 @@ export interface AgentInfo {
   thinking?: string;
   status?: 'idle' | 'running' | 'error';
   sessionCount?: number;
+  identity?: AgentIdentity;
 }
 
 /** agent.identity.get RPC 返回的身份信息 */
@@ -76,7 +77,9 @@ export interface AgentIdentity {
   name?: string;
   emoji?: string;
   avatar?: string;
-  description?: string;
+  avatarSource?: string;
+  avatarStatus?: 'none' | 'local' | 'remote' | 'data';
+  avatarReason?: string;
 }
 
 export type AgentProfileSource = 'gateway' | 'local';
@@ -94,6 +97,8 @@ export interface AgentLocalProfile {
   officeZone?: AgentOfficeZone;
   color?: string;
   source: AgentProfileSource;
+  bindingStatus?: 'pending' | 'bound' | 'failed';
+  bindingError?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -101,7 +106,7 @@ export interface AgentLocalProfile {
 export interface AgentTeamInstruction {
   id: string;
   text: string;
-  status: 'draft' | 'applied';
+  status: 'draft' | 'pending' | 'applied' | 'failed';
   createdAt: number;
   appliedAt?: number;
   summary?: string;
@@ -128,11 +133,7 @@ export type AiActionRunStatus =
   | 'failed'
   | 'cancelled';
 
-export type AiActionExecutionMode =
-  | 'isolated-session'
-  | 'domain-thread'
-  | 'subagent-tree'
-  | 'local-bridge';
+export type AiActionExecutionMode = 'isolated-session' | 'domain-thread' | 'subagent-tree' | 'local-bridge';
 
 export interface AiActionApproval {
   id: string;
@@ -156,6 +157,9 @@ export interface AiActionRun {
   plan?: string;
   resultSummary?: string;
   error?: string;
+  lastAssistantResponse?: string;
+  targetAgentId?: string;
+  gatewayAgentId?: string;
   gatewaySessionKey?: string;
   gatewayRunId?: string;
   childSessionKeys?: string[];

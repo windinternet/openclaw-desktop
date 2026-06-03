@@ -35,28 +35,21 @@ import {
   createAgentFromNaturalLanguage,
   createEmptyAgentTeamProfile,
   createInstruction,
+  markAgentProfileBindingFailed,
   mergeAgentTeamMembers,
   normalizeAgentTeamProfile,
+  reconcileAgentTeamProfileWithGateway,
   shouldCreateAgentFromInstruction,
   upsertAgentProfile,
   type AgentTeamMember,
 } from '../lib/agent-team';
-import {
-  AI_ACTION_RUNS_STORAGE_KEY,
-  createAiActionRun,
-  executeAiActionRunWithGateway,
-  normalizeAiActionRuns,
-} from '../lib/ai-action-center';
-import { loadInstanceData, saveInstanceData } from '../lib/local-persistence';
+import { createAiActionRun, executeAiActionRunWithGateway } from '../lib/ai-action-center';
+import { upsertAiActionRun } from '../lib/ai-action-run-store';
+import { buildAgentTeamComposePrompt, buildGatewayAgentCreatePrompt } from '../lib/ai-action-prompts';
+import { fetchGatewayAgentFileContent, fetchGatewayAgentFiles } from '../lib/gateway-agents';
+import { loadInstanceData, saveInstanceDataAwaited } from '../lib/local-persistence';
 import { useStore } from '../lib';
-import type {
-  AiActionRun,
-  AgentLocalProfile,
-  AgentOfficeZone,
-  AgentTeamProfile,
-  WorkspaceFile,
-  WorkspaceFileContent,
-} from '../lib/types';
+import type { AiActionRun, AgentLocalProfile, AgentOfficeZone, AgentTeamProfile, WorkspaceFile } from '../lib/types';
 
 const { Title, Text } = Typography;
 
@@ -68,7 +61,16 @@ const TEAM_PANEL_STYLE: CSSProperties = {
 
 const PROFILE_COLORS = ['#2563eb', '#059669', '#d97706', '#7c3aed', '#dc2626', '#0891b2'];
 
-const BOOTSTRAP_FILES = new Set(['AGENTS.md', 'SOUL.md', 'USER.md', 'GEMINI.md', 'CLAUDE.md']);
+const BOOTSTRAP_FILES = new Set([
+  'AGENTS.md',
+  'SOUL.md',
+  'TOOLS.md',
+  'BOOTSTRAP.md',
+  'IDENTITY.md',
+  'USER.md',
+  'GEMINI.md',
+  'CLAUDE.md',
+]);
 
 interface ProfileDraft {
   displayName: string;
@@ -183,11 +185,12 @@ function profileDraftFromMember(member: AgentTeamMember): ProfileDraft {
 }
 
 function createGatewayAgentId(name: string, existingIds: Set<string>): string {
-  const base = name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'agent';
+  const base =
+    name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'agent';
   let id = base;
   let index = 2;
   while (existingIds.has(id)) {
@@ -209,39 +212,10 @@ function buildQuickAgentProfile(values: QuickAgentDraft, profile: AgentTeamProfi
     officeZone: 'work',
     color: PROFILE_COLORS[timestamp % PROFILE_COLORS.length],
     source: 'gateway',
+    bindingStatus: 'pending',
     createdAt: timestamp,
     updatedAt: timestamp,
   };
-}
-
-function buildAgentActionPrompt(options: {
-  mode: 'compose' | 'create';
-  input: string;
-  desiredProfile?: AgentLocalProfile;
-}): string {
-  const profileBlock = options.desiredProfile
-    ? [
-        `目标 Agent ID: ${options.desiredProfile.agentId}`,
-        `展示名称: ${options.desiredProfile.displayName || options.desiredProfile.agentId}`,
-        `角色/职责: ${options.desiredProfile.role || '待 OpenClaw 根据指令补全'}`,
-        `人格摘要: ${options.desiredProfile.personality || '待 OpenClaw 根据指令补全'}`,
-        `办公室头衔: ${options.desiredProfile.officeTitle || options.desiredProfile.role || 'Agent'}`,
-        `办公室区域: ${options.desiredProfile.officeZone || 'work'}`,
-      ].join('\n')
-    : '无预设画像，请根据用户指令生成计划。';
-
-  return [
-    '你是 OpenClaw Desktop 的 AI Action Center 执行会话。',
-    '目标：通过 OpenClaw Gateway 的真实能力创建或编排 Agent 团队，而不是只生成 Desktop 本地草稿。',
-    '请优先使用当前 Gateway 暴露的 Agent / Session / Tool / MCP / Node 能力；如缺少直接创建 Agent 的工具，请输出最小可执行计划、需要的 Gateway 注册能力和阻塞点。',
-    'Desktop 会把职位 title、称呼、办公室区域、人格/认知摘要等扩展资料保存在本地 profile，Gateway Agent 仍是团队成员事实源。',
-    `动作类型: ${options.mode === 'create' ? '创建 Gateway Agent' : '编排 Gateway Agent 团队'}`,
-    '本地扩展画像:',
-    profileBlock,
-    '用户指令:',
-    options.input.trim(),
-    '输出要求：先给出将要调用或需要调用的 Gateway 能力，再给出创建/更新结果；如果需要用户审批，请明确风险和审批项。',
-  ].join('\n\n');
 }
 
 function AgentRosterItem({
@@ -281,7 +255,7 @@ function AgentRosterItem({
             flexShrink: 0,
           }}
         >
-          <IconServer />
+          {member.agent.identity?.emoji ? <span>{member.agent.identity.emoji}</span> : <IconServer />}
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
           <Text strong style={{ display: 'block' }} ellipsis>
@@ -306,6 +280,7 @@ export default function TeamsPage() {
   const connectionStatus = useStore((s) => s.connectionStatus);
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const activeClient = useStore((s) => s.activeClient);
+  const actionRunsVersion = useStore((s) => s.actionRunsVersion);
 
   const [teamProfile, setTeamProfile] = useState<AgentTeamProfile>(() => createEmptyAgentTeamProfile());
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -332,7 +307,7 @@ export default function TeamsPage() {
   const currentProfileDraft = useMemo(
     () =>
       selectedMember
-        ? profileDrafts[selectedMember.agent.id] ?? profileDraftFromMember(selectedMember)
+        ? (profileDrafts[selectedMember.agent.id] ?? profileDraftFromMember(selectedMember))
         : {
             displayName: '',
             role: '',
@@ -349,14 +324,18 @@ export default function TeamsPage() {
   const isConnected = connectionStatus === 'connected';
   const gatewayAgentCount = members.filter((member) => member.source === 'gateway').length;
   const pendingProfileCount = Object.keys(teamProfile.agents).filter(
-    (agentId) => !agents.some((agent) => agent.id === agentId),
+    (agentId) =>
+      teamProfile.agents[agentId].bindingStatus !== 'failed' && !agents.some((agent) => agent.id === agentId),
+  ).length;
+  const failedProfileCount = Object.values(teamProfile.agents).filter(
+    (profile) => profile.bindingStatus === 'failed',
   ).length;
 
   const persistProfile = useCallback(
-    (nextProfile: AgentTeamProfile) => {
+    async (nextProfile: AgentTeamProfile) => {
       setTeamProfile(nextProfile);
       if (currentInstanceId) {
-        saveInstanceData(currentInstanceId, AGENT_TEAM_PROFILE_STORAGE_KEY, nextProfile);
+        await saveInstanceDataAwaited(currentInstanceId, AGENT_TEAM_PROFILE_STORAGE_KEY, nextProfile);
       }
     },
     [currentInstanceId],
@@ -365,16 +344,7 @@ export default function TeamsPage() {
   const upsertActionRun = useCallback(
     async (run: AiActionRun) => {
       if (!currentInstanceId) return;
-      const stored = await loadInstanceData<AiActionRun[]>(
-        currentInstanceId,
-        AI_ACTION_RUNS_STORAGE_KEY,
-      );
-      const runs = normalizeAiActionRuns(stored);
-      const exists = runs.some((item) => item.id === run.id);
-      const nextRuns = exists
-        ? runs.map((item) => (item.id === run.id ? run : item))
-        : [run, ...runs];
-      saveInstanceData(currentInstanceId, AI_ACTION_RUNS_STORAGE_KEY, nextRuns);
+      await upsertAiActionRun(currentInstanceId, run);
     },
     [currentInstanceId],
   );
@@ -389,10 +359,7 @@ export default function TeamsPage() {
       }
       setProfileLoading(true);
       try {
-        const stored = await loadInstanceData<AgentTeamProfile>(
-          currentInstanceId,
-          AGENT_TEAM_PROFILE_STORAGE_KEY,
-        );
+        const stored = await loadInstanceData<AgentTeamProfile>(currentInstanceId, AGENT_TEAM_PROFILE_STORAGE_KEY);
         if (!cancelled) setTeamProfile(normalizeAgentTeamProfile(stored));
       } finally {
         if (!cancelled) setProfileLoading(false);
@@ -403,7 +370,17 @@ export default function TeamsPage() {
     return () => {
       cancelled = true;
     };
-  }, [currentInstanceId]);
+  }, [actionRunsVersion, currentInstanceId]);
+
+  useEffect(() => {
+    if (agents.length === 0) return;
+    const reconciled = reconcileAgentTeamProfileWithGateway(agents, teamProfile);
+    if (reconciled !== teamProfile) {
+      queueMicrotask(() => {
+        void persistProfile(reconciled);
+      });
+    }
+  }, [agents, persistProfile, teamProfile]);
 
   const updateCurrentProfileDraft = useCallback(
     (updates: Partial<ProfileDraft>) => {
@@ -456,7 +433,7 @@ export default function TeamsPage() {
       createdAt: selectedMember.profile.createdAt || timestamp,
       updatedAt: timestamp,
     };
-    persistProfile(upsertAgentProfile(teamProfile, nextAgentProfile));
+    void persistProfile(upsertAgentProfile(teamProfile, nextAgentProfile));
     Toast.success('Agent 本地画像已保存');
   }, [currentProfileDraft, persistProfile, selectedMember, teamProfile]);
 
@@ -470,10 +447,15 @@ export default function TeamsPage() {
       Toast.error('缺少当前实例，无法记录 ActionRun');
       return;
     }
+    if (!activeClient || connectionStatus !== 'connected') {
+      Toast.error('未连接 Gateway，无法执行团队编排');
+      return;
+    }
 
     setActionSubmitting(true);
-    const actionRun = createAiActionRun({
-      type: 'agent_team_compose',
+    const createsAgent = shouldCreateAgentFromInstruction(text);
+    const baseActionRun = createAiActionRun({
+      type: createsAgent ? 'gateway_agent_create' : 'agent_team_compose',
       sourcePage: 'teams',
       instanceId: currentInstanceId,
       agentId: selectedMember?.agent.id || agents.find((agent) => agent.default)?.id || agents[0]?.id || 'main',
@@ -482,7 +464,7 @@ export default function TeamsPage() {
     });
     let nextProfile = teamProfile;
     let desiredProfile: AgentLocalProfile | undefined;
-    if (shouldCreateAgentFromInstruction(text)) {
+    if (createsAgent) {
       const parsedProfile = createAgentFromNaturalLanguage(text);
       desiredProfile = {
         ...parsedProfile,
@@ -491,6 +473,7 @@ export default function TeamsPage() {
           new Set(Object.keys(nextProfile.agents)),
         ),
         source: 'gateway',
+        bindingStatus: 'pending',
       };
       nextProfile = upsertAgentProfile(nextProfile, desiredProfile);
       nextProfile = {
@@ -504,19 +487,18 @@ export default function TeamsPage() {
       };
     }
 
-    persistProfile(nextProfile);
+    await persistProfile(nextProfile);
+    const actionRun = {
+      ...baseActionRun,
+      targetAgentId: desiredProfile?.agentId,
+    };
     await upsertActionRun({ ...actionRun, status: 'planning', updatedAt: Date.now() });
     try {
-      if (!activeClient || connectionStatus !== 'connected') {
-        throw new Error('未连接 Gateway，无法执行团队编排');
-      }
       const updatedRun = await executeAiActionRunWithGateway(activeClient, actionRun, {
-        title: 'Agent 团队编排',
-        prompt: buildAgentActionPrompt({
-          mode: shouldCreateAgentFromInstruction(text) ? 'create' : 'compose',
-          input: text,
-          desiredProfile,
-        }),
+        title: createsAgent ? '创建 Gateway Agent' : 'Agent 团队编排',
+        prompt: createsAgent
+          ? buildGatewayAgentCreatePrompt({ input: text, profile: desiredProfile })
+          : buildAgentTeamComposePrompt({ input: text, profile: desiredProfile }),
       });
       await upsertActionRun(updatedRun);
       useStore.getState().fetchSessions();
@@ -524,13 +506,17 @@ export default function TeamsPage() {
       setComposerText('');
       setComposerModalVisible(false);
     } catch (err) {
+      const error = err instanceof Error ? err.message : 'Gateway 执行失败';
+      if (desiredProfile) {
+        await persistProfile(markAgentProfileBindingFailed(nextProfile, desiredProfile.agentId, error));
+      }
       await upsertActionRun({
         ...actionRun,
         status: 'failed',
-        error: err instanceof Error ? err.message : 'Gateway 执行失败',
+        error,
         updatedAt: Date.now(),
       });
-      Toast.error(err instanceof Error ? err.message : 'Gateway 执行失败');
+      Toast.error(error);
     } finally {
       setActionSubmitting(false);
     }
@@ -555,15 +541,20 @@ export default function TeamsPage() {
       Toast.error('缺少当前实例，无法记录 ActionRun');
       return;
     }
+    if (!activeClient || connectionStatus !== 'connected') {
+      Toast.error('未连接 Gateway，无法创建 Agent');
+      return;
+    }
 
     setActionSubmitting(true);
     const desiredProfile = buildQuickAgentProfile(quickDraft, teamProfile);
     const input = `创建 Gateway Agent：${desiredProfile.displayName}${desiredProfile.role ? `，角色：${desiredProfile.role}` : ''}`;
     const instruction = createInstruction(input, desiredProfile.agentId);
-    persistProfile({
+    const pendingProfile = {
       ...upsertAgentProfile(teamProfile, desiredProfile),
       instructions: [instruction, ...teamProfile.instructions],
-    });
+    };
+    await persistProfile(pendingProfile);
     const actionRun = createAiActionRun({
       type: 'gateway_agent_create',
       sourcePage: 'teams',
@@ -572,18 +563,12 @@ export default function TeamsPage() {
       input,
       executionMode: 'isolated-session',
     });
+    actionRun.targetAgentId = desiredProfile.agentId;
     await upsertActionRun({ ...actionRun, status: 'planning', updatedAt: Date.now() });
     try {
-      if (!activeClient || connectionStatus !== 'connected') {
-        throw new Error('未连接 Gateway，无法创建 Agent');
-      }
       const updatedRun = await executeAiActionRunWithGateway(activeClient, actionRun, {
         title: '创建 Gateway Agent',
-        prompt: buildAgentActionPrompt({
-          mode: 'create',
-          input,
-          desiredProfile,
-        }),
+        prompt: buildGatewayAgentCreatePrompt({ input, profile: desiredProfile }),
       });
       await upsertActionRun(updatedRun);
       useStore.getState().fetchSessions();
@@ -592,13 +577,15 @@ export default function TeamsPage() {
       setQuickModalVisible(false);
       Toast.success('已提交到 Gateway 创建 Agent');
     } catch (err) {
+      const error = err instanceof Error ? err.message : 'Gateway 执行失败';
+      await persistProfile(markAgentProfileBindingFailed(pendingProfile, desiredProfile.agentId, error));
       await upsertActionRun({
         ...actionRun,
         status: 'failed',
-        error: err instanceof Error ? err.message : 'Gateway 执行失败',
+        error,
         updatedAt: Date.now(),
       });
-      Toast.error(err instanceof Error ? err.message : 'Gateway 执行失败');
+      Toast.error(error);
     } finally {
       setActionSubmitting(false);
     }
@@ -619,10 +606,8 @@ export default function TeamsPage() {
     setSelectedFile(null);
     setFileContent('');
     try {
-      const data = await activeClient.request<WorkspaceFile[]>('agents.files.list', {
-        agentId: selectedMember.agent.id,
-      });
-      setFiles(Array.isArray(data) ? data : []);
+      const data = await fetchGatewayAgentFiles(activeClient, selectedMember.agent.id);
+      setFiles(data);
     } catch (err) {
       Toast.error(err instanceof Error ? err.message : '读取 Agent 文件列表失败');
     } finally {
@@ -641,10 +626,7 @@ export default function TeamsPage() {
       setFileLoading(true);
       setFileContent('');
       try {
-        const result = await activeClient.request<WorkspaceFileContent>('agents.files.get', {
-          agentId: selectedMember.agent.id,
-          name: file.name,
-        });
+        const result = await fetchGatewayAgentFileContent(activeClient, selectedMember.agent.id, file.name);
         setFileContent(result.content ?? '');
       } catch (err) {
         Toast.error(err instanceof Error ? err.message : '读取文件失败');
@@ -663,6 +645,10 @@ export default function TeamsPage() {
         <Descriptions
           data={[
             { key: 'Agent ID', value: agent.id },
+            { key: 'Identity 名称', value: agent.identity?.name || '—' },
+            { key: 'Identity Emoji', value: agent.identity?.emoji || '—' },
+            { key: 'Identity Avatar', value: agent.identity?.avatar || '—' },
+            { key: 'Avatar 状态', value: agent.identity?.avatarStatus || '—' },
             { key: '来源', value: selectedMember.source === 'gateway' ? 'OpenClaw Gateway' : '本地草稿' },
             { key: '状态', value: getAgentStatusLabel(agent.status) },
             { key: '会话数', value: String(agent.sessionCount ?? 0) },
@@ -676,7 +662,9 @@ export default function TeamsPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
           <div style={TEAM_PANEL_STYLE}>
             <div style={{ padding: 14 }}>
-              <Text type="tertiary" size="small">角色</Text>
+              <Text type="tertiary" size="small">
+                角色
+              </Text>
               <Text strong style={{ display: 'block', marginTop: 6 }}>
                 {selectedMember.profile.role || '待补充'}
               </Text>
@@ -684,7 +672,9 @@ export default function TeamsPage() {
           </div>
           <div style={TEAM_PANEL_STYLE}>
             <div style={{ padding: 14 }}>
-              <Text type="tertiary" size="small">办公室头衔</Text>
+              <Text type="tertiary" size="small">
+                办公室头衔
+              </Text>
               <Text strong style={{ display: 'block', marginTop: 6 }}>
                 {selectedMember.profile.officeTitle || 'Agent'}
               </Text>
@@ -692,7 +682,9 @@ export default function TeamsPage() {
           </div>
           <div style={TEAM_PANEL_STYLE}>
             <div style={{ padding: 14 }}>
-              <Text type="tertiary" size="small">办公室区域</Text>
+              <Text type="tertiary" size="small">
+                办公室区域
+              </Text>
               <Text strong style={{ display: 'block', marginTop: 6 }}>
                 {selectedMember.profile.officeZone || 'work'}
               </Text>
@@ -726,9 +718,7 @@ export default function TeamsPage() {
         />
         <Select
           value={currentProfileDraft.officeZone}
-          onChange={(value) =>
-            updateCurrentProfileDraft({ officeZone: String(value) as AgentOfficeZone })
-          }
+          onChange={(value) => updateCurrentProfileDraft({ officeZone: String(value) as AgentOfficeZone })}
         >
           <Select.Option value="work">工作区</Select.Option>
           <Select.Option value="meeting">会议区</Select.Option>
@@ -756,7 +746,9 @@ export default function TeamsPage() {
       />
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <Text type="tertiary" size="small">颜色</Text>
+        <Text type="tertiary" size="small">
+          颜色
+        </Text>
         {PROFILE_COLORS.map((color) => (
           <button
             key={color}
@@ -767,7 +759,8 @@ export default function TeamsPage() {
               width: 22,
               height: 22,
               borderRadius: 11,
-              border: currentProfileDraft.color === color ? '2px solid var(--semi-color-text-0)' : '1px solid transparent',
+              border:
+                currentProfileDraft.color === color ? '2px solid var(--semi-color-text-0)' : '1px solid transparent',
               background: color,
               cursor: 'pointer',
             }}
@@ -831,7 +824,11 @@ export default function TeamsPage() {
                     <Text ellipsis style={{ maxWidth: 160 }}>
                       {file.name}
                     </Text>
-                    {BOOTSTRAP_FILES.has(file.name) && <Tag size="small" color="blue">启动</Tag>}
+                    {BOOTSTRAP_FILES.has(file.name) && (
+                      <Tag size="small" color="blue">
+                        启动
+                      </Tag>
+                    )}
                   </Space>
                   <Text type="tertiary" size="small" style={{ display: 'block', marginLeft: 22 }}>
                     {formatSize(file.size)} · {formatTime(file.modifiedAt)}
@@ -842,11 +839,7 @@ export default function TeamsPage() {
           </div>
         </div>
         <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {selectedFile && (
-            <Text strong>
-              {selectedFile.name}
-            </Text>
-          )}
+          {selectedFile && <Text strong>{selectedFile.name}</Text>}
           <pre
             style={{
               ...TEAM_PANEL_STYLE,
@@ -879,8 +872,17 @@ export default function TeamsPage() {
           <div key={instruction.id} style={{ ...TEAM_PANEL_STYLE, padding: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
               <Text strong>{instruction.summary || '团队编排草稿'}</Text>
-              <Tag color={instruction.status === 'applied' ? 'green' : 'orange'} size="small">
-                {instruction.status === 'applied' ? '已记录画像' : '草稿'}
+              <Tag
+                color={instruction.status === 'applied' ? 'green' : instruction.status === 'failed' ? 'red' : 'orange'}
+                size="small"
+              >
+                {instruction.status === 'applied'
+                  ? '已绑定'
+                  : instruction.status === 'failed'
+                    ? '失败'
+                    : instruction.status === 'pending'
+                      ? '待绑定'
+                      : '草稿'}
               </Tag>
             </div>
             <Text style={{ display: 'block', marginTop: 8, whiteSpace: 'pre-wrap' }}>{instruction.text}</Text>
@@ -928,6 +930,7 @@ export default function TeamsPage() {
         <Tag color="blue">{members.length} 个团队成员</Tag>
         <Tag color="green">{gatewayAgentCount} 个 Gateway Agent</Tag>
         <Tag color="orange">{pendingProfileCount} 个待绑定本地画像</Tag>
+        {failedProfileCount > 0 && <Tag color="red">{failedProfileCount} 个绑定失败画像</Tag>}
         <Tag color={isConnected ? 'green' : 'grey'}>{isConnected ? 'Gateway 已连接' : 'Gateway 未连接'}</Tag>
       </div>
 
@@ -978,7 +981,9 @@ export default function TeamsPage() {
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <Title heading={4} style={{ margin: 0 }} ellipsis>
-                        {selectedMember.profile.displayName || agentNameString(selectedMember.agent.name) || selectedMember.agent.id}
+                        {selectedMember.profile.displayName ||
+                          agentNameString(selectedMember.agent.name) ||
+                          selectedMember.agent.id}
                       </Title>
                       <Text type="tertiary" ellipsis style={{ display: 'block' }}>
                         {selectedMember.profile.role || selectedMember.agent.id}
@@ -987,33 +992,55 @@ export default function TeamsPage() {
                   </div>
                   <Space>
                     {selectedMember.agent.default && <Tag color="blue">Default</Tag>}
-                    <Tag color={selectedMember.source === 'local' ? 'blue' : getAgentStatusColor(selectedMember.agent.status)}>
-                      {selectedMember.source === 'local' ? 'local draft' : getAgentStatusLabel(selectedMember.agent.status)}
+                    <Tag
+                      color={
+                        selectedMember.source === 'local' ? 'blue' : getAgentStatusColor(selectedMember.agent.status)
+                      }
+                    >
+                      {selectedMember.source === 'local'
+                        ? 'local draft'
+                        : getAgentStatusLabel(selectedMember.agent.status)}
                     </Tag>
                   </Space>
                 </div>
 
                 <Tabs style={{ marginTop: 16 }}>
                   <Tabs.TabPane
-                    tab={<span><IconBulb /> 概览</span>}
+                    tab={
+                      <span>
+                        <IconBulb /> 概览
+                      </span>
+                    }
                     itemKey="overview"
                   >
                     {renderOverview()}
                   </Tabs.TabPane>
                   <Tabs.TabPane
-                    tab={<span><IconEdit /> 本地画像</span>}
+                    tab={
+                      <span>
+                        <IconEdit /> 本地画像
+                      </span>
+                    }
                     itemKey="profile"
                   >
                     {renderProfileEditor()}
                   </Tabs.TabPane>
                   <Tabs.TabPane
-                    tab={<span><IconFile /> Agent 文件</span>}
+                    tab={
+                      <span>
+                        <IconFile /> Agent 文件
+                      </span>
+                    }
                     itemKey="files"
                   >
                     {renderFiles()}
                   </Tabs.TabPane>
                   <Tabs.TabPane
-                    tab={<span><IconBox /> 编排记录</span>}
+                    tab={
+                      <span>
+                        <IconBox /> 编排记录
+                      </span>
+                    }
                     itemKey="instructions"
                   >
                     {renderInstructions()}

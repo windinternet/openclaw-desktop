@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  applyAiActionAssistantResponse,
   buildAiActionDomainThreadKey,
   buildAiActionGatewaySessionCreateRequest,
   buildAiActionSessionKey,
@@ -8,7 +9,15 @@ import {
   executeAiActionRunWithGateway,
   filterUserVisibleSessions,
   isDesktopManagedSession,
+  parseAiActionAssistantResponse,
+  resolveAiActionApprovalWithGateway,
+  syncAiActionRunWithGateway,
 } from '../lib/ai-action-center';
+import {
+  buildAgentTeamComposePrompt,
+  buildApprovalDecisionPrompt,
+  buildGatewayAgentCreatePrompt,
+} from '../lib/ai-action-prompts';
 import type { SessionInfo } from '../lib/types';
 
 interface GatewayRequestStub {
@@ -45,9 +54,7 @@ describe('AI Action Center session rules', () => {
       { key: 'legacy', label: buildAiActionSessionLabel('旧格式动作') },
     ];
 
-    expect(filterUserVisibleSessions(sessions).map((session) => session.key)).toEqual([
-      'agent:main:dashboard:abc',
-    ]);
+    expect(filterUserVisibleSessions(sessions).map((session) => session.key)).toEqual(['agent:main:dashboard:abc']);
     expect(isDesktopManagedSession(sessions[1])).toBe(true);
     expect(isDesktopManagedSession(sessions[3])).toBe(true);
   });
@@ -89,7 +96,7 @@ describe('AI Action Center session rules', () => {
     });
     const calls: Array<{ method: string; params: unknown }> = [];
     const client: GatewayRequestStub = {
-      request: async <T,>(method: string, params?: unknown): Promise<T> => {
+      request: async <T>(method: string, params?: unknown): Promise<T> => {
         calls.push({ method, params });
         if (method === 'sessions.create') return { key: run.gatewaySessionKey } as T;
         if (method === 'chat.send') {
@@ -120,5 +127,185 @@ describe('AI Action Center session rules', () => {
     expect(updated.gatewaySessionKey).toBe(run.gatewaySessionKey);
 
     vi.restoreAllMocks();
+  });
+
+  it('uses a unique session label for repeated actions of the same type', () => {
+    const first = createAiActionRun({
+      type: 'gateway_agent_create',
+      sourcePage: 'teams',
+      instanceId: 'instance-1',
+      input: '创建产品 Agent',
+    });
+    const second = createAiActionRun({
+      type: 'gateway_agent_create',
+      sourcePage: 'teams',
+      instanceId: 'instance-1',
+      input: '创建设计 Agent',
+    });
+
+    const firstRequest = buildAiActionGatewaySessionCreateRequest(first, '创建 Gateway Agent');
+    const secondRequest = buildAiActionGatewaySessionCreateRequest(second, '创建 Gateway Agent');
+
+    expect(firstRequest.label).toContain(first.id);
+    expect(secondRequest.label).toContain(second.id);
+    expect(firstRequest.label).not.toBe(secondRequest.label);
+  });
+
+  it('parses structured and legacy approval replies', () => {
+    const structured = parseAiActionAssistantResponse(`
+执行计划如下。
+
+\`\`\`ai-action
+{"version":1,"kind":"approval_required","summary":"创建产品 Agent","approval":{"title":"创建 Agent","risk":"medium","reason":"将新增 Gateway Agent"}}
+\`\`\`
+`);
+    expect(structured).toMatchObject({
+      kind: 'approval_required',
+      summary: '创建产品 Agent',
+      approval: {
+        title: '创建 Agent',
+        risk: 'medium',
+      },
+    });
+
+    const legacy = parseAiActionAssistantResponse('🛑 需要你确认：以上创建方案是否 OK？确认后我立即执行。');
+    expect(legacy?.kind).toBe('approval_required');
+  });
+
+  it('turns an approval reply into an actionable awaiting approval run', () => {
+    const run = createAiActionRun({
+      type: 'gateway_agent_create',
+      sourcePage: 'teams',
+      instanceId: 'instance-1',
+      input: '创建产品 Agent',
+    });
+
+    const updated = applyAiActionAssistantResponse(
+      run,
+      `
+\`\`\`ai-action
+{"version":1,"kind":"approval_required","summary":"创建产品 Agent","approval":{"title":"创建 Agent","risk":"medium","reason":"将新增 Gateway Agent"}}
+\`\`\`
+`,
+    );
+
+    expect(updated.status).toBe('awaiting_approval');
+    expect(updated.approvals).toHaveLength(1);
+    expect(updated.approvals?.[0]).toMatchObject({
+      title: '创建 Agent',
+      risk: 'medium',
+      status: 'pending',
+    });
+  });
+
+  it('captures the real Gateway agent id from a completed create response', () => {
+    const run = createAiActionRun({
+      type: 'gateway_agent_create',
+      sourcePage: 'teams',
+      instanceId: 'instance-1',
+      input: '创建产品 Agent',
+    });
+
+    const updated = applyAiActionAssistantResponse(
+      run,
+      `\`\`\`ai-action
+{"version":1,"kind":"completed","summary":"已创建 Agent","result":{"agentId":"wang-pet"}}
+\`\`\``,
+    );
+
+    expect(updated.status).toBe('done');
+    expect(updated.gatewayAgentId).toBe('wang-pet');
+  });
+
+  it('syncs the final assistant reply from sessions.get', async () => {
+    const run = createAiActionRun({
+      type: 'gateway_agent_create',
+      sourcePage: 'teams',
+      instanceId: 'instance-1',
+      input: '创建产品 Agent',
+    });
+    const client: GatewayRequestStub = {
+      request: async <T>(method: string): Promise<T> => {
+        expect(method).toBe('sessions.get');
+        return {
+          messages: [
+            { role: 'user', content: [{ type: 'text', text: '创建产品 Agent' }] },
+            {
+              role: 'assistant',
+              content: [
+                {
+                  type: 'text',
+                  text: '需要确认\\n```ai-action\\n{"version":1,"kind":"approval_required","summary":"创建产品 Agent","approval":{"title":"创建 Agent","risk":"medium","reason":"将新增 Gateway Agent"}}\\n```',
+                },
+              ],
+              stopReason: 'stop',
+            },
+          ],
+        } as T;
+      },
+    };
+
+    const updated = await syncAiActionRunWithGateway(client, run);
+
+    expect(updated.status).toBe('awaiting_approval');
+    expect(updated.plan).toContain('需要确认');
+  });
+
+  it('sends an approval decision back to the same execution session', async () => {
+    const run = applyAiActionAssistantResponse(
+      createAiActionRun({
+        type: 'gateway_agent_create',
+        sourcePage: 'teams',
+        instanceId: 'instance-1',
+        input: '创建产品 Agent',
+      }),
+      `\`\`\`ai-action
+{"version":1,"kind":"approval_required","summary":"创建产品 Agent","approval":{"title":"创建 Agent","risk":"medium","reason":"将新增 Gateway Agent"}}
+\`\`\``,
+    );
+    const calls: Array<{ method: string; params: unknown }> = [];
+    const client: GatewayRequestStub = {
+      request: async <T>(method: string, params?: unknown): Promise<T> => {
+        calls.push({ method, params });
+        return { runId: 'approval-run-1', status: 'accepted', sessionKey: run.gatewaySessionKey } as T;
+      },
+    };
+
+    const updated = await resolveAiActionApprovalWithGateway(client, run, run.approvals![0].id, 'approved');
+
+    expect(calls[0]).toMatchObject({
+      method: 'chat.send',
+      params: {
+        sessionKey: run.gatewaySessionKey,
+      },
+    });
+    expect(updated.status).toBe('running');
+    expect(updated.gatewayRunId).toBe('approval-run-1');
+    expect(updated.approvals?.[0].status).toBe('approved');
+  });
+
+  it('renders action prompts from disk templates without unresolved placeholders', () => {
+    const createPrompt = buildGatewayAgentCreatePrompt({
+      input: '创建产品 Agent',
+      profile: {
+        agentId: 'product',
+        displayName: '产品经理',
+        role: '负责产品规划',
+        source: 'gateway',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    });
+    const composePrompt = buildAgentTeamComposePrompt({ input: '让产品和研发协作' });
+    const decisionPrompt = buildApprovalDecisionPrompt({
+      decision: 'approved',
+      approvalTitle: '创建 Agent',
+      actionInput: '创建产品 Agent',
+    });
+
+    for (const prompt of [createPrompt, composePrompt, decisionPrompt]) {
+      expect(prompt).toContain('```ai-action');
+      expect(prompt).not.toMatch(/\{\{[^}]+\}\}/);
+    }
   });
 });

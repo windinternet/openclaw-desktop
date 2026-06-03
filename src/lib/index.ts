@@ -62,6 +62,7 @@ export type {
 export { useStore } from './store';
 export { createGatewayClient } from './gateway';
 export type { GatewayClient } from './gateway';
+export { fetchGatewayAgentFileContent, fetchGatewayAgentFiles, fetchGatewayAgents } from './gateway-agents';
 export {
   DEFAULT_SKILL_MARKETPLACE_SOURCE_ID,
   SKILL_MARKETPLACE_SOURCES,
@@ -71,12 +72,7 @@ export {
   normalizeSkillMarketplaceSearchResponse,
 } from './skill-marketplace';
 
-export type {
-  ThemeMode,
-  ThemeColor,
-  SupportedLocale,
-  AppSettings,
-} from './settings-types';
+export type { ThemeMode, ThemeColor, SupportedLocale, AppSettings } from './settings-types';
 export { PRESET_THEME_COLORS, DEFAULT_SETTINGS } from './settings-types';
 export { useSettingsStore } from './settings-store';
 export {
@@ -88,14 +84,21 @@ export {
   buildAiActionGatewaySessionCreateRequest,
   buildAiActionSessionKey,
   buildAiActionSessionLabel,
+  buildUniqueAiActionSessionLabel,
+  applyAiActionAssistantResponse,
   createAiActionRun,
   executeAiActionRunWithGateway,
   filterUserVisibleSessions,
   isDesktopManagedSession,
   normalizeAiActionRuns,
+  parseAiActionAssistantResponse,
+  resolveAiActionApprovalWithGateway,
+  syncAiActionRunWithGateway,
 } from './ai-action-center';
 export {
-  DESKTOP_BRIDGE_CAPABILITIES,
-  connectDesktopBridgeToGateway,
-  disconnectDesktopBridge,
-} from './desktop-bridge';
+  loadAiActionRuns,
+  saveAiActionRuns,
+  syncAiActionRunsWithGateway,
+  upsertAiActionRun,
+} from './ai-action-run-store';
+export { DESKTOP_BRIDGE_CAPABILITIES, connectDesktopBridgeToGateway, disconnectDesktopBridge } from './desktop-bridge';

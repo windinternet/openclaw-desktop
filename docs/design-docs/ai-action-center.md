@@ -62,6 +62,8 @@ AiActionRun {
   input: string
   plan?: string
   resultSummary?: string
+  targetAgentId?: string
+  gatewayAgentId?: string
   gatewaySessionKey?: string
   gatewayRunId?: string
   childSessionKeys?: string[]
@@ -92,8 +94,10 @@ agent:<agentId>:desktop-action:<actionType>:<actionRunId>
 
 ```text
 desktop-action
-[desktop-action] <title>
+[desktop-action] <title> · <actionRunId>
 ```
+
+每个 ActionRun 都必须创建新的隔离会话，即使动作类型和标题相同也不能复用。`sessions.create` 的 `label` 在 Gateway 中需要唯一，因此 label 必须包含 `actionRunId`；固定的 `[desktop-action] <title>` 只作为旧数据兼容格式识别。
 
 ### 可选：领域线程
 
@@ -138,12 +142,12 @@ Remote/OpenClaw Agent
 
 建议边界：
 
-| 类型 | 用途 |
-|------|------|
-| Node | 设备能力主机，如屏幕、位置、相机、桌面状态 |
+| 类型       | 用途                                                              |
+| ---------- | ----------------------------------------------------------------- |
+| Node       | 设备能力主机，如屏幕、位置、相机、桌面状态                        |
 | MCP Server | Desktop 暴露本机工具，如读取/修改本机文件、操作 PPT、访问本地应用 |
-| Skill | 固化任务流程、约束和提示，如“修改 PPT 前必须渲染检查” |
-| Agent | 负责规划、推理、工具选择和结果解释 |
+| Skill      | 固化任务流程、约束和提示，如“修改 PPT 前必须渲染检查”             |
+| Agent      | 负责规划、推理、工具选择和结果解释                                |
 
 对“把我桌面的 xxx.ppt 改一下”这类任务，推荐：
 
@@ -169,6 +173,36 @@ Approval 记录必须包含：
 标题、风险等级、具体对象、目标位置、审批结果、时间
 ```
 
+### Action Center 业务审批协议
+
+OpenClaw 原生 exec 审批通过 Gateway 的 `exec.approval.requested` 事件和 `exec.approval.resolve` RPC 处理。除此之外，Agent 在执行产品层动作前也可能先给出计划并请求用户确认。Action Center 使用结构化回复协议把这类普通会话确认转换为可操作审批。
+
+执行会话的 assistant 回复必须以 `ai-action` JSON 块结束：
+
+```text
+approval_required -> ActionRun.status = awaiting_approval
+completed         -> ActionRun.status = done
+failed            -> ActionRun.status = failed
+```
+
+`gateway_agent_create` 的 `completed` 回复还必须在 `result.agentId` 中返回真实 Gateway Agent id。Desktop 不信任“已创建”文字本身；同步 ActionRun 时会重新读取 Gateway Agent 列表验证 Agent 存在，验证失败则把 ActionRun 和待绑定本地画像标记为 `failed`。
+
+审批通过后，Desktop 向同一个 `gatewaySessionKey` 发送批准决定，Agent 继续执行已经批准的方案；审批拒绝后，Desktop 发送拒绝决定并把 ActionRun 标记为 `cancelled`。如果执行过程中出现新的、实质不同的风险，Agent 可以再次返回新的 `approval_required`。
+
+Gateway 执行会话完成后，Desktop 使用 `sessions.get({ key })` 读取完整消息，而不是依赖会截断长文本的 `sessions.preview`。为兼容旧回复，解析器也识别“需要你确认”“确认后执行”等明确确认语句。
+
+## 提示词模板
+
+需要调用大模型的动作提示词必须作为仓库内文件落盘，不允许继续硬编码在 React 页面中：
+
+```text
+src/prompts/ai-actions/gateway-agent-create.md
+src/prompts/ai-actions/agent-team-compose.md
+src/prompts/ai-actions/approval-decision.md
+```
+
+模板通过 `src/lib/ai-action-prompts.ts` 渲染。模板负责约束只读探查、副作用前审批、结构化回复和审批后的继续执行；页面只负责提供用户输入和本地扩展画像。
+
 ## 当前落地边界
 
 当前第一版已落地：
@@ -178,6 +212,9 @@ Approval 记录必须包含：
 - 普通会话列表过滤 Desktop-managed session 的纯函数。
 - Action Center UI：动作列表、状态、session/run 映射、计划和结果展示。
 - Agent Teams 自然语言编排和创建 Agent 通过 `sessions.create + chat.send` 提交到 Gateway 隔离执行会话。
+- 同类型动作重复执行时使用新的 ActionRun 隔离会话，并为 `sessions.create` 生成包含 ActionRun id 的唯一 label。
+- Action Center 自动读取执行会话回复，解析业务审批，并提供批准/拒绝交互。
+- Agent 创建、团队编排和审批决定提示词已迁移到落盘 Markdown 模板。
 - Teams 本地 profile 只扩展 Gateway Agent，不伪造本地团队成员。
 - Gateway client 支持 `role: node` / `clientMode: node` / `capabilities`。Desktop 主 UI 连接 Gateway 成功后，`connectToGateway()` 会自动启动 Desktop Bridge node 连接，声明 `desktop.ai_action`、`desktop.local_bridge`、`desktop.mcp_bridge`；断开或切换实例时同步断开 bridge。
 
@@ -191,5 +228,5 @@ Approval 记录必须包含：
 
 1. 接入 Gateway 明确的 Agent CRUD / App SDK `oc.agents` 能力后，把 `gateway_agent_create` 从“Agent 执行会话”升级为直接创建并回填结果。
 2. 增加 Desktop Local Bridge MCP server，并把可调用工具映射到 Gateway node/tool 目录。
-3. 增加审批 UI，端侧写操作进入 `awaiting_approval`。
+3. 接入 OpenClaw 原生 `exec.approval.requested / exec.approval.resolve`，与 Action Center 业务审批统一展示。
 4. 增加 Skill：本地文件编辑、PPT 修改、Agent 团队编排、3D Office 布局。

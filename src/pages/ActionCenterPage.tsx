@@ -2,26 +2,27 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Button,
   Card,
+  Collapse,
   Descriptions,
   Empty,
   Modal,
   Space,
   Spin,
   Tag,
+  Toast,
   Typography,
 } from '@douyinfe/semi-ui';
+import { IconBolt, IconClose, IconDelete, IconRefresh, IconTickCircle } from '@douyinfe/semi-icons';
+import { resolveAiActionApprovalWithGateway } from '../lib/ai-action-center';
 import {
-  IconBolt,
-  IconDelete,
-  IconRefresh,
-} from '@douyinfe/semi-icons';
-import {
-  AI_ACTION_RUNS_STORAGE_KEY,
-  normalizeAiActionRuns,
-} from '../lib/ai-action-center';
-import { loadInstanceData, saveInstanceData } from '../lib/local-persistence';
+  loadAiActionRuns,
+  saveAiActionRuns,
+  syncAiActionRunsWithGateway,
+  upsertAiActionRun,
+} from '../lib/ai-action-run-store';
+import MarkdownView from '../components/MarkdownView';
 import { useStore } from '../lib';
-import type { AiActionRun, AiActionRunStatus } from '../lib/types';
+import type { AiActionApproval, AiActionRun, AiActionRunStatus } from '../lib/types';
 
 const { Title, Text } = Typography;
 
@@ -101,9 +102,13 @@ function runTitle(run: AiActionRun): string {
 
 export default function ActionCenterPage() {
   const currentInstanceId = useStore((s) => s.currentInstanceId);
+  const activeClient = useStore((s) => s.activeClient);
+  const connectionStatus = useStore((s) => s.connectionStatus);
+  const actionRunsVersion = useStore((s) => s.actionRunsVersion);
   const [runs, setRuns] = useState<AiActionRun[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [decisionLoadingId, setDecisionLoadingId] = useState<string | null>(null);
 
   const selectedRun = useMemo(
     () => runs.find((run) => run.id === selectedRunId) ?? runs[0] ?? null,
@@ -117,21 +122,21 @@ export default function ActionCenterPage() {
     }
     setLoading(true);
     try {
-      const stored = await loadInstanceData<AiActionRun[]>(
-        currentInstanceId,
-        AI_ACTION_RUNS_STORAGE_KEY,
-      );
-      setRuns(normalizeAiActionRuns(stored).sort((a, b) => b.updatedAt - a.updatedAt));
+      const nextRuns =
+        activeClient && connectionStatus === 'connected'
+          ? await syncAiActionRunsWithGateway(currentInstanceId, activeClient)
+          : await loadAiActionRuns(currentInstanceId);
+      setRuns(nextRuns.sort((a, b) => b.updatedAt - a.updatedAt));
     } finally {
       setLoading(false);
     }
-  }, [currentInstanceId]);
+  }, [activeClient, connectionStatus, currentInstanceId]);
 
   useEffect(() => {
     queueMicrotask(() => {
       void loadRuns();
     });
-  }, [loadRuns]);
+  }, [actionRunsVersion, loadRuns]);
 
   const clearRuns = useCallback(() => {
     if (!currentInstanceId || runs.length === 0) return;
@@ -143,10 +148,33 @@ export default function ActionCenterPage() {
       onOk: () => {
         setRuns([]);
         setSelectedRunId(null);
-        saveInstanceData(currentInstanceId, AI_ACTION_RUNS_STORAGE_KEY, []);
+        void saveAiActionRuns(currentInstanceId, []);
       },
     });
   }, [currentInstanceId, runs.length]);
+
+  const handleApprovalDecision = useCallback(
+    async (approval: AiActionApproval, decision: 'approved' | 'rejected') => {
+      if (!selectedRun || !currentInstanceId) return;
+      if (!activeClient || connectionStatus !== 'connected') {
+        Toast.error('未连接 Gateway，无法提交审批决定');
+        return;
+      }
+
+      setDecisionLoadingId(approval.id);
+      try {
+        const updated = await resolveAiActionApprovalWithGateway(activeClient, selectedRun, approval.id, decision);
+        await upsertAiActionRun(currentInstanceId, updated);
+        setRuns((current) => current.map((run) => (run.id === updated.id ? updated : run)));
+        Toast.success(decision === 'approved' ? '已批准，AI 将继续执行' : '已拒绝，动作已取消');
+      } catch (err) {
+        Toast.error(err instanceof Error ? err.message : '提交审批决定失败');
+      } finally {
+        setDecisionLoadingId(null);
+      }
+    },
+    [activeClient, connectionStatus, currentInstanceId, selectedRun],
+  );
 
   return (
     <div style={{ height: '100%', overflow: 'auto', padding: 24 }}>
@@ -182,7 +210,9 @@ export default function ActionCenterPage() {
       ) : runs.length === 0 ? (
         <div style={{ height: 320, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Empty description="暂无动作记录">
-            <Text type="tertiary" size="small">从团队页的自然语言编排开始，会在这里看到 ActionRun。</Text>
+            <Text type="tertiary" size="small">
+              从团队页的自然语言编排开始，会在这里看到 ActionRun。
+            </Text>
           </Empty>
         </div>
       ) : (
@@ -199,20 +229,23 @@ export default function ActionCenterPage() {
                   textAlign: 'left',
                   cursor: 'pointer',
                   borderColor: selectedRun?.id === run.id ? 'var(--semi-color-primary)' : 'var(--semi-color-border)',
-                  background: selectedRun?.id === run.id
-                    ? 'var(--semi-color-primary-light-default)'
-                    : 'var(--semi-color-bg-1)',
+                  background:
+                    selectedRun?.id === run.id ? 'var(--semi-color-primary-light-default)' : 'var(--semi-color-bg-1)',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <IconBolt style={{ color: 'var(--semi-color-primary)' }} />
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <Text strong ellipsis style={{ display: 'block' }}>{runTitle(run)}</Text>
+                    <Text strong ellipsis style={{ display: 'block' }}>
+                      {runTitle(run)}
+                    </Text>
                     <Text type="tertiary" size="small" ellipsis style={{ display: 'block' }}>
                       {run.input}
                     </Text>
                   </div>
-                  <Tag color={statusColor(run.status)} size="small">{statusLabel(run.status)}</Tag>
+                  <Tag color={statusColor(run.status)} size="small">
+                    {statusLabel(run.status)}
+                  </Tag>
                 </div>
                 <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 8 }}>
                   {formatTime(run.updatedAt)} · {modeLabel(run.executionMode)}
@@ -226,7 +259,9 @@ export default function ActionCenterPage() {
               <div style={{ display: 'grid', gap: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                   <div>
-                    <Title heading={4} style={{ margin: 0 }}>{runTitle(selectedRun)}</Title>
+                    <Title heading={4} style={{ margin: 0 }}>
+                      {runTitle(selectedRun)}
+                    </Title>
                     <Text type="tertiary">{selectedRun.id}</Text>
                   </div>
                   <Tag color={statusColor(selectedRun.status)}>{statusLabel(selectedRun.status)}</Tag>
@@ -239,6 +274,8 @@ export default function ActionCenterPage() {
                     { key: '动作类型', value: selectedRun.type },
                     { key: '来源页面', value: selectedRun.sourcePage },
                     { key: 'Agent', value: selectedRun.agentId },
+                    { key: '目标 Agent', value: selectedRun.targetAgentId || '—' },
+                    { key: '实际 Gateway Agent', value: selectedRun.gatewayAgentId || '—' },
                     { key: '执行模式', value: modeLabel(selectedRun.executionMode) },
                     { key: 'Gateway Session', value: selectedRun.gatewaySessionKey || '—' },
                     { key: 'Gateway Run', value: selectedRun.gatewayRunId || '—' },
@@ -250,20 +287,121 @@ export default function ActionCenterPage() {
                 <div style={PANEL_STYLE}>
                   <div style={{ padding: 14 }}>
                     <Text strong>用户意图</Text>
-                    <Text style={{ display: 'block', marginTop: 8, whiteSpace: 'pre-wrap' }}>
-                      {selectedRun.input}
-                    </Text>
+                    <Text style={{ display: 'block', marginTop: 8, whiteSpace: 'pre-wrap' }}>{selectedRun.input}</Text>
                   </div>
                 </div>
 
+                {selectedRun.plan && (
+                  <div style={PANEL_STYLE}>
+                    <div style={{ padding: 14 }}>
+                      <Text strong>执行计划</Text>
+                      <MarkdownView content={selectedRun.plan} />
+                    </div>
+                  </div>
+                )}
+
                 <div style={PANEL_STYLE}>
                   <div style={{ padding: 14 }}>
-                    <Text strong>计划 / 结果</Text>
-                    <Text type="tertiary" style={{ display: 'block', marginTop: 8, whiteSpace: 'pre-wrap' }}>
-                      {selectedRun.resultSummary || selectedRun.plan || selectedRun.error || '等待 Gateway 执行结果。'}
-                    </Text>
+                    <Text strong>执行结果</Text>
+                    <MarkdownView content={selectedRun.resultSummary || '等待 Gateway 执行结果。'} />
+                    {selectedRun.lastAssistantResponse && (
+                      <Collapse
+                        className="action-raw-response-collapse"
+                        defaultActiveKey={[]}
+                        keepDOM={false}
+                        lazyRender
+                      >
+                        <Collapse.Panel itemKey="raw-response" header="查看原始响应">
+                          <div className="action-raw-response">
+                            <MarkdownView content={selectedRun.lastAssistantResponse} showProtocolBlocks />
+                          </div>
+                        </Collapse.Panel>
+                      </Collapse>
+                    )}
                   </div>
                 </div>
+
+                {selectedRun.error && (
+                  <div style={PANEL_STYLE}>
+                    <div style={{ padding: 14 }}>
+                      <Text strong>错误</Text>
+                      <MarkdownView content={selectedRun.error} />
+                    </div>
+                  </div>
+                )}
+
+                {(selectedRun.approvals?.length ?? 0) > 0 && (
+                  <div style={PANEL_STYLE}>
+                    <div style={{ padding: 14, display: 'grid', gap: 12 }}>
+                      <Text strong>审批</Text>
+                      {selectedRun.approvals?.map((approval) => (
+                        <div
+                          key={approval.id}
+                          style={{
+                            borderTop: '1px solid var(--semi-color-border)',
+                            paddingTop: 12,
+                            display: 'grid',
+                            gap: 8,
+                          }}
+                        >
+                          <div
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
+                          >
+                            <Text strong>{approval.title}</Text>
+                            <Space>
+                              <Tag
+                                color={
+                                  approval.risk === 'high' ? 'red' : approval.risk === 'medium' ? 'orange' : 'blue'
+                                }
+                              >
+                                {approval.risk === 'high' ? '高风险' : approval.risk === 'medium' ? '中风险' : '低风险'}
+                              </Tag>
+                              <Tag
+                                color={
+                                  approval.status === 'pending'
+                                    ? 'orange'
+                                    : approval.status === 'approved'
+                                      ? 'green'
+                                      : 'grey'
+                                }
+                              >
+                                {approval.status === 'pending'
+                                  ? '待审批'
+                                  : approval.status === 'approved'
+                                    ? '已批准'
+                                    : '已拒绝'}
+                              </Tag>
+                            </Space>
+                          </div>
+                          <Text type="tertiary" style={{ whiteSpace: 'pre-wrap' }}>
+                            {approval.reason}
+                          </Text>
+                          {approval.status === 'pending' && (
+                            <Space>
+                              <Button
+                                icon={<IconTickCircle />}
+                                type="primary"
+                                theme="solid"
+                                loading={decisionLoadingId === approval.id}
+                                onClick={() => handleApprovalDecision(approval, 'approved')}
+                              >
+                                批准并继续
+                              </Button>
+                              <Button
+                                icon={<IconClose />}
+                                type="danger"
+                                loading={decisionLoadingId === approval.id}
+                                onClick={() => handleApprovalDecision(approval, 'rejected')}
+                              >
+                                拒绝
+                              </Button>
+                            </Space>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <Empty description="请选择动作记录" />

@@ -183,3 +183,12 @@ export function saveInstanceData<T>(instanceId: string, key: string, value: T): 
   }
   if (hasLocalStorage()) localStorage.setItem(`openclaw-${key}-${instanceId}`, JSON.stringify(value));
 }
+
+export async function saveInstanceDataAwaited<T>(instanceId: string, key: string, value: T): Promise<void> {
+  const storage = getElectronStorage();
+  if (storage) {
+    await storage.saveInstanceData(instanceId, key, value);
+    return;
+  }
+  if (hasLocalStorage()) localStorage.setItem(`openclaw-${key}-${instanceId}`, JSON.stringify(value));
+}

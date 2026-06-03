@@ -20,21 +20,17 @@ import type {
   GatewayRetryInfo,
 } from './types';
 import { createGatewayClient, type GatewayClient } from './gateway';
-import {
-  connectDesktopBridgeToGateway,
-  disconnectDesktopBridge,
-} from './desktop-bridge';
-import {
-  fetchSkillMarketplaceSkills,
-} from './skill-marketplace';
+import { connectDesktopBridgeToGateway, disconnectDesktopBridge } from './desktop-bridge';
+import { fetchSkillMarketplaceSkills } from './skill-marketplace';
 import { fetchGatewayUser, fetchUserProfile } from './user';
-import { isAssistantCompletionEvent, notifyAssistantCompletion } from './assistant-completion-notifier';
+import { fetchGatewayAgents } from './gateway-agents';
 import {
-  loadAppSnapshot,
-  removePersistedInstance,
-  saveCurrentInstanceId,
-  saveInstances,
-} from './local-persistence';
+  getAgentEventSessionKey,
+  isAssistantCompletionEvent,
+  notifyAssistantCompletion,
+} from './assistant-completion-notifier';
+import { syncAiActionRunsWithGateway } from './ai-action-run-store';
+import { loadAppSnapshot, removePersistedInstance, saveCurrentInstanceId, saveInstances } from './local-persistence';
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
@@ -48,6 +44,7 @@ interface StoreState {
   connectionError: string | null;
   connectionRetry: GatewayRetryInfo | null;
   activeClient: GatewayClient | null;
+  actionRunsVersion: number;
 
   // ── Gateway Data (for current instance) ──
   sessions: SessionInfo[];
@@ -119,6 +116,7 @@ export const useStore = create<StoreState>((set, get) => ({
   connectionError: null,
   connectionRetry: null,
   activeClient: null,
+  actionRunsVersion: 0,
 
   sessions: [],
   agents: [],
@@ -136,9 +134,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   hydrateInstances: (instances, currentInstanceId) => {
     const validCurrentInstanceId =
-      currentInstanceId && instances.some((i) => i.id === currentInstanceId)
-        ? currentInstanceId
-        : null;
+      currentInstanceId && instances.some((i) => i.id === currentInstanceId) ? currentInstanceId : null;
     set({ instances, currentInstanceId: validCurrentInstanceId });
   },
 
@@ -146,10 +142,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const snapshot = await loadAppSnapshot();
     const instances = snapshot.instances;
     const savedCurrentId = snapshot.currentInstanceId;
-    const currentInstanceId =
-      savedCurrentId && instances.some((i) => i.id === savedCurrentId)
-        ? savedCurrentId
-        : null;
+    const currentInstanceId = savedCurrentId && instances.some((i) => i.id === savedCurrentId) ? savedCurrentId : null;
     set({ instances, currentInstanceId });
   },
 
@@ -191,9 +184,7 @@ export const useStore = create<StoreState>((set, get) => ({
     if (id) {
       saveCurrentInstanceId(id);
       set((state) => {
-        const instances = state.instances.map((i) =>
-          i.id === id ? { ...i, hasPendingActivity: false } : i,
-        );
+        const instances = state.instances.map((i) => (i.id === id ? { ...i, hasPendingActivity: false } : i));
         saveInstances(instances);
         return { currentInstanceId: id, instances };
       });
@@ -205,18 +196,14 @@ export const useStore = create<StoreState>((set, get) => ({
 
   setInstanceStatus: (id, status) => {
     set((state) => ({
-      instances: state.instances.map((i) =>
-        i.id === id ? { ...i, connectionStatus: status } : i,
-      ),
+      instances: state.instances.map((i) => (i.id === id ? { ...i, connectionStatus: status } : i)),
     }));
   },
 
   markInstanceActivity: (id) => {
     set((state) => {
       const instances = state.instances.map((i) =>
-        i.id === id
-          ? { ...i, hasPendingActivity: true, lastActivityAt: Date.now() }
-          : i,
+        i.id === id ? { ...i, hasPendingActivity: true, lastActivityAt: Date.now() } : i,
       );
       saveInstances(instances);
       return { instances };
@@ -225,9 +212,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   clearInstanceActivity: (id) => {
     set((state) => {
-      const instances = state.instances.map((i) =>
-        i.id === id ? { ...i, hasPendingActivity: false } : i,
-      );
+      const instances = state.instances.map((i) => (i.id === id ? { ...i, hasPendingActivity: false } : i));
       saveInstances(instances);
       return { instances };
     });
@@ -253,7 +238,11 @@ export const useStore = create<StoreState>((set, get) => ({
     // 丢弃旧连接
     const oldClient = get().activeClient;
     if (oldClient) {
-      try { oldClient.disconnect(); } catch { /* ignore stale client cleanup failure */ }
+      try {
+        oldClient.disconnect();
+      } catch {
+        /* ignore stale client cleanup failure */
+      }
     }
     disconnectDesktopBridge();
 
@@ -266,7 +255,15 @@ export const useStore = create<StoreState>((set, get) => ({
         const state = get();
         notifyAssistantCompletion(event, state.sessions);
         if (isAssistantCompletionEvent(event)) {
-          get().fetchSessions();
+          const sessionKey = getAgentEventSessionKey(event);
+          const instanceId = get().currentInstanceId;
+          void (async () => {
+            if (instanceId) {
+              await syncAiActionRunsWithGateway(instanceId, client, sessionKey);
+              set((current) => ({ actionRunsVersion: current.actionRunsVersion + 1 }));
+            }
+            await Promise.allSettled([get().fetchSessions(), get().fetchAgents()]);
+          })();
         }
       },
       onStatusChange: (status: ConnectionStatus) => {
@@ -305,7 +302,11 @@ export const useStore = create<StoreState>((set, get) => ({
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Connection failed';
       // 连接握手失败（包括设备签名/认证错误）：断开并停止重试，避免无限循环
-      try { client.disconnect(); } catch { /* ignore failed cleanup after rejected handshake */ }
+      try {
+        client.disconnect();
+      } catch {
+        /* ignore failed cleanup after rejected handshake */
+      }
       set({ connectionStatus: 'error', connectionError: msg, connectionRetry: null, activeClient: null });
     }
   },
@@ -342,13 +343,15 @@ export const useStore = create<StoreState>((set, get) => ({
     if (!client) return;
     try {
       const data = await client.request<{ sessions?: SessionInfo[] } | SessionInfo[]>('sessions.list');
-      const list = Array.isArray(data) ? data : data?.sessions ?? [];
+      const list = Array.isArray(data) ? data : (data?.sessions ?? []);
 
       // 批量拉 preview 提取标题
       if (list.length > 0) {
         const keys = list.map((s) => s.key);
         try {
-          const previewRes = await client.request<{ previews?: { key: string; items?: { role: string; text?: string }[] }[] }>('sessions.preview', { keys });
+          const previewRes = await client.request<{
+            previews?: { key: string; items?: { role: string; text?: string }[] }[];
+          }>('sessions.preview', { keys });
           const previews = previewRes?.previews ?? [];
           for (const p of previews) {
             const session = list.find((s) => s.key === p.key);
@@ -358,7 +361,9 @@ export const useStore = create<StoreState>((set, get) => ({
               session.title = firstText.replace(/[\n\r]/g, ' ').slice(0, 40);
             }
           }
-        } catch { /* preview 静默失败 */ }
+        } catch {
+          /* preview 静默失败 */
+        }
       }
 
       set({ sessions: list as SessionInfo[] });
@@ -371,9 +376,8 @@ export const useStore = create<StoreState>((set, get) => ({
     const client = getClient(get());
     if (!client) return;
     try {
-      const data = await client.request<{ agents?: AgentInfo[] } | AgentInfo[]>('agents.list');
-      const list = Array.isArray(data) ? data : data?.agents ?? [];
-      set({ agents: list as AgentInfo[] });
+      const list = await fetchGatewayAgents(client);
+      set({ agents: list });
     } catch (err) {
       console.error('[fetchAgents]', err);
     }
@@ -395,7 +399,7 @@ export const useStore = create<StoreState>((set, get) => ({
     if (!client) return;
     try {
       const data = await client.request<{ jobs?: CronJob[] } | CronJob[]>('cron.list');
-      const list = Array.isArray(data) ? data : data?.jobs ?? [];
+      const list = Array.isArray(data) ? data : (data?.jobs ?? []);
       set({ cronJobs: list as CronJob[] });
     } catch (err) {
       console.error('[fetchCronJobs]', err);
@@ -430,7 +434,7 @@ export const useStore = create<StoreState>((set, get) => ({
     if (!client) return;
     try {
       const data = await client.request<{ skills?: SkillInfo[] } | SkillInfo[]>('skills.status');
-      const list = Array.isArray(data) ? data : data?.skills ?? [];
+      const list = Array.isArray(data) ? data : (data?.skills ?? []);
       set({ skills: list as SkillInfo[] });
     } catch (err) {
       console.error('[fetchSkills]', err);
@@ -511,9 +515,7 @@ export const useStore = create<StoreState>((set, get) => ({
     if (!user) return;
 
     set((s) => {
-      const instances = s.instances.map((i) =>
-        i.id === instance.id ? { ...i, gatewayUser: user } : i,
-      );
+      const instances = s.instances.map((i) => (i.id === instance.id ? { ...i, gatewayUser: user } : i));
       saveInstances(instances);
       return { instances };
     });
@@ -540,16 +542,18 @@ export const useStore = create<StoreState>((set, get) => ({
 
     try {
       type AssistantInfo = { displayName?: string; name?: string; avatarUrl?: string; avatar?: string };
-      const info = await client.request<AssistantInfo>('assistant.info').catch(() =>
-        client.request<AssistantInfo>('assistant.get')
-      );
+      const info = await client
+        .request<AssistantInfo>('assistant.info')
+        .catch(() => client.request<AssistantInfo>('assistant.get'));
       console.log('[fetchAssistantInfo]', JSON.stringify(info));
       const assistantName = info?.displayName || info?.name;
       const avatarUrl = info?.avatarUrl || info?.avatar;
       if (assistantName || avatarUrl) {
         set((s) => {
           const instances = s.instances.map((i) =>
-            i.id === instance.id ? { ...i, assistantName: assistantName ?? i.assistantName, avatarUrl: avatarUrl ?? i.avatarUrl } : i,
+            i.id === instance.id
+              ? { ...i, assistantName: assistantName ?? i.assistantName, avatarUrl: avatarUrl ?? i.avatarUrl }
+              : i,
           );
           saveInstances(instances);
           return { instances };
@@ -621,9 +625,7 @@ export const useStore = create<StoreState>((set, get) => ({
     if (!client) throw new Error('未连接 Gateway');
 
     set((state) => ({
-      sessions: state.sessions.map((s) =>
-        s.key === key ? { ...s, label } : s,
-      ),
+      sessions: state.sessions.map((s) => (s.key === key ? { ...s, label } : s)),
     }));
 
     await client.request('sessions.patch', { key, label });
