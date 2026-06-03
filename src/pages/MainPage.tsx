@@ -3,6 +3,7 @@ import {Layout, Modal, Toast} from '@douyinfe/semi-ui';
 import {Outlet} from 'react-router-dom';
 import {useTranslation} from 'react-i18next';
 import {useStore} from '../lib';
+import {useSettingsStore} from '../lib/settings-store';
 import Sidebar from '../components/Sidebar';
 import InstanceDrawer from '../components/InstanceDrawer';
 import ConnectionWizard from '../components/ConnectionWizard';
@@ -15,12 +16,15 @@ export default function MainPage() {
     const {t} = useTranslation();
     const instances = useStore((s) => s.instances);
     const currentId = useStore((s) => s.currentInstanceId);
+    const instanceRuntimes = useStore((s) => s.instanceRuntimes);
+    const connectAllInstancesOnStartup = useSettingsStore((s) => s.settings.connectAllInstancesOnStartup);
     const connectionStatus = useStore((s) => s.connectionStatus);
     const connectionError = useStore((s) => s.connectionError);
     const connectionRetry = useStore((s) => s.connectionRetry);
     const [addModalVisible, setAddModalVisible] = useState(false);
     const [drawerVisible, setDrawerVisible] = useState(false);
-    const connectingRef = useRef(false);
+    const connectingRef = useRef(new Set<string>());
+    const startupConnectionsStartedRef = useRef(false);
     const prevStatusRef = useRef<string | null>(null);
     const prevRetryAttemptRef = useRef(0);
     const lastErrorToastRef = useRef(0);
@@ -32,13 +36,28 @@ export default function MainPage() {
     }, [currentId, instances]);
 
     useEffect(() => {
-        if (currentId && connectionStatus === 'disconnected' && !connectingRef.current) {
-            connectingRef.current = true;
-            useStore.getState().connectToGateway().finally(() => {
-                connectingRef.current = false;
+        if (!currentId) return;
+        const runtime = instanceRuntimes[currentId];
+        if (runtime?.autoConnectSuppressed || runtime?.connectionStatus !== 'disconnected') return;
+        if (!connectingRef.current.has(currentId)) {
+            connectingRef.current.add(currentId);
+            useStore.getState().connectToGateway(currentId).finally(() => {
+                connectingRef.current.delete(currentId);
             });
         }
-    }, [currentId, connectionStatus]);
+    }, [currentId, instanceRuntimes]);
+
+    useEffect(() => {
+        if (startupConnectionsStartedRef.current || !connectAllInstancesOnStartup || instances.length === 0) return;
+        startupConnectionsStartedRef.current = true;
+        for (const instance of instances) {
+            if (connectingRef.current.has(instance.id)) continue;
+            connectingRef.current.add(instance.id);
+            useStore.getState().connectToGateway(instance.id).finally(() => {
+                connectingRef.current.delete(instance.id);
+            });
+        }
+    }, [connectAllInstancesOnStartup, instances]);
 
     useEffect(() => {
         if (connectionStatus === prevStatusRef.current) return;

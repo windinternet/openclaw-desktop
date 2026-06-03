@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { applyTheme } from '../lib/theme';
+import { DEFAULT_SETTINGS } from '../lib/settings-types';
 
 function createStyleDeclaration() {
   const values = new Map<string, string>();
@@ -50,11 +51,16 @@ describe('applyTheme', () => {
       locale: 'zh-CN',
       userDisplayName: '',
       aiCompletionSound: 'mixkit-message-pop-alert-2354.mp3',
+      connectAllInstancesOnStartup: false,
     });
 
     expect(body.style.getPropertyValue('--semi-color-primary')).toBe('#722ED1');
     expect(body.style.getPropertyValue('--semi-color-primary-hover')).toBe('#8043d6');
     expect(body.getAttribute('theme-mode')).toBe('dark');
     expect(documentElement.style.getPropertyValue('--semi-color-primary')).toBe('#722ED1');
+  });
+
+  it('defaults to connecting only the current instance on startup', () => {
+    expect(DEFAULT_SETTINGS.connectAllInstancesOnStartup).toBe(false);
   });
 });

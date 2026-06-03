@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { TagColor } from '@douyinfe/semi-ui/lib/es/tag';
 import { SideSheet, Button, Tag, Popconfirm, Typography } from '@douyinfe/semi-ui';
-import { IconServer, IconPlus, IconDeleteStroked } from '@douyinfe/semi-icons';
+import { IconServer, IconPlus, IconDeleteStroked, IconLink, IconPause } from '@douyinfe/semi-icons';
 import { useStore } from '../lib';
 
 const { Text } = Typography;
@@ -24,17 +24,29 @@ const STATUS_CONFIG: Record<string, StatusStyle> = {
   error: { color: 'red', key: 'instance.statusError' },
 };
 
+function formatRelativeTime(timestamp?: number): string {
+  if (!timestamp) return '';
+  const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  if (seconds < 60) return '刚刚';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} 分钟前`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} 小时前`;
+  return `${Math.floor(hours / 24)} 天前`;
+}
+
 export default function InstanceDrawer({ visible, onClose, onAddInstance }: InstanceDrawerProps) {
   const { t } = useTranslation();
   const instances = useStore((s) => s.instances);
   const currentInstanceId = useStore((s) => s.currentInstanceId);
+  const instanceRuntimes = useStore((s) => s.instanceRuntimes);
 
   return (
     <SideSheet
       visible={visible}
       onCancel={onClose}
       placement="left"
-      width={320}
+      width={380}
       headerStyle={{ padding: '16px 20px', borderBottom: '1px solid var(--semi-color-border)' }}
       title={<Text style={{ fontSize: 16, fontWeight: 600 }}>{t('instance.drawerTitle')}</Text>}
     >
@@ -47,10 +59,14 @@ export default function InstanceDrawer({ visible, onClose, onAddInstance }: Inst
           )}
           {instances.map((inst) => {
             const isCurrent = inst.id === currentInstanceId;
-            const statusInfo = inst.connectionStatus
-              ? STATUS_CONFIG[inst.connectionStatus]
-              : null;
+            const runtime = instanceRuntimes[inst.id];
+            const status = runtime?.connectionStatus ?? 'disconnected';
+            const statusInfo = STATUS_CONFIG[status];
             const showRedDot = inst.hasPendingActivity && !isCurrent;
+            const activityTime = formatRelativeTime(inst.lastActivityAt);
+            const statusDetail = runtime?.connectionRetry
+              ? t('instance.retrying', { attempt: runtime.connectionRetry.attempt })
+              : runtime?.connectionError;
 
             return (
               <div
@@ -71,7 +87,7 @@ export default function InstanceDrawer({ visible, onClose, onAddInstance }: Inst
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
-                  padding: '8px 12px',
+                  padding: '10px 12px',
                   margin: '0 8px 2px',
                   borderRadius: 6,
                   cursor: 'pointer',
@@ -125,10 +141,35 @@ export default function InstanceDrawer({ visible, onClose, onAddInstance }: Inst
                   >
                     {inst.gatewayUrl}
                   </Text>
-                  {statusInfo && (
-                    <Tag size="small" color={statusInfo.color} style={{ marginTop: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, minWidth: 0 }}>
+                    <Tag size="small" color={statusInfo.color} style={{ flexShrink: 0 }}>
                       {t(statusInfo.key)}
                     </Tag>
+                    {statusDetail && (
+                      <Text type="tertiary" size="small" ellipsis style={{ minWidth: 0 }}>
+                        {statusDetail}
+                      </Text>
+                    )}
+                  </div>
+                  {inst.lastActivitySummary && (
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 6, minWidth: 0 }}>
+                      <Text
+                        ellipsis
+                        size="small"
+                        style={{
+                          minWidth: 0,
+                          color: showRedDot ? 'var(--semi-color-text-0)' : 'var(--semi-color-text-2)',
+                          fontWeight: showRedDot ? 600 : 400,
+                        }}
+                      >
+                        {inst.lastActivitySummary}
+                      </Text>
+                      {activityTime && (
+                        <Text type="tertiary" size="small" style={{ flexShrink: 0 }}>
+                          {activityTime}
+                        </Text>
+                      )}
+                    </div>
                   )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
@@ -142,6 +183,20 @@ export default function InstanceDrawer({ visible, onClose, onAddInstance }: Inst
                       }}
                     />
                   )}
+                  <Button
+                    icon={status === 'connected' || status === 'connecting' ? <IconPause /> : <IconLink />}
+                    size="small"
+                    theme="borderless"
+                    title={status === 'connected' || status === 'connecting' ? t('instance.disconnect') : t('instance.connect')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (status === 'connected' || status === 'connecting') {
+                        useStore.getState().disconnectGateway(inst.id);
+                      } else {
+                        void useStore.getState().connectToGateway(inst.id);
+                      }
+                    }}
+                  />
                   <Popconfirm title={t('instance.deleteConfirm')} onConfirm={() => useStore.getState().removeInstance(inst.id)}>
                     <Button
                       icon={<IconDeleteStroked />}

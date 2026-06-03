@@ -7,17 +7,16 @@ export const DESKTOP_BRIDGE_CAPABILITIES = [
   'desktop.mcp_bridge',
 ];
 
-let bridgeClient: GatewayClient | null = null;
-let bridgeInstanceId: string | null = null;
+const bridgeClients = new Map<string, GatewayClient>();
 
 export async function connectDesktopBridgeToGateway(instance: InstanceConfig): Promise<HelloOk> {
-  if (bridgeClient && bridgeInstanceId === instance.id && bridgeClient.getStatus() === 'connected') {
-    return bridgeClient.connect();
+  const existingClient = bridgeClients.get(instance.id);
+  if (existingClient?.getStatus() === 'connected') {
+    return existingClient.connect();
   }
 
-  bridgeClient?.disconnect();
-  bridgeInstanceId = instance.id;
-  bridgeClient = createGatewayClient({
+  existingClient?.disconnect();
+  const client = createGatewayClient({
     url: instance.gatewayUrl,
     token: instance.token,
     clientId: 'openclaw-desktop-node',
@@ -27,12 +26,20 @@ export async function connectDesktopBridgeToGateway(instance: InstanceConfig): P
     scopes: ['node.read', 'node.write'],
     capabilities: DESKTOP_BRIDGE_CAPABILITIES,
   });
+  bridgeClients.set(instance.id, client);
 
-  return bridgeClient.connect();
+  return client.connect();
 }
 
-export function disconnectDesktopBridge(): void {
-  bridgeClient?.disconnect();
-  bridgeClient = null;
-  bridgeInstanceId = null;
+export function disconnectDesktopBridge(instanceId?: string): void {
+  if (instanceId) {
+    bridgeClients.get(instanceId)?.disconnect();
+    bridgeClients.delete(instanceId);
+    return;
+  }
+
+  for (const client of bridgeClients.values()) {
+    client.disconnect();
+  }
+  bridgeClients.clear();
 }

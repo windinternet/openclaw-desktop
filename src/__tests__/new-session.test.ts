@@ -29,6 +29,7 @@ describe('new session creation params', () => {
       agentId: 'main',
       key: params.key,
       model: 'gpt-4.1',
+      label: '整理今天的计划',
     });
     expect(params.key).not.toBe('agent:main:main');
     expect(params.title).toBe('整理今天的计划');

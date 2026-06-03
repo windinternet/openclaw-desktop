@@ -1,6 +1,7 @@
 export type {
   // Connection & Instance
   InstanceConfig,
+  InstanceActivityKind,
   ConnectionStatus,
   ConnectionState,
   DiscoveredInstance,

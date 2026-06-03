@@ -42,4 +42,13 @@ describe('Sidebar session list', () => {
     expect(mainPageSource).not.toContain('paddingTop: isMacOS ? 30 : 0');
     expect(mainPageSource).not.toContain("WebkitAppRegion: 'drag'");
   });
+
+  it('renders per-instance runtime status and recent activity in the instance drawer', () => {
+    const source = readFileSync('src/components/InstanceDrawer.tsx', 'utf8');
+
+    expect(source).toContain('instanceRuntimes[inst.id]');
+    expect(source).toContain('lastActivitySummary');
+    expect(source).toContain('lastActivityAt');
+    expect(source).toContain('hasPendingActivity');
+  });
 });

@@ -25,6 +25,7 @@ import { fetchSkillMarketplaceSkills } from './skill-marketplace';
 import { fetchGatewayUser, fetchUserProfile } from './user';
 import { fetchGatewayAgents } from './gateway-agents';
 import {
+  getAssistantCompletionSummary,
   getAgentEventSessionKey,
   isAssistantCompletionEvent,
   notifyAssistantCompletion,
@@ -36,10 +37,61 @@ function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 }
 
+const processedCompletionEventKeys = new Set<string>();
+
+function getCompletionEventKey(instanceId: string, event: { payload?: unknown; seq?: number }): string {
+  const payload =
+    typeof event.payload === 'object' && event.payload !== null ? (event.payload as Record<string, unknown>) : {};
+  const runId = payload.runId ?? payload.run_id;
+  const sessionKey = payload.sessionKey ?? payload.session_key;
+  return `${instanceId}:${typeof runId === 'string' ? runId : `${String(sessionKey ?? 'unknown')}:${event.seq ?? 'completion'}`}`;
+}
+
+export interface InstanceRuntime {
+  client: GatewayClient | null;
+  autoConnectSuppressed: boolean;
+  connectionStatus: ConnectionStatus;
+  connectionError: string | null;
+  connectionRetry: GatewayRetryInfo | null;
+  sessions: SessionInfo[];
+  agents: AgentInfo[];
+  models: ModelInfo[];
+  cronJobs: CronJob[];
+  tools: ToolInfo[];
+  skills: SkillInfo[];
+  skillMarketplaceResults: SkillMarketplaceSkill[];
+  workspaceFiles: WorkspaceFile[];
+  health: GatewayHealth | null;
+  gatewayStatus: GatewayStatus | null;
+  agentIdentity: AgentIdentity | null;
+}
+
+function createInstanceRuntime(): InstanceRuntime {
+  return {
+    client: null,
+    autoConnectSuppressed: false,
+    connectionStatus: 'disconnected',
+    connectionError: null,
+    connectionRetry: null,
+    sessions: [],
+    agents: [],
+    models: [],
+    cronJobs: [],
+    tools: [],
+    skills: [],
+    skillMarketplaceResults: [],
+    workspaceFiles: [],
+    health: null,
+    gatewayStatus: null,
+    agentIdentity: null,
+  };
+}
+
 interface StoreState {
   // ── Instance ──
   instances: InstanceConfig[];
   currentInstanceId: string | null;
+  instanceRuntimes: Record<string, InstanceRuntime>;
   connectionStatus: ConnectionStatus;
   connectionError: string | null;
   connectionRetry: GatewayRetryInfo | null;
@@ -68,30 +120,30 @@ interface StoreState {
   setConnectionStatus: (status: ConnectionStatus, error?: string) => void;
   getCurrentInstance: () => InstanceConfig | null;
   setInstanceStatus: (id: string, status: ConnectionStatus) => void;
-  markInstanceActivity: (id: string) => void;
+  markInstanceActivity: (id: string, summary?: string) => void;
   clearInstanceActivity: (id: string) => void;
 
   // ── Connection ──
-  connectToGateway: () => Promise<void>;
-  disconnectGateway: () => void;
-  refreshAll: () => Promise<void>;
+  connectToGateway: (instanceId?: string) => Promise<void>;
+  disconnectGateway: (instanceId?: string) => void;
+  refreshAll: (instanceId?: string) => Promise<void>;
 
   // ── Data fetching ──
-  fetchSessions: () => Promise<void>;
-  fetchAgents: () => Promise<void>;
-  fetchModels: () => Promise<void>;
-  fetchCronJobs: () => Promise<void>;
+  fetchSessions: (instanceId?: string) => Promise<void>;
+  fetchAgents: (instanceId?: string) => Promise<void>;
+  fetchModels: (instanceId?: string) => Promise<void>;
+  fetchCronJobs: (instanceId?: string) => Promise<void>;
   fetchCronRuns: (jobId: string) => Promise<CronRun[]>;
-  fetchTools: () => Promise<void>;
-  fetchSkills: () => Promise<void>;
+  fetchTools: (instanceId?: string) => Promise<void>;
+  fetchSkills: (instanceId?: string) => Promise<void>;
   searchSkillMarketplace: (params: SkillMarketplaceSearchParams) => Promise<SkillMarketplaceSkill[]>;
   installMarketplaceSkill: (skill: SkillMarketplaceSkill) => Promise<SkillMarketplaceInstallResult>;
-  fetchWorkspaceFiles: (agentId?: string) => Promise<void>;
-  fetchHealth: () => Promise<void>;
-  fetchGatewayStatus: () => Promise<void>;
-  fetchGatewayUserForCurrent: () => Promise<void>;
-  fetchAgentIdentity: (agentId?: string) => Promise<void>;
-  fetchAssistantInfo: () => Promise<void>;
+  fetchWorkspaceFiles: (agentId?: string, instanceId?: string) => Promise<void>;
+  fetchHealth: (instanceId?: string) => Promise<void>;
+  fetchGatewayStatus: (instanceId?: string) => Promise<void>;
+  fetchGatewayUserForCurrent: (instanceId?: string) => Promise<void>;
+  fetchAgentIdentity: (agentId?: string, instanceId?: string) => Promise<void>;
+  fetchAssistantInfo: (instanceId?: string) => Promise<void>;
 
   // ── Mutations ──
   createCronJob: (job: Omit<CronJob, 'id'>) => Promise<void>;
@@ -102,6 +154,47 @@ interface StoreState {
   patchSessionLabel: (key: string, label: string | null) => Promise<void>;
 }
 
+function runtimeToCurrentView(runtime: InstanceRuntime): Partial<StoreState> {
+  return {
+    activeClient: runtime.client,
+    connectionStatus: runtime.connectionStatus,
+    connectionError: runtime.connectionError,
+    connectionRetry: runtime.connectionRetry,
+    sessions: runtime.sessions,
+    agents: runtime.agents,
+    models: runtime.models,
+    cronJobs: runtime.cronJobs,
+    tools: runtime.tools,
+    skills: runtime.skills,
+    skillMarketplaceResults: runtime.skillMarketplaceResults,
+    workspaceFiles: runtime.workspaceFiles,
+    health: runtime.health,
+    gatewayStatus: runtime.gatewayStatus,
+    agentIdentity: runtime.agentIdentity,
+  };
+}
+
+function withInstanceRuntime(
+  state: StoreState,
+  instanceId: string,
+  updates: Partial<InstanceRuntime>,
+): Partial<StoreState> {
+  const runtime = {
+    ...(state.instanceRuntimes[instanceId] ?? createInstanceRuntime()),
+    ...updates,
+  };
+  const next: Partial<StoreState> = {
+    instanceRuntimes: {
+      ...state.instanceRuntimes,
+      [instanceId]: runtime,
+    },
+  };
+  if (state.currentInstanceId === instanceId) {
+    Object.assign(next, runtimeToCurrentView(runtime));
+  }
+  return next;
+}
+
 function getClient(state: StoreState): GatewayClient | null {
   if (state.activeClient && state.activeClient.getStatus() === 'connected') {
     return state.activeClient;
@@ -109,9 +202,18 @@ function getClient(state: StoreState): GatewayClient | null {
   return null;
 }
 
+function getInstanceClient(state: StoreState, requestedInstanceId?: string): { instanceId: string; client: GatewayClient } | null {
+  const instanceId = requestedInstanceId ?? state.currentInstanceId;
+  if (!instanceId) return null;
+  const client = state.instanceRuntimes[instanceId]?.client;
+  if (!client || client.getStatus() !== 'connected') return null;
+  return { instanceId, client };
+}
+
 export const useStore = create<StoreState>((set, get) => ({
   instances: [],
   currentInstanceId: null,
+  instanceRuntimes: {},
   connectionStatus: 'disconnected',
   connectionError: null,
   connectionRetry: null,
@@ -135,7 +237,18 @@ export const useStore = create<StoreState>((set, get) => ({
   hydrateInstances: (instances, currentInstanceId) => {
     const validCurrentInstanceId =
       currentInstanceId && instances.some((i) => i.id === currentInstanceId) ? currentInstanceId : null;
-    set({ instances, currentInstanceId: validCurrentInstanceId });
+    set((state) => {
+      const instanceRuntimes = Object.fromEntries(
+        instances.map((instance) => [instance.id, state.instanceRuntimes[instance.id] ?? createInstanceRuntime()]),
+      );
+      const runtime = validCurrentInstanceId ? instanceRuntimes[validCurrentInstanceId] : createInstanceRuntime();
+      return {
+        instances,
+        currentInstanceId: validCurrentInstanceId,
+        instanceRuntimes,
+        ...runtimeToCurrentView(runtime),
+      };
+    });
   },
 
   loadInstances: async () => {
@@ -143,7 +256,18 @@ export const useStore = create<StoreState>((set, get) => ({
     const instances = snapshot.instances;
     const savedCurrentId = snapshot.currentInstanceId;
     const currentInstanceId = savedCurrentId && instances.some((i) => i.id === savedCurrentId) ? savedCurrentId : null;
-    set({ instances, currentInstanceId });
+    set((state) => {
+      const instanceRuntimes = Object.fromEntries(
+        instances.map((instance) => [instance.id, state.instanceRuntimes[instance.id] ?? createInstanceRuntime()]),
+      );
+      const runtime = currentInstanceId ? instanceRuntimes[currentInstanceId] : createInstanceRuntime();
+      return {
+        instances,
+        currentInstanceId,
+        instanceRuntimes,
+        ...runtimeToCurrentView(runtime),
+      };
+    });
   },
 
   addInstance: (config) => {
@@ -163,19 +287,38 @@ export const useStore = create<StoreState>((set, get) => ({
       };
       const instances = [...state.instances, instance];
       saveInstances(instances);
-      return { instances };
+      return {
+        instances,
+        instanceRuntimes: {
+          ...state.instanceRuntimes,
+          [instance.id]: createInstanceRuntime(),
+        },
+      };
     });
   },
 
   removeInstance: (id) => {
+    const runtime = get().instanceRuntimes[id];
+    try {
+      runtime?.client?.disconnect();
+    } catch {
+      /* ignore stale client cleanup failure */
+    }
+    disconnectDesktopBridge(id);
     set((state) => {
       const instances = state.instances.filter((i) => i.id !== id);
+      const instanceRuntimes = { ...state.instanceRuntimes };
+      delete instanceRuntimes[id];
       saveInstances(instances);
       removePersistedInstance(id);
       if (state.currentInstanceId === id) saveCurrentInstanceId(null);
+      const currentInstanceId = state.currentInstanceId === id ? null : state.currentInstanceId;
+      const currentRuntime = currentInstanceId ? instanceRuntimes[currentInstanceId] : createInstanceRuntime();
       return {
         instances,
-        currentInstanceId: state.currentInstanceId === id ? null : state.currentInstanceId,
+        currentInstanceId,
+        instanceRuntimes,
+        ...runtimeToCurrentView(currentRuntime),
       };
     });
   },
@@ -185,12 +328,21 @@ export const useStore = create<StoreState>((set, get) => ({
       saveCurrentInstanceId(id);
       set((state) => {
         const instances = state.instances.map((i) => (i.id === id ? { ...i, hasPendingActivity: false } : i));
+        const runtime = state.instanceRuntimes[id] ?? createInstanceRuntime();
         saveInstances(instances);
-        return { currentInstanceId: id, instances };
+        return {
+          currentInstanceId: id,
+          instances,
+          instanceRuntimes: {
+            ...state.instanceRuntimes,
+            [id]: runtime,
+          },
+          ...runtimeToCurrentView(runtime),
+        };
       });
     } else {
       saveCurrentInstanceId(null);
-      set({ currentInstanceId: null });
+      set({ currentInstanceId: null, ...runtimeToCurrentView(createInstanceRuntime()) });
     }
   },
 
@@ -200,10 +352,18 @@ export const useStore = create<StoreState>((set, get) => ({
     }));
   },
 
-  markInstanceActivity: (id) => {
+  markInstanceActivity: (id, summary) => {
     set((state) => {
       const instances = state.instances.map((i) =>
-        i.id === id ? { ...i, hasPendingActivity: true, lastActivityAt: Date.now() } : i,
+        i.id === id
+          ? {
+              ...i,
+              hasPendingActivity: true,
+              lastActivityAt: Date.now(),
+              lastActivityKind: 'assistant-completed' as const,
+              lastActivitySummary: summary ?? i.lastActivitySummary,
+            }
+          : i,
       );
       saveInstances(instances);
       return { instances };
@@ -230,76 +390,109 @@ export const useStore = create<StoreState>((set, get) => ({
 
   // ── Connection ──
 
-  connectToGateway: async () => {
+  connectToGateway: async (requestedInstanceId) => {
     const state = get();
-    const instance = state.instances.find((i) => i.id === state.currentInstanceId);
+    const instanceId = requestedInstanceId ?? state.currentInstanceId;
+    const instance = state.instances.find((i) => i.id === instanceId);
     if (!instance) return;
 
-    // 丢弃旧连接
-    const oldClient = get().activeClient;
-    if (oldClient) {
+    const existingRuntime = state.instanceRuntimes[instance.id] ?? createInstanceRuntime();
+    const existingClient = existingRuntime.client;
+    if (existingClient?.getStatus() === 'connected' || existingClient?.getStatus() === 'connecting') {
+      set((current) => withInstanceRuntime(current, instance.id, {}));
+      return;
+    }
+    if (existingClient) {
       try {
-        oldClient.disconnect();
+        existingClient.disconnect();
       } catch {
         /* ignore stale client cleanup failure */
       }
     }
-    disconnectDesktopBridge();
 
-    set({ connectionStatus: 'connecting', connectionError: null, connectionRetry: null, activeClient: null });
+    set((current) =>
+      withInstanceRuntime(current, instance.id, {
+        autoConnectSuppressed: false,
+        connectionStatus: 'connecting',
+        connectionError: null,
+        connectionRetry: null,
+        client: null,
+      }),
+    );
 
     const client = createGatewayClient({
       url: instance.gatewayUrl,
       token: instance.token,
       onEvent: (event) => {
         const state = get();
-        notifyAssistantCompletion(event, state.sessions);
+        const runtime = state.instanceRuntimes[instance.id] ?? createInstanceRuntime();
+        const summary = getAssistantCompletionSummary(event, runtime.sessions);
+        notifyAssistantCompletion(event, runtime.sessions, instance.name);
         if (isAssistantCompletionEvent(event)) {
           const sessionKey = getAgentEventSessionKey(event);
-          const instanceId = get().currentInstanceId;
+          const eventKey = getCompletionEventKey(instance.id, event);
+          const isNewCompletion = !processedCompletionEventKeys.has(eventKey);
+          processedCompletionEventKeys.add(eventKey);
+          if (processedCompletionEventKeys.size > 100) processedCompletionEventKeys.clear();
+          if (summary && isNewCompletion && state.currentInstanceId !== instance.id) {
+            get().markInstanceActivity(instance.id, summary);
+          }
           void (async () => {
-            if (instanceId) {
-              await syncAiActionRunsWithGateway(instanceId, client, sessionKey);
-              set((current) => ({ actionRunsVersion: current.actionRunsVersion + 1 }));
-            }
-            await Promise.allSettled([get().fetchSessions(), get().fetchAgents()]);
+            await syncAiActionRunsWithGateway(instance.id, client, sessionKey);
+            set((current) => ({ actionRunsVersion: current.actionRunsVersion + 1 }));
+            await Promise.allSettled([get().fetchSessions(instance.id), get().fetchAgents(instance.id)]);
           })();
         }
       },
       onStatusChange: (status: ConnectionStatus) => {
         const s = get();
-        if (s.activeClient !== client) return; // 旧 client 的回调忽略
+        if (s.instanceRuntimes[instance.id]?.client !== client) return; // 旧 client 的回调忽略
         if (status === 'connected') {
-          set({ connectionStatus: 'connected', connectionError: null, connectionRetry: null });
-          get().refreshAll();
+          set((current) =>
+            withInstanceRuntime(current, instance.id, {
+              connectionStatus: 'connected',
+              connectionError: null,
+              connectionRetry: null,
+            }),
+          );
+          get().refreshAll(instance.id);
           void connectDesktopBridgeToGateway(instance).catch((err) => {
             void err;
           });
         } else if (status === 'error') {
-          set({ connectionStatus: 'error', connectionError: '网关连接错误' });
+          set((current) =>
+            withInstanceRuntime(current, instance.id, {
+              connectionStatus: 'error',
+              connectionError: '网关连接错误',
+            }),
+          );
         } else if (status === 'disconnected') {
-          set({ connectionStatus: 'disconnected' });
-          disconnectDesktopBridge();
+          set((current) => withInstanceRuntime(current, instance.id, { connectionStatus: 'disconnected' }));
+          disconnectDesktopBridge(instance.id);
         } else if (status === 'connecting') {
-          set({ connectionStatus: 'connecting' });
+          set((current) => withInstanceRuntime(current, instance.id, { connectionStatus: 'connecting' }));
         }
       },
       onRetry: (info) => {
         const s = get();
-        if (s.activeClient !== client) return;
-        set({
-          connectionRetry: info,
-          connectionError: info?.reason ?? null,
-          connectionStatus: info ? 'connecting' : s.connectionStatus,
-        });
+        const runtime = s.instanceRuntimes[instance.id];
+        if (runtime?.client !== client) return;
+        set((current) =>
+          withInstanceRuntime(current, instance.id, {
+            connectionRetry: info,
+            connectionError: info?.reason ?? null,
+            connectionStatus: info ? 'connecting' : runtime.connectionStatus,
+          }),
+        );
       },
     });
 
-    set({ activeClient: client });
+    set((current) => withInstanceRuntime(current, instance.id, { client }));
 
     try {
       await client.connect();
     } catch (err) {
+      if (get().instanceRuntimes[instance.id]?.client !== client) return;
       const msg = err instanceof Error ? err.message : 'Connection failed';
       // 连接握手失败（包括设备签名/认证错误）：断开并停止重试，避免无限循环
       try {
@@ -307,40 +500,59 @@ export const useStore = create<StoreState>((set, get) => ({
       } catch {
         /* ignore failed cleanup after rejected handshake */
       }
-      set({ connectionStatus: 'error', connectionError: msg, connectionRetry: null, activeClient: null });
+      set((current) =>
+        withInstanceRuntime(current, instance.id, {
+          connectionStatus: 'error',
+          connectionError: msg,
+          connectionRetry: null,
+          client: null,
+        }),
+      );
     }
   },
 
-  disconnectGateway: () => {
-    const { activeClient } = get();
-    disconnectDesktopBridge();
-    if (activeClient) {
-      activeClient.disconnect();
-      set({ activeClient: null, connectionStatus: 'disconnected', connectionRetry: null });
+  disconnectGateway: (requestedInstanceId) => {
+    const state = get();
+    const instanceId = requestedInstanceId ?? state.currentInstanceId;
+    if (!instanceId) return;
+    const client = state.instanceRuntimes[instanceId]?.client;
+    disconnectDesktopBridge(instanceId);
+    if (client) {
+      client.disconnect();
     }
+    set((current) =>
+      withInstanceRuntime(current, instanceId, {
+        client: null,
+        autoConnectSuppressed: true,
+        connectionStatus: 'disconnected',
+        connectionError: null,
+        connectionRetry: null,
+      }),
+    );
   },
 
-  refreshAll: async () => {
+  refreshAll: async (instanceId) => {
     await Promise.allSettled([
-      get().fetchSessions(),
-      get().fetchAgents(),
-      get().fetchModels(),
-      get().fetchCronJobs(),
-      get().fetchTools(),
-      get().fetchSkills(),
-      get().fetchHealth(),
-      get().fetchGatewayStatus(),
-      get().fetchGatewayUserForCurrent(),
-      get().fetchAgentIdentity(),
-      get().fetchAssistantInfo(),
+      get().fetchSessions(instanceId),
+      get().fetchAgents(instanceId),
+      get().fetchModels(instanceId),
+      get().fetchCronJobs(instanceId),
+      get().fetchTools(instanceId),
+      get().fetchSkills(instanceId),
+      get().fetchHealth(instanceId),
+      get().fetchGatewayStatus(instanceId),
+      get().fetchGatewayUserForCurrent(instanceId),
+      get().fetchAgentIdentity('main', instanceId),
+      get().fetchAssistantInfo(instanceId),
     ]);
   },
 
   // ── Data Fetching ──
 
-  fetchSessions: async () => {
-    const client = getClient(get());
-    if (!client) return;
+  fetchSessions: async (requestedInstanceId) => {
+    const target = getInstanceClient(get(), requestedInstanceId);
+    if (!target) return;
+    const { instanceId, client } = target;
     try {
       const data = await client.request<{ sessions?: SessionInfo[] } | SessionInfo[]>('sessions.list');
       const list = Array.isArray(data) ? data : (data?.sessions ?? []);
@@ -366,41 +578,46 @@ export const useStore = create<StoreState>((set, get) => ({
         }
       }
 
-      set({ sessions: list as SessionInfo[] });
+      set((state) => withInstanceRuntime(state, instanceId, { sessions: list as SessionInfo[] }));
     } catch (err) {
       console.error('[fetchSessions]', err);
     }
   },
 
-  fetchAgents: async () => {
-    const client = getClient(get());
-    if (!client) return;
+  fetchAgents: async (requestedInstanceId) => {
+    const target = getInstanceClient(get(), requestedInstanceId);
+    if (!target) return;
+    const { instanceId, client } = target;
     try {
       const list = await fetchGatewayAgents(client);
-      set({ agents: list });
+      set((state) => withInstanceRuntime(state, instanceId, { agents: list }));
     } catch (err) {
       console.error('[fetchAgents]', err);
     }
   },
 
-  fetchModels: async () => {
-    const client = getClient(get());
-    if (!client) return;
+  fetchModels: async (requestedInstanceId) => {
+    const target = getInstanceClient(get(), requestedInstanceId);
+    if (!target) return;
+    const { instanceId, client } = target;
     try {
       const data = await client.request<{ models?: ModelInfo[] } | ModelInfo[]>('models.list', { view: 'configured' });
-      set({ models: Array.isArray(data) ? data : (data?.models ?? []) });
+      set((state) =>
+        withInstanceRuntime(state, instanceId, { models: Array.isArray(data) ? data : (data?.models ?? []) }),
+      );
     } catch (err) {
       console.error('[fetchModels]', err);
     }
   },
 
-  fetchCronJobs: async () => {
-    const client = getClient(get());
-    if (!client) return;
+  fetchCronJobs: async (requestedInstanceId) => {
+    const target = getInstanceClient(get(), requestedInstanceId);
+    if (!target) return;
+    const { instanceId, client } = target;
     try {
       const data = await client.request<{ jobs?: CronJob[] } | CronJob[]>('cron.list');
       const list = Array.isArray(data) ? data : (data?.jobs ?? []);
-      set({ cronJobs: list as CronJob[] });
+      set((state) => withInstanceRuntime(state, instanceId, { cronJobs: list as CronJob[] }));
     } catch (err) {
       console.error('[fetchCronJobs]', err);
     }
@@ -418,34 +635,41 @@ export const useStore = create<StoreState>((set, get) => ({
     }
   },
 
-  fetchTools: async () => {
-    const client = getClient(get());
-    if (!client) return;
+  fetchTools: async (requestedInstanceId) => {
+    const target = getInstanceClient(get(), requestedInstanceId);
+    if (!target) return;
+    const { instanceId, client } = target;
     try {
       const data = await client.request<ToolInfo[]>('tools.catalog');
-      set({ tools: Array.isArray(data) ? data : [] });
+      set((state) => withInstanceRuntime(state, instanceId, { tools: Array.isArray(data) ? data : [] }));
     } catch (err) {
       console.error('[fetchTools]', err);
     }
   },
 
-  fetchSkills: async () => {
-    const client = getClient(get());
-    if (!client) return;
+  fetchSkills: async (requestedInstanceId) => {
+    const target = getInstanceClient(get(), requestedInstanceId);
+    if (!target) return;
+    const { instanceId, client } = target;
     try {
       const data = await client.request<{ skills?: SkillInfo[] } | SkillInfo[]>('skills.status');
       const list = Array.isArray(data) ? data : (data?.skills ?? []);
-      set({ skills: list as SkillInfo[] });
+      set((state) => withInstanceRuntime(state, instanceId, { skills: list as SkillInfo[] }));
     } catch (err) {
       console.error('[fetchSkills]', err);
     }
   },
 
   searchSkillMarketplace: async (params) => {
+    const instanceId = get().currentInstanceId;
     const results = await (typeof window !== 'undefined' && window.electronAPI?.marketplace
       ? window.electronAPI.marketplace.search(params)
       : fetchSkillMarketplaceSkills(params));
-    set({ skillMarketplaceResults: results });
+    if (instanceId) {
+      set((state) => withInstanceRuntime(state, instanceId, { skillMarketplaceResults: results }));
+    } else {
+      set({ skillMarketplaceResults: results });
+    }
     return results;
   },
 
@@ -465,47 +689,51 @@ export const useStore = create<StoreState>((set, get) => ({
     return result;
   },
 
-  fetchWorkspaceFiles: async (agentId: string = 'main') => {
-    const client = getClient(get());
-    if (!client) return;
+  fetchWorkspaceFiles: async (agentId: string = 'main', requestedInstanceId) => {
+    const target = getInstanceClient(get(), requestedInstanceId);
+    if (!target) return;
+    const { instanceId, client } = target;
     try {
       const data = await client.request<WorkspaceFile[]>('agents.files.list', { agentId });
-      set({ workspaceFiles: Array.isArray(data) ? data : [] });
+      set((state) => withInstanceRuntime(state, instanceId, { workspaceFiles: Array.isArray(data) ? data : [] }));
     } catch (err) {
       console.error('[fetchWorkspaceFiles]', err);
     }
   },
 
-  fetchHealth: async () => {
-    const client = getClient(get());
-    if (!client) return;
+  fetchHealth: async (requestedInstanceId) => {
+    const target = getInstanceClient(get(), requestedInstanceId);
+    if (!target) return;
+    const { instanceId, client } = target;
     try {
       const data = await client.request<GatewayHealth>('health');
-      set({ health: data });
+      set((state) => withInstanceRuntime(state, instanceId, { health: data }));
     } catch (err) {
       console.error('[fetchHealth]', err);
     }
   },
 
-  fetchGatewayStatus: async () => {
-    const client = getClient(get());
-    if (!client) return;
+  fetchGatewayStatus: async (requestedInstanceId) => {
+    const target = getInstanceClient(get(), requestedInstanceId);
+    if (!target) return;
+    const { instanceId, client } = target;
     try {
       const data = await client.request<GatewayStatus>('status');
-      set({ gatewayStatus: data });
+      set((state) => withInstanceRuntime(state, instanceId, { gatewayStatus: data }));
     } catch (err) {
       console.error('[fetchGatewayStatus]', err);
     }
   },
 
-  fetchGatewayUserForCurrent: async () => {
+  fetchGatewayUserForCurrent: async (requestedInstanceId) => {
     const state = get();
-    const instance = state.instances.find((i) => i.id === state.currentInstanceId);
+    const instanceId = requestedInstanceId ?? state.currentInstanceId;
+    const instance = state.instances.find((i) => i.id === instanceId);
     if (!instance) return;
 
     let user: GatewayUser | null = null;
 
-    const activeClient = getClient(state);
+    const activeClient = getInstanceClient(state, instance.id)?.client ?? null;
     if (activeClient) {
       user = await fetchUserProfile(activeClient, 'main');
     } else {
@@ -521,23 +749,25 @@ export const useStore = create<StoreState>((set, get) => ({
     });
   },
 
-  fetchAgentIdentity: async (agentId: string = 'main') => {
-    const client = getClient(get());
-    if (!client) return;
+  fetchAgentIdentity: async (agentId: string = 'main', requestedInstanceId) => {
+    const target = getInstanceClient(get(), requestedInstanceId);
+    if (!target) return;
+    const { instanceId, client } = target;
     try {
       const data = await client.request<AgentIdentity>('agent.identity.get', { agentId });
       console.log('[fetchAgentIdentity]', JSON.stringify(data));
-      set({ agentIdentity: data });
+      set((state) => withInstanceRuntime(state, instanceId, { agentIdentity: data }));
     } catch (err) {
       console.error('[fetchAgentIdentity]', err);
     }
   },
 
-  fetchAssistantInfo: async () => {
+  fetchAssistantInfo: async (requestedInstanceId) => {
     const state = get();
-    const client = getClient(state);
-    if (!client) return;
-    const instance = state.instances.find((i) => i.id === state.currentInstanceId);
+    const target = getInstanceClient(state, requestedInstanceId);
+    if (!target) return;
+    const { instanceId, client } = target;
+    const instance = state.instances.find((i) => i.id === instanceId);
     if (!instance) return;
 
     try {

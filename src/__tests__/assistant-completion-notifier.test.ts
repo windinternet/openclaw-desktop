@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   getAgentEventSessionKey,
+  getAssistantCompletionSummary,
   getCurrentChatSessionKey,
   isAssistantCompletionEvent,
+  notifyAssistantCompletion,
   shouldNotifyAssistantCompletion,
 } from '../lib/assistant-completion-notifier';
 import { DEFAULT_ALERT_SOUND, alertSounds } from '../assets/sound/alert';
@@ -89,5 +91,52 @@ describe('assistant completion notifier', () => {
     });
 
     expect(shouldNotifyAssistantCompletion('session-a')).toBe(true);
+  });
+
+  it('builds a reusable activity summary from the matching session title', () => {
+    expect(
+      getAssistantCompletionSummary(
+        {
+          type: 'event',
+          event: 'run.completed',
+          payload: { sessionKey: 'session-a' },
+        },
+        [{ key: 'session-a', title: '部署检查' }],
+      ),
+    ).toBe('会话「部署检查」已完成');
+  });
+
+  it('includes the instance name in system notifications', async () => {
+    const show = vi.fn(async () => true);
+    vi.stubGlobal('Audio', class {
+      play() {
+        return Promise.resolve();
+      }
+    });
+    vi.stubGlobal('window', {
+      location: { hash: '#/dashboard' },
+      electronAPI: { notifications: { show } },
+    });
+    vi.stubGlobal('document', {
+      visibilityState: 'hidden',
+      hasFocus: () => false,
+    });
+
+    notifyAssistantCompletion(
+      {
+        type: 'event',
+        event: 'run.completed',
+        payload: { sessionKey: 'session-a', runId: 'notification-instance-name' },
+      },
+      [{ key: 'session-a', title: '部署检查' }],
+      'Instance A',
+    );
+
+    await vi.waitFor(() => {
+      expect(show).toHaveBeenCalledWith({
+        title: 'OpenClaw · Instance A',
+        body: '会话「部署检查」的 AI 回复已完成',
+      });
+    });
   });
 });

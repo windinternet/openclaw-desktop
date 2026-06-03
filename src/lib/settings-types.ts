@@ -24,6 +24,7 @@ export interface AppSettings {
   locale: SupportedLocale;
   userDisplayName: string;
   aiCompletionSound: string;
+  connectAllInstancesOnStartup: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -33,4 +34,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   locale: 'zh-CN',
   userDisplayName: '',
   aiCompletionSound: 'mixkit-message-pop-alert-2354.mp3',
+  connectAllInstancesOnStartup: false,
 };

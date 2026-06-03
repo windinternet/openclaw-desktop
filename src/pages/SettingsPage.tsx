@@ -8,6 +8,7 @@ import {
   Button,
   Tag,
   Space,
+  Switch,
 } from '@douyinfe/semi-ui';
 import { useSettingsStore } from '../lib/settings-store';
 import { PRESET_THEME_COLORS } from '../lib/settings-types';
@@ -267,6 +268,24 @@ export default function SettingsPage() {
             onChange={(val: string) => updateSettings({ userDisplayName: val })}
             style={{ maxWidth: 320 }}
           />
+        </SectionCard>
+
+        {/* ═══ Connections ═══ */}
+        <SectionCard icon="🔗" title={t('settings.connections')} desc={t('settings.connectionsDesc')}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24 }}>
+            <div style={{ minWidth: 0 }}>
+              <Text style={{ display: 'block', color: 'var(--semi-color-text-0)' }}>
+                {t('settings.connectAllInstancesOnStartup')}
+              </Text>
+              <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>
+                {t('settings.connectAllInstancesOnStartupDesc')}
+              </Text>
+            </div>
+            <Switch
+              checked={settings.connectAllInstancesOnStartup}
+              onChange={(checked: boolean) => updateSettings({ connectAllInstancesOnStartup: checked })}
+            />
+          </div>
         </SectionCard>
 
         {/* ═══ About ═══ */}

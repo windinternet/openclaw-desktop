@@ -1,5 +1,7 @@
 // ── Connection & Instance ─────────────────────────────────────────
 
+export type InstanceActivityKind = 'assistant-completed';
+
 export interface InstanceConfig {
   id: string;
   name: string;
@@ -13,6 +15,8 @@ export interface InstanceConfig {
   gatewayUser?: GatewayUser;
   hasPendingActivity?: boolean;
   lastActivityAt?: number;
+  lastActivityKind?: InstanceActivityKind;
+  lastActivitySummary?: string;
 }
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';

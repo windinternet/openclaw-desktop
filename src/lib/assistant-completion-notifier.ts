@@ -57,6 +57,12 @@ function findSessionTitle(sessions: SessionInfo[], sessionKey?: string): string 
   return session?.title?.trim() || session?.key;
 }
 
+export function getAssistantCompletionSummary(frame: EventFrame, sessions: SessionInfo[]): string | null {
+  if (!isAssistantCompletionEvent(frame)) return null;
+  const sessionTitle = findSessionTitle(sessions, getAgentEventSessionKey(frame));
+  return sessionTitle ? `会话「${sessionTitle}」已完成` : 'AI 回复已完成';
+}
+
 async function showSystemNotification(title: string, body: string): Promise<void> {
   if (typeof window !== 'undefined' && 'electronAPI' in window && window.electronAPI.notifications) {
     await window.electronAPI.notifications.show({ title, body });
@@ -72,7 +78,7 @@ async function showSystemNotification(title: string, body: string): Promise<void
   }
 }
 
-export function notifyAssistantCompletion(frame: EventFrame, sessions: SessionInfo[]): void {
+export function notifyAssistantCompletion(frame: EventFrame, sessions: SessionInfo[], instanceName?: string): void {
   if (!isAssistantCompletionEvent(frame)) return;
 
   const sessionKey = getAgentEventSessionKey(frame);
@@ -88,7 +94,8 @@ export function notifyAssistantCompletion(frame: EventFrame, sessions: SessionIn
   const soundId = settings.aiCompletionSound || DEFAULT_ALERT_SOUND;
   const sessionTitle = findSessionTitle(sessions, sessionKey);
   const body = sessionTitle ? `会话「${sessionTitle}」的 AI 回复已完成` : 'AI 回复已完成';
+  const title = instanceName ? `OpenClaw · ${instanceName}` : 'OpenClaw';
 
   playAlertSound(soundId);
-  showSystemNotification('OpenClaw', body).catch(() => {});
+  showSystemNotification(title, body).catch(() => {});
 }
