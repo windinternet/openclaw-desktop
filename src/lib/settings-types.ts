@@ -1,3 +1,5 @@
+import type { AgentSwitchStrategy } from './agent-switch-settings';
+
 export type ThemeMode = 'light' | 'dark' | 'auto';
 
 export interface ThemeColor {
@@ -25,6 +27,7 @@ export interface AppSettings {
   userDisplayName: string;
   aiCompletionSound: string;
   connectAllInstancesOnStartup: boolean;
+  agentSwitchStrategy: AgentSwitchStrategy;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -35,4 +38,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   userDisplayName: '',
   aiCompletionSound: 'mixkit-message-pop-alert-2354.mp3',
   connectAllInstancesOnStartup: false,
+  agentSwitchStrategy: 'new-session',
 };

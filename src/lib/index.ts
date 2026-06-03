@@ -81,6 +81,8 @@ export {
 
 export type { ThemeMode, ThemeColor, SupportedLocale, AppSettings } from './settings-types';
 export { PRESET_THEME_COLORS, DEFAULT_SETTINGS } from './settings-types';
+export type { AgentSwitchStrategy, InstanceAgentSwitchStrategy } from './agent-switch-settings';
+export { resolveAgentSwitchStrategy } from './agent-switch-settings';
 export { useSettingsStore } from './settings-store';
 export {
   AI_ACTION_RUNS_STORAGE_KEY,

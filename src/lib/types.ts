@@ -1,5 +1,7 @@
 // ── Connection & Instance ─────────────────────────────────────────
 
+import type { InstanceAgentSwitchStrategy } from './agent-switch-settings';
+
 export type InstanceActivityKind = 'assistant-completed';
 
 export interface InstanceConfig {
@@ -17,6 +19,7 @@ export interface InstanceConfig {
   lastActivityAt?: number;
   lastActivityKind?: InstanceActivityKind;
   lastActivitySummary?: string;
+  agentSwitchStrategy?: InstanceAgentSwitchStrategy;
 }
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';

@@ -52,6 +52,7 @@ describe('applyTheme', () => {
       userDisplayName: '',
       aiCompletionSound: 'mixkit-message-pop-alert-2354.mp3',
       connectAllInstancesOnStartup: false,
+      agentSwitchStrategy: 'new-session',
     });
 
     expect(body.style.getPropertyValue('--semi-color-primary')).toBe('#722ED1');
@@ -86,6 +87,7 @@ describe('applyTheme', () => {
       userDisplayName: '',
       aiCompletionSound: 'mixkit-message-pop-alert-2354.mp3',
       connectAllInstancesOnStartup: false,
+      agentSwitchStrategy: 'new-session',
     });
 
     expect(body.style.getPropertyValue('--semi-color-primary-light-default')).toBe('#f1eafa');
@@ -96,5 +98,9 @@ describe('applyTheme', () => {
 
   it('defaults to connecting only the current instance on startup', () => {
     expect(DEFAULT_SETTINGS.connectAllInstancesOnStartup).toBe(false);
+  });
+
+  it('defaults to creating a new visible session when switching agents', () => {
+    expect(DEFAULT_SETTINGS.agentSwitchStrategy).toBe('new-session');
   });
 });
