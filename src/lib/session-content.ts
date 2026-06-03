@@ -1,3 +1,9 @@
+import {
+  CONTEXT_SUMMARY_END,
+  CONTEXT_SUMMARY_START,
+  USER_MESSAGE_START,
+} from './agent-switching';
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -13,6 +19,23 @@ export function decodeSessionKeyParam(value?: string): string | undefined {
   } catch {
     return value;
   }
+}
+
+export interface ParsedContextualUserMessage {
+  summary: string;
+  userMessage: string;
+}
+
+export function parseContextualUserMessage(value: unknown): ParsedContextualUserMessage | null {
+  const text = extractSessionMessageText(value);
+  if (!text.startsWith(CONTEXT_SUMMARY_START)) return null;
+  const summaryEndIndex = text.indexOf(CONTEXT_SUMMARY_END);
+  const userStartIndex = text.indexOf(USER_MESSAGE_START);
+  if (summaryEndIndex < 0 || userStartIndex < 0 || userStartIndex < summaryEndIndex) return null;
+  return {
+    summary: text.slice(CONTEXT_SUMMARY_START.length, summaryEndIndex).trim(),
+    userMessage: text.slice(userStartIndex + USER_MESSAGE_START.length).trim(),
+  };
 }
 
 export function extractSessionMessageText(value: unknown): string {

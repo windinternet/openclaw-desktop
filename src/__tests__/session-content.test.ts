@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { decodeSessionKeyParam, extractSessionMessageItems, extractSessionMessageText } from '../lib/session-content';
+import {
+  decodeSessionKeyParam,
+  extractSessionMessageItems,
+  extractSessionMessageText,
+  parseContextualUserMessage,
+} from '../lib/session-content';
+import { buildContextualUserMessage } from '../lib/agent-switching';
 
 describe('session content helpers', () => {
   it('decodes route session keys before comparing them with session records', () => {
@@ -37,5 +43,14 @@ describe('session content helpers', () => {
 
     expect(source).toContain("activeClient.request('chat.history', { sessionKey: activeSessionKey })");
     expect(source).not.toContain("activeClient.request('sessions.history'");
+  });
+
+  it('parses desktop context summaries without obscuring the user message', () => {
+    const raw = buildContextualUserMessage('前序摘要', '继续实现');
+
+    expect(parseContextualUserMessage(raw)).toEqual({
+      summary: '前序摘要',
+      userMessage: '继续实现',
+    });
   });
 });

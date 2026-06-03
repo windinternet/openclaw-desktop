@@ -60,6 +60,7 @@ export function isDesktopManagedSession(session: Pick<SessionInfo, 'key' | 'sess
   return (
     key.includes(`:${DESKTOP_ACTION_PEER_PREFIX}:`) ||
     key.includes(`:${DESKTOP_THREAD_PEER_PREFIX}:`) ||
+    key.includes(':subagent:') ||
     Boolean(session.label?.startsWith(DESKTOP_ACTION_LABEL_PREFIX)) ||
     Boolean(session.title?.startsWith(DESKTOP_ACTION_LABEL_PREFIX))
   );

@@ -13,6 +13,7 @@ vi.mock('../lib/local-persistence', () => ({
 import {
   appendLogicalTimelineEntries,
   consumePendingSummary,
+  findSubagentMappingByChildSessionKey,
   getSubagentMapping,
   loadAgentSwitchState,
   savePendingSummary,
@@ -55,6 +56,10 @@ describe('agent switch persistence', () => {
     expect(getSubagentMapping('instance-b', 'agent:a:dashboard:root', 'b')?.childSessionKey).toBe(
       'agent:b:subagent:child',
     );
+    expect(findSubagentMappingByChildSessionKey('instance-b', 'agent:b:subagent:child')).toMatchObject({
+      rootSessionKey: 'agent:a:dashboard:root',
+      agentId: 'b',
+    });
   });
 
   it('keeps logical timelines bounded', async () => {

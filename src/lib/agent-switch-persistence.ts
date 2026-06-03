@@ -128,6 +128,15 @@ export function getSubagentMapping(
   return requireState(instanceId).subagentMappings[mappingKey(rootSessionKey, agentId)];
 }
 
+export function findSubagentMappingByChildSessionKey(
+  instanceId: string,
+  childSessionKey: string,
+): SubagentSessionMapping | undefined {
+  return Object.values(requireState(instanceId).subagentMappings).find(
+    (mapping) => mapping.childSessionKey === childSessionKey,
+  );
+}
+
 export function appendLogicalTimelineEntries(
   instanceId: string,
   rootSessionKey: string,

@@ -51,12 +51,14 @@ describe('AI Action Center session rules', () => {
       { key: 'agent:main:dashboard:abc', title: '普通对话' },
       { key: 'agent:main:desktop-action:agent-team:action-1', title: '执行会话' },
       { key: 'agent:main:desktop-thread:office-layout:instance-1', title: '领域线程' },
+      { key: 'agent:writer:subagent:child-1', title: 'Agent 镜头子会话' },
       { key: 'legacy', label: buildAiActionSessionLabel('旧格式动作') },
     ];
 
     expect(filterUserVisibleSessions(sessions).map((session) => session.key)).toEqual(['agent:main:dashboard:abc']);
     expect(isDesktopManagedSession(sessions[1])).toBe(true);
     expect(isDesktopManagedSession(sessions[3])).toBe(true);
+    expect(isDesktopManagedSession(sessions[4])).toBe(true);
   });
 
   it('creates draft ActionRun records with an isolated Gateway session by default', () => {
