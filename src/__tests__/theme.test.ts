@@ -52,6 +52,7 @@ describe('applyTheme', () => {
       userDisplayName: '',
       aiCompletionSound: 'mixkit-message-pop-alert-2354.mp3',
       connectAllInstancesOnStartup: false,
+      externalLinkMode: 'system',
       agentSwitchStrategy: 'new-session',
     });
 
@@ -87,6 +88,7 @@ describe('applyTheme', () => {
       userDisplayName: '',
       aiCompletionSound: 'mixkit-message-pop-alert-2354.mp3',
       connectAllInstancesOnStartup: false,
+      externalLinkMode: 'system',
       agentSwitchStrategy: 'new-session',
     });
 

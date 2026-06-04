@@ -13,6 +13,7 @@ import App from './App';
 async function bootstrap() {
   const snapshot = await loadAppSnapshot();
   useSettingsStore.getState().hydrateSettings(snapshot.settings);
+  (window as any).electronAPI?.setExternalLinkMode?.(snapshot.settings.externalLinkMode ?? 'system');
   useStore.getState().hydrateInstances(snapshot.instances, snapshot.currentInstanceId);
 
   const { locale } = snapshot.settings;

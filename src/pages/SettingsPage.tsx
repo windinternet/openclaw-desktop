@@ -290,6 +290,28 @@ export default function SettingsPage() {
               onChange={(checked: boolean) => updateSettings({ connectAllInstancesOnStartup: checked })}
             />
           </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24 }}>
+            <div style={{ minWidth: 0 }}>
+              <Text style={{ display: 'block', color: 'var(--semi-color-text-0)' }}>
+                外部链接打开方式
+              </Text>
+              <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>
+                选择在系统默认浏览器或内部窗口中打开外部链接
+              </Text>
+            </div>
+            <Select
+              value={settings.externalLinkMode ?? 'system'}
+              onChange={(val: any) => {
+                updateSettings({ externalLinkMode: val as 'system' | 'internal' });
+                (window as any).electronAPI?.setExternalLinkMode?.(val);
+              }}
+              style={{ width: 140 }}
+            >
+              <Select.Option value="system">默认浏览器</Select.Option>
+              <Select.Option value="internal">内部窗口</Select.Option>
+            </Select>
+          </div>
         </SectionCard>
 
         <SectionCard

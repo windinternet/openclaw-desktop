@@ -43,4 +43,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   install: {
     run: () => ipcRenderer.invoke('install:openclaw'),
   },
+  setExternalLinkMode: (mode: string) => ipcRenderer.send('set-external-link-mode', mode),
 })

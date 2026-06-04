@@ -9,15 +9,15 @@ describe('Sidebar session list', () => {
     expect(source).toContain("sessionActivityStates");
     expect(source).toContain("actState === 'generating'");
     expect(source).toContain("clearSessionActivityState");
-    expect(source).toContain('<Spin size="small" />');
+    expect(source).toContain('session-spinner');
   });
 
   it('emphasizes the active session title', () => {
     const source = readFileSync('src/components/Sidebar.tsx', 'utf8');
 
     expect(source).toContain("decodeSessionKeyParam(location.pathname.replace('/chat/', ''))");
-    expect(source).toContain("padding: '0 0 0 8px'");
-    expect(source).toContain('fontSize: isCurrent ? 14 : 13');
+    expect(source).toContain("padding: '0 8px'");
+    expect(source).toContain('fontSize: 12');
     expect(source).toContain('fontWeight: isCurrent ? 700 : 400');
     expect(source).toContain("color: isCurrent ? 'var(--semi-color-primary)' : 'var(--semi-color-text-0)'");
   });

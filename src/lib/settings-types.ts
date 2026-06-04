@@ -27,6 +27,7 @@ export interface AppSettings {
   userDisplayName: string;
   aiCompletionSound: string;
   connectAllInstancesOnStartup: boolean;
+  externalLinkMode: 'system' | 'internal';
   agentSwitchStrategy: AgentSwitchStrategy;
 }
 
@@ -38,5 +39,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   userDisplayName: '',
   aiCompletionSound: 'mixkit-message-pop-alert-2354.mp3',
   connectAllInstancesOnStartup: false,
+  externalLinkMode: 'system',
   agentSwitchStrategy: 'new-session',
 };

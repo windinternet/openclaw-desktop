@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Notification } from 'electron'
+import { app, BrowserWindow, ipcMain, Notification, shell } from 'electron'
 import path from 'node:path'
 import { execFile, execFileSync, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
@@ -18,6 +18,8 @@ if (!app.isPackaged) {
 
 const isDev = !app.isPackaged
 
+let externalLinkMode: 'system' | 'internal' = 'system';
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
@@ -36,6 +38,43 @@ function createWindow() {
       height: 36,
     },
   })
+
+
+  // 拦截外部链接在系统浏览器打开，防止替换当前窗口
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    const isHttp = url.startsWith('http://') || url.startsWith('https://');
+    if (!isHttp) return { action: 'allow' };
+    if (externalLinkMode === 'system') {
+      shell.openExternal(url);
+      return { action: 'deny' };
+    }
+    // internal mode: open in new Electron window
+    const child = new BrowserWindow({
+      width: 1024,
+      height: 768,
+      webPreferences: { contextIsolation: true, nodeIntegration: false },
+    });
+    child.loadURL(url);
+    return { action: 'deny' };
+  });
+
+  win.webContents.on('will-navigate', (event, url) => {
+    const isHttp = url.startsWith('http://') || url.startsWith('https://');
+    if (!isHttp) return;
+    if (externalLinkMode === 'system') {
+      event.preventDefault();
+      shell.openExternal(url);
+      return;
+    }
+    // internal mode: open in new window, prevent current window navigation
+    event.preventDefault();
+    const child = new BrowserWindow({
+      width: 1024,
+      height: 768,
+      webPreferences: { contextIsolation: true, nodeIntegration: false },
+    });
+    child.loadURL(url);
+  });
 
   if (isDev) {
     win.loadURL('http://localhost:5173')
@@ -360,6 +399,12 @@ ipcMain.handle('install:openclaw', async () => {
   const script = 'curl -fsSL https://openclaw.ai/install.sh | bash'
   openTerminal(script)
 })
+
+ipcMain.on('set-external-link-mode', (_event, mode: string) => {
+  if (mode === 'system' || mode === 'internal') {
+    externalLinkMode = mode;
+  }
+});
 
 app.whenReady().then(createWindow)
 
