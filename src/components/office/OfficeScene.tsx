@@ -84,6 +84,31 @@ function createBox(
   return mesh;
 }
 
+function createCylinder(
+  radiusTop: number,
+  radiusBottom: number,
+  height: number,
+  color: string,
+  position: THREE.Vector3Tuple,
+  options: { radialSegments?: number; opacity?: number; roughness?: number } = {},
+): THREE.Mesh {
+  const material = new THREE.MeshStandardMaterial({
+    color,
+    roughness: options.roughness ?? 0.7,
+    metalness: 0.08,
+    transparent: options.opacity !== undefined,
+    opacity: options.opacity ?? 1,
+  });
+  const mesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(radiusTop, radiusBottom, height, options.radialSegments ?? 18),
+    material,
+  );
+  mesh.position.set(...position);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
 function createZonePlane(width: number, depth: number, color: string, position: THREE.Vector3Tuple): THREE.Mesh {
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(width, 0.06, depth),
@@ -377,6 +402,95 @@ function createShelf(x: number, z: number, theme: OfficeTheme): THREE.Group {
   return shelf;
 }
 
+function createSofa(x: number, z: number, theme: OfficeTheme): THREE.Group {
+  const sofa = new THREE.Group();
+  const upholstery = theme.mode === 'light' ? '#a78bfa' : '#6d28d9';
+  const cushion = theme.mode === 'light' ? '#ede9fe' : '#4c1d95';
+  sofa.add(createBox(2.65, 0.28, 0.72, upholstery, [x, 0.28, z], { roughness: 0.78 }));
+  sofa.add(createBox(2.65, 0.62, 0.18, upholstery, [x, 0.58, z + 0.36], { roughness: 0.78 }));
+  sofa.add(createBox(0.16, 0.46, 0.76, upholstery, [x - 1.42, 0.42, z], { roughness: 0.78 }));
+  sofa.add(createBox(0.16, 0.46, 0.76, upholstery, [x + 1.42, 0.42, z], { roughness: 0.78 }));
+  [-0.72, 0, 0.72].forEach((offset) => {
+    sofa.add(createBox(0.62, 0.08, 0.54, cushion, [x + offset, 0.46, z - 0.08], { roughness: 0.82 }));
+  });
+  return sofa;
+}
+
+function createArmchair(x: number, z: number, theme: OfficeTheme): THREE.Group {
+  const chair = new THREE.Group();
+  const color = theme.mode === 'light' ? '#bae6fd' : '#0e7490';
+  const cushion = theme.mode === 'light' ? '#f0f9ff' : '#164e63';
+  chair.add(createBox(0.78, 0.26, 0.76, color, [x, 0.25, z], { roughness: 0.78 }));
+  chair.add(createBox(0.78, 0.58, 0.16, color, [x, 0.52, z + 0.36], { roughness: 0.78 }));
+  chair.add(createBox(0.13, 0.38, 0.76, color, [x - 0.46, 0.38, z], { roughness: 0.78 }));
+  chair.add(createBox(0.13, 0.38, 0.76, color, [x + 0.46, 0.38, z], { roughness: 0.78 }));
+  chair.add(createBox(0.48, 0.07, 0.48, cushion, [x, 0.42, z - 0.08], { roughness: 0.82 }));
+  return chair;
+}
+
+function createCoffeeTable(x: number, z: number, theme: OfficeTheme): THREE.Group {
+  const table = new THREE.Group();
+  table.add(createBox(1.25, 0.08, 0.72, theme.scene.desk, [x, 0.25, z], { roughness: 0.65 }));
+  [
+    [-0.48, -0.24],
+    [0.48, -0.24],
+    [-0.48, 0.24],
+    [0.48, 0.24],
+  ].forEach(([lx, lz]) => {
+    table.add(createCylinder(0.08, 0.08, 0.22, theme.scene.wall, [x + lx, 0.11, z + lz], { radialSegments: 10 }));
+  });
+  table.add(createCylinder(0.12, 0.1, 0.16, theme.scene.accent, [x - 0.3, 0.36, z], { radialSegments: 16 }));
+  table.add(createCylinder(0.08, 0.08, 0.2, theme.scene.meeting, [x + 0.22, 0.38, z + 0.12], { radialSegments: 16 }));
+  return table;
+}
+
+function createWaterDispenser(x: number, z: number, theme: OfficeTheme): THREE.Group {
+  const dispenser = new THREE.Group();
+  const water = theme.mode === 'light' ? '#60a5fa' : '#38bdf8';
+  const body = theme.mode === 'light' ? '#f8fafc' : '#64748b';
+  dispenser.add(createBox(0.46, 0.82, 0.38, body, [x, 0.42, z], { roughness: 0.68 }));
+  dispenser.add(createCylinder(0.2, 0.24, 0.34, water, [x, 1.0, z], { opacity: 0.58, roughness: 0.18 }));
+  dispenser.add(createBox(0.28, 0.08, 0.04, theme.scene.accent, [x, 0.52, z - 0.21], { roughness: 0.2 }));
+  dispenser.add(createBox(0.22, 0.1, 0.04, theme.scene.screen, [x, 0.68, z - 0.21], { roughness: 0.2 }));
+  return dispenser;
+}
+
+function createCoffeeMachine(x: number, z: number, theme: OfficeTheme): THREE.Group {
+  const machine = new THREE.Group();
+  const body = theme.mode === 'light' ? '#334155' : '#0f172a';
+  machine.add(createBox(0.64, 0.58, 0.42, body, [x, 0.5, z], { roughness: 0.34 }));
+  machine.add(createBox(0.44, 0.08, 0.06, theme.scene.accent, [x, 0.75, z - 0.24], { roughness: 0.2 }));
+  machine.add(createCylinder(0.12, 0.1, 0.16, theme.scene.trim, [x - 0.18, 0.18, z - 0.18], { radialSegments: 16 }));
+  machine.add(createCylinder(0.12, 0.1, 0.16, theme.scene.trim, [x + 0.18, 0.18, z - 0.18], { radialSegments: 16 }));
+  return machine;
+}
+
+function createFloorLamp(x: number, z: number, theme: OfficeTheme): THREE.Group {
+  const lamp = new THREE.Group();
+  const shade = theme.mode === 'light' ? '#fde68a' : '#f59e0b';
+  lamp.add(createCylinder(0.08, 0.12, 0.1, theme.scene.wall, [x, 0.05, z], { radialSegments: 14, roughness: 0.55 }));
+  lamp.add(createCylinder(0.035, 0.035, 1.05, theme.scene.trim, [x, 0.58, z], { radialSegments: 10, roughness: 0.28 }));
+  lamp.add(createCylinder(0.26, 0.36, 0.3, shade, [x, 1.22, z], { radialSegments: 18, opacity: 0.82, roughness: 0.36 }));
+  return lamp;
+}
+
+function createLoungeProps(scene: THREE.Scene, theme: OfficeTheme): void {
+  scene.add(createBox(4.9, 0.05, 3.2, theme.scene.lounge, [-7.0, 0.075, 3.6], { opacity: 0.24, roughness: 0.82 }));
+  scene.add(createSofa(-7.15, 5.82, theme));
+  scene.add(createArmchair(-8.55, 3.35, theme));
+  scene.add(createArmchair(-5.45, 3.1, theme));
+  scene.add(createCoffeeTable(-7.05, 4.12, theme));
+  scene.add(createWaterDispenser(-9.25, 5.18, theme));
+  scene.add(createBox(1.05, 0.62, 0.42, theme.scene.wall, [-5.35, 0.32, 5.72], { roughness: 0.7 }));
+  scene.add(createBox(0.98, 0.08, 0.38, theme.scene.accent, [-5.35, 0.68, 5.72], { roughness: 0.24 }));
+  scene.add(createCoffeeMachine(-5.35, 5.72, theme));
+  scene.add(createBox(0.95, 0.08, 1.25, theme.scene.meeting, [-6.15, 0.12, 1.75], { opacity: 0.48, roughness: 0.7 }));
+  scene.add(createBox(0.68, 0.09, 0.68, theme.scene.accent, [-6.15, 0.2, 1.75], { roughness: 0.45 }));
+  scene.add(createFloorLamp(-4.75, 5.15, theme));
+  scene.add(createPlant(-9.05, 2.0, theme));
+  scene.add(createShelf(-9.88, 3.8, theme));
+}
+
 function createReception(theme: OfficeTheme): THREE.Group {
   const group = new THREE.Group();
   group.add(createBox(2.2, 0.44, 0.88, theme.scene.desk, [-1.25, 0.25, -4.8]));
@@ -410,11 +524,7 @@ function createOfficeProps(scene: THREE.Scene, theme: OfficeTheme, companyName: 
   scene.add(createZoneGroup(5.8, 5.8, theme.scene.work, [6.1, 0.035, 3.0], theme));
   scene.add(createZoneGroup(5.7, 5.2, theme.scene.meeting, [-1.0, 0.04, 3.9], theme));
   scene.add(createReception(theme));
-
-  scene.add(createBox(2.9, 0.24, 0.94, theme.scene.wall, [-7.1, 0.28, 5.9]));
-  scene.add(createBox(1.05, 0.16, 1.05, theme.scene.desk, [-8.1, 0.2, 3.15]));
-  scene.add(createBox(0.88, 0.06, 0.88, theme.scene.accent, [-6.2, 0.16, 3.05]));
-  scene.add(createBox(1.3, 0.06, 1.7, theme.scene.meeting, [-6.7, 0.08, 1.7], { opacity: 0.42 }));
+  createLoungeProps(scene, theme);
 
   [-2.25, -1.0, 0.25].forEach((x) => {
     scene.add(createBox(1.05, 0.14, 1.0, theme.scene.desk, [x, 0.31, 3.5]));
