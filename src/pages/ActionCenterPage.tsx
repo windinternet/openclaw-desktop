@@ -12,11 +12,12 @@ import {
   Toast,
   Typography,
 } from '@douyinfe/semi-ui';
-import { IconBolt, IconClose, IconDelete, IconRefresh, IconTickCircle } from '@douyinfe/semi-icons';
+import { IconBolt, IconClose, IconDelete, IconRefresh, IconSend, IconTickCircle } from '@douyinfe/semi-icons';
 import { resolveAiActionApprovalWithGateway } from '../lib/ai-action-center';
 import {
   loadAiActionRuns,
   resyncAiActionRun,
+  resumeStalledAiActionRun,
   saveAiActionRuns,
   syncAiActionRunsWithGateway,
   upsertAiActionRun,
@@ -33,7 +34,7 @@ const PANEL_STYLE = {
   background: 'var(--semi-color-bg-1)',
 };
 
-const RESYNCABLE_STATUSES: AiActionRunStatus[] = ['done', 'failed', 'cancelled'];
+const RESYNCABLE_STATUSES: AiActionRunStatus[] = ['running', 'awaiting_approval', 'done', 'failed', 'cancelled'];
 
 function formatTime(ts?: number): string {
   if (!ts) return '-';
@@ -113,6 +114,7 @@ export default function ActionCenterPage() {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [decisionLoadingId, setDecisionLoadingId] = useState<string | null>(null);
   const [resyncLoadingId, setResyncLoadingId] = useState<string | null>(null);
+  const [resumeLoadingId, setResumeLoadingId] = useState<string | null>(null);
 
   const selectedRun = useMemo(
     () => runs.find((run) => run.id === selectedRunId) ?? runs[0] ?? null,
@@ -190,11 +192,35 @@ export default function ActionCenterPage() {
       try {
         const synced = await resyncAiActionRun(currentInstanceId, activeClient, run);
         setRuns((current) => current.map((r) => (r.id === synced.id ? synced : r)));
-        Toast.success('已重新同步');
+        Toast.success(
+          synced.status === 'done' || synced.status === 'failed' || synced.status === 'cancelled'
+            ? '已重新同步'
+            : '已刷新状态',
+        );
       } catch (err) {
         Toast.error(err instanceof Error ? err.message : '重新同步失败');
       } finally {
         setResyncLoadingId(null);
+      }
+    },
+    [activeClient, connectionStatus, currentInstanceId],
+  );
+
+  const handleResume = useCallback(
+    async (run: AiActionRun) => {
+      if (!currentInstanceId || !activeClient || connectionStatus !== 'connected') {
+        Toast.error('未连接 Gateway，无法追问继续');
+        return;
+      }
+      setResumeLoadingId(run.id);
+      try {
+        const resumed = await resumeStalledAiActionRun(currentInstanceId, activeClient, run);
+        setRuns((current) => current.map((r) => (r.id === resumed.id ? resumed : r)));
+        Toast.success('已发送追问消息，Gateway 将继续执行');
+      } catch (err) {
+        Toast.error(err instanceof Error ? err.message : '追问继续失败');
+      } finally {
+        setResumeLoadingId(null);
       }
     },
     [activeClient, connectionStatus, currentInstanceId],
@@ -291,14 +317,27 @@ export default function ActionCenterPage() {
                   <Space>
                     <Tag color={statusColor(selectedRun.status)}>{statusLabel(selectedRun.status)}</Tag>
                     {RESYNCABLE_STATUSES.includes(selectedRun.status) && (
-                      <Button
-                        size="small"
-                        icon={<IconRefresh />}
-                        loading={resyncLoadingId === selectedRun.id}
-                        onClick={() => handleResync(selectedRun)}
-                      >
-                        重新同步
-                      </Button>
+                      <>
+                        <Button
+                          size="small"
+                          icon={<IconRefresh />}
+                          loading={resyncLoadingId === selectedRun.id}
+                          onClick={() => handleResync(selectedRun)}
+                        >
+                          {selectedRun.status === 'running' || selectedRun.status === 'awaiting_approval' ? '刷新状态' : '重新同步'}
+                        </Button>
+                        {(selectedRun.status === 'running' || selectedRun.status === 'awaiting_approval') && (
+                          <Button
+                            size="small"
+                            type="primary"
+                            icon={<IconSend />}
+                            loading={resumeLoadingId === selectedRun.id}
+                            onClick={() => handleResume(selectedRun)}
+                          >
+                            追问继续
+                          </Button>
+                        )}
+                      </>
                     )}
                   </Space>
                 </div>

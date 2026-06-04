@@ -262,16 +262,113 @@ export async function syncAiActionRunWithGateway(
   run: AiActionRun,
 ): Promise<AiActionRun> {
   if (!run.gatewaySessionKey) return run;
-  const result = await client.request<{ messages?: unknown[] }>('sessions.get', {
-    key: run.gatewaySessionKey,
-  });
+
+  let result: { messages?: unknown[] } | undefined;
+  try {
+    result = await client.request<{ messages?: unknown[] }>('sessions.get', {
+      key: run.gatewaySessionKey,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'sessions.get 调用失败';
+    return {
+      ...run,
+      error: `Gateway 会话查询失败：${message}`,
+      updatedAt: now(),
+    };
+  }
+
   const messages = Array.isArray(result?.messages) ? result.messages : [];
   const assistantText = messages
     .filter((message) => isRecord(message) && message.role === 'assistant')
     .map((message) => extractSessionMessageText(message))
     .filter(Boolean)
     .at(-1);
-  return assistantText ? applyAiActionAssistantResponse(run, assistantText) : run;
+
+  if (assistantText && assistantText !== run.lastAssistantResponse) {
+    return applyAiActionAssistantResponse(run, assistantText);
+  }
+
+  return run;
+}
+
+
+
+/**
+ * 非破坏性查询 ActionRun 在 Gateway 上的最新状态。
+ * 与 syncAiActionRunWithGateway 不同，该函数不会覆盖 run 已有的 error 或 resultSummary，
+ * 只会在确实获取到新的结构化回复时才变更 status。
+ *
+ * 典型用途：Gateway 重连后手动「刷新状态」按钮。
+ */
+export async function queryAiActionRunStatus(
+  client: { request<T = unknown>(method: string, params?: unknown): Promise<T> },
+  run: AiActionRun,
+): Promise<AiActionRun> {
+  if (!run.gatewaySessionKey) return run;
+
+  try {
+    const result = await client.request<{ messages?: unknown[] }>('sessions.get', {
+      key: run.gatewaySessionKey,
+    });
+    const messages = Array.isArray(result?.messages) ? result.messages : [];
+    const assistantText = messages
+      .filter((message) => isRecord(message) && message.role === 'assistant')
+      .map((message) => extractSessionMessageText(message))
+      .filter(Boolean)
+      .at(-1);
+    if (assistantText && assistantText !== run.lastAssistantResponse) {
+      return applyAiActionAssistantResponse(run, assistantText);
+    }
+    return run;
+  } catch {
+    return {
+      ...run,
+      error: run.error || '无法查询 Gateway 会话状态（Gateway 可能重启或会话已丢失）',
+      updatedAt: now(),
+    };
+  }
+}
+
+
+/**
+ * 向卡住的 ActionRun 对应 Gateway 会话发送追问消息，触发 Agent 继续执行。
+ *
+ * 典型场景：Gateway 意外重启导致 Agent 异步执行中断，会话中无新输出。
+ * 通过 chat.send 注入恢复提示，Gateway 收到后重新驱动 Agent 输出结果。
+ *
+ * 注意：
+ * - 仅适用于 running / planning 状态（awaiting_approval 应通过审批按钮恢复）。
+ * - 发送后 run 状态保持 running，后续由 Gateway 事件流 / syncAiActionRunWithGateway 完成状态过渡。
+ */
+export async function resumeAiActionRunWithGateway(
+  client: { request<T = unknown>(method: string, params?: unknown): Promise<T> },
+  run: AiActionRun,
+): Promise<AiActionRun> {
+  if (!run.gatewaySessionKey) {
+    throw new Error('ActionRun 缺少 Gateway 执行会话，无法追问');
+  }
+
+  const now_ts = now();
+  const resumePrompt = [
+    '[系统中断恢复] Gateway 连接已恢复，之前此会话可能因服务重启而中断。',
+    '请根据已收到的上下文判断当前进度：',
+    '- 如果之前的任务尚未完成，请继续执行并在完成后输出```ai-action 结构化结果。',
+    '- 如果任务已完成，请直接输出```ai-action 完成状态和结果摘要。',
+    '不要重复已经完成的操作。',
+  ].join(' ');
+
+  const sendResult = await client.request<ChatSendResult>('chat.send', {
+    message: resumePrompt,
+    sessionKey: run.gatewaySessionKey,
+    idempotencyKey: `${run.id}:resume:${now_ts.toString(36)}`,
+  });
+
+  return {
+    ...run,
+    status: 'running',
+    gatewayRunId: sendResult.runId || run.gatewayRunId,
+    updatedAt: now_ts,
+  };
 }
 
 export async function resolveAiActionApprovalWithGateway(

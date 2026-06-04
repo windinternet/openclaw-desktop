@@ -1,4 +1,4 @@
-import { AI_ACTION_RUNS_STORAGE_KEY, normalizeAiActionRuns, syncAiActionRunWithGateway } from './ai-action-center';
+import { AI_ACTION_RUNS_STORAGE_KEY, normalizeAiActionRuns, queryAiActionRunStatus, resumeAiActionRunWithGateway, syncAiActionRunWithGateway } from './ai-action-center';
 import {
   AGENT_TEAM_PROFILE_STORAGE_KEY,
   bindAgentProfileToGatewayAgent,
@@ -8,7 +8,7 @@ import {
 } from './agent-team';
 import { fetchGatewayAgents } from './gateway-agents';
 import { loadInstanceData, saveInstanceDataAwaited } from './local-persistence';
-import type { AgentTeamProfile, AiActionRun } from './types';
+import type { AgentTeamProfile, AiActionRun, AiActionRunStatus } from './types';
 
 export interface AiActionGatewayClient {
   request<T = unknown>(method: string, params?: unknown): Promise<T>;
@@ -79,22 +79,37 @@ export async function reconcileGatewayAgentCreationRun(
   };
 }
 
+/**
+ * 重新同步 ActionRun。
+ *
+ * - 终态（done / failed / cancelled）：重置为 running 后调用 syncAiActionRunWithGateway 重新解析。
+ * - 非终态（running / awaiting_approval / planning）：使用 queryAiActionRunStatus 非破坏性查询，
+ *   仅在有新的结构化回复时才变更状态，避免意外覆盖现有结果。
+ */
 export async function resyncAiActionRun(
   instanceId: string,
   client: AiActionGatewayClient,
   run: AiActionRun,
 ): Promise<AiActionRun> {
-  const resetRun: AiActionRun = {
-    ...run,
-    status: 'running',
-    resultSummary: undefined,
-    error: undefined,
-    lastAssistantResponse: undefined,
-    plan: undefined,
-    approvals: [],
-    updatedAt: Date.now(),
-  };
-  const synced = await syncAiActionRunWithGateway(client, resetRun);
+  const terminal: AiActionRunStatus[] = ['done', 'failed', 'cancelled'];
+  let synced: AiActionRun;
+
+  if (terminal.includes(run.status)) {
+    const resetRun: AiActionRun = {
+      ...run,
+      status: 'running',
+      resultSummary: undefined,
+      error: undefined,
+      lastAssistantResponse: undefined,
+      plan: undefined,
+      approvals: [],
+      updatedAt: Date.now(),
+    };
+    synced = await syncAiActionRunWithGateway(client, resetRun);
+  } else {
+    synced = await queryAiActionRunStatus(client, run);
+  }
+
   await upsertAiActionRun(instanceId, synced);
   return synced;
 }
@@ -132,4 +147,57 @@ export async function syncAiActionRunsWithGateway(
   await saveInstanceDataAwaited(instanceId, AGENT_TEAM_PROFILE_STORAGE_KEY, profile);
   await saveAiActionRuns(instanceId, nextRuns);
   return nextRuns;
+}
+
+
+/**
+ * Gateway 重连后自动恢复所有非终态 ActionRun。
+ *
+ * - 对每个非终态 run 调用 queryAiActionRunStatus 查询 Gateway 最新状态。
+ * - 若 session 已不存在，run 上会记录 error 标记，用户可在 UI 中看到并手动处理。
+ * - 返回更新后的 runs 数组（按 updatedAt 降序）。
+ */
+
+/**
+ * 向卡住的 ActionRun 发送追问消息以触发 Gateway 继续执行。
+ *
+ * 仅适用于 running / planning 状态；awaiting_approval 请使用审批按钮。
+ * 发送后 run 状态保持 running，后续 Gateway 事件流会驱动状态过渡。
+ */
+export async function resumeStalledAiActionRun(
+  instanceId: string,
+  client: AiActionGatewayClient,
+  run: AiActionRun,
+): Promise<AiActionRun> {
+  const resumed = await resumeAiActionRunWithGateway(client, run);
+  await upsertAiActionRun(instanceId, resumed);
+  return resumed;
+}
+
+export async function recoverInterruptedAiActionRuns(
+  instanceId: string,
+  client: AiActionGatewayClient,
+): Promise<AiActionRun[]> {
+  const runs = await loadAiActionRuns(instanceId);
+  const nonTerminalStatuses: AiActionRunStatus[] = ['planning', 'running', 'awaiting_approval'];
+  let changed = false;
+  const recovered = await Promise.all(
+    runs.map(async (run) => {
+      if (!nonTerminalStatuses.includes(run.status) || !run.gatewaySessionKey) return run;
+      try {
+        const synced = await queryAiActionRunStatus(client, run);
+        if (synced !== run) {
+          changed = true;
+          return { ...synced, updatedAt: Date.now() };
+        }
+        return run;
+      } catch {
+        return { ...run, error: run.error || '重连后自动恢复同步失败', updatedAt: Date.now() };
+      }
+    }),
+  );
+  if (changed) {
+    await saveAiActionRuns(instanceId, recovered);
+  }
+  return recovered.sort((a, b) => b.updatedAt - a.updatedAt);
 }

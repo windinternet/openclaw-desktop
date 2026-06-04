@@ -103,9 +103,14 @@ export {
   parseAiActionAssistantResponse,
   resolveAiActionApprovalWithGateway,
   syncAiActionRunWithGateway,
+  queryAiActionRunStatus,
+  resumeAiActionRunWithGateway,
 } from './ai-action-center';
 export {
   loadAiActionRuns,
+  recoverInterruptedAiActionRuns,
+  resyncAiActionRun,
+  resumeStalledAiActionRun,
   saveAiActionRuns,
   syncAiActionRunsWithGateway,
   upsertAiActionRun,

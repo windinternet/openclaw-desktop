@@ -30,7 +30,7 @@ import {
   isAssistantCompletionEvent,
   notifyAssistantCompletion,
 } from './assistant-completion-notifier';
-import { syncAiActionRunsWithGateway } from './ai-action-run-store';
+import { recoverInterruptedAiActionRuns, syncAiActionRunsWithGateway } from './ai-action-run-store';
 import { loadAppSnapshot, removePersistedInstance, saveCurrentInstanceId, saveInstances } from './local-persistence';
 
 function generateId(): string {
@@ -470,6 +470,7 @@ export const useStore = create<StoreState>((set, get) => ({
             }),
           );
           get().refreshAll(instance.id);
+          void recoverInterruptedAiActionRuns(instance.id, client).catch(() => {});
           void connectDesktopBridgeToGateway(instance).catch((err) => {
             void err;
           });
