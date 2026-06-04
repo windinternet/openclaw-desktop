@@ -207,8 +207,6 @@ export function applyAiActionAssistantResponse(run: AiActionRun, text: string): 
   if (!response) {
     return {
       ...run,
-      status: 'done',
-      resultSummary: responseText,
       lastAssistantResponse: responseText,
       updatedAt: timestamp,
     };

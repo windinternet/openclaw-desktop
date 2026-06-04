@@ -286,6 +286,45 @@ describe('AI Action Center session rules', () => {
     expect(updated.approvals?.[0].status).toBe('approved');
   });
 
+  it('keeps status unchanged for intermediate messages without structured ai-action block', () => {
+    const run = createAiActionRun({
+      type: 'gateway_agent_create',
+      sourcePage: 'teams',
+      instanceId: 'instance-1',
+      input: '创建产品 Agent',
+    });
+    const runningRun = { ...run, status: 'running' as const };
+
+    const updated = applyAiActionAssistantResponse(runningRun, '已收到请求，正在执行...');
+
+    expect(updated.status).toBe('running');
+    expect(updated.lastAssistantResponse).toBe('已收到请求，正在执行...');
+    expect(updated.resultSummary).toBeUndefined();
+  });
+
+  it('transitions to done when a structured completed response arrives after intermediate messages', () => {
+    const run = createAiActionRun({
+      type: 'gateway_agent_create',
+      sourcePage: 'teams',
+      instanceId: 'instance-1',
+      input: '创建产品 Agent',
+    });
+    const runningRun = { ...run, status: 'running' as const };
+
+    const intermediate = applyAiActionAssistantResponse(runningRun, '已收到请求，正在执行...');
+    expect(intermediate.status).toBe('running');
+
+    const final = applyAiActionAssistantResponse(
+      intermediate,
+      '已完成\n```ai-action\n{"version":1,"kind":"completed","summary":"创建成功","result":{"agentId":"agent-xyz"}}\n```',
+    );
+
+    expect(final.status).toBe('done');
+    expect(final.resultSummary).toBe('创建成功');
+    expect(final.gatewayAgentId).toBe('agent-xyz');
+    expect(final.lastAssistantResponse).toContain('ai-action');
+  });
+
   it('renders action prompts from disk templates without unresolved placeholders', () => {
     const createPrompt = buildGatewayAgentCreatePrompt({
       input: '创建产品 Agent',

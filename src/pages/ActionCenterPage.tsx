@@ -16,6 +16,7 @@ import { IconBolt, IconClose, IconDelete, IconRefresh, IconTickCircle } from '@d
 import { resolveAiActionApprovalWithGateway } from '../lib/ai-action-center';
 import {
   loadAiActionRuns,
+  resyncAiActionRun,
   saveAiActionRuns,
   syncAiActionRunsWithGateway,
   upsertAiActionRun,
@@ -31,6 +32,8 @@ const PANEL_STYLE = {
   border: '1px solid var(--semi-color-border)',
   background: 'var(--semi-color-bg-1)',
 };
+
+const RESYNCABLE_STATUSES: AiActionRunStatus[] = ['done', 'failed', 'cancelled'];
 
 function formatTime(ts?: number): string {
   if (!ts) return '-';
@@ -109,6 +112,7 @@ export default function ActionCenterPage() {
   const [loading, setLoading] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [decisionLoadingId, setDecisionLoadingId] = useState<string | null>(null);
+  const [resyncLoadingId, setResyncLoadingId] = useState<string | null>(null);
 
   const selectedRun = useMemo(
     () => runs.find((run) => run.id === selectedRunId) ?? runs[0] ?? null,
@@ -174,6 +178,26 @@ export default function ActionCenterPage() {
       }
     },
     [activeClient, connectionStatus, currentInstanceId, selectedRun],
+  );
+
+  const handleResync = useCallback(
+    async (run: AiActionRun) => {
+      if (!currentInstanceId || !activeClient || connectionStatus !== 'connected') {
+        Toast.error('未连接 Gateway，无法重新同步');
+        return;
+      }
+      setResyncLoadingId(run.id);
+      try {
+        const synced = await resyncAiActionRun(currentInstanceId, activeClient, run);
+        setRuns((current) => current.map((r) => (r.id === synced.id ? synced : r)));
+        Toast.success('已重新同步');
+      } catch (err) {
+        Toast.error(err instanceof Error ? err.message : '重新同步失败');
+      } finally {
+        setResyncLoadingId(null);
+      }
+    },
+    [activeClient, connectionStatus, currentInstanceId],
   );
 
   return (
@@ -264,7 +288,19 @@ export default function ActionCenterPage() {
                     </Title>
                     <Text type="tertiary">{selectedRun.id}</Text>
                   </div>
-                  <Tag color={statusColor(selectedRun.status)}>{statusLabel(selectedRun.status)}</Tag>
+                  <Space>
+                    <Tag color={statusColor(selectedRun.status)}>{statusLabel(selectedRun.status)}</Tag>
+                    {RESYNCABLE_STATUSES.includes(selectedRun.status) && (
+                      <Button
+                        size="small"
+                        icon={<IconRefresh />}
+                        loading={resyncLoadingId === selectedRun.id}
+                        onClick={() => handleResync(selectedRun)}
+                      >
+                        重新同步
+                      </Button>
+                    )}
+                  </Space>
                 </div>
 
                 <Descriptions

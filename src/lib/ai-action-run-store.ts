@@ -79,6 +79,26 @@ export async function reconcileGatewayAgentCreationRun(
   };
 }
 
+export async function resyncAiActionRun(
+  instanceId: string,
+  client: AiActionGatewayClient,
+  run: AiActionRun,
+): Promise<AiActionRun> {
+  const resetRun: AiActionRun = {
+    ...run,
+    status: 'running',
+    resultSummary: undefined,
+    error: undefined,
+    lastAssistantResponse: undefined,
+    plan: undefined,
+    approvals: [],
+    updatedAt: Date.now(),
+  };
+  const synced = await syncAiActionRunWithGateway(client, resetRun);
+  await upsertAiActionRun(instanceId, synced);
+  return synced;
+}
+
 export async function syncAiActionRunsWithGateway(
   instanceId: string,
   client: AiActionGatewayClient,
