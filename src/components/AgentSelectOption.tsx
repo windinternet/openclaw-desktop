@@ -22,9 +22,6 @@ export default function AgentSelectOption({ agent }: { agent: AgentInfo }) {
         <Text ellipsis style={{ display: 'block', fontSize: 13, color: 'var(--semi-color-text-0)' }}>
           {name}
         </Text>
-        <Text ellipsis type="tertiary" size="small" style={{ display: 'block', fontSize: 11 }}>
-          {agent.id}
-        </Text>
       </div>
     </div>
   );

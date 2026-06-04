@@ -33,7 +33,7 @@ function createWindow() {
     },
     titleBarStyle: 'hidden',
     titleBarOverlay: {
-      color: '#00000000',
+      ...(process.platform !== 'linux' ? { color: '#00000000' } : {}),
       symbolColor: '#ffffff',
       height: 36,
     },

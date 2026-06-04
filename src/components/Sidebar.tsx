@@ -17,7 +17,7 @@ import {
   IconCheckList,
   IconUserGroup,
   IconDesktop,
-  IconBookmark,
+  IconCustomize,
   IconBolt,
   IconSun,
   IconMoon,
@@ -40,7 +40,7 @@ const ROUTE_MAP: Record<string, string> = {
   actions: '/actions',
   teams: '/teams',
   office: '/office',
-  memory: '/memory',
+  memory: '/tuning',
   settings: '/settings',
 };
 
@@ -78,6 +78,7 @@ interface SidebarProps {
 }
 
 const SIDEBAR_MACOS_TOP_INSET = 30;
+const SIDEBAR_LINUX_TOP_INSET = 12;
 const SIDEBAR_DRAG_HEIGHT = 36;
 
 function NavSectionLabel({ label }: { label: string }) {
@@ -117,7 +118,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
   const connectionRetry = useStore((s) => s.connectionRetry);
   const [relativeNow] = useState(() => Date.now());
   const isMacOS = typeof window !== 'undefined' && window.electronAPI?.platform === 'darwin';
-  const sidebarTopInset = isMacOS ? SIDEBAR_MACOS_TOP_INSET : 0;
+  const sidebarTopInset = isMacOS ? SIDEBAR_MACOS_TOP_INSET : SIDEBAR_LINUX_TOP_INSET;
 
   useEffect(() => {
     useStore.getState().fetchSessions();
@@ -604,7 +605,8 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
           <linearGradient id="ig-kanban" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#6366f1"/><stop offset="100%" stopColor="#818cf8"/></linearGradient>
           <linearGradient id="ig-teams" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#0ea5e9"/><stop offset="100%" stopColor="#38bdf8"/></linearGradient>
           <linearGradient id="ig-office" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#d946ef"/><stop offset="100%" stopColor="#f0abfc"/></linearGradient>
-          <linearGradient id="ig-memory" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#eab308"/><stop offset="100%" stopColor="#fde047"/></linearGradient>
+          <linearGradient id="ig-memory" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#8b5cf6"/><stop offset="100%" stopColor="#c084fc"/></linearGradient>
+          <linearGradient id="ig-actions" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#f43f5e"/><stop offset="100%" stopColor="#fb7185"/></linearGradient>
         </defs>
       </svg>
     <div style={{ position: 'relative', display: 'flex', flex: 1, minHeight: 0 }}>
@@ -643,7 +645,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
         <NavSectionLabel label={t('nav.sectionCollaboration')} />
         <Nav.Item itemKey="teams" text={t('nav.teams')} icon={<IconUserGroup />} />
         <Nav.Item itemKey="office" text={t('nav.office')} icon={<IconDesktop />} />
-        <Nav.Item itemKey="memory" text={t('nav.memory')} icon={<IconBookmark />} />
+        <Nav.Item itemKey="memory" text="调教" icon={<IconCustomize />} />
       </Nav>
     </div>
       {showPopover && createPortal(

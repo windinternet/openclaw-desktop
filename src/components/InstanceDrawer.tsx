@@ -6,6 +6,7 @@ import { useStore } from '../lib';
 
 const { Text } = Typography;
 const INSTANCE_DRAWER_MACOS_TOP_INSET = 30;
+const INSTANCE_DRAWER_LINUX_TOP_INSET = 12;
 
 interface InstanceDrawerProps {
   visible: boolean;
@@ -42,7 +43,7 @@ export default function InstanceDrawer({ visible, onClose, onAddInstance }: Inst
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const instanceRuntimes = useStore((s) => s.instanceRuntimes);
   const isMacOS = typeof window !== 'undefined' && window.electronAPI?.platform === 'darwin';
-  const headerPaddingTop = isMacOS ? INSTANCE_DRAWER_MACOS_TOP_INSET + 16 : 16;
+  const headerPaddingTop = isMacOS ? INSTANCE_DRAWER_MACOS_TOP_INSET + 16 : INSTANCE_DRAWER_LINUX_TOP_INSET + 16;
 
   return (
     <SideSheet
