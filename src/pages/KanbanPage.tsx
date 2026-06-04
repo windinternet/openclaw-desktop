@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { forwardRef, useImperativeHandle, useState, useEffect, useCallback, useRef } from 'react';
 import type { CSSProperties, DragEvent } from 'react';
 import {
   Card,
@@ -18,13 +18,12 @@ import {
   IconAlertCircle,
   IconServer,
 } from '@douyinfe/semi-icons';
-import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
 import type { AgentInfo } from '../lib/types';
 import type { KanbanCard, KanbanColumn } from '../lib/types';
 import { loadInstanceData, saveInstanceData } from '../lib/local-persistence';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 function agentNameString(name: unknown): string {
   if (typeof name === 'string') return name;
@@ -433,8 +432,11 @@ function KanbanCardItem({ card, agentName, onDelete, onDragStart }: KanbanCardIt
 
 // ── Main Kanban Page ──────────────────────────────────────────────────
 
-export default function KanbanPage() {
-  const { t } = useTranslation();
+export interface KanbanPageHandle {
+  getCardCount(): number;
+}
+
+const KanbanPage = forwardRef<KanbanPageHandle, { embedded?: boolean }>(function KanbanPage({ embedded: _embedded = false }, ref) {
   const agents = useStore((s) => s.agents);
   const currentInstanceId = useStore((s) => s.currentInstanceId);
 
@@ -598,6 +600,10 @@ export default function KanbanPage() {
     return agentNameString(agent?.name) || agent?.id;
   };
 
+  useImperativeHandle(ref, () => ({
+    getCardCount: () => columns.reduce((sum, col) => sum + col.cards.length, 0),
+  }), [columns]);
+
   const cardCounts = columns.reduce(
     (acc, col) => {
       acc[col.id] = col.cards.length;
@@ -618,36 +624,6 @@ export default function KanbanPage() {
       }}
       onDragEnd={handleDragEnd}
     >
-      {/* ── Header ────────────────────────────────────────────── */}
-      <div
-        style={{
-          padding: '20px 24px 16px',
-          flexShrink: 0,
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div>
-            <Title heading={3} style={{ margin: 0 }}>
-              📋 {t('nav.kanban')}
-            </Title>
-            <Text type="tertiary" size="small">
-              {t('page.kanbanDesc')}
-            </Text>
-          </div>
-          <Space>
-            <Text type="tertiary" size="small">
-              {columns.reduce((sum, col) => sum + col.cards.length, 0)} 张卡片
-            </Text>
-          </Space>
-        </div>
-      </div>
-
       {/* ── Board Columns ─────────────────────────────────────── */}
       <div
         style={{
@@ -827,4 +803,8 @@ export default function KanbanPage() {
       </Modal>
     </div>
   );
-}
+});
+
+KanbanPage.displayName = 'KanbanPage';
+
+export default KanbanPage;

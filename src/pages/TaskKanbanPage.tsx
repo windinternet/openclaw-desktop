@@ -1,0 +1,124 @@
+import { useRef, useState } from 'react';
+import { Button, Space, Tabs, Typography } from '@douyinfe/semi-ui';
+import { IconCheckList, IconKanban, IconPlus, IconRefresh } from '@douyinfe/semi-icons';
+import TasksPage, { type TasksPageHandle } from './TasksPage';
+import KanbanPage, { type KanbanPageHandle } from './KanbanPage';
+
+const { Title, Text } = Typography;
+
+export default function TaskKanbanPage() {
+  const [activeTab, setActiveTab] = useState<string>('tasks');
+  const [taskRefreshing, setTaskRefreshing] = useState(false);
+  const [kanbanCount, setKanbanCount] = useState(0);
+  const tasksRef = useRef<TasksPageHandle>(null);
+  const kanbanRef = useRef<KanbanPageHandle>(null);
+
+  const kanbanCountTimer = useRef<ReturnType<typeof setInterval>>();
+
+  const handleTasksRefresh = () => {
+    setTaskRefreshing(true);
+    tasksRef.current?.refresh();
+    setTimeout(() => setTaskRefreshing(false), 800);
+  };
+
+  return (
+    <div
+      style={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          padding: '20px 24px 0',
+          flexShrink: 0,
+        }}
+      >
+        <Title heading={3} style={{ margin: 0 }}>
+          任务看板
+        </Title>
+        <Text type="tertiary" size="small">
+          定时任务与看板管理
+        </Text>
+      </div>
+
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <Tabs
+          activeKey={activeTab}
+          onChange={(key) => {
+            setActiveTab(key);
+            if (key === 'kanban') {
+              // Refresh kanban count when switching to kanban tab
+              setTimeout(() => {
+                setKanbanCount(kanbanRef.current?.getCardCount() ?? 0);
+              }, 50);
+            }
+            if (kanbanCountTimer.current) {
+              clearInterval(kanbanCountTimer.current);
+              kanbanCountTimer.current = undefined;
+            }
+            if (key === 'kanban') {
+              kanbanCountTimer.current = setInterval(() => {
+                setKanbanCount(kanbanRef.current?.getCardCount() ?? 0);
+              }, 1000);
+            }
+          }}
+          tabBarExtraContent={
+            activeTab === 'tasks' ? (
+              <Space>
+                <Button
+                  icon={<IconRefresh />}
+                  size="small"
+                  loading={taskRefreshing}
+                  onClick={handleTasksRefresh}
+                >
+                  刷新
+                </Button>
+                <Button
+                  icon={<IconPlus />}
+                  type="primary"
+                  size="small"
+                  onClick={() => tasksRef.current?.openAdd()}
+                >
+                  添加任务
+                </Button>
+              </Space>
+            ) : (
+              <Text type="tertiary" size="small">
+                {kanbanCount} 张卡片
+              </Text>
+            )
+          }
+          style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
+          contentStyle={{ flex: 1, overflow: 'hidden', padding: 0 }}
+          tabBarStyle={{ padding: '0 24px' }}
+        >
+          <Tabs.TabPane
+            tab={
+              <span>
+                <IconCheckList style={{ marginRight: 6 }} />
+                任务
+              </span>
+            }
+            itemKey="tasks"
+          >
+            <TasksPage ref={tasksRef} embedded />
+          </Tabs.TabPane>
+          <Tabs.TabPane
+            tab={
+              <span>
+                <IconKanban style={{ marginRight: 6 }} />
+                看板
+              </span>
+            }
+            itemKey="kanban"
+          >
+            <KanbanPage ref={kanbanRef} embedded />
+          </Tabs.TabPane>
+        </Tabs>
+      </div>
+    </div>
+  );
+}

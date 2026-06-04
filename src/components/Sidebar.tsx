@@ -15,7 +15,6 @@ import {
   IconPlusCircle,
   IconPuzzle,
   IconCheckList,
-  IconKanban,
   IconUserGroup,
   IconDesktop,
   IconBookmark,
@@ -23,7 +22,6 @@ import {
   IconSun,
   IconMoon,
   IconSetting,
-  IconFolderStroked,
 } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
@@ -38,10 +36,8 @@ const ROUTE_MAP: Record<string, string> = {
   search: '/search',
   'new-session': '/new-session',
   extensions: '/extensions',
-  tasks: '/tasks',
+  taskkanban: '/taskkanban',
   actions: '/actions',
-  workspace: '/workspace',
-  kanban: '/kanban',
   teams: '/teams',
   office: '/office',
   memory: '/memory',
@@ -642,10 +638,8 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
 
         <NavSectionLabel label={t('nav.sectionTools')} />
         <Nav.Item itemKey="extensions" text={t('nav.extensions')} icon={<IconPuzzle />} />
-        <Nav.Item itemKey="tasks" text={t('nav.tasks')} icon={<IconCheckList />} />
+        <Nav.Item itemKey="taskkanban" text="任务看板" icon={<IconCheckList />} />
         <Nav.Item itemKey="actions" text={t('nav.actions')} icon={<IconBolt />} />
-        <Nav.Item itemKey="workspace" text={t('nav.workspace') || '工作区'} icon={<IconFolderStroked />} />
-        <Nav.Item itemKey="kanban" text={t('nav.kanban')} icon={<IconKanban />} />
 
         <NavSectionLabel label={t('nav.sectionCollaboration')} />
         <Nav.Item itemKey="teams" text={t('nav.teams')} icon={<IconUserGroup />} />

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { forwardRef, useImperativeHandle, useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   Button,
@@ -13,8 +13,6 @@ import {
   Empty,
 } from '@douyinfe/semi-ui';
 import {
-  IconPlus,
-  IconRefresh,
   IconPlayCircle,
   IconEdit,
   IconDelete,
@@ -22,11 +20,10 @@ import {
   IconTickCircle,
   IconMinusCircle,
 } from '@douyinfe/semi-icons';
-import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
 import type { CronJob, CronRun } from '../lib/types';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 function agentNameString(name: unknown): string {
   if (typeof name === 'string') return name;
@@ -65,8 +62,12 @@ function runTime(ms?: number): string {
   return `${mins}m ${secs}s`;
 }
 
-export default function TasksPage() {
-  const { t } = useTranslation();
+export interface TasksPageHandle {
+  refresh(): void;
+  openAdd(): void;
+}
+
+const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function TasksPage({ embedded = false }, ref) {
   const cronJobs = useStore((s) => s.cronJobs);
   const agents = useStore((s) => s.agents);
   const connectionStatus = useStore((s) => s.connectionStatus);
@@ -92,6 +93,14 @@ export default function TasksPage() {
       fetchCronJobs().finally(() => setLoading(false));
     }
   }, [connectionStatus, fetchCronJobs]);
+
+  useImperativeHandle(ref, () => ({
+    refresh: () => {
+      setLoading(true);
+      fetchCronJobs().finally(() => setLoading(false));
+    },
+    openAdd: () => setAddModalVisible(true),
+  }), [fetchCronJobs]);
 
   const handleAdd = useCallback(
     async (values: Record<string, unknown>) => {
@@ -395,54 +404,17 @@ export default function TasksPage() {
   return (
     <div
       style={{
-        padding: 24,
+        padding: embedded ? '8px 0 0' : 24,
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
       }}
     >
-      {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 16,
-          flexShrink: 0,
-        }}
-      >
-        <div>
-          <Title heading={4} style={{ margin: 0 }}>
-            ⏰ {t('nav.tasks')}
-          </Title>
-          <Text type="tertiary" size="small">
-            定时任务与自动化调度
-          </Text>
-        </div>
-        <Space>
-          <Button
-            icon={<IconRefresh />}
-            onClick={() => {
-              setLoading(true);
-              fetchCronJobs().finally(() => setLoading(false));
-            }}
-            loading={loading}
-          >
-            刷新
-          </Button>
-          <Button
-            icon={<IconPlus />}
-            type="primary"
-            onClick={() => setAddModalVisible(true)}
-          >
-            添加任务
-          </Button>
-        </Space>
-      </div>
+
 
       {/* Table */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: embedded ? '0 24px' : 0 }}>
         {connectionStatus !== 'connected' ? (
           <div
             style={{
@@ -636,4 +608,9 @@ export default function TasksPage() {
       </Modal>
     </div>
   );
-}
+});
+
+TasksPage.displayName = 'TasksPage';
+
+export default TasksPage;
+
