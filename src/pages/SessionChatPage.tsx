@@ -553,6 +553,7 @@ export default function SessionChatPage() {
         : message.trim();
 
       sendingRef.current = true;
+      useStore.getState().patchSessionActivityState(activeSessionKey, 'generating');
       setGenerating(true);
       if (genTimeoutRef.current) clearTimeout(genTimeoutRef.current);
       genTimeoutRef.current = setTimeout(() => endGeneration('completed'), 300000);
@@ -843,7 +844,7 @@ export default function SessionChatPage() {
           }}
           mode="bubble"
           align="leftRight"
-          style={{ maxWidth: 820, margin: '0 auto', paddingBottom: 8 }}
+          style={{ paddingBottom: 8 }}
         />
       </div>
       <div style={{ flexShrink: 0, borderTop: '1px solid var(--semi-color-border)', padding: '8px 16px 12px' }}>

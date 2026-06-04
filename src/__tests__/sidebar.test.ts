@@ -5,10 +5,11 @@ describe('Sidebar session list', () => {
   it('renders a single trailing status indicator for each session row', () => {
     const source = readFileSync('src/components/Sidebar.tsx', 'utf8');
 
-    expect(source).not.toMatch(/<span\s+style=\{\{\s*width:\s*6,\s*height:\s*6,[\s\S]*?backgroundColor:\s*statusColor/);
-    expect(source).toContain("isActive ? (");
+    // activity state indicators use sessionActivityStates map
+    expect(source).toContain("sessionActivityStates");
+    expect(source).toContain("actState === 'generating'");
+    expect(source).toContain("clearSessionActivityState");
     expect(source).toContain('<Spin size="small" />');
-    expect(source).toMatch(/width:\s*12,\s*height:\s*12,[\s\S]*?backgroundColor:\s*statusColor/);
   });
 
   it('emphasizes the active session title', () => {

@@ -171,16 +171,8 @@ export default function ChatView({
       }}
     >
       {/* Messages area */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '20px 24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 16,
-        }}
-      >
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', minHeight: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {loading ? (
           <div
             style={{
@@ -211,6 +203,7 @@ export default function ChatView({
           messages.map(renderMessage)
         )}
         <div ref={messagesEndRef} />
+      </div>
       </div>
 
       {/* Input area */}

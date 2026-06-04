@@ -142,16 +142,8 @@ export default function SettingsPage() {
       </div>
 
       {/* Content */}
-      <div
-        style={{
-          flex: 1,
-          overflow: 'auto',
-          padding: '16px 28px 28px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 16,
-        }}
-      >
+      <div style={{ flex: 1, overflow: 'auto', padding: '16px 28px 28px', minHeight: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* ═══ Theme ═══ */}
         <SectionCard icon="🎨" title={t('settings.theme')} desc={t('settings.themeDesc')}>
           {/* Mode selector */}
@@ -389,6 +381,7 @@ export default function SettingsPage() {
             {t('settings.reset')}
           </Button>
         </div>
+      </div>
       </div>
     </div>
   );

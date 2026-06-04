@@ -64,6 +64,9 @@ export interface InstanceRuntime {
   health: GatewayHealth | null;
   gatewayStatus: GatewayStatus | null;
   agentIdentity: AgentIdentity | null;
+  sessionActivityStates: Record<string, 'generating' | 'completed' | 'error'>;
+  // per-session activity state for sidebar indicators (generating / completed / error)
+
 }
 
 function createInstanceRuntime(): InstanceRuntime {
@@ -84,6 +87,7 @@ function createInstanceRuntime(): InstanceRuntime {
     health: null,
     gatewayStatus: null,
     agentIdentity: null,
+    sessionActivityStates: {},
   };
 }
 
@@ -110,6 +114,7 @@ interface StoreState {
   health: GatewayHealth | null;
   gatewayStatus: GatewayStatus | null;
   agentIdentity: AgentIdentity | null;
+  sessionActivityStates: Record<string, 'generating' | 'completed' | 'error'>;
 
   // ── Instance CRUD ──
   hydrateInstances: (instances: InstanceConfig[], currentInstanceId: string | null) => void;
@@ -156,6 +161,9 @@ interface StoreState {
   toggleCronJob: (id: string, enabled: boolean) => Promise<void>;
   runCronJob: (id: string) => Promise<{ runId: string }>;
   patchSessionLabel: (key: string, label: string | null) => Promise<void>;
+  // Track per-session activity (generating/completed/error → sidebar indicators)
+  patchSessionActivityState: (sessionKey: string, state: 'generating' | 'completed' | 'error') => void;
+  clearSessionActivityState: (sessionKey: string) => void;
 }
 
 function runtimeToCurrentView(runtime: InstanceRuntime): Partial<StoreState> {
@@ -175,6 +183,7 @@ function runtimeToCurrentView(runtime: InstanceRuntime): Partial<StoreState> {
     health: runtime.health,
     gatewayStatus: runtime.gatewayStatus,
     agentIdentity: runtime.agentIdentity,
+    sessionActivityStates: runtime.sessionActivityStates,
   };
 }
 
@@ -235,6 +244,7 @@ export const useStore = create<StoreState>((set, get) => ({
   health: null,
   gatewayStatus: null,
   agentIdentity: null,
+  sessionActivityStates: {},
 
   // ── Instance CRUD ──
 
@@ -442,6 +452,28 @@ export const useStore = create<StoreState>((set, get) => ({
         const runtime = state.instanceRuntimes[instance.id] ?? createInstanceRuntime();
         const summary = getAssistantCompletionSummary(event, runtime.sessions);
         notifyAssistantCompletion(event, runtime.sessions, instance.name);
+        // Update session activity state from agent events
+        if (event.event === 'agent') {
+          const p = event.payload as Record<string, unknown> | undefined;
+          if (p) {
+            const evtSessionKey = (p.sessionKey ?? p.session_key ?? '') as string;
+            if (evtSessionKey) {
+              const stream = (p.stream ?? p.state ?? '') as string;
+              if (stream === 'assistant' || stream === 'tool') {
+                get().patchSessionActivityState(evtSessionKey, 'generating');
+              } else if (stream === 'lifecycle') {
+                const data = (typeof p.data === 'object' && p.data !== null) ? p.data as Record<string, unknown> : null;
+                const phase = (p.phase ?? data?.phase ?? '') as string;
+                if (phase === 'error') {
+                  get().patchSessionActivityState(evtSessionKey, 'error');
+                } else if (phase === 'end' || phase === 'done' || phase === 'complete') {
+                  get().patchSessionActivityState(evtSessionKey, 'completed');
+                }
+              }
+            }
+          }
+        }
+
         if (isAssistantCompletionEvent(event)) {
           const sessionKey = getAgentEventSessionKey(event);
           const eventKey = getCompletionEventKey(instance.id, event);
@@ -865,6 +897,77 @@ export const useStore = create<StoreState>((set, get) => ({
     return client.request<{ runId: string }>('cron.run', { id });
   },
 
+  // Hydrate persisted session activity states on load
+  _hydrateSessionActivityStates: () => {
+    try {
+      const raw = localStorage.getItem('openclaw-session-activity-states');
+      if (!raw) return;
+      const persisted = JSON.parse(raw);
+      if (typeof persisted !== 'object' || !persisted) return;
+      set((s) => {
+        const id = s.currentInstanceId;
+        if (!id) return s;
+        const runtime = s.instanceRuntimes[id];
+        if (!runtime) return s;
+        return {
+          ...s,
+          sessionActivityStates: { ...runtime.sessionActivityStates, ...persisted },
+          instanceRuntimes: {
+            ...s.instanceRuntimes,
+            [id]: { ...runtime, sessionActivityStates: { ...runtime.sessionActivityStates, ...persisted } },
+          },
+        };
+      });
+    } catch { /* ignore */ }
+  },
+
+  patchSessionActivityState: (sessionKey, state) => {
+    set((s) => {
+      const id = s.currentInstanceId;
+      if (!id) return s;
+      const runtime = s.instanceRuntimes[id] ?? {
+        client: null, autoConnectSuppressed: false, connectionStatus: "disconnected",
+        connectionError: null, connectionRetry: null,
+        sessions: [], agents: [], models: [], cronJobs: [], tools: [], skills: [],
+        skillMarketplaceResults: [], workspaceFiles: [], health: null,
+        gatewayStatus: null, agentIdentity: null, sessionActivityStates: {}
+      };
+      const next = { ...runtime.sessionActivityStates, [sessionKey]: state };
+      // Persist completed/error states to localStorage (generating state is not persisted)
+      if (state !== 'generating') {
+        try { localStorage.setItem('openclaw-session-activity-states', JSON.stringify(next)); } catch {}
+      }
+      return {
+        ...s,
+        sessionActivityStates: next,
+        instanceRuntimes: {
+          ...s.instanceRuntimes,
+          [id]: { ...runtime, sessionActivityStates: next },
+        },
+      };
+    });
+  },
+
+  clearSessionActivityState: (sessionKey) => {
+    set((s) => {
+      const id = s.currentInstanceId;
+      if (!id) return s;
+      const runtime = s.instanceRuntimes[id];
+      if (!runtime) return s;
+      const next = { ...runtime.sessionActivityStates };
+      delete next[sessionKey];
+      // Sync to localStorage
+      try { localStorage.setItem('openclaw-session-activity-states', JSON.stringify(next)); } catch {}
+      return {
+        ...s,
+        sessionActivityStates: next,
+        instanceRuntimes: {
+          ...s.instanceRuntimes,
+          [id]: { ...runtime, sessionActivityStates: next },
+        },
+      };
+    });
+  },
   patchSessionLabel: async (key, label) => {
     const client = getClient(get());
     if (!client) throw new Error('未连接 Gateway');

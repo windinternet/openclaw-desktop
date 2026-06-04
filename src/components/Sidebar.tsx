@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import type { ComponentClass, CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Nav, Avatar, Button, Spin, Typography, Input, Toast } from '@douyinfe/semi-ui';
+import { Nav, Avatar, Button, Typography, Input, Toast } from '@douyinfe/semi-ui';
 import { InfiniteLoader, AutoSizer } from 'react-virtualized';
 import VList from 'react-virtualized/dist/commonjs/List';
 import {
@@ -438,6 +438,13 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
     return new Date(ts).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
   };
 
+  const sessionActivityStatesRead = useStore((s) => s.sessionActivityStates);
+  const runtimeSessionActivityStates = useStore(
+    (s) => (s.currentInstanceId && s.instanceRuntimes[s.currentInstanceId]) 
+      ? s.instanceRuntimes[s.currentInstanceId].sessionActivityStates 
+      : ({} as Record<string, 'generating' | 'completed' | 'error'>),
+  );
+  const clearSessionActivityState = useStore((s) => s.clearSessionActivityState);
   const patchSessionLabel = useStore((s) => s.patchSessionLabel);
 
   const startEditing = useCallback((s: typeof sessions[0]) => {
@@ -475,21 +482,6 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
     setEditingValue('');
   }, []);
 
-  const getSessionStatusColor = (status?: string): string => {
-    switch (status) {
-      case 'active':
-        return 'var(--semi-color-success)';
-      case 'idle':
-        return 'var(--semi-color-warning)';
-      case 'completed':
-        return 'var(--semi-color-primary)';
-      case 'archived':
-        return 'var(--semi-color-text-2)';
-      default:
-        return 'transparent';
-    }
-  };
-
   const currentSessionKey = location.pathname.startsWith('/chat/')
     ? decodeSessionKeyParam(location.pathname.replace('/chat/', ''))
     : null;
@@ -508,16 +500,14 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
                       const s = visibleSessions[index];
                       if (!s) return null;
                       const isCurrent = s.key === currentSessionKey;
-                      const isActive = s.status === 'active';
                       const isEditing = editingKey === s.key;
-                      const statusColor = getSessionStatusColor(s.status);
                       return (
-                        <div key={key} style={{ ...style, padding: '0 0 0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                        <div key={key} style={{ ...style, padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
                           backgroundColor: isCurrent ? 'var(--semi-color-primary-light-default)' : 'transparent',
                           borderLeft: isCurrent ? '3px solid var(--semi-color-primary)' : '3px solid transparent',
                           boxShadow: isCurrent ? 'inset 0 0 0 1px var(--semi-color-primary-light-active)' : 'none',
                         }}
-                          onClick={() => { if (!isEditing) navigate(`/chat/${encodeURIComponent(s.key)}`); }}
+                          onClick={() => { if (!isEditing) { clearSessionActivityState(s.key); navigate(`/chat/${encodeURIComponent(s.key)}`); } }}
                           onDoubleClick={(e) => { e.stopPropagation(); startEditing(s); }}>
                           {isEditing ? (
                             <Input
@@ -532,20 +522,27 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
                               maxLength={512}
                             />
                           ) : (
-                            <span style={{ flex: 1, fontSize: isCurrent ? 14 : 13, fontWeight: isCurrent ? 700 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isCurrent ? 'var(--semi-color-primary)' : 'var(--semi-color-text-0)' }}>
+                            <span style={{ flex: 1, fontSize: 12, fontWeight: isCurrent ? 700 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isCurrent ? 'var(--semi-color-primary)' : 'var(--semi-color-text-0)' }}>
                               {formatSessionName(s)}
                             </span>
                           )}
-                          {!isEditing && s.status && (
-                            isActive ? (
-                              <Spin size="small" />
-                            ) : (
+                          {!isEditing && (() => {
+                            const actState = runtimeSessionActivityStates[s.key] || sessionActivityStatesRead[s.key];
+                            if (actState === 'generating') {
+                              return <span className="session-spinner" style={{ width: 10, height: 10, borderRadius: '50%', border: '1.5px solid var(--semi-color-primary)', borderBottomColor: 'transparent', display: 'inline-block', flexShrink: 0 }} />;
+                            }
+                            const actColor =
+                              actState === 'completed' ? 'var(--semi-color-success' :
+                              actState === 'error' ? 'var(--semi-color-danger' :
+                              null;
+                            if (!actColor) return null;
+                            return (
                               <span style={{
-                                width: 12, height: 12, borderRadius: '50%', flexShrink: 0,
-                                backgroundColor: statusColor,
+                                width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                                backgroundColor: actColor,
                               }} />
-                            )
-                          )}
+                            );
+                          })()}
                           {!isEditing && s.updatedAt && (
                             <span style={{ fontSize: 10, color: 'var(--semi-color-text-2)', flexShrink: 0, whiteSpace: 'nowrap' }}>
                               {formatRelativeTime(s.updatedAt)}
@@ -594,7 +591,9 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
 
   return (
     <>
-      <svg aria-hidden="true" style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}>
+      <style>{`@keyframes session-spin{to{transform:rotate(360deg)}}.session-spinner{animation:session-spin 1s linear infinite}`}</style>
+      <svg aria-hidden="true"
+       style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}>
         <defs>
           <linearGradient id="ig-dashboard" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#3b82f6"/><stop offset="100%" stopColor="#818cf8"/></linearGradient>
           <linearGradient id="ig-search" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#f59e0b"/><stop offset="100%" stopColor="#fbbf24"/></linearGradient>
