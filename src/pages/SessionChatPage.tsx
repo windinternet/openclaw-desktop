@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AIChatDialogue, AIChatInput, Toast } from '@douyinfe/semi-ui';
 import type { RenderContentProps } from '@douyinfe/semi-ui/lib/es/chat/interface';
@@ -217,9 +217,7 @@ export default function SessionChatPage() {
   const PAGE_SIZE = 30;
   const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
   const [allHistory, setAllHistory] = useState<DisplayChat[]>([]);
-  const restoreDistanceRef = useRef<number | null>(null);
-  const prevDisplayLimitRef = useRef(PAGE_SIZE);
-  const initialLoadRef = useRef(true);
+
   
   const streamingIdRef = useRef<string | null>(null);
   const patchAppliedRef = useRef(false);
@@ -245,15 +243,6 @@ export default function SessionChatPage() {
     if (prevRootSessionKeyRef.current !== rootSessionKey) {
       setChats([]);
       initialMessageSentRef.current = null;
-      // Session switch: reset ALL scroll-related markers so the
-      // new session does not inherit stale positioning from the old one.
-      restoreDistanceRef.current = null;
-      initialLoadRef.current = true;
-      try {
-        const el = chatContainerRef.current;
-        const scrollable = el?.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list');
-        if (scrollable) scrollable.scrollTop = 0;
-      } catch { /* scrollable not available yet */ }
     }
     prevRootSessionKeyRef.current = rootSessionKey;
     sendingRef.current = false;
@@ -286,76 +275,22 @@ export default function SessionChatPage() {
     if (!chatModel && models.length > 0) queueMicrotask(() => setChatModel(models[0].id));
   }, [models, chatModel]);
 
-  /**
-   * Synchronous scroll restoration — runs BEFORE the browser paints,
-   * so the user never sees a flash to the bottom when history loads.
-   */
-  useLayoutEffect(() => {
-    if (chats.length === 0) return;
-    if (!chatContainerRef.current) return;
-    const scrollable = chatContainerRef.current.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list');
-    const target = scrollable ?? chatContainerRef.current;
-
-    // 1. Restore scroll position when user scrolled up to load history
-    if (restoreDistanceRef.current !== null && displayLimit > prevDisplayLimitRef.current) {
-      const distance = restoreDistanceRef.current;
-      restoreDistanceRef.current = null;
-      target.scrollTop = target.scrollHeight - distance;
-      return;
-    }
-
-    // 2. Counter AIChatDialogue's internal auto-scroll on initial load / session switch.
-    //    AIChatDialogue's init() always calls scrollToBottomImmediately() on mount,
-    //    and componentDidUpdate also scrolls on any chats reference change.
-    //    We counter-scroll to 0 unless streaming has started.
-    //    initialLoadRef is set to true on session switch and false when streaming begins.
-    if (initialLoadRef.current) {
-      target.scrollTop = 0;
-    }
-  }, [chats, displayLimit]);
-
-  /**
-   * Auto-scroll ONLY when there is an in-progress (streaming) message.
-   * Initial history load and session switches do NOT scroll.
-   * Uses requestAnimationFrame for the actual scroll action instead of a
-   * fixed timer, so the measurement runs right after the browser layout pass
-   * and captures the true scrollHeight (including async-rendered content).
+    /**
+   * Auto-scroll to bottom when new chats arrive, but only if the user
+   * is already near the bottom (within 200px).  This keeps the user
+   * at the bottom during streaming while letting them freely scroll
+   * up to read history without being yanked back down.
    */
   useEffect(() => {
     if (chats.length === 0) return;
-    const hasStreaming = chats.some((c) => c.status === 'in_progress');
-    if (!hasStreaming) return;
     const timer = setTimeout(() => {
-      requestAnimationFrame(() => {
-        if (chatContainerRef.current) {
-          const scrollable = chatContainerRef.current.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list');
-          const target = scrollable ?? chatContainerRef.current;
-          const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 200;
-          if (isNearBottom) target.scrollTop = target.scrollHeight;
-        }
-      });
-    }, 50);
-    return () => clearTimeout(timer);
-  }, [chats]);
-
-  /**
-   * Second pass — only fires if streaming continues, catches late
-   * content rendering. Uses requestAnimationFrame for accurate height.
-   */
-  useEffect(() => {
-    if (chats.length === 0) return;
-    const hasStreaming = chats.some((c) => c.status === 'in_progress');
-    if (!hasStreaming) return;
-    const timer = setTimeout(() => {
-      requestAnimationFrame(() => {
-        if (chatContainerRef.current) {
-          const scrollable = chatContainerRef.current.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list');
-          const target = scrollable ?? chatContainerRef.current;
-          const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 200;
-          if (isNearBottom) target.scrollTop = target.scrollHeight;
-        }
-      });
-    }, 1000);
+      if (chatContainerRef.current) {
+        const scrollable = chatContainerRef.current.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list');
+        const target = scrollable ?? chatContainerRef.current;
+        const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 200;
+        if (isNearBottom) target.scrollTop = target.scrollHeight;
+      }
+    }, 200);
     return () => clearTimeout(timer);
   }, [chats]);
 
@@ -371,8 +306,6 @@ export default function SessionChatPage() {
     const handleScroll = () => {
       if (scrollable.scrollTop < 80 && displayLimit < allHistory.length) {
         setDisplayLimit((prev) => Math.min(prev + PAGE_SIZE, allHistory.length));
-        // Reset restore state so a new scroll-up always captures fresh position
-        restoreDistanceRef.current = null;
       }
     };
     scrollable.addEventListener('scroll', handleScroll, { passive: true });
@@ -387,23 +320,12 @@ export default function SessionChatPage() {
     if (allHistory.length === 0) return;
     const visible = allHistory.slice(-displayLimit);
     
-    // Save scroll position before state update, but only when displayLimit
-    // actually increased (user loading more history), not on initial mount
-    const isLoadMore = displayLimit > prevDisplayLimitRef.current;
-    prevDisplayLimitRef.current = displayLimit;
-    if (isLoadMore && chatContainerRef.current) {
-      const scrollable = chatContainerRef.current.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list') || chatContainerRef.current;
-      restoreDistanceRef.current = scrollable.scrollHeight - scrollable.scrollTop;
-    }
-    
-    setChats((prev) => {
+        setChats((prev) => {
       const historyIds = new Set(allHistory.map((c) => c.id));
       const streamingOnly = prev.filter((c) => !historyIds.has(c.id));
       return mergeChats([...visible, ...streamingOnly]);
     });
   }, [displayLimit, allHistory]);
-
-
 
   useEffect(() => {
     if (!currentInstanceId || !rootSessionKey || chats.length === 0) return;
@@ -496,7 +418,6 @@ export default function SessionChatPage() {
         if (isActiveLensEvent) {
           setGenerating(true);
           if (genTimeoutRef.current) { clearTimeout(genTimeoutRef.current); genTimeoutRef.current = null; }
-          initialLoadRef.current = false;
         }
         const data = p.data as Record<string, unknown> | undefined;
         const delta = (data?.delta ?? data?.text ?? data?.content ?? '') as string;
@@ -539,7 +460,6 @@ export default function SessionChatPage() {
         if (isActiveLensEvent) {
           setGenerating(true);
           if (genTimeoutRef.current) { clearTimeout(genTimeoutRef.current); genTimeoutRef.current = null; }
-          initialLoadRef.current = false;
         }
         const data = p.data as Record<string, unknown> | undefined;
         const phase = p.phase as string | undefined;
@@ -617,7 +537,6 @@ export default function SessionChatPage() {
           }
         } else if (phase === 'start' || phase === 'running') {
           if (isActiveLensEvent) setGenerating(true);
-          initialLoadRef.current = false;
           // 开始新 Stream 时创建占位消息
           if (phase === 'start') {
             setChats((prev) => {
@@ -957,7 +876,6 @@ export default function SessionChatPage() {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div ref={chatContainerRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: '16px 16px 0' }}>
         <AIChatDialogue
-          key={activeSessionKey || 'no-session'}
           chats={chats}
           roleConfig={roleConfig}
           chatBoxRenderConfig={{
