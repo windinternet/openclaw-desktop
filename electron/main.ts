@@ -20,6 +20,18 @@ const isDev = !app.isPackaged
 
 let externalLinkMode: 'system' | 'internal' = 'system';
 
+/** 判断目标 URL 是否与当前 Electron 窗口同源 */
+function isSameOrigin(currentUrl: string, targetUrl: string): boolean {
+  try {
+    const cur = new URL(currentUrl);
+    const tgt = new URL(targetUrl);
+    return cur.origin === tgt.origin;
+  } catch {
+    return false;
+  }
+}
+
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
@@ -42,8 +54,11 @@ function createWindow() {
 
   // 拦截外部链接在系统浏览器打开，防止替换当前窗口
   win.webContents.setWindowOpenHandler(({ url }) => {
-    const isHttp = url.startsWith('http://') || url.startsWith('https://');
-    if (!isHttp) return { action: 'allow' };
+    // 同源链接放行（指向自己的服务，不是外部链接）
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      return { action: 'allow' };
+    }
+    if (isSameOrigin(win.webContents.getURL(), url)) return { action: 'allow' };
     if (externalLinkMode === 'system') {
       shell.openExternal(url);
       return { action: 'deny' };
@@ -59,8 +74,11 @@ function createWindow() {
   });
 
   win.webContents.on('will-navigate', (event, url) => {
-    const isHttp = url.startsWith('http://') || url.startsWith('https://');
-    if (!isHttp) return;
+    // 同源链接放行
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      return;
+    }
+    if (isSameOrigin(win.webContents.getURL(), url)) return;
     if (externalLinkMode === 'system') {
       event.preventDefault();
       shell.openExternal(url);
