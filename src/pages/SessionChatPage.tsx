@@ -219,6 +219,7 @@ export default function SessionChatPage() {
   const [allHistory, setAllHistory] = useState<DisplayChat[]>([]);
   const restoreDistanceRef = useRef<number | null>(null);
   const prevDisplayLimitRef = useRef(PAGE_SIZE);
+  const scrollToBottomRef = useRef(false);
   
   const streamingIdRef = useRef<string | null>(null);
   const patchAppliedRef = useRef(false);
@@ -244,6 +245,13 @@ export default function SessionChatPage() {
     if (prevRootSessionKeyRef.current !== rootSessionKey) {
       setChats([]);
       initialMessageSentRef.current = null;
+      // Reset scrollTop to prevent stale position from old session
+      // triggering isNearBottom when new history loads
+      try {
+        const el = chatContainerRef.current;
+        const scrollable = el?.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list');
+        if (scrollable) scrollable.scrollTop = 0;
+      } catch { /* scrollable not available yet */ }
     }
     prevRootSessionKeyRef.current = rootSessionKey;
     sendingRef.current = false;
@@ -302,10 +310,37 @@ export default function SessionChatPage() {
         const scrollable = chatContainerRef.current.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list');
         const target = scrollable ?? chatContainerRef.current;
         const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 200;
-        if (isNearBottom) target.scrollTop = target.scrollHeight;
+        if (isNearBottom) {
+          // Scroll to the true bottom (scrollHeight - clientHeight, not scrollHeight)
+          target.scrollTop = target.scrollHeight;
+          // Set a flag so ResizeObserver can re-scroll if content renders later
+          scrollToBottomRef.current = true;
+        } else {
+          scrollToBottomRef.current = false;
+        }
       }
     }, 200);
     return () => clearTimeout(timer);
+  }, [chats]);
+
+  /**
+   * ResizeObserver — watches the scrollable container for layout shifts
+   * (images, code blocks, etc.) and keeps the user at the bottom if
+   * the auto-scroll previously decided they should be there.
+   */
+  useEffect(() => {
+    const el = chatContainerRef.current;
+    if (!el) return;
+    const scrollable = el.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list') || el;
+    
+    const observer = new ResizeObserver(() => {
+      if (scrollToBottomRef.current) {
+        scrollable.scrollTop = scrollable.scrollHeight;
+      }
+    });
+    
+    observer.observe(scrollable);
+    return () => observer.disconnect();
   }, [chats]);
 
   /**
