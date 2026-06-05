@@ -85,7 +85,7 @@ function NavSectionLabel({ label }: { label: string }) {
   return (
     <li
       style={{
-        padding: '14px 24px 4px',
+        padding: '6px 12px 2px',
         fontSize: 12,
         fontWeight: 600,
         textTransform: 'uppercase',
@@ -564,7 +564,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
         </div>
       )}
       <div style={{ width: '100%', borderTop: '1px solid var(--semi-color-border)' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', padding: '10px 0 0 0', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', padding: '6px 0 0 0', gap: 8 }}>
           <Avatar size="extra-small" src={currentInstance?.avatarUrl || undefined}
             style={{ flexShrink: 0, backgroundColor: currentInstance?.avatarUrl ? 'transparent' : 'var(--semi-color-primary-light-default)' }}>
             {currentInstance?.name?.charAt(0).toUpperCase() ?? <IconServer />}

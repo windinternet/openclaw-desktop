@@ -100,6 +100,8 @@ export default function MainPage() {
                     display: 'flex',
                     flexDirection: 'column',
                     height: '100%',
+                    width: 300,
+                    flexShrink: 0,
                 }}
             >
                 <Sidebar
