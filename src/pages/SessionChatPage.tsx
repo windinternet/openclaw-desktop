@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AIChatDialogue, AIChatInput, Toast } from '@douyinfe/semi-ui';
 import type { RenderContentProps } from '@douyinfe/semi-ui/lib/es/chat/interface';
@@ -276,22 +276,31 @@ export default function SessionChatPage() {
     if (!chatModel && models.length > 0) queueMicrotask(() => setChatModel(models[0].id));
   }, [models, chatModel]);
 
+  /**
+   * Synchronous scroll restoration — runs BEFORE the browser paints,
+   * so the user never sees a flash to the bottom when history loads.
+   */
+  useLayoutEffect(() => {
+    if (chats.length === 0) return;
+    if (restoreDistanceRef.current === null) return;
+    if (!chatContainerRef.current) return;
+    const scrollable = chatContainerRef.current.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list');
+    const target = scrollable ?? chatContainerRef.current;
+    const distance = restoreDistanceRef.current;
+    restoreDistanceRef.current = null;
+    target.scrollTop = target.scrollHeight - distance;
+  }, [chats]);
+
+  /**
+   * Auto-scroll only when user is already near the bottom.
+   * Uses a short delay to let the DOM settle.
+   */
   useEffect(() => {
     if (chats.length === 0) return;
     const timer = setTimeout(() => {
       if (chatContainerRef.current) {
         const scrollable = chatContainerRef.current.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list');
         const target = scrollable ?? chatContainerRef.current;
-        
-        // If we just loaded more history, restore scroll position instead of auto-scrolling
-        if (restoreDistanceRef.current !== null) {
-          const distance = restoreDistanceRef.current;
-          restoreDistanceRef.current = null;
-          target.scrollTop = target.scrollHeight - distance;
-          return;
-        }
-        
-        // Otherwise, only auto-scroll if user is near the bottom
         const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 200;
         if (isNearBottom) target.scrollTop = target.scrollHeight;
       }
