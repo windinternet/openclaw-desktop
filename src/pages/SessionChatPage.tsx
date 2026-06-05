@@ -217,7 +217,8 @@ export default function SessionChatPage() {
   const PAGE_SIZE = 30;
   const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
   const [allHistory, setAllHistory] = useState<DisplayChat[]>([]);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const restoreDistanceRef = useRef<number | null>(null);
+  const prevDisplayLimitRef = useRef(PAGE_SIZE);
   
   const streamingIdRef = useRef<string | null>(null);
   const patchAppliedRef = useRef(false);
@@ -281,7 +282,16 @@ export default function SessionChatPage() {
       if (chatContainerRef.current) {
         const scrollable = chatContainerRef.current.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list');
         const target = scrollable ?? chatContainerRef.current;
-        // Only auto-scroll if user is near the bottom
+        
+        // If we just loaded more history, restore scroll position instead of auto-scrolling
+        if (restoreDistanceRef.current !== null) {
+          const distance = restoreDistanceRef.current;
+          restoreDistanceRef.current = null;
+          target.scrollTop = target.scrollHeight - distance;
+          return;
+        }
+        
+        // Otherwise, only auto-scroll if user is near the bottom
         const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 200;
         if (isNearBottom) target.scrollTop = target.scrollHeight;
       }
@@ -299,22 +309,33 @@ export default function SessionChatPage() {
     if (!el) return;
     const scrollable = el.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list') || el;
     const handleScroll = () => {
-      if (scrollable.scrollTop < 80 && !isLoadingMore && displayLimit < allHistory.length) {
-        setIsLoadingMore(true);
+      if (scrollable.scrollTop < 80 && displayLimit < allHistory.length) {
         setDisplayLimit((prev) => Math.min(prev + PAGE_SIZE, allHistory.length));
-        requestAnimationFrame(() => setIsLoadingMore(false));
+        // Reset restore state so a new scroll-up always captures fresh position
+        restoreDistanceRef.current = null;
       }
     };
     scrollable.addEventListener('scroll', handleScroll, { passive: true });
     return () => scrollable.removeEventListener('scroll', handleScroll);
-  }, [allHistory.length, displayLimit, isLoadingMore]);
+  }, [allHistory.length, displayLimit]);
 
   /**
    * When displayLimit changes (user scrolls up), show more history chats.
+   * Preserves scroll position so the user stays at the same visual location.
    */
   useEffect(() => {
     if (allHistory.length === 0) return;
     const visible = allHistory.slice(-displayLimit);
+    
+    // Save scroll position before state update, but only when displayLimit
+    // actually increased (user loading more history), not on initial mount
+    const isLoadMore = displayLimit > prevDisplayLimitRef.current;
+    prevDisplayLimitRef.current = displayLimit;
+    if (isLoadMore && chatContainerRef.current) {
+      const scrollable = chatContainerRef.current.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list') || chatContainerRef.current;
+      restoreDistanceRef.current = scrollable.scrollHeight - scrollable.scrollTop;
+    }
+    
     setChats((prev) => {
       const historyIds = new Set(allHistory.map((c) => c.id));
       const streamingOnly = prev.filter((c) => !historyIds.has(c.id));
