@@ -49,7 +49,9 @@ interface ActorState {
   nextLeisureDecisionAt: number;
   collisionReaction: number;
   manualWalking: boolean;
+  isPlayerControlled: boolean;
   lastMoveDirection: THREE.Vector3;
+  jumpVelocity: number;
 }
 
 interface SceneState {
@@ -433,6 +435,7 @@ function createRobot(agent: OfficeAgent, theme: OfficeTheme): ActorState {
   group.add(hitBox);
   markAgentObject(group, agent.agentId);
   group.scale.setScalar(0.78);
+  group.rotation.order = 'YXZ'; // Y=facing, Z=arm swing - independent axes
 
   const actor: ActorState = {
     agent,
@@ -450,7 +453,9 @@ function createRobot(agent: OfficeAgent, theme: OfficeTheme): ActorState {
     nextLeisureDecisionAt: 0,
     collisionReaction: 0,
     manualWalking: false,
+    isPlayerControlled: false,
     lastMoveDirection: new THREE.Vector3(-0.7, 0, -0.7).normalize(),
+    jumpVelocity: 0,
   };
   updateLoungeActivityProp(actor, theme);
   return actor;
@@ -803,10 +808,14 @@ function movementVectorForKeys(keys: Set<string>, azimuth: number): THREE.Vector
   return move;
 }
 
+// FPS-style: move selected agent in camera-relative direction, agent faces camera look direction
 function moveSelectedActorFromKeys(state: SceneState, selectedAgentId: string | null, delta: number): void {
   state.controlledAgentId = selectedAgentId;
+  // Only reset manualWalking for OTHER agents (not the controlled one, not when null)
   state.actors.forEach((actor) => {
-    actor.manualWalking = false;
+    if (selectedAgentId && actor.agent.agentId !== selectedAgentId) {
+      actor.manualWalking = false;
+    }
     if (actor.agent.agentId !== selectedAgentId && actor.nextLeisureDecisionAt === Number.POSITIVE_INFINITY) {
       actor.nextLeisureDecisionAt = 0;
     }
@@ -815,11 +824,19 @@ function moveSelectedActorFromKeys(state: SceneState, selectedAgentId: string | 
 
   const actor = state.actors.get(selectedAgentId);
   if (!actor) return;
+  actor.manualWalking = true;
   actor.nextLeisureDecisionAt = Number.POSITIVE_INFINITY;
+
+  // Always face camera direction via direct Y rotation (avoids lookAt quirk)
+  actor.group.rotation.y = Math.PI - state.cameraControl.azimuth;
+  const cameraForward = new THREE.Vector3(-Math.sin(state.cameraControl.azimuth), 0, -Math.cos(state.cameraControl.azimuth));
+  actor.lastMoveDirection.copy(cameraForward);
+  actor.target.copy(actor.group.position); // keep target synced
 
   const move = movementVectorForKeys(state.pressedKeys, state.cameraControl.azimuth);
   if (move.lengthSq() <= 0.0001) return;
 
+  // FPS move
   const nextTarget = actor.group.position.clone().addScaledVector(move, delta * MANUAL_AGENT_WALK_SPEED);
   nextTarget.y = OFFICE_AGENT_GROUND_Y;
   clampFreeRoamVector(nextTarget);
@@ -827,23 +844,25 @@ function moveSelectedActorFromKeys(state: SceneState, selectedAgentId: string | 
 
   actor.group.position.copy(nextTarget);
   actor.target.copy(nextTarget);
-  actor.group.lookAt(nextTarget.x + move.x, actor.group.position.y, nextTarget.z + move.z);
-  actor.manualWalking = true;
-  actor.lastMoveDirection.copy(move);
-  actor.nextLeisureDecisionAt = Number.POSITIVE_INFINITY;
+  actor.group.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI - state.cameraControl.azimuth);
 }
 
+// FPS first-person camera: camera at agent head, look direction from azimuth/elevation
 function applyFirstPersonCamera(state: SceneState, container: HTMLDivElement, actor: ActorState): void {
   state.camera = state.firstPersonCamera;
   state.cameraMode = 'first-person';
 
-  const forward = actor.lastMoveDirection.lengthSq() > 0.0001
-    ? actor.lastMoveDirection.clone().normalize()
-    : new THREE.Vector3(-Math.sin(state.cameraControl.azimuth), 0, -Math.cos(state.cameraControl.azimuth)).normalize();
-  const eye = actor.group.position.clone().addScaledVector(forward, 0.18);
-  eye.y = OFFICE_AGENT_GROUND_Y + 0.96;
-  const lookAt = actor.group.position.clone().addScaledVector(forward, 5.4);
-  lookAt.y = OFFICE_AGENT_GROUND_Y + 0.9;
+  // Camera position: top of agent's head
+  const eye = actor.group.position.clone();
+  eye.y = actor.group.position.y + 0.96;
+  
+  // Look direction from camera azimuth/elevation
+  const lookDir = new THREE.Vector3(
+    -Math.sin(state.cameraControl.azimuth) * Math.cos(state.cameraControl.elevation),
+    Math.sin(state.cameraControl.elevation),
+    -Math.cos(state.cameraControl.azimuth) * Math.cos(state.cameraControl.elevation),
+  );
+  const lookAt = eye.clone().add(lookDir);
 
   state.firstPersonCamera.position.copy(eye);
   state.firstPersonCamera.lookAt(lookAt);
@@ -869,7 +888,7 @@ function updateActors(state: SceneState, agents: OfficeAgent[], theme: OfficeThe
       const previousActivity = existing.agent.loungeActivity;
       const previousZone = existing.agent.zone;
       existing.agent = agent;
-      if (state.controlledAgentId !== agent.agentId) {
+      if (state.controlledAgentId !== agent.agentId && !existing.isPlayerControlled) {
         existing.target.set(agent.position.x, agent.position.y, agent.position.z);
       }
       if (previousActivity !== agent.loungeActivity || previousZone !== agent.zone) {
@@ -907,11 +926,15 @@ function isFreeRoamPointBlocked(x: number, z: number, padding = 0): boolean {
 function enforceActorGrounding(actor: ActorState): void {
   actor.group.position.y = Math.max(actor.group.position.y, OFFICE_AGENT_GROUND_Y);
   actor.target.y = OFFICE_AGENT_GROUND_Y;
-  if (actor.group.position.y !== OFFICE_AGENT_GROUND_Y) {
+  if (actor.group.position.y < OFFICE_AGENT_GROUND_Y) {
     actor.group.position.y = OFFICE_AGENT_GROUND_Y;
   }
-  actor.group.rotation.x = 0;
-  actor.group.rotation.z = Math.min(0.22, Math.max(-0.22, actor.group.rotation.z));
+  if (!actor.isPlayerControlled) {
+    actor.group.rotation.x = 0;
+    actor.group.rotation.z = Math.min(0.22, Math.max(-0.22, actor.group.rotation.z));
+  } else {
+    actor.group.rotation.z = Math.min(0.22, Math.max(-0.22, actor.group.rotation.z));
+  }
 }
 
 function chooseNextLeisureTarget(actor: ActorState, time: number): THREE.Vector3 {
@@ -999,14 +1022,23 @@ function resolveActorCollisions(actors: Map<string, ActorState>): void {
 }
 
 function animateActor(actor: ActorState, time: number, delta: number, selected: boolean): void {
-  if (isLeisureActor(actor) && time >= actor.nextLeisureDecisionAt && actor.group.position.distanceTo(actor.target) < 0.08) {
+  // Jump physics
+  if (actor.jumpVelocity !== 0 || actor.group.position.y > OFFICE_AGENT_GROUND_Y) {
+    actor.group.position.y += actor.jumpVelocity;
+    actor.jumpVelocity -= 0.004; // gravity
+    if (actor.group.position.y <= OFFICE_AGENT_GROUND_Y) {
+      actor.group.position.y = OFFICE_AGENT_GROUND_Y;
+      actor.jumpVelocity = 0;
+    }
+  }
+  if (!actor.isPlayerControlled && isLeisureActor(actor) && time >= actor.nextLeisureDecisionAt && actor.group.position.distanceTo(actor.target) < 0.08) {
     actor.target.copy(chooseNextLeisureTarget(actor, time));
     actor.nextLeisureDecisionAt = time + 3200 + Math.abs(Math.sin(actor.phase)) * 4200;
   }
 
   const movement = getMovementProfile(actor.currentZone, actor.agent.zone);
   const distance = actor.group.position.distanceTo(actor.target);
-  if (distance > 0.015) {
+  if (distance > 0.015 && !actor.manualWalking) {
     const speed = actor.manualWalking ? MANUAL_AGENT_WALK_SPEED : isLeisureActor(actor) ? 0.72 : movement.speed;
     const step = Math.min(1, delta * speed);
     actor.group.position.lerp(actor.target, step);
@@ -1095,6 +1127,7 @@ function handleSceneClick(
   const hit = hits.find((item) => typeof item.object.userData.agentId === 'string');
   if (hit) {
     onSelectAgent(String(hit.object.userData.agentId));
+    container.requestPointerLock();
     return;
   }
 
@@ -1192,6 +1225,17 @@ export default function OfficeScene({
         }
       };
       const onMouseMove = (event: MouseEvent) => {
+        // FPS mode: mouse controls look direction (pointer lock)
+        if (state.cameraMode === 'first-person' && document.pointerLockElement === container) {
+          // FPS: compute azimuth/elevation directly with full range
+          const sens = 0.003;
+          state.cameraControl.azimuth = Number((state.cameraControl.azimuth - event.movementX * sens).toFixed(4));
+          state.cameraControl.elevation = Math.max(-1.4, Math.min(1.4,
+            Number((state.cameraControl.elevation - event.movementY * sens).toFixed(4))
+          ));
+          return;
+        }
+        // Third-person mode: original drag behavior
         if (state.middleDrag.active) {
           event.preventDefault();
           const deltaX = event.clientX - state.middleDrag.lastX;
@@ -1219,15 +1263,20 @@ export default function OfficeScene({
       };
       const onKeyDown = (event: KeyboardEvent) => {
         const key = event.key.toLowerCase();
-        if (event.key === ' ') {
+        if (event.key === ' ' && state.cameraMode === 'first-person') {
           event.preventDefault();
-          resetCameraControl(state, container);
+          // Jump: apply upward velocity if on ground
+          const actor = state.controlledAgentId ? state.actors.get(state.controlledAgentId) : null;
+          if (actor && actor.group.position.y <= OFFICE_AGENT_GROUND_Y + 0.01) {
+            actor.jumpVelocity = 0.12;
+          }
           return;
         }
         if (key === 'v') {
           event.preventDefault();
           selectedRef.current = null;
           onSelectAgent(null);
+          document.exitPointerLock();
           resetCameraControl(state, container);
           return;
         }
@@ -1239,9 +1288,22 @@ export default function OfficeScene({
         state.pressedKeys.delete(event.key.toLowerCase());
       };
       const onWindowKeyDown = (event: KeyboardEvent) => {
-        if (event.key === ' ') {
+        if (event.key === 'Escape') {
           event.preventDefault();
+          document.exitPointerLock();
+          if (state.cameraMode === 'first-person') {
+            selectedRef.current = null;
+            onSelectAgent(null);
+          }
           resetCameraControl(state, container);
+          return;
+        }
+        if (event.key === ' ' && state.cameraMode === 'first-person') {
+          event.preventDefault();
+          const actor = state.controlledAgentId ? state.actors.get(state.controlledAgentId) : null;
+          if (actor && actor.group.position.y <= OFFICE_AGENT_GROUND_Y + 0.01) {
+            actor.jumpVelocity = 0.12;
+          }
           return;
         }
         if (event.key.toLowerCase() === 'v') {
