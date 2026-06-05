@@ -142,6 +142,29 @@ function behaviorLabel(behavior: OfficeAgent['behavior']): string {
   }
 }
 
+function loungeActivityLabel(activity: OfficeAgent['loungeActivity']): string | null {
+  switch (activity) {
+    case 'sofa':
+      return '坐沙发放松';
+    case 'coffee':
+      return '喝咖啡';
+    case 'hydrating':
+      return '补水';
+    case 'charging':
+      return '充电';
+    case 'napping':
+      return '小憩';
+    case 'chatting':
+      return '闲聊';
+    case 'reading':
+      return '阅读';
+    case 'wandering':
+      return '随意走动';
+    default:
+      return null;
+  }
+}
+
 function connectionBadgeType(status: ConnectionStatus): 'success' | 'warning' | 'danger' {
   if (status === 'connected') return 'success';
   if (status === 'connecting') return 'warning';
@@ -284,7 +307,7 @@ export default function Office3DPage() {
           theme={officeTheme}
           companyName={displayOfficeProfile.companyName}
           cameraResetSignal={cameraResetSignal}
-          selectedAgentId={selectedAgent?.agentId ?? null}
+          selectedAgentId={selectedAgentId}
           onSelectAgent={setSelectedAgentId}
           onReceptionInteract={handleReceptionInteract}
           onSceneError={setSceneError}
@@ -343,6 +366,9 @@ export default function Office3DPage() {
             </Space>
             <Text style={{ color: officeTheme.panel.muted }}>
               {behaviorLabel(selectedAgent.behavior)}
+              {selectedAgent.zone === 'lounge' && loungeActivityLabel(selectedAgent.loungeActivity)
+                ? ` · ${loungeActivityLabel(selectedAgent.loungeActivity)}`
+                : ''}
               {selectedAgent.model ? ` · ${selectedAgent.model}` : ''}
               {selectedAgent.currentTask ? ` · ${selectedAgent.currentTask}` : ''}
             </Text>
@@ -359,7 +385,7 @@ export default function Office3DPage() {
           <Text style={{ color: officeTheme.panel.muted }}>休闲 → 工作/会议：快步前往</Text>
           <Text style={{ color: officeTheme.panel.muted }}>工作/会议 → 休闲：慢走回去</Text>
           <Text style={{ color: officeTheme.panel.muted }}>多个活跃 Agent 会话：进入会议区协作</Text>
-          <Text style={{ color: officeTheme.panel.muted }}>WASD/左键拖动平移 · 中键旋转 · 滚轮缩放 · 空格还原</Text>
+          <Text style={{ color: officeTheme.panel.muted }}>未选中：WASD/左键拖动平移 · 选中 Agent：WASD 行走并切第一视角 · V 返回第三人称</Text>
           <Text style={{ color: officeTheme.panel.muted }}>点击前台：了解当前办公室情况</Text>
         </Space>
       </Card>

@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import type { ConnectionStatus, OfficeAgent } from '../../lib/types';
-import { getMovementProfile } from '../../lib/office-layout';
+import {
+  OFFICE_AGENT_COLLISION_RADIUS,
+  OFFICE_AGENT_GROUND_Y,
+  OFFICE_FREE_ROAM_BOUNDS,
+  OFFICE_SCENE_COLLISION_VOLUMES,
+  getMovementProfile,
+} from '../../lib/office-layout';
 import type { OfficeTheme } from '../../lib/office-theme';
 import {
   dragPanOfficeCamera,
@@ -12,6 +18,8 @@ import {
   type OfficeCameraDirection,
   type OfficeCameraState,
 } from '../../lib/office-camera';
+
+const MANUAL_AGENT_WALK_SPEED = 5.8;
 
 interface OfficeSceneProps {
   agents: OfficeAgent[];
@@ -33,16 +41,25 @@ interface ActorState {
   leftArm: THREE.Mesh;
   rightArm: THREE.Mesh;
   label: THREE.Sprite;
+  activityProp: THREE.Group;
   currentZone: OfficeAgent['zone'];
   target: THREE.Vector3;
   phase: number;
   baseScale: number;
+  nextLeisureDecisionAt: number;
+  collisionReaction: number;
+  manualWalking: boolean;
+  lastMoveDirection: THREE.Vector3;
 }
 
 interface SceneState {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
-  camera: THREE.OrthographicCamera;
+  camera: THREE.Camera;
+  thirdPersonCamera: THREE.OrthographicCamera;
+  firstPersonCamera: THREE.PerspectiveCamera;
+  cameraMode: 'third-person' | 'first-person';
+  controlledAgentId: string | null;
   actors: Map<string, ActorState>;
   raycaster: THREE.Raycaster;
   pointer: THREE.Vector2;
@@ -227,6 +244,35 @@ function createLabel(text: string, color: string, theme: OfficeTheme): THREE.Spr
   return sprite;
 }
 
+function createActivityBadge(text: string, color: string, theme: OfficeTheme): THREE.Sprite {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 72;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = theme.scene.labelBackground;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(16, 14, 96, 42, 16);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = theme.scene.labelText;
+    ctx.font = '700 24px system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 64, 35);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true }));
+  sprite.scale.set(0.54, 0.3, 1);
+  sprite.position.set(0.28, 1.48, 0);
+  return sprite;
+}
+
 function createWallText(text: string, theme: OfficeTheme): THREE.Mesh {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
@@ -272,6 +318,58 @@ function markAgentObject(object: THREE.Object3D, agentId: string): void {
 function markOfficeAction(object: THREE.Object3D, action: string): void {
   object.userData.officeAction = action;
   object.children.forEach((child) => markOfficeAction(child, action));
+}
+
+function clearGroup(group: THREE.Group): void {
+  group.clear();
+}
+
+function updateLoungeActivityProp(actor: ActorState, theme: OfficeTheme): void {
+  clearGroup(actor.activityProp);
+  if (actor.agent.zone !== 'lounge') return;
+
+  const activity = actor.agent.loungeActivity ?? 'wandering';
+  if (activity === 'coffee' || activity === 'hydrating') {
+    const color = activity === 'coffee' ? theme.scene.meeting : '#60a5fa';
+    const cup = createCylinder(0.07, 0.06, 0.16, color, [0.36, 0.68, 0.24], { radialSegments: 14 });
+    actor.activityProp.add(cup);
+    return;
+  }
+
+  if (activity === 'charging') {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(0.38, 0.018, 8, 28),
+      new THREE.MeshStandardMaterial({
+        color: theme.scene.accent,
+        emissive: theme.scene.accent,
+        emissiveIntensity: 0.22,
+        roughness: 0.36,
+      }),
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.03;
+    actor.activityProp.add(ring);
+    return;
+  }
+
+  if (activity === 'napping') {
+    actor.activityProp.add(createActivityBadge('Zz', actor.agent.color, theme));
+    return;
+  }
+
+  if (activity === 'chatting') {
+    actor.activityProp.add(createActivityBadge('...', actor.agent.color, theme));
+    return;
+  }
+
+  if (activity === 'reading') {
+    actor.activityProp.add(createBox(0.26, 0.16, 0.035, theme.scene.screen, [0.28, 0.68, 0.24], { roughness: 0.22 }));
+    return;
+  }
+
+  if (activity === 'sofa') {
+    actor.activityProp.add(createBox(0.18, 0.08, 0.18, theme.scene.trim, [-0.26, 0.42, 0.04], { roughness: 0.8 }));
+  }
 }
 
 function createRobot(agent: OfficeAgent, theme: OfficeTheme): ActorState {
@@ -329,10 +427,14 @@ function createRobot(agent: OfficeAgent, theme: OfficeTheme): ActorState {
 
   const label = createLabel(agent.name, agent.color, theme);
   group.add(label);
+  const activityProp = new THREE.Group();
+  group.add(activityProp);
+  const hitBox = createHitBox(0.92, 1.55, 0.92, [0, 0.74, 0]);
+  group.add(hitBox);
   markAgentObject(group, agent.agentId);
   group.scale.setScalar(0.78);
 
-  return {
+  const actor: ActorState = {
     agent,
     group,
     body,
@@ -340,11 +442,18 @@ function createRobot(agent: OfficeAgent, theme: OfficeTheme): ActorState {
     leftArm,
     rightArm,
     label,
+    activityProp,
     currentZone: agent.zone,
     target: new THREE.Vector3(agent.position.x, agent.position.y, agent.position.z),
     phase: Math.random() * Math.PI * 2,
     baseScale: 0.78,
+    nextLeisureDecisionAt: 0,
+    collisionReaction: 0,
+    manualWalking: false,
+    lastMoveDirection: new THREE.Vector3(-0.7, 0, -0.7).normalize(),
   };
+  updateLoungeActivityProp(actor, theme);
+  return actor;
 }
 
 function createDesk(x: number, z: number, theme: OfficeTheme): THREE.Group {
@@ -504,7 +613,7 @@ function createReception(theme: OfficeTheme): THREE.Group {
     zone: 'lounge',
     behavior: 'listening',
     color: theme.scene.accent,
-    position: { x: -1.25, y: 0.34, z: -3.95 },
+    position: { x: -1.25, y: OFFICE_AGENT_GROUND_Y, z: -3.95 },
   };
   const npc = createRobot(npcAgent, theme).group;
   npc.scale.setScalar(0.68);
@@ -565,7 +674,8 @@ function createScene(container: HTMLDivElement, theme: OfficeTheme, companyName:
     ? new THREE.Fog(theme.scene.fog, 24, 54)
     : null;
 
-  const camera = new THREE.OrthographicCamera(-7, 7, 5, -5, 0.1, 120);
+  const thirdPersonCamera = new THREE.OrthographicCamera(-7, 7, 5, -5, 0.1, 120);
+  const firstPersonCamera = new THREE.PerspectiveCamera(64, 1, 0.05, 90);
 
   const ambient = new THREE.AmbientLight(theme.mode === 'light' ? '#ffffff' : '#dbeafe', theme.mode === 'light' ? 1.8 : 1.4);
   scene.add(ambient);
@@ -585,7 +695,11 @@ function createScene(container: HTMLDivElement, theme: OfficeTheme, companyName:
   const state = {
     renderer,
     scene,
-    camera,
+    camera: thirdPersonCamera,
+    thirdPersonCamera,
+    firstPersonCamera,
+    cameraMode: 'third-person' as const,
+    controlledAgentId: null,
     actors: new Map(),
     raycaster: new THREE.Raycaster(),
     pointer: new THREE.Vector2(),
@@ -605,24 +719,31 @@ function resizeScene(state: SceneState, container: HTMLDivElement): void {
   const height = Math.max(1, container.clientHeight);
   const aspect = width / height;
   const frustum = state.cameraControl.frustum;
-  state.camera.left = (-frustum * aspect) / 2;
-  state.camera.right = (frustum * aspect) / 2;
-  state.camera.top = frustum / 2;
-  state.camera.bottom = -frustum / 2;
-  state.camera.updateProjectionMatrix();
+  state.thirdPersonCamera.left = (-frustum * aspect) / 2;
+  state.thirdPersonCamera.right = (frustum * aspect) / 2;
+  state.thirdPersonCamera.top = frustum / 2;
+  state.thirdPersonCamera.bottom = -frustum / 2;
+  state.thirdPersonCamera.updateProjectionMatrix();
+  state.firstPersonCamera.aspect = aspect;
+  state.firstPersonCamera.updateProjectionMatrix();
   state.renderer.setSize(width, height, false);
 }
 
 function applyCameraControl(state: SceneState, container: HTMLDivElement): void {
+  state.camera = state.thirdPersonCamera;
+  state.cameraMode = 'third-person';
   const { target, distance, azimuth, elevation } = state.cameraControl;
   const horizontal = Math.cos(elevation) * distance;
-  state.camera.position.set(
+  state.thirdPersonCamera.position.set(
     target.x + Math.sin(azimuth) * horizontal,
     target.y + Math.sin(elevation) * distance,
     target.z + Math.cos(azimuth) * horizontal,
   );
-  state.camera.lookAt(target.x, target.y, target.z);
+  state.thirdPersonCamera.lookAt(target.x, target.y, target.z);
   resizeScene(state, container);
+  container.dataset.officeCameraMode = state.cameraMode;
+  delete container.dataset.officeFirstPersonAgentId;
+  delete container.dataset.officeControlledAgentId;
   container.dataset.officeCameraDistance = String(state.cameraControl.distance);
   container.dataset.officeCameraAzimuth = String(state.cameraControl.azimuth);
   container.dataset.officeCameraFrustum = String(state.cameraControl.frustum);
@@ -636,9 +757,11 @@ function setCameraControl(state: SceneState, container: HTMLDivElement, next: Of
 }
 
 function resetCameraControl(state: SceneState, container: HTMLDivElement): void {
+  state.controlledAgentId = null;
   state.pressedKeys.clear();
   state.middleDrag.active = false;
   state.leftDrag.active = false;
+  delete container.dataset.officeFirstPersonAgentId;
   setCameraControl(state, container, resetOfficeCamera());
 }
 
@@ -663,6 +786,73 @@ function updateCameraFromKeys(state: SceneState, container: HTMLDivElement, delt
   }
 }
 
+function movementVectorForKeys(keys: Set<string>, azimuth: number): THREE.Vector3 {
+  const move = new THREE.Vector3();
+  const forward = new THREE.Vector3(-Math.sin(azimuth), 0, -Math.cos(azimuth));
+  const right = new THREE.Vector3(Math.cos(azimuth), 0, -Math.sin(azimuth));
+
+  keys.forEach((key) => {
+    const direction = directionForKey(key);
+    if (direction === 'forward') move.add(forward);
+    if (direction === 'backward') move.sub(forward);
+    if (direction === 'right') move.add(right);
+    if (direction === 'left') move.sub(right);
+  });
+
+  if (move.lengthSq() > 0.0001) move.normalize();
+  return move;
+}
+
+function moveSelectedActorFromKeys(state: SceneState, selectedAgentId: string | null, delta: number): void {
+  state.controlledAgentId = selectedAgentId;
+  state.actors.forEach((actor) => {
+    actor.manualWalking = false;
+    if (actor.agent.agentId !== selectedAgentId && actor.nextLeisureDecisionAt === Number.POSITIVE_INFINITY) {
+      actor.nextLeisureDecisionAt = 0;
+    }
+  });
+  if (!selectedAgentId) return;
+
+  const actor = state.actors.get(selectedAgentId);
+  if (!actor) return;
+  actor.nextLeisureDecisionAt = Number.POSITIVE_INFINITY;
+
+  const move = movementVectorForKeys(state.pressedKeys, state.cameraControl.azimuth);
+  if (move.lengthSq() <= 0.0001) return;
+
+  const nextTarget = actor.group.position.clone().addScaledVector(move, delta * MANUAL_AGENT_WALK_SPEED);
+  nextTarget.y = OFFICE_AGENT_GROUND_Y;
+  clampFreeRoamVector(nextTarget);
+  if (isFreeRoamPointBlocked(nextTarget.x, nextTarget.z, 0.02)) return;
+
+  actor.group.position.copy(nextTarget);
+  actor.target.copy(nextTarget);
+  actor.group.lookAt(nextTarget.x + move.x, actor.group.position.y, nextTarget.z + move.z);
+  actor.manualWalking = true;
+  actor.lastMoveDirection.copy(move);
+  actor.nextLeisureDecisionAt = Number.POSITIVE_INFINITY;
+}
+
+function applyFirstPersonCamera(state: SceneState, container: HTMLDivElement, actor: ActorState): void {
+  state.camera = state.firstPersonCamera;
+  state.cameraMode = 'first-person';
+
+  const forward = actor.lastMoveDirection.lengthSq() > 0.0001
+    ? actor.lastMoveDirection.clone().normalize()
+    : new THREE.Vector3(-Math.sin(state.cameraControl.azimuth), 0, -Math.cos(state.cameraControl.azimuth)).normalize();
+  const eye = actor.group.position.clone().addScaledVector(forward, 0.18);
+  eye.y = OFFICE_AGENT_GROUND_Y + 0.96;
+  const lookAt = actor.group.position.clone().addScaledVector(forward, 5.4);
+  lookAt.y = OFFICE_AGENT_GROUND_Y + 0.9;
+
+  state.firstPersonCamera.position.copy(eye);
+  state.firstPersonCamera.lookAt(lookAt);
+  resizeScene(state, container);
+  container.dataset.officeCameraMode = state.cameraMode;
+  container.dataset.officeFirstPersonAgentId = actor.agent.agentId;
+  container.dataset.officeControlledAgentId = state.controlledAgentId ?? '';
+}
+
 function updateActors(state: SceneState, agents: OfficeAgent[], theme: OfficeTheme): void {
   const nextIds = new Set(agents.map((agent) => agent.agentId));
 
@@ -676,8 +866,15 @@ function updateActors(state: SceneState, agents: OfficeAgent[], theme: OfficeThe
   agents.forEach((agent) => {
     const existing = state.actors.get(agent.agentId);
     if (existing) {
+      const previousActivity = existing.agent.loungeActivity;
+      const previousZone = existing.agent.zone;
       existing.agent = agent;
-      existing.target.set(agent.position.x, agent.position.y, agent.position.z);
+      if (state.controlledAgentId !== agent.agentId) {
+        existing.target.set(agent.position.x, agent.position.y, agent.position.z);
+      }
+      if (previousActivity !== agent.loungeActivity || previousZone !== agent.zone) {
+        updateLoungeActivityProp(existing, theme);
+      }
       return;
     }
 
@@ -687,11 +884,131 @@ function updateActors(state: SceneState, agents: OfficeAgent[], theme: OfficeThe
   });
 }
 
+function isLeisureActor(actor: ActorState): boolean {
+  return actor.agent.zone === 'lounge' && (actor.agent.behavior === 'resting' || actor.agent.behavior === 'offline');
+}
+
+function needsRuntimeCollision(actor: ActorState): boolean {
+  return isLeisureActor(actor) || actor.manualWalking;
+}
+
+function clampFreeRoamVector(vector: THREE.Vector3): void {
+  vector.x = Math.min(OFFICE_FREE_ROAM_BOUNDS.maxX, Math.max(OFFICE_FREE_ROAM_BOUNDS.minX, vector.x));
+  vector.z = Math.min(OFFICE_FREE_ROAM_BOUNDS.maxZ, Math.max(OFFICE_FREE_ROAM_BOUNDS.minZ, vector.z));
+}
+
+function isFreeRoamPointBlocked(x: number, z: number, padding = 0): boolean {
+  return OFFICE_SCENE_COLLISION_VOLUMES.some((volume) => {
+    const distance = Math.hypot(x - volume.x, z - volume.z);
+    return distance < OFFICE_AGENT_COLLISION_RADIUS + volume.radius + padding;
+  });
+}
+
+function enforceActorGrounding(actor: ActorState): void {
+  actor.group.position.y = Math.max(actor.group.position.y, OFFICE_AGENT_GROUND_Y);
+  actor.target.y = OFFICE_AGENT_GROUND_Y;
+  if (actor.group.position.y !== OFFICE_AGENT_GROUND_Y) {
+    actor.group.position.y = OFFICE_AGENT_GROUND_Y;
+  }
+  actor.group.rotation.x = 0;
+  actor.group.rotation.z = Math.min(0.22, Math.max(-0.22, actor.group.rotation.z));
+}
+
+function chooseNextLeisureTarget(actor: ActorState, time: number): THREE.Vector3 {
+  const activity = actor.agent.loungeActivity ?? 'wandering';
+  const base = new THREE.Vector3(actor.agent.position.x, actor.agent.position.y, actor.agent.position.z);
+  const wanderScale = activity === 'napping' || activity === 'charging' ? 0.24 : activity === 'sofa' ? 0.38 : 1.18;
+  const seed = actor.phase + time * 0.00017;
+
+  for (let attempt = 0; attempt < 14; attempt += 1) {
+    const angle = seed + attempt * 2.399963229728653;
+    const distance = wanderScale * (0.45 + (attempt % 4) * 0.18);
+    const target = new THREE.Vector3(
+      base.x + Math.cos(angle) * distance,
+      base.y,
+      base.z + Math.sin(angle) * distance,
+    );
+    clampFreeRoamVector(target);
+    if (!isFreeRoamPointBlocked(target.x, target.z, 0.04)) return target;
+  }
+
+  clampFreeRoamVector(base);
+  return base;
+}
+
+function pushActorFromPoint(actor: ActorState, x: number, z: number, minDistance: number, strength = 1): void {
+  const dx = actor.group.position.x - x;
+  const dz = actor.group.position.z - z;
+  const distance = Math.hypot(dx, dz);
+  if (distance >= minDistance) return;
+
+  const normalX = distance > 0.001 ? dx / distance : Math.cos(actor.phase);
+  const normalZ = distance > 0.001 ? dz / distance : Math.sin(actor.phase);
+  const push = (minDistance - distance) * strength;
+  actor.group.position.x += normalX * push;
+  actor.group.position.z += normalZ * push;
+  actor.target.x += normalX * push * 1.8;
+  actor.target.z += normalZ * push * 1.8;
+  clampFreeRoamVector(actor.group.position);
+  clampFreeRoamVector(actor.target);
+  actor.collisionReaction = Math.min(1, actor.collisionReaction + 0.55);
+  actor.nextLeisureDecisionAt = 0;
+}
+
+function resolveActorCollisions(actors: Map<string, ActorState>): void {
+  const leisureActors = Array.from(actors.values()).filter(needsRuntimeCollision);
+
+  leisureActors.forEach((actor) => {
+    OFFICE_SCENE_COLLISION_VOLUMES.forEach((volume) => {
+      pushActorFromPoint(actor, volume.x, volume.z, OFFICE_AGENT_COLLISION_RADIUS + volume.radius, 0.9);
+    });
+    enforceActorGrounding(actor);
+  });
+
+  for (let index = 0; index < leisureActors.length; index += 1) {
+    const actor = leisureActors[index];
+    for (let nextIndex = index + 1; nextIndex < leisureActors.length; nextIndex += 1) {
+      const other = leisureActors[nextIndex];
+      const dx = actor.group.position.x - other.group.position.x;
+      const dz = actor.group.position.z - other.group.position.z;
+      const distance = Math.hypot(dx, dz);
+      const minDistance = OFFICE_AGENT_COLLISION_RADIUS * 2;
+      if (distance >= minDistance) continue;
+
+      const normalX = distance > 0.001 ? dx / distance : Math.cos(actor.phase - other.phase);
+      const normalZ = distance > 0.001 ? dz / distance : Math.sin(actor.phase - other.phase);
+      const push = (minDistance - distance) / 2;
+      actor.group.position.x += normalX * push;
+      actor.group.position.z += normalZ * push;
+      other.group.position.x -= normalX * push;
+      other.group.position.z -= normalZ * push;
+      actor.target.x += normalX * push * 2;
+      actor.target.z += normalZ * push * 2;
+      other.target.x -= normalX * push * 2;
+      other.target.z -= normalZ * push * 2;
+      clampFreeRoamVector(actor.group.position);
+      clampFreeRoamVector(other.group.position);
+      clampFreeRoamVector(actor.target);
+      clampFreeRoamVector(other.target);
+      actor.collisionReaction = Math.min(1, actor.collisionReaction + 0.8);
+      other.collisionReaction = Math.min(1, other.collisionReaction + 0.8);
+      actor.nextLeisureDecisionAt = 0;
+      other.nextLeisureDecisionAt = 0;
+    }
+  }
+}
+
 function animateActor(actor: ActorState, time: number, delta: number, selected: boolean): void {
+  if (isLeisureActor(actor) && time >= actor.nextLeisureDecisionAt && actor.group.position.distanceTo(actor.target) < 0.08) {
+    actor.target.copy(chooseNextLeisureTarget(actor, time));
+    actor.nextLeisureDecisionAt = time + 3200 + Math.abs(Math.sin(actor.phase)) * 4200;
+  }
+
   const movement = getMovementProfile(actor.currentZone, actor.agent.zone);
   const distance = actor.group.position.distanceTo(actor.target);
   if (distance > 0.015) {
-    const step = Math.min(1, delta * movement.speed);
+    const speed = actor.manualWalking ? MANUAL_AGENT_WALK_SPEED : isLeisureActor(actor) ? 0.72 : movement.speed;
+    const step = Math.min(1, delta * speed);
     actor.group.position.lerp(actor.target, step);
     actor.group.lookAt(actor.target.x, actor.group.position.y, actor.target.z);
   } else {
@@ -700,9 +1017,17 @@ function animateActor(actor: ActorState, time: number, delta: number, selected: 
 
   const phase = time * 0.004 + actor.phase;
   const bob = Math.sin(phase) * 0.035;
-  actor.body.position.y = 0.42 + bob;
+  const reaction = actor.collisionReaction;
+  actor.collisionReaction = Math.max(0, reaction - delta * 2.4);
+  actor.body.position.y = 0.42 + bob + Math.sin(reaction * Math.PI) * 0.08;
 
-  if (actor.agent.behavior === 'working') {
+  if (actor.manualWalking) {
+    actor.group.rotation.z = Math.sin(phase * 2.4) * 0.055 + Math.sin(reaction * Math.PI) * 0.12;
+    actor.leftArm.rotation.x = Math.sin(phase * 5.8) * 0.42;
+    actor.rightArm.rotation.x = Math.cos(phase * 5.8) * 0.42;
+    actor.leftArm.rotation.z = 0.38;
+    actor.rightArm.rotation.z = -0.38;
+  } else if (actor.agent.behavior === 'working') {
     actor.leftArm.rotation.x = Math.sin(phase * 5) * 0.35;
     actor.rightArm.rotation.x = Math.cos(phase * 5) * 0.35;
   } else if (actor.agent.behavior === 'presenting') {
@@ -711,9 +1036,32 @@ function animateActor(actor: ActorState, time: number, delta: number, selected: 
   } else if (actor.agent.behavior === 'listening') {
     actor.group.rotation.z = Math.sin(phase * 1.4) * 0.035;
   } else if (actor.agent.behavior === 'resting' || actor.agent.behavior === 'offline') {
-    actor.group.rotation.z = Math.sin(phase * 0.8) * 0.055;
+    const activity = actor.agent.loungeActivity ?? 'wandering';
+    actor.group.rotation.z = Math.sin(phase * 0.8) * 0.045 + Math.sin(reaction * Math.PI) * 0.16;
     actor.leftArm.rotation.z = 0.55;
     actor.rightArm.rotation.z = -0.55;
+    if (activity === 'coffee' || activity === 'hydrating') {
+      actor.rightArm.rotation.z = -0.85 + Math.sin(phase * 2.4) * 0.12;
+      actor.rightArm.rotation.x = -0.6 + Math.sin(phase * 2.4) * 0.22;
+      actor.activityProp.position.y = Math.sin(phase * 2.4) * 0.04;
+    } else if (activity === 'charging') {
+      const material = actor.face.material as THREE.MeshStandardMaterial;
+      material.emissiveIntensity = 0.45 + Math.abs(Math.sin(phase * 1.7)) * 0.55;
+      actor.activityProp.rotation.z += delta * 1.8;
+    } else if (activity === 'napping') {
+      actor.group.rotation.z = 0.18 + Math.sin(phase * 0.45) * 0.035 + Math.sin(reaction * Math.PI) * 0.16;
+      actor.leftArm.rotation.z = 0.75;
+      actor.rightArm.rotation.z = -0.75;
+      actor.activityProp.position.y = Math.sin(phase * 0.8) * 0.05;
+    } else if (activity === 'chatting') {
+      actor.group.rotation.y = Math.sin(phase * 1.2) * 0.18;
+      actor.leftArm.rotation.z = 0.35 + Math.sin(phase * 2.3) * 0.16;
+      actor.activityProp.scale.setScalar(1 + Math.abs(Math.sin(phase * 1.6)) * 0.1);
+    } else if (activity === 'reading') {
+      actor.leftArm.rotation.z = 0.25;
+      actor.rightArm.rotation.z = -0.25;
+      actor.group.rotation.z = Math.sin(phase * 0.6) * 0.025 + Math.sin(reaction * Math.PI) * 0.16;
+    }
   } else if (actor.agent.behavior === 'stuck') {
     const material = actor.face.material as THREE.MeshStandardMaterial;
     material.emissiveIntensity = 0.3 + Math.abs(Math.sin(phase * 4)) * 1.1;
@@ -721,7 +1069,7 @@ function animateActor(actor: ActorState, time: number, delta: number, selected: 
 
   const scale = actor.baseScale * (selected ? 1.14 : 1);
   actor.group.scale.lerp(new THREE.Vector3(scale, scale, scale), 0.12);
-  actor.label.visible = selected || actor.agent.behavior === 'presenting';
+  actor.label.visible = true;
 }
 
 function handleSceneClick(
@@ -733,6 +1081,7 @@ function handleSceneClick(
 ): void {
   if (event.button !== 0) return;
   container.focus();
+  if (state.cameraMode === 'first-person') return;
   const rect = container.getBoundingClientRect();
   state.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   state.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -744,7 +1093,24 @@ function handleSceneClick(
     return;
   }
   const hit = hits.find((item) => typeof item.object.userData.agentId === 'string');
-  onSelectAgent(hit ? String(hit.object.userData.agentId) : null);
+  if (hit) {
+    onSelectAgent(String(hit.object.userData.agentId));
+    return;
+  }
+
+  const groundPoint = new THREE.Vector3();
+  const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -OFFICE_AGENT_GROUND_Y);
+  state.raycaster.ray.intersectPlane(groundPlane, groundPoint);
+  let nearestAgentId: string | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  state.actors.forEach((actor) => {
+    const distance = Math.hypot(actor.group.position.x - groundPoint.x, actor.group.position.z - groundPoint.z);
+    if (distance < nearestDistance) {
+      nearestAgentId = actor.agent.agentId;
+      nearestDistance = distance;
+    }
+  });
+  onSelectAgent(nearestDistance <= 1.45 ? nearestAgentId : null);
 }
 
 export default function OfficeScene({
@@ -777,6 +1143,9 @@ export default function OfficeScene({
 
   useEffect(() => {
     selectedRef.current = selectedAgentId;
+    if (stateRef.current) {
+      stateRef.current.controlledAgentId = selectedAgentId;
+    }
   }, [selectedAgentId]);
 
   useEffect(() => {
@@ -855,6 +1224,13 @@ export default function OfficeScene({
           resetCameraControl(state, container);
           return;
         }
+        if (key === 'v') {
+          event.preventDefault();
+          selectedRef.current = null;
+          onSelectAgent(null);
+          resetCameraControl(state, container);
+          return;
+        }
         if (!directionForKey(key)) return;
         event.preventDefault();
         state.pressedKeys.add(key);
@@ -863,9 +1239,17 @@ export default function OfficeScene({
         state.pressedKeys.delete(event.key.toLowerCase());
       };
       const onWindowKeyDown = (event: KeyboardEvent) => {
-        if (event.key !== ' ') return;
-        event.preventDefault();
-        resetCameraControl(state, container);
+        if (event.key === ' ') {
+          event.preventDefault();
+          resetCameraControl(state, container);
+          return;
+        }
+        if (event.key.toLowerCase() === 'v') {
+          event.preventDefault();
+          selectedRef.current = null;
+          onSelectAgent(null);
+          resetCameraControl(state, container);
+        }
       };
 
       container.addEventListener('pointerdown', onPointerDown);
@@ -883,10 +1267,21 @@ export default function OfficeScene({
         if (disposed) return;
         const delta = Math.min(0.05, (now - state.lastTime) / 1000);
         state.lastTime = now;
-        updateCameraFromKeys(state, container, delta);
+        moveSelectedActorFromKeys(state, selectedRef.current, delta);
+        if (!selectedRef.current) {
+          updateCameraFromKeys(state, container, delta);
+        }
         state.actors.forEach((actor) => {
           animateActor(actor, now, delta, actor.agent.agentId === selectedRef.current);
+          enforceActorGrounding(actor);
         });
+        resolveActorCollisions(state.actors);
+        const selectedActor = selectedRef.current ? state.actors.get(selectedRef.current) : null;
+        if (selectedActor) {
+          applyFirstPersonCamera(state, container, selectedActor);
+        } else if (state.cameraMode === 'first-person') {
+          resetCameraControl(state, container);
+        }
         state.renderer.render(state.scene, state.camera);
         state.frame = window.requestAnimationFrame(render);
       };

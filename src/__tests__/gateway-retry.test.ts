@@ -86,6 +86,84 @@ describe('Gateway retry state', () => {
     client.disconnect();
   });
 
+  it('accepts the connect response from an automatic reconnect attempt', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        platform: 'darwin',
+        device: {
+          signChallenge: vi.fn(async ({ nonce }: { nonce: string }) => ({
+            deviceId: 'desktop-device',
+            publicKey: 'public-key',
+            signature: 'signature',
+            signedAt: 1,
+            nonce,
+          })),
+        },
+      },
+    });
+
+    const statuses: string[] = [];
+    const retryEvents: Array<GatewayRetryInfo | null> = [];
+    const client = createGatewayClient({
+      url: 'ws://127.0.0.1:18789',
+      token: 'token',
+      onStatusChange: (status) => statuses.push(status),
+      onRetry: (info) => retryEvents.push(info),
+    });
+
+    const connectPromise = client.connect();
+    const firstSocket = FakeWebSocket.instances[0];
+    firstSocket.readyState = FakeWebSocket.OPEN;
+    firstSocket.onopen?.();
+    firstSocket.onmessage?.({
+      data: JSON.stringify({
+        type: 'event',
+        event: 'connect.challenge',
+        payload: { nonce: 'nonce-1' },
+      }),
+    } as MessageEvent);
+    await Promise.resolve();
+    firstSocket.onmessage?.({
+      data: JSON.stringify({
+        type: 'res',
+        id: 'c1',
+        ok: true,
+        payload: { server: { version: 'v1' }, policy: { tickIntervalMs: 30000 } },
+      }),
+    } as MessageEvent);
+    await expect(connectPromise).resolves.toMatchObject({ server: { version: 'v1' } });
+
+    firstSocket.close();
+    await vi.advanceTimersByTimeAsync(1000);
+
+    const secondSocket = FakeWebSocket.instances[1];
+    secondSocket.readyState = FakeWebSocket.OPEN;
+    secondSocket.onopen?.();
+    secondSocket.onmessage?.({
+      data: JSON.stringify({
+        type: 'event',
+        event: 'connect.challenge',
+        payload: { nonce: 'nonce-2' },
+      }),
+    } as MessageEvent);
+    await Promise.resolve();
+    secondSocket.onmessage?.({
+      data: JSON.stringify({
+        type: 'res',
+        id: 'c1',
+        ok: true,
+        payload: { server: { version: 'v2' }, policy: { tickIntervalMs: 30000 } },
+      }),
+    } as MessageEvent);
+
+    expect(client.getStatus()).toBe('connected');
+    expect(statuses.at(-1)).toBe('connected');
+    expect(retryEvents.at(-1)).toBeNull();
+    client.disconnect();
+  });
+
   it('can connect as a Gateway node with declared desktop capabilities', async () => {
     vi.stubGlobal('WebSocket', FakeWebSocket);
     vi.stubGlobal('window', {

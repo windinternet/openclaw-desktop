@@ -229,7 +229,7 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
   function handleResFrame(f: Record<string, unknown>): void {
     const id = String(f.id ?? '');
 
-    if (id === 'c1' && connectResolve !== null) {
+    if (id === 'c1') {
       console.log('[GatewayClient] connect response:', { ok: f.ok, error: f.error });
       if (connectTimer !== null) {
         clearTimeout(connectTimer);
@@ -245,10 +245,19 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
         retryCallback?.(null);
         resetTickTimer();
         helloCallback?.(payload);
-        connectResolve(payload);
+        connectResolve?.(payload);
       } else {
         const errInfo = f.error as GatewayError | undefined;
-        connectReject?.(new Error(errInfo?.message ?? 'Connection rejected'));
+        const message = errInfo?.message ?? 'Connection rejected';
+        if (connectReject !== null) {
+          connectReject(new Error(message));
+        } else {
+          lastCloseReason = message;
+          setStatus('error');
+          if (ws !== null && ws.readyState === WebSocket.OPEN) {
+            ws.close();
+          }
+        }
       }
       connectResolve = null;
       connectReject = null;

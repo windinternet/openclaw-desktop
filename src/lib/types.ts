@@ -512,6 +512,16 @@ export interface KanbanCard {
 
 // ── 3D Office ──────────────────────────────────────────────────────
 
+export type OfficeLoungeActivity =
+  | 'sofa'
+  | 'coffee'
+  | 'hydrating'
+  | 'charging'
+  | 'napping'
+  | 'chatting'
+  | 'reading'
+  | 'wandering';
+
 export interface OfficeAgent {
   agentId: string;
   name: string;
@@ -522,6 +532,7 @@ export interface OfficeAgent {
   color: string;
   model?: string;
   slotId?: string;
+  loungeActivity?: OfficeLoungeActivity;
   position: { x: number; y: number; z: number };
   currentTask?: string;
 }
