@@ -262,12 +262,9 @@ export default function Office3DPage() {
     setCameraResetSignal((value) => value + 1);
   };
 
-  const handleReceptionInteract = () => {
-    Toast.info({
-      content: `前台：${displayOfficeProfile.receptionGreeting}。当前 ${connectionLabel(connectionStatus)}，办公室里有 ${officeAgents.length} 个 Agent，${activeSessions} 个活跃/待命会话。工作区 ${workingCount}，会议区 ${meetingCount}，休闲区 ${loungeCount}。`,
-      duration: 6,
-    });
-  };
+  const receptionMessage = useMemo(() => {
+    return `前台：${displayOfficeProfile.receptionGreeting}。当前 ${connectionLabel(connectionStatus)}，办公室里有 ${officeAgents.length} 个 Agent，${activeSessions} 个活跃/待命会话。工作区 ${workingCount}，会议区 ${meetingCount}，休闲区 ${loungeCount}。`;
+  }, [displayOfficeProfile.receptionGreeting, connectionStatus, officeAgents, activeSessions, workingCount, meetingCount, loungeCount]);
 
   return (
     <div
@@ -309,7 +306,7 @@ export default function Office3DPage() {
           cameraResetSignal={cameraResetSignal}
           selectedAgentId={selectedAgentId}
           onSelectAgent={setSelectedAgentId}
-          onReceptionInteract={handleReceptionInteract}
+          receptionMessage={receptionMessage}
           onSceneError={setSceneError}
         />
       )}

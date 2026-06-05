@@ -29,8 +29,8 @@ interface OfficeSceneProps {
   cameraResetSignal: number;
   selectedAgentId: string | null;
   onSelectAgent: (agentId: string | null) => void;
-  onReceptionInteract: () => void;
   onSceneError: (message: string | null) => void;
+  receptionMessage?: string;
 }
 
 interface ActorState {
@@ -62,6 +62,7 @@ interface SceneState {
   firstPersonCamera: THREE.PerspectiveCamera;
   cameraMode: 'third-person' | 'first-person';
   controlledAgentId: string | null;
+  fpsExitAgentId: string | null;
   actors: Map<string, ActorState>;
   raycaster: THREE.Raycaster;
   pointer: THREE.Vector2;
@@ -310,6 +311,83 @@ function createWallText(text: string, theme: OfficeTheme): THREE.Mesh {
   mesh.castShadow = false;
   mesh.receiveShadow = false;
   return mesh;
+}
+
+
+function createSpeechBubble(text: string, theme: OfficeTheme): THREE.Sprite {
+  const fontSize = 18;
+  const maxLineWidth = 480;
+  const lineHeight = fontSize * 1.4;
+  const padding = 20;
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    const dummy = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true }));
+    dummy.scale.set(0.1, 0.1, 1);
+    return dummy;
+  }
+  ctx.font = `500 ${fontSize}px system-ui, -apple-system, sans-serif`;
+  const lines: string[] = [];
+  let currentLine = '';
+  for (const char of text) {
+    const testLine = currentLine + char;
+    const metrics = ctx.measureText(testLine);
+    if (metrics.width > maxLineWidth && currentLine) {
+      lines.push(currentLine);
+      currentLine = char;
+    } else {
+      currentLine = testLine;
+    }
+  }
+  if (currentLine) lines.push(currentLine);
+  const cw = maxLineWidth + padding * 2;
+  const ch = Math.max(60, lines.length * lineHeight + padding * 2 + 20);
+  canvas.width = cw;
+  canvas.height = ch;
+  ctx.clearRect(0, 0, cw, ch);
+  const bg = theme.mode === 'light' ? '#ffffff' : '#1e293b';
+  const fg = theme.mode === 'light' ? '#0f172a' : '#f1f5f9';
+  ctx.fillStyle = bg;
+  ctx.strokeStyle = theme.scene.accent;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(padding / 2, 0, cw - padding, ch - 20, 14);
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cw / 2 - 10, ch - 20);
+  ctx.lineTo(cw / 2, ch);
+  ctx.lineTo(cw / 2 + 10, ch - 20);
+  ctx.fill();
+  ctx.fillStyle = fg;
+  ctx.font = `500 ${fontSize}px system-ui, -apple-system, sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  lines.forEach((line, i) => { ctx.fillText(line, padding, padding + i * lineHeight); });
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true }));
+  const aspect = cw / ch;
+  sprite.scale.set(3.2, 3.2 / aspect, 1);
+  return sprite;
+}
+
+function showReceptionBubble(state: SceneState, text: string, theme: OfficeTheme): void {
+  const existing = state.scene.getObjectByName('reception-bubble');
+  if (existing) {
+    state.scene.remove(existing);
+    (existing as THREE.Sprite).material.map?.dispose();
+    (existing as THREE.Sprite).material.dispose();
+  }
+  const bubble = createSpeechBubble(text, theme);
+  bubble.name = 'reception-bubble';
+  bubble.position.set(-1.25, 2.2, -3.95);
+  state.scene.add(bubble);
+  setTimeout(() => {
+    state.scene.remove(bubble);
+    bubble.material.map?.dispose();
+    bubble.material.dispose();
+  }, 8000);
 }
 
 function markAgentObject(object: THREE.Object3D, agentId: string): void {
@@ -705,6 +783,7 @@ function createScene(container: HTMLDivElement, theme: OfficeTheme, companyName:
     firstPersonCamera,
     cameraMode: 'third-person' as const,
     controlledAgentId: null,
+    fpsExitAgentId: null,
     actors: new Map(),
     raycaster: new THREE.Raycaster(),
     pointer: new THREE.Vector2(),
@@ -762,7 +841,16 @@ function setCameraControl(state: SceneState, container: HTMLDivElement, next: Of
 }
 
 function resetCameraControl(state: SceneState, container: HTMLDivElement): void {
+  const exitId = state.fpsExitAgentId ?? state.controlledAgentId;
+  if (exitId) {
+    const prevActor = state.actors.get(exitId);
+    if (prevActor) {
+      prevActor.manualWalking = false;
+      prevActor.target.copy(prevActor.group.position);
+    }
+  }
   state.controlledAgentId = null;
+  state.fpsExitAgentId = null;
   state.pressedKeys.clear();
   state.middleDrag.active = false;
   state.leftDrag.active = false;
@@ -826,9 +914,9 @@ function moveSelectedActorFromKeys(state: SceneState, selectedAgentId: string | 
   if (!actor) return;
   actor.manualWalking = true;
   actor.nextLeisureDecisionAt = Number.POSITIVE_INFINITY;
-
+  actor.isPlayerControlled = true;
   // Always face camera direction via direct Y rotation (avoids lookAt quirk)
-  actor.group.rotation.y = Math.PI - state.cameraControl.azimuth;
+  actor.group.rotation.y = state.cameraControl.azimuth + Math.PI;
   const cameraForward = new THREE.Vector3(-Math.sin(state.cameraControl.azimuth), 0, -Math.cos(state.cameraControl.azimuth));
   actor.lastMoveDirection.copy(cameraForward);
   actor.target.copy(actor.group.position); // keep target synced
@@ -838,13 +926,13 @@ function moveSelectedActorFromKeys(state: SceneState, selectedAgentId: string | 
 
   // FPS move
   const nextTarget = actor.group.position.clone().addScaledVector(move, delta * MANUAL_AGENT_WALK_SPEED);
-  nextTarget.y = OFFICE_AGENT_GROUND_Y;
+  if (nextTarget.y < OFFICE_AGENT_GROUND_Y) nextTarget.y = OFFICE_AGENT_GROUND_Y;
   clampFreeRoamVector(nextTarget);
-  if (isFreeRoamPointBlocked(nextTarget.x, nextTarget.z, 0.02)) return;
+  if (isFreeRoamPointBlocked(nextTarget.x, nextTarget.z, 0.02, actor.group.position.y)) return;
 
   actor.group.position.copy(nextTarget);
   actor.target.copy(nextTarget);
-  actor.group.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI - state.cameraControl.azimuth);
+  actor.group.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), state.cameraControl.azimuth + Math.PI);
 }
 
 // FPS first-person camera: camera at agent head, look direction from azimuth/elevation
@@ -916,18 +1004,33 @@ function clampFreeRoamVector(vector: THREE.Vector3): void {
   vector.z = Math.min(OFFICE_FREE_ROAM_BOUNDS.maxZ, Math.max(OFFICE_FREE_ROAM_BOUNDS.minZ, vector.z));
 }
 
-function isFreeRoamPointBlocked(x: number, z: number, padding = 0): boolean {
+function isFreeRoamPointBlocked(x: number, z: number, padding = 0, actorY?: number): boolean {
   return OFFICE_SCENE_COLLISION_VOLUMES.some((volume) => {
+    if (actorY !== undefined && volume.height && actorY > volume.height + 0.05) return false;
     const distance = Math.hypot(x - volume.x, z - volume.z);
     return distance < OFFICE_AGENT_COLLISION_RADIUS + volume.radius + padding;
   });
 }
 
+function getLandingSurfaceY(actor: ActorState): number {
+  for (const volume of OFFICE_SCENE_COLLISION_VOLUMES) {
+    if (!volume.height) continue;
+    const distance = Math.hypot(actor.group.position.x - volume.x, actor.group.position.z - volume.z);
+    if (distance < OFFICE_AGENT_COLLISION_RADIUS + volume.radius) {
+      if (actor.group.position.y >= volume.height - 0.05 && actor.group.position.y <= volume.height + 0.5) {
+        return volume.height;
+      }
+    }
+  }
+  return OFFICE_AGENT_GROUND_Y;
+}
+
 function enforceActorGrounding(actor: ActorState): void {
-  actor.group.position.y = Math.max(actor.group.position.y, OFFICE_AGENT_GROUND_Y);
-  actor.target.y = OFFICE_AGENT_GROUND_Y;
-  if (actor.group.position.y < OFFICE_AGENT_GROUND_Y) {
-    actor.group.position.y = OFFICE_AGENT_GROUND_Y;
+  const surfaceY = getLandingSurfaceY(actor);
+  actor.group.position.y = Math.max(actor.group.position.y, surfaceY);
+  actor.target.y = surfaceY;
+  if (actor.group.position.y < surfaceY) {
+    actor.group.position.y = surfaceY;
   }
   if (!actor.isPlayerControlled) {
     actor.group.rotation.x = 0;
@@ -1026,8 +1129,9 @@ function animateActor(actor: ActorState, time: number, delta: number, selected: 
   if (actor.jumpVelocity !== 0 || actor.group.position.y > OFFICE_AGENT_GROUND_Y) {
     actor.group.position.y += actor.jumpVelocity;
     actor.jumpVelocity -= 0.004; // gravity
-    if (actor.group.position.y <= OFFICE_AGENT_GROUND_Y) {
-      actor.group.position.y = OFFICE_AGENT_GROUND_Y;
+    const landY = getLandingSurfaceY(actor);
+    if (actor.group.position.y <= landY) {
+      actor.group.position.y = landY;
       actor.jumpVelocity = 0;
     }
   }
@@ -1086,7 +1190,7 @@ function animateActor(actor: ActorState, time: number, delta: number, selected: 
       actor.rightArm.rotation.z = -0.75;
       actor.activityProp.position.y = Math.sin(phase * 0.8) * 0.05;
     } else if (activity === 'chatting') {
-      actor.group.rotation.y = Math.sin(phase * 1.2) * 0.18;
+      if (!actor.isPlayerControlled) actor.group.rotation.y = Math.sin(phase * 1.2) * 0.18;
       actor.leftArm.rotation.z = 0.35 + Math.sin(phase * 2.3) * 0.16;
       actor.activityProp.scale.setScalar(1 + Math.abs(Math.sin(phase * 1.6)) * 0.1);
     } else if (activity === 'reading') {
@@ -1109,7 +1213,7 @@ function handleSceneClick(
   state: SceneState,
   container: HTMLDivElement,
   onSelectAgent: (agentId: string | null) => void,
-  onReceptionInteract: () => void,
+  showBubble: () => void,
 ): void {
   if (event.button !== 0) return;
   container.focus();
@@ -1121,7 +1225,7 @@ function handleSceneClick(
   const hits = state.raycaster.intersectObjects(state.scene.children, true);
   const actionHit = hits.find((item) => item.object.userData.officeAction === 'reception');
   if (actionHit) {
-    onReceptionInteract();
+    showBubble();
     return;
   }
   const hit = hits.find((item) => typeof item.object.userData.agentId === 'string');
@@ -1154,10 +1258,13 @@ export default function OfficeScene({
   cameraResetSignal,
   selectedAgentId,
   onSelectAgent,
-  onReceptionInteract,
   onSceneError,
-}: OfficeSceneProps) {
+  receptionMessage,}: OfficeSceneProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const onSelectRef = useRef(onSelectAgent);
+  const onSceneErrorRef = useRef(onSceneError);
+  const receptionInfoRef = useRef(receptionMessage ?? '');
+  const themeRef = useRef(theme);
   const stateRef = useRef<SceneState | null>(null);
   const agentsRef = useRef<OfficeAgent[]>(agents);
   const selectedRef = useRef<string | null>(selectedAgentId);
@@ -1168,6 +1275,7 @@ export default function OfficeScene({
     [disconnected],
   );
 
+  useEffect(() => { agentsRef.current = agents; onSelectRef.current = onSelectAgent; onSceneErrorRef.current = onSceneError; receptionInfoRef.current = receptionMessage ?? ''; themeRef.current = theme; });
   useEffect(() => {
     agentsRef.current = agents;
     const state = stateRef.current;
@@ -1199,13 +1307,14 @@ export default function OfficeScene({
       stateRef.current = state;
       updateActors(state, agentsRef.current, theme);
       resizeScene(state, container);
-      onSceneError(null);
+      onSceneErrorRef.current(null);
 
       const resizeObserver = new ResizeObserver(() => resizeScene(state, container));
       resizeObserver.observe(container);
 
+      const showBubble = () => { showReceptionBubble(state, receptionInfoRef.current, themeRef.current); };
       const onPointerDown = (event: PointerEvent) => (
-        handleSceneClick(event, state, container, onSelectAgent, onReceptionInteract)
+        handleSceneClick(event, state, container, onSelectRef.current, showBubble)
       );
       const onMouseDown = (event: MouseEvent) => {
         event.preventDefault();
@@ -1275,7 +1384,7 @@ export default function OfficeScene({
         if (key === 'v') {
           event.preventDefault();
           selectedRef.current = null;
-          onSelectAgent(null);
+          onSelectRef.current(null);
           document.exitPointerLock();
           resetCameraControl(state, container);
           return;
@@ -1293,7 +1402,7 @@ export default function OfficeScene({
           document.exitPointerLock();
           if (state.cameraMode === 'first-person') {
             selectedRef.current = null;
-            onSelectAgent(null);
+            onSelectRef.current(null);
           }
           resetCameraControl(state, container);
           return;
@@ -1309,7 +1418,7 @@ export default function OfficeScene({
         if (event.key.toLowerCase() === 'v') {
           event.preventDefault();
           selectedRef.current = null;
-          onSelectAgent(null);
+          onSelectRef.current(null);
           resetCameraControl(state, container);
         }
       };
@@ -1329,6 +1438,7 @@ export default function OfficeScene({
         if (disposed) return;
         const delta = Math.min(0.05, (now - state.lastTime) / 1000);
         state.lastTime = now;
+        state.fpsExitAgentId = state.controlledAgentId;
         moveSelectedActorFromKeys(state, selectedRef.current, delta);
         if (!selectedRef.current) {
           updateCameraFromKeys(state, container, delta);
@@ -1368,9 +1478,9 @@ export default function OfficeScene({
         stateRef.current = null;
       };
     } catch (error) {
-      onSceneError(error instanceof Error ? error.message : '3D scene initialization failed');
+      onSceneErrorRef.current(error instanceof Error ? error.message : '3D scene initialization failed');
     }
-  }, [companyName, onReceptionInteract, onSceneError, onSelectAgent, theme]);
+  }, [companyName, theme]);
 
   return (
     <div

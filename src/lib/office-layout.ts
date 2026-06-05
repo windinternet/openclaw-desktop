@@ -8,6 +8,7 @@ export interface MovementProfile {
 }
 
 export interface OfficeCollisionVolume {
+  height: number;       // top-surface Y; actor above this can pass over / land on
   id: string;
   x: number;
   z: number;
@@ -50,30 +51,30 @@ export const OFFICE_FREE_ROAM_BOUNDS = {
 };
 
 export const LOUNGE_COLLISION_VOLUMES: OfficeCollisionVolume[] = [
-  { id: 'lounge-sofa', x: -7.15, z: 6.18, radius: 0.44 },
-  { id: 'lounge-coffee-table', x: -7.05, z: 4.12, radius: 0.72 },
-  { id: 'lounge-water-dispenser', x: -9.25, z: 5.18, radius: 0.42 },
-  { id: 'lounge-coffee-bar', x: -5.35, z: 5.72, radius: 0.58 },
-  { id: 'lounge-charging-mat', x: -6.15, z: 1.75, radius: 0.58 },
-  { id: 'lounge-floor-lamp', x: -4.75, z: 5.15, radius: 0.36 },
-  { id: 'lounge-plant', x: -9.05, z: 2.0, radius: 0.38 },
+  { id: 'lounge-sofa', x: -7.15, z: 6.18, radius: 0.44, height: 0.52 },
+  { id: 'lounge-coffee-table', x: -7.05, z: 4.12, radius: 0.72, height: 0.37 },
+  { id: 'lounge-water-dispenser', x: -9.25, z: 5.18, radius: 0.42, height: 0.52 },
+  { id: 'lounge-coffee-bar', x: -5.35, z: 5.72, radius: 0.58, height: 0.52 },
+  { id: 'lounge-charging-mat', x: -6.15, z: 1.75, radius: 0.58, height: 0.52 },
+  { id: 'lounge-floor-lamp', x: -4.75, z: 5.15, radius: 0.36, height: 0.52 },
+  { id: 'lounge-plant', x: -9.05, z: 2.0, radius: 0.38, height: 0.52 },
 ];
 
 export const OFFICE_SCENE_COLLISION_VOLUMES: OfficeCollisionVolume[] = [
   ...LOUNGE_COLLISION_VOLUMES,
-  { id: 'reception-desk', x: -1.25, z: -4.8, radius: 1.15 },
-  { id: 'meeting-table', x: -1.0, z: 3.5, radius: 1.28 },
-  { id: 'meeting-board', x: 1.9, z: 6.25, radius: 0.72 },
-  { id: 'work-desk-1', x: 5.0, z: 0.45, radius: 0.38 },
-  { id: 'work-desk-2', x: 7.0, z: 0.45, radius: 0.38 },
-  { id: 'work-desk-3', x: 5.0, z: 2.35, radius: 0.38 },
-  { id: 'work-desk-4', x: 7.0, z: 2.35, radius: 0.38 },
-  { id: 'work-desk-5', x: 5.0, z: 4.25, radius: 0.38 },
-  { id: 'work-desk-6', x: 7.0, z: 4.25, radius: 0.38 },
-  { id: 'left-wall', x: -9.7, z: 0.45, radius: 0.34 },
-  { id: 'right-wall', x: 9.7, z: 0.45, radius: 0.34 },
-  { id: 'back-wall', x: 0, z: 7.05, radius: 0.36 },
-  { id: 'front-wall', x: -1.25, z: -6.02, radius: 0.36 },
+  { id: 'reception-desk', x: -1.25, z: -4.8, radius: 1.15, height: 0.52 },
+  { id: 'meeting-table', x: -1.0, z: 3.5, radius: 1.28, height: 0.37 },
+  { id: 'meeting-board', x: 1.9, z: 6.25, radius: 0.72, height: 0.52 },
+  { id: 'work-desk-1', x: 5.0, z: 0.45, radius: 0.38, height: 0.37 },
+  { id: 'work-desk-2', x: 7.0, z: 0.45, radius: 0.38, height: 0.37 },
+  { id: 'work-desk-3', x: 5.0, z: 2.35, radius: 0.38, height: 0.37 },
+  { id: 'work-desk-4', x: 7.0, z: 2.35, radius: 0.38, height: 0.37 },
+  { id: 'work-desk-5', x: 5.0, z: 4.25, radius: 0.38, height: 0.37 },
+  { id: 'work-desk-6', x: 7.0, z: 4.25, radius: 0.38, height: 0.37 },
+  { id: 'left-wall', x: -9.7, z: 0.45, radius: 0.34, height: 4.0 },
+  { id: 'right-wall', x: 9.7, z: 0.45, radius: 0.34, height: 4.0 },
+  { id: 'back-wall', x: 0, z: 7.05, radius: 0.36, height: 4.0 },
+  { id: 'front-wall', x: -1.25, z: -6.02, radius: 0.36, height: 4.0 },
 ];
 
 const WORK_SLOTS: OfficeSlot[] = [
@@ -209,6 +210,7 @@ export function assignOfficeLayout(agents: OfficeAgent[]): OfficeAgent[] {
         x: placement.position.x,
         z: placement.position.z,
         radius: OFFICE_AGENT_COLLISION_RADIUS,
+        height: OFFICE_AGENT_GROUND_Y,
       });
 
       return {
