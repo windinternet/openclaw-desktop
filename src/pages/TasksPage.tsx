@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useState, useEffect, useCallback, useMemo } from 'react';
+import { forwardRef, useImperativeHandle, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Table,
   Button,
@@ -19,8 +19,13 @@ import {
   IconAlertCircle,
   IconTickCircle,
   IconMinusCircle,
+  IconBolt,
+  IconComment,
 } from '@douyinfe/semi-icons';
 import { useStore } from '../lib';
+import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway, filterUserVisibleSessions } from '../lib/ai-action-center';
+import { upsertAiActionRun } from '../lib/ai-action-run-store';
+import type { AiActionRun } from '../lib/types';
 import type { CronJob, CronRun } from '../lib/types';
 
 const { Text } = Typography;
@@ -80,8 +85,21 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
   const runCronJob = useStore((s) => s.runCronJob);
   const fetchCronRuns = useStore((s) => s.fetchCronRuns);
 
+  const sessions = filterUserVisibleSessions(useStore((s) => s.sessions));
+  const realApiRef = useRef<any>(null);
+
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [editJob, setEditJob] = useState<CronJob | null>(null);
+  const [magicLoading, setMagicLoading] = useState(false);
+
+  // -- form state --
+  const [titleDraft, setTitleDraft] = useState('');
+  const [promptDraft, setPromptDraft] = useState('');
+  const [scheduleDraft, setScheduleDraft] = useState('');
+  const [agentIdDraft, setAgentIdDraft] = useState<string | undefined>(undefined);
+  const [deliveryModeDraft, setDeliveryModeDraft] = useState('none');
+  const [deliveryToDraft, setDeliveryToDraft] = useState('');
+  const [deliveryTargetDraft, setDeliveryTargetDraft] = useState('');
   const [expandedRowKeys, setExpandedRowKeys] = useState<string[]>([]);
   const [runHistory, setRunHistory] = useState<Record<string, CronRun[]>>({});
   const [runningJobs, setRunningJobs] = useState<Set<string>>(new Set());
@@ -102,58 +120,90 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
     openAdd: () => setAddModalVisible(true),
   }), [fetchCronJobs]);
 
-  const handleAdd = useCallback(
-    async (values: Record<string, unknown>) => {
-      const job = {
-        title: String(values.title ?? ''),
-        schedule: String(values.schedule ?? ''),
-        enabled: true,
-        agentId: values.agentId ? String(values.agentId) : undefined,
-        delivery:
-          values.deliveryMode && values.deliveryMode !== 'none'
-            ? {
-                mode: values.deliveryMode as 'announce' | 'none' | 'webhook',
-                target: values.deliveryTarget ? String(values.deliveryTarget) : undefined,
-                to: values.deliveryTo ? String(values.deliveryTo) : undefined,
-              }
-            : { mode: 'none' as const },
-      };
-      try {
-        await createCronJob(job);
-        Toast.success('定时任务已创建');
-        setAddModalVisible(false);
-      } catch {
-        Toast.error('创建失败');
-      }
-    },
-    [createCronJob],
-  );
+  const handleAdd = useCallback(async () => {
+    if (!scheduleDraft.trim()) { Toast.error('请输入 Cron 表达式'); return; }
+    const job: any = {
+      title: titleDraft || '',
+      prompt: promptDraft || undefined,
+      schedule: scheduleDraft.trim(),
+      enabled: true,
+      agentId: agentIdDraft || undefined,
+      delivery: deliveryModeDraft !== 'none'
+        ? { mode: deliveryModeDraft as 'announce' | 'webhook', target: deliveryTargetDraft || undefined, to: deliveryToDraft || undefined }
+        : { mode: 'none' as const },
+    };
+    try { await createCronJob(job); Toast.success('定时任务已创建'); setAddModalVisible(false); } catch { Toast.error('创建失败'); }
+  }, [createCronJob, titleDraft, promptDraft, scheduleDraft, agentIdDraft, deliveryModeDraft, deliveryToDraft, deliveryTargetDraft]);
 
-  const handleEdit = useCallback(
-    async (values: Record<string, unknown>) => {
-      if (!editJob) return;
-      try {
-        await updateCronJob(editJob.id, {
-          title: String(values.title ?? ''),
-          schedule: String(values.schedule ?? ''),
-          agentId: values.agentId ? String(values.agentId) : undefined,
-          delivery:
-            values.deliveryMode && values.deliveryMode !== 'none'
-              ? {
-                  mode: values.deliveryMode as 'announce' | 'none' | 'webhook',
-                  target: values.deliveryTarget ? String(values.deliveryTarget) : undefined,
-                  to: values.deliveryTo ? String(values.deliveryTo) : undefined,
-                }
-              : { mode: 'none' as const },
-        });
-        Toast.success('定时任务已更新');
-        setEditJob(null);
-      } catch {
-        Toast.error('更新失败');
+  const handleEdit = useCallback(async () => {
+    if (!editJob) return;
+    try {
+      await updateCronJob(editJob.id, {
+        title: '',
+        prompt: promptDraft || undefined,
+        schedule: scheduleDraft.trim(),
+        agentId: agentIdDraft || undefined,
+        delivery: deliveryModeDraft !== 'none'
+          ? { mode: deliveryModeDraft as 'announce' | 'webhook', target: deliveryTargetDraft || undefined, to: deliveryToDraft || undefined }
+          : { mode: 'none' as const },
+      } as any);
+      Toast.success('定时任务已更新');
+      setEditJob(null);
+    } catch { Toast.error('更新失败'); }
+  }, [editJob, updateCronJob, titleDraft, promptDraft, scheduleDraft, agentIdDraft, deliveryModeDraft, deliveryToDraft, deliveryTargetDraft]);
+
+  const handleMagicFill = useCallback(async () => {
+    const st = useStore.getState();
+    const client = st.activeClient?.getStatus() === 'connected' ? st.activeClient : null;
+    if (!promptDraft.trim()) { Toast.warning('请先填写任务内容'); return; }
+    if (!client || !st.currentInstanceId) { Toast.error('未连接到 Gateway'); return; }
+    const instanceId = st.currentInstanceId;
+
+    setMagicLoading(true);
+    try {
+      const run = createAiActionRun({ type: 'cron-task-parser', sourcePage: 'tasks', instanceId, input: promptDraft });
+      await upsertAiActionRun(instanceId, run);
+      const executed = await executeAiActionRunWithGateway(client, run, {
+        title: '解析定时任务',
+        prompt: 'Extract cron job params from: ' + promptDraft + '\nReturn ONLY inside \x60\x60\x60ai-action\n{"kind":"completed","summary":"...","result":{"cronPrompt":"...","schedule":"cron expr","deliveryMode":"announce|none|webhook","deliverySessionKey":""}}\n\x60\x60\x60',
+      });
+
+      let synced: AiActionRun = executed;
+      const deadline = Date.now() + 60000;
+      while (Date.now() < deadline) {
+        synced = await syncAiActionRunWithGateway(client, synced);
+        if (synced.status === 'done' || synced.status === 'failed' || synced.status === 'cancelled') { await upsertAiActionRun(instanceId, synced); break; }
+        await new Promise((r) => setTimeout(r, 2000));
       }
-    },
-    [editJob, updateCronJob],
-  );
+
+      if (synced.status !== 'done') { Toast.error('AI 解析未完成'); return; }
+
+      // Parse
+      const text = synced.lastAssistantResponse ?? '';
+      let obj: any = null;
+      const blocks = Array.from(text.matchAll(/```(?:json|ai-action)\s*([\s\S]*?)```/gi));
+      for (let i = blocks.length - 1; i >= 0 && !obj; i--) { try { const p = JSON.parse(blocks[i][1].trim()); obj = p?.result ?? p; } catch {} }
+      if (!obj) { Toast.error('解析失败'); return; }
+
+      // Apply to BOTH state and form
+      if (typeof obj.title === 'string' && obj.title) setTitleDraft(obj.title);
+      if (typeof obj.cronPrompt === 'string' && obj.cronPrompt) setPromptDraft(obj.cronPrompt);
+      if (typeof obj.schedule === 'string' && obj.schedule) setScheduleDraft(obj.schedule);
+      if (obj.deliveryMode === 'announce' || obj.deliveryMode === 'webhook') setDeliveryModeDraft(obj.deliveryMode);
+      if (typeof obj.deliverySessionKey === 'string' && obj.deliverySessionKey) setDeliveryToDraft(obj.deliverySessionKey);
+
+      // Also push to Semi Design Form via the real API
+      const fields: Record<string, unknown> = {};
+      if (obj.cronPrompt) fields.prompt = obj.cronPrompt;
+      if (obj.schedule) fields.schedule = obj.schedule;
+      if (obj.deliveryMode) fields.deliveryMode = obj.deliveryMode;
+      if (obj.deliverySessionKey) fields.deliveryTo = obj.deliverySessionKey;
+      realApiRef.current?.setValues(fields);
+
+      Toast.success('已填写任务内容');
+    } catch (err) { console.error('[magicFill]', err); Toast.error('解析出错'); }
+    finally { setMagicLoading(false); }
+  }, [promptDraft]);
 
   const handleDelete = useCallback(
     (job: CronJob) => {
@@ -352,12 +402,30 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
         field="title"
         label="标题"
         placeholder="定时任务名称"
+        onChange={(v: string) => setTitleDraft(v)}
         rules={[{ required: false }]}
+      />
+      <Form.TextArea
+        field="prompt"
+        label={<span style={{ fontWeight: 600, fontSize: 15 }}>⭐ 任务内容</span>}
+        placeholder="例如：每天上午9点在团队频道发送晨会摘要…"
+        rules={[{ required: true, message: '请填写任务内容' }]}
+        style={{ minHeight: 120, fontSize: 14 }}
+        onChange={(v: string) => setPromptDraft(v)}
+        extraText={
+          <Space>
+            <Text type="tertiary" size="small">定时触发时发送给 Agent 的指令</Text>
+            <Button icon={<IconBolt />} size="small" type="primary" theme="light" loading={magicLoading} onClick={handleMagicFill}>
+              {magicLoading ? 'AI 解析中…' : '✨ 魔法填充'}
+            </Button>
+          </Space>
+        }
       />
       <Form.Input
         field="schedule"
         label="Cron 表达式"
         placeholder="例如: 0 */6 * * *"
+        onChange={(v: string) => setScheduleDraft(v)}
         rules={[{ required: true, message: '请输入 Cron 表达式' }]}
         extraText={
           <Text type="tertiary" size="small">
@@ -369,6 +437,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
         field="agentId"
         label="Agent"
         placeholder="选择 Agent（可选）"
+        onChange={(v: any) => setAgentIdDraft(v || undefined)}
         style={{ width: '100%' }}
         showClear
       >
@@ -383,16 +452,39 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
         label="投递方式"
         placeholder="选择投递方式"
         style={{ width: '100%' }}
-        initValue="none"
+        onChange={(v: any) => setDeliveryModeDraft(String(v ?? 'none'))}
       >
         <Form.Select.Option value="none">无</Form.Select.Option>
-        <Form.Select.Option value="announce">Announce</Form.Select.Option>
-        <Form.Select.Option value="webhook">Webhook</Form.Select.Option>
+        <Form.Select.Option value="announce">Announce（发送到聊天）</Form.Select.Option>
+        <Form.Select.Option value="webhook">Webhook（发送到 URL）</Form.Select.Option>
       </Form.Select>
+
+      <Form.Select
+        field="deliveryTo"
+        label="目标会话"
+        placeholder="选择要投递到的会话"
+        style={{ width: '100%' }}
+        onChange={(v: any) => setDeliveryToDraft(String(v ?? ''))}
+        showClear
+      >
+        {sessions.filter((s: any) => s.key || s.sessionKey).map((s: any) => (
+          <Form.Select.Option key={s.key || s.sessionKey || ''} value={s.key || s.sessionKey || ''}>
+            <Tooltip content={<div style={{ fontSize: 12, lineHeight: 1.6 }}><div>Key: {s.key || s.sessionKey || '-'}</div><div>Agent: {s.agentId || '-'}</div><div>状态: {s.status || '-'}</div></div>}>
+              <Space>
+                <IconComment style={{ color: 'var(--semi-color-primary)' }} />
+                <span>{s.title || s.label || s.sessionKey || s.key || '未命名会话'}</span>
+                <Tag size="small" color="blue" type="light">{s.status || 'active'}</Tag>
+              </Space>
+            </Tooltip>
+          </Form.Select.Option>
+        ))}
+      </Form.Select>
+
       <Form.Input
         field="deliveryTarget"
-        label="投递目标"
-        placeholder="Announce 模式下的目标（可选）"
+        label="Webhook URL"
+        placeholder="Webhook 模式下的回调 URL"
+        onChange={(v: string) => setDeliveryTargetDraft(v)}
         rules={[{ required: false }]}
       />
       {!isEdit && (
@@ -548,7 +640,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
         width={520}
         destroyOnClose
       >
-        <Form onSubmit={handleAdd} labelPosition="top" labelWidth={100}>
+        <Form getFormApi={(api: any) => { realApiRef.current = api; }} labelPosition="top" labelWidth={100}>
           {cronFormFields(false)}
           <div
             style={{
@@ -559,7 +651,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
             }}
           >
             <Button onClick={() => setAddModalVisible(false)}>取消</Button>
-            <Button type="primary" htmlType="submit">
+            <Button type="primary" onClick={handleAdd}>
               保存
             </Button>
           </div>
@@ -577,7 +669,6 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
       >
         {editJob && (
           <Form
-            onSubmit={handleEdit}
             labelPosition="top"
             labelWidth={100}
             initValues={{
@@ -599,7 +690,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
               }}
             >
               <Button onClick={() => setEditJob(null)}>取消</Button>
-              <Button type="primary" htmlType="submit">
+              <Button type="primary" onClick={handleEdit}>
                 保存
               </Button>
             </div>

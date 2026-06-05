@@ -293,6 +293,7 @@ export interface AgentEventPayload {
 export interface CronJob {
   id: string;
   title?: string;
+  prompt?: string;
   schedule: string;
   enabled: boolean;
   agentId?: string;
