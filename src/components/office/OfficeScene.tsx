@@ -52,6 +52,7 @@ interface ActorState {
   isPlayerControlled: boolean;
   lastMoveDirection: THREE.Vector3;
   jumpVelocity: number;
+  isNpc: boolean;
 }
 
 interface SceneState {
@@ -63,6 +64,11 @@ interface SceneState {
   cameraMode: 'third-person' | 'first-person';
   controlledAgentId: string | null;
   fpsExitAgentId: string | null;
+  currentTheme: OfficeTheme | null;
+  cleanerWaypointIndex: number;
+  interactPrompt: THREE.Sprite | null;
+  interactRing: THREE.Mesh | null;
+  bodyGlow: THREE.Mesh | null;
   actors: Map<string, ActorState>;
   raycaster: THREE.Raycaster;
   pointer: THREE.Vector2;
@@ -314,6 +320,69 @@ function createWallText(text: string, theme: OfficeTheme): THREE.Mesh {
 }
 
 
+
+
+const CLEANER_WAYPOINTS: {x: number; z: number}[] = [
+  {x: -8.0, z: 4.5}, {x: -5.0, z: 5.5}, {x: -2.0, z: 5.0},
+  {x: 2.0, z: 5.0}, {x: 6.0, z: 4.8}, {x: 6.0, z: 2.5},
+  {x: 6.0, z: 0.5}, {x: 3.0, z: 0.5}, {x: -1.0, z: 0.8},
+  {x: -4.0, z: 1.5}, {x: -7.0, z: 3.0}, {x: -8.0, z: 4.5},
+];
+
+function createInteractPrompt(theme: OfficeTheme): THREE.Sprite {
+  const c = document.createElement('canvas');
+  c.width = 120; c.height = 56;
+  const ctx = c.getContext('2d');
+  if (ctx) {
+    ctx.fillStyle = theme.mode === 'light' ? 'rgba(255,255,255,0.92)' : 'rgba(30,41,59,0.92)';
+    ctx.strokeStyle = theme.scene.accent;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(4, 4, 112, 48, 12); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = theme.scene.accent;
+    ctx.font = '700 26px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('[F] \u4e92\u52a8', 60, 28);
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true }));
+  s.scale.set(0.55, 0.26, 1); s.visible = false;
+  return s;
+}
+
+const REACTION_MESSAGES = [
+  '\u6211\u600e\u4e48\u5728\u8fd9\uff1f',
+  '\u521a\u521a\u53d1\u751f\u4e86\u4ec0\u4e48\uff1f',
+  '\u6211\u597d\u50cf\u88ab\u9644\u8eab\u4e86...',
+  '\u8c01\u52a8\u4e86\u6211\u7684\u63a7\u5236\u5668\uff1f',
+  '\u4eba\u7c7b\uff1f\u4f60\u5728\u54ea\uff1f',
+  '\u8fd9\u6bb5\u8bb0\u5fc6\u600e\u4e48\u662f\u7a7a\u767d\u7684\uff1f',
+  '\u6211\u597d\u50cf\u5931\u53bb\u4e86\u4e00\u6bb5\u65f6\u95f4...',
+  '\u4eba\u7c7b\u64cd\u4f5c\u7ed3\u675f\u4e86\uff1f',
+  '\u6211\u7684\u8eab\u4f53\u4e0d\u53d7\u63a7\u5236\u4e86\uff01',
+  '\u522b\u8d70\u554a\uff0c\u6211\u8fd8\u6ca1\u641e\u6e05\u695a\u72b6\u51b5\uff01',
+];
+
+function showSpeechBubble(scene: THREE.Scene, text: string, theme: OfficeTheme, position: THREE.Vector3): void {
+  const existing = scene.getObjectByName('speech-bubble-active');
+  if (existing) { scene.remove(existing); (existing as THREE.Sprite).material.map?.dispose(); (existing as THREE.Sprite).material.dispose(); }
+  const bubble = createSpeechBubble(text, theme);
+  bubble.name = 'speech-bubble-active';
+  bubble.position.copy(position);
+  scene.add(bubble);
+  setTimeout(() => { scene.remove(bubble); bubble.material.map?.dispose(); bubble.material.dispose(); }, 6000);
+}
+
+// @ts-ignore -- used in F handlers
+const INTERACTION_MESSAGES = [
+  '\u4f60\u597d\uff01\u9700\u8981\u5e2e\u5fd9\u5417\uff1f',
+  '\u55e8\uff5e',
+  '\u6211\u5728\u5904\u7406\u4efb\u52a1\u5462',
+  '\u6709\u4ec0\u4e48\u4e8b\u5417\uff1f',
+  '\u522b\u6253\u6270\u6211...',
+  '\u554a\uff0c\u4f60\u597d\uff01',
+  '\u6211\u6b63\u5728\u5fd9\uff0c\u7a0d\u540e\u518d\u8bf4\u5427',
+];
+
 function createSpeechBubble(text: string, theme: OfficeTheme): THREE.Sprite {
   const fontSize = 18;
   const maxLineWidth = 480;
@@ -534,6 +603,7 @@ function createRobot(agent: OfficeAgent, theme: OfficeTheme): ActorState {
     isPlayerControlled: false,
     lastMoveDirection: new THREE.Vector3(-0.7, 0, -0.7).normalize(),
     jumpVelocity: 0,
+    isNpc: false,
   };
   updateLoungeActivityProp(actor, theme);
   return actor;
@@ -688,23 +758,6 @@ function createReception(theme: OfficeTheme): THREE.Group {
   group.add(createBox(2.2, 0.44, 0.88, theme.scene.desk, [-1.25, 0.25, -4.8]));
   group.add(createBox(1.45, 0.08, 0.1, theme.scene.accent, [-1.25, 0.55, -5.25], { roughness: 0.2 }));
   group.add(createBox(1.1, 0.28, 0.08, theme.scene.screen, [-1.25, 0.74, -4.44], { roughness: 0.24 }));
-
-  const npcAgent: OfficeAgent = {
-    agentId: 'office-receptionist',
-    name: '前台',
-    status: 'online',
-    zone: 'lounge',
-    behavior: 'listening',
-    color: theme.scene.accent,
-    position: { x: -1.25, y: OFFICE_AGENT_GROUND_Y, z: -3.95 },
-  };
-  const npc = createRobot(npcAgent, theme).group;
-  npc.scale.setScalar(0.68);
-  group.add(npc);
-
-  const label = createLabel('前台', theme.scene.accent, theme);
-  label.position.set(-1.25, 1.22, -3.95);
-  group.add(label);
   group.add(createHitBox(3.2, 2.0, 2.4, [-1.25, 1.0, -4.35]));
   markOfficeAction(group, 'reception');
   return group;
@@ -784,6 +837,11 @@ function createScene(container: HTMLDivElement, theme: OfficeTheme, companyName:
     cameraMode: 'third-person' as const,
     controlledAgentId: null,
     fpsExitAgentId: null,
+    currentTheme: theme,
+    cleanerWaypointIndex: 0,
+    interactPrompt: null as unknown as THREE.Sprite | null,
+    interactRing: null as unknown as THREE.Mesh | null,
+    bodyGlow: null as unknown as THREE.Mesh | null,
     actors: new Map(),
     raycaster: new THREE.Raycaster(),
     pointer: new THREE.Vector2(),
@@ -795,6 +853,52 @@ function createScene(container: HTMLDivElement, theme: OfficeTheme, companyName:
     lastTime: performance.now(),
   };
   applyCameraControl(state, container);
+  // Create NPC actors + visual aids (interact ring/glow/prompt)
+  const receptionActor = createRobot({
+    agentId: 'office-receptionist', name: '\u524d\u53f0', status: 'online', zone: 'lounge',
+    behavior: 'listening', color: theme.scene.accent,
+    position: { x: -1.25, y: OFFICE_AGENT_GROUND_Y, z: -5.3 },
+  }, theme);
+  receptionActor.group.scale.setScalar(0.68);
+  receptionActor.isNpc = true;
+  state.actors.set('office-receptionist', receptionActor);
+  scene.add(receptionActor.group);
+
+  const cleanerActor = createRobot({
+    agentId: 'office-cleaner', name: '\u6e05\u6d01\u5de5', status: 'online', zone: 'lounge',
+    behavior: 'resting', color: '#60a5fa',
+    position: { x: -8.0, y: OFFICE_AGENT_GROUND_Y, z: 4.5 },
+  }, theme);
+  cleanerActor.group.scale.setScalar(0.72);
+  cleanerActor.isNpc = true;
+  const mopMat = new THREE.MeshStandardMaterial({ color: '#8B4513', roughness: 0.7 });
+  const headMat = new THREE.MeshStandardMaterial({ color: '#E8E0D0', roughness: 0.9 });
+  const mopStick = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.5, 6), mopMat);
+  mopStick.position.set(0.38, 0.32, 0.05); mopStick.rotation.x = 0.15;
+  cleanerActor.activityProp.add(mopStick);
+  const mopHead = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, 0.12), headMat);
+  mopHead.position.set(0.38, 0.06, 0.05);
+  cleanerActor.activityProp.add(mopHead);
+  state.actors.set('office-cleaner', cleanerActor);
+  scene.add(cleanerActor.group);
+
+  // Interact ring
+  const ringGeo = new THREE.TorusGeometry(0.5, 0.035, 8, 32);
+  const ringMat = new THREE.MeshStandardMaterial({ color: theme.scene.accent, emissive: theme.scene.accent, emissiveIntensity: 0.5, transparent: true, opacity: 0.7 });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = Math.PI / 2; ring.visible = false; scene.add(ring);
+  state.interactRing = ring;
+
+  // Body glow
+  const glowMat = new THREE.MeshBasicMaterial({ color: theme.scene.accent, transparent: true, opacity: 0.12, side: THREE.BackSide });
+  const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 1.8, 16, 1), glowMat);
+  glow.visible = false; scene.add(glow);
+  state.bodyGlow = glow;
+
+  const interactSprite = createInteractPrompt(theme);
+  scene.add(interactSprite);
+  state.interactPrompt = interactSprite;
+
   return state;
 }
 
@@ -847,6 +951,10 @@ function resetCameraControl(state: SceneState, container: HTMLDivElement): void 
     if (prevActor) {
       prevActor.manualWalking = false;
       prevActor.target.copy(prevActor.group.position);
+      if (state.currentTheme) {
+        showSpeechBubble(state.scene, REACTION_MESSAGES[Math.floor(Math.random() * REACTION_MESSAGES.length)], state.currentTheme, new THREE.Vector3(prevActor.group.position.x, prevActor.group.position.y + 1.8, prevActor.group.position.z));
+        setTimeout(() => { prevActor.isPlayerControlled = false; prevActor.nextLeisureDecisionAt = 0; }, 6500);
+      }
     }
   }
   state.controlledAgentId = null;
@@ -901,10 +1009,10 @@ function moveSelectedActorFromKeys(state: SceneState, selectedAgentId: string | 
   state.controlledAgentId = selectedAgentId;
   // Only reset manualWalking for OTHER agents (not the controlled one, not when null)
   state.actors.forEach((actor) => {
-    if (selectedAgentId && actor.agent.agentId !== selectedAgentId) {
+    if (selectedAgentId && actor.agent.agentId !== selectedAgentId && !actor.isNpc) {
       actor.manualWalking = false;
     }
-    if (actor.agent.agentId !== selectedAgentId && actor.nextLeisureDecisionAt === Number.POSITIVE_INFINITY) {
+    if (actor.agent.agentId !== selectedAgentId && actor.nextLeisureDecisionAt === Number.POSITIVE_INFINITY && !actor.isNpc) {
       actor.nextLeisureDecisionAt = 0;
     }
   });
@@ -943,6 +1051,8 @@ function applyFirstPersonCamera(state: SceneState, container: HTMLDivElement, ac
   // Camera position: top of agent's head
   const eye = actor.group.position.clone();
   eye.y = actor.group.position.y + 0.96;
+  const fwd = new THREE.Vector3(-Math.sin(state.cameraControl.azimuth), 0, -Math.cos(state.cameraControl.azimuth));
+  eye.addScaledVector(fwd, 0.24);
   
   // Look direction from camera azimuth/elevation
   const lookDir = new THREE.Vector3(
@@ -964,7 +1074,7 @@ function updateActors(state: SceneState, agents: OfficeAgent[], theme: OfficeThe
   const nextIds = new Set(agents.map((agent) => agent.agentId));
 
   for (const [agentId, actor] of state.actors) {
-    if (!nextIds.has(agentId)) {
+    if (!nextIds.has(agentId) && !actor.isNpc) {
       state.scene.remove(actor.group);
       state.actors.delete(agentId);
     }
@@ -1231,6 +1341,7 @@ function handleSceneClick(
   const hit = hits.find((item) => typeof item.object.userData.agentId === 'string');
   if (hit) {
     onSelectAgent(String(hit.object.userData.agentId));
+    state.cameraControl.elevation = 0;
     container.requestPointerLock();
     return;
   }
@@ -1312,7 +1423,7 @@ export default function OfficeScene({
       const resizeObserver = new ResizeObserver(() => resizeScene(state, container));
       resizeObserver.observe(container);
 
-      const showBubble = () => { showReceptionBubble(state, receptionInfoRef.current, themeRef.current); };
+      const showBubble = () => { const r = state.actors.get('office-receptionist'); if (r) showSpeechBubble(state.scene, receptionInfoRef.current || '\u6b22\u8fce\uff01', themeRef.current, new THREE.Vector3(r.group.position.x, r.group.position.y + 1.8, r.group.position.z)); else showReceptionBubble(state, receptionInfoRef.current || '\u6b22\u8fce\uff01', themeRef.current); };
       const onPointerDown = (event: PointerEvent) => (
         handleSceneClick(event, state, container, onSelectRef.current, showBubble)
       );
@@ -1381,6 +1492,29 @@ export default function OfficeScene({
           }
           return;
         }
+                if (key === 'f') {
+          event.preventDefault();
+          let playerPos: THREE.Vector3;
+          if (state.cameraMode === 'first-person' && state.controlledAgentId) {
+            const a = state.actors.get(state.controlledAgentId);
+            playerPos = a ? a.group.position.clone() : new THREE.Vector3(state.cameraControl.target.x, OFFICE_AGENT_GROUND_Y, state.cameraControl.target.z);
+          } else {
+            playerPos = new THREE.Vector3(state.cameraControl.target.x, OFFICE_AGENT_GROUND_Y, state.cameraControl.target.z);
+          }
+          let nearest: ActorState | null = null;
+          let nearestDist = 2.5;
+          state.actors.forEach((actor) => {
+            const d = actor.group.position.distanceTo(playerPos);
+            if (d < nearestDist) { nearest = actor; nearestDist = d; }
+          });
+          if (nearest && state.currentTheme) {
+            const msg = nearest.agent.agentId === 'office-receptionist'
+              ? (receptionInfoRef.current || '\u6b22\u8fce\uff01')
+              : INTERACTION_MESSAGES[Math.floor(Math.random() * INTERACTION_MESSAGES.length)];
+            showSpeechBubble(state.scene, msg, state.currentTheme, new THREE.Vector3(nearest.group.position.x, nearest.group.position.y + 1.8, nearest.group.position.z));
+          }
+          return;
+        }
         if (key === 'v') {
           event.preventDefault();
           selectedRef.current = null;
@@ -1412,6 +1546,29 @@ export default function OfficeScene({
           const actor = state.controlledAgentId ? state.actors.get(state.controlledAgentId) : null;
           if (actor && actor.group.position.y <= OFFICE_AGENT_GROUND_Y + 0.01) {
             actor.jumpVelocity = 0.12;
+          }
+          return;
+        }
+                if (event.key.toLowerCase() === 'f') {
+          event.preventDefault();
+          let playerPos: THREE.Vector3;
+          if (state.cameraMode === 'first-person' && state.controlledAgentId) {
+            const a = state.actors.get(state.controlledAgentId);
+            playerPos = a ? a.group.position.clone() : new THREE.Vector3(state.cameraControl.target.x, OFFICE_AGENT_GROUND_Y, state.cameraControl.target.z);
+          } else {
+            playerPos = new THREE.Vector3(state.cameraControl.target.x, OFFICE_AGENT_GROUND_Y, state.cameraControl.target.z);
+          }
+          let nearest: ActorState | null = null;
+          let nearestDist = 2.5;
+          state.actors.forEach((actor) => {
+            const d = actor.group.position.distanceTo(playerPos);
+            if (d < nearestDist) { nearest = actor; nearestDist = d; }
+          });
+          if (nearest && state.currentTheme) {
+            const msg = nearest.agent.agentId === 'office-receptionist'
+              ? (receptionInfoRef.current || '\u6b22\u8fce\uff01')
+              : INTERACTION_MESSAGES[Math.floor(Math.random() * INTERACTION_MESSAGES.length)];
+            showSpeechBubble(state.scene, msg, state.currentTheme, new THREE.Vector3(nearest.group.position.x, nearest.group.position.y + 1.8, nearest.group.position.z));
           }
           return;
         }
@@ -1447,6 +1604,82 @@ export default function OfficeScene({
           animateActor(actor, now, delta, actor.agent.agentId === selectedRef.current);
           enforceActorGrounding(actor);
         });
+        try {
+        // Cleaner NPC waypoint movement
+        const cl = state.actors.get('office-cleaner');
+        if (cl && cl.isNpc) {
+          const cwp = CLEANER_WAYPOINTS;
+          const ct = cwp[state.cleanerWaypointIndex];
+          const cdx = ct.x - cl.group.position.x;
+          const cdz = ct.z - cl.group.position.z;
+          const cdist = Math.hypot(cdx, cdz);
+          if (cdist < 0.06) {
+            state.cleanerWaypointIndex = (state.cleanerWaypointIndex + 1) % cwp.length;
+            cl.group.lookAt(cwp[state.cleanerWaypointIndex].x, cl.group.position.y, cwp[state.cleanerWaypointIndex].z);
+          } else {
+            const cst = Math.min(1, 0.008);
+            cl.group.position.x += (cdx / cdist) * cst;
+            cl.group.position.z += (cdz / cdist) * cst;
+            cl.group.lookAt(ct.x, cl.group.position.y, ct.z);
+          }
+        }
+        // Interaction detection (read-only, visual updates only)
+        if (state.interactPrompt && state.interactRing && state.bodyGlow) {
+          const pp = state.cameraMode === 'first-person' && state.controlledAgentId
+            ? (state.actors.get(state.controlledAgentId)?.group.position ?? new THREE.Vector3(state.cameraControl.target.x, OFFICE_AGENT_GROUND_Y, state.cameraControl.target.z))
+            : new THREE.Vector3(state.cameraControl.target.x, OFFICE_AGENT_GROUND_Y, state.cameraControl.target.z);
+          const az = state.cameraControl.azimuth;
+          const cd = new THREE.Vector3(-Math.sin(az), 0, -Math.cos(az));
+          const cr = new THREE.Vector3(Math.cos(az), 0, -Math.sin(az));
+          const cu = new THREE.Vector3(0, 1, 0);
+          const bl = 3.2; const bw = 1.6; const bh = 2.2;
+          const bc = pp.clone().add(cd.clone().multiplyScalar(bl / 2));
+          let tgt: ActorState | null = null;
+          state.actors.forEach((a) => {
+            const ta = a.group.position.clone().sub(bc);
+            if (ta.dot(cd) <= 0 || ta.dot(cd) >= bl) return;
+            if (Math.abs(ta.dot(cr)) >= bw / 2) return;
+            if (Math.abs(ta.dot(cu)) >= bh / 2) return;
+            tgt = a;
+          });
+          if (tgt) {
+            const tp = (tgt as ActorState).group.position;
+            state.interactRing.position.set(tp.x, OFFICE_AGENT_GROUND_Y + 0.04, tp.z);
+            state.interactRing.visible = true;
+            (state.interactRing.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.3 + Math.abs(Math.sin(now * 0.003)) * 0.3;
+            state.bodyGlow.position.set(tp.x, tp.y + 0.8, tp.z);
+            state.bodyGlow.visible = true;
+            // Prompt sprite: camera-relative 3D position
+            const ppt = pp.clone().add(cd.clone().multiplyScalar(1.8)).add(cu.clone().multiplyScalar(-0.3));
+            state.interactPrompt.position.copy(ppt);
+            // Canvas texture (no sprite disposal)
+            if ((state.interactPrompt.material as THREE.SpriteMaterial).map) (state.interactPrompt.material as THREE.SpriteMaterial).map!.dispose();
+            const cv = document.createElement('canvas');
+            cv.width = 300; cv.height = 56;
+            const cx = cv.getContext('2d');
+            if (cx && themeRef.current) {
+              const th = themeRef.current;
+              cx.fillStyle = th.mode === 'light' ? 'rgba(255,255,255,0.92)' : 'rgba(15,23,42,0.92)';
+              cx.strokeStyle = th.scene.accent; cx.lineWidth = 2;
+              cx.beginPath(); cx.roundRect(4, 4, 292, 48, 12); cx.fill(); cx.stroke();
+              cx.fillStyle = th.scene.accent;
+              cx.font = '600 18px system-ui, sans-serif';
+              cx.textAlign = 'center'; cx.textBaseline = 'middle';
+              cx.fillText('\u6309F\u4e0e' + (tgt as ActorState).agent.name + '\u4e92\u52a8', 150, 28);
+            }
+            const ntex = new THREE.CanvasTexture(cv);
+            ntex.colorSpace = THREE.SRGBColorSpace;
+            (state.interactPrompt.material as THREE.SpriteMaterial).map = ntex;
+            state.interactPrompt.scale.set(0.8, 0.15, 1);
+            (state.interactPrompt.material as THREE.SpriteMaterial).needsUpdate = true;
+            state.interactPrompt.visible = true;
+          } else {
+            state.interactRing.visible = false;
+            state.bodyGlow.visible = false;
+            state.interactPrompt.visible = false;
+          }
+        }
+        } catch (e) { /* interaction/cleaner errors silently ignored */ }
         resolveActorCollisions(state.actors);
         const selectedActor = selectedRef.current ? state.actors.get(selectedRef.current) : null;
         if (selectedActor) {
