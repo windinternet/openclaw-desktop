@@ -214,6 +214,11 @@ export default function SessionChatPage() {
   const [chatModel, setChatModel] = useState('');
   const [chatThinking, setChatThinking] = useState('medium');
 
+  const PAGE_SIZE = 30;
+  const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
+  const [allHistory, setAllHistory] = useState<DisplayChat[]>([]);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  
   const streamingIdRef = useRef<string | null>(null);
   const patchAppliedRef = useRef(false);
   const patchModelRef = useRef('');
@@ -276,11 +281,48 @@ export default function SessionChatPage() {
       if (chatContainerRef.current) {
         const scrollable = chatContainerRef.current.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list');
         const target = scrollable ?? chatContainerRef.current;
-        target.scrollTop = target.scrollHeight;
+        // Only auto-scroll if user is near the bottom
+        const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 200;
+        if (isNearBottom) target.scrollTop = target.scrollHeight;
       }
     }, 200);
     return () => clearTimeout(timer);
   }, [chats]);
+
+  /**
+   * Lazy load more history when user scrolls to the top of the chat area.
+   * Only triggers when there are older messages not yet displayed.
+   */
+  useEffect(() => {
+    if (!Array.isArray(allHistory) || allHistory.length <= PAGE_SIZE) return;
+    const el = chatContainerRef.current;
+    if (!el) return;
+    const scrollable = el.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list') || el;
+    const handleScroll = () => {
+      if (scrollable.scrollTop < 80 && !isLoadingMore && displayLimit < allHistory.length) {
+        setIsLoadingMore(true);
+        setDisplayLimit((prev) => Math.min(prev + PAGE_SIZE, allHistory.length));
+        requestAnimationFrame(() => setIsLoadingMore(false));
+      }
+    };
+    scrollable.addEventListener('scroll', handleScroll, { passive: true });
+    return () => scrollable.removeEventListener('scroll', handleScroll);
+  }, [allHistory.length, displayLimit, isLoadingMore]);
+
+  /**
+   * When displayLimit changes (user scrolls up), show more history chats.
+   */
+  useEffect(() => {
+    if (allHistory.length === 0) return;
+    const visible = allHistory.slice(-displayLimit);
+    setChats((prev) => {
+      const historyIds = new Set(allHistory.map((c) => c.id));
+      const streamingOnly = prev.filter((c) => !historyIds.has(c.id));
+      return mergeChats([...visible, ...streamingOnly]);
+    });
+  }, [displayLimit, allHistory]);
+
+
 
   useEffect(() => {
     if (!currentInstanceId || !rootSessionKey || chats.length === 0) return;
@@ -318,7 +360,15 @@ export default function SessionChatPage() {
         }));
         if (cancelled) return;
         const loadedChats = mergeChats(histories.flat());
-        setChats((prev) => mergeChats([...loadedChats, ...prev]));
+        const newLimit = Math.min(PAGE_SIZE, loadedChats.length);
+        setAllHistory(loadedChats);
+        setDisplayLimit(newLimit);
+        setChats((prev) => {
+          const historyIds = new Set(loadedChats.map((c) => c.id));
+          const streamingOnly = prev.filter((c) => !historyIds.has(c.id) && c.status === 'in_progress');
+          const visible = loadedChats.slice(-newLimit);
+          return mergeChats([...visible, ...streamingOnly]);
+        });
       } catch {
         if (!cancelled) setChats((prev) => (prev.length > 0 ? prev : []));
       }
@@ -403,7 +453,7 @@ export default function SessionChatPage() {
         });
         streamingIdRef.current = runId;
       } else if (stream === 'tool') {
-        // ── 工具调用事件 ──
+        // ── 工具调用事件：独立为单独的 DisplayChat 条目 ──
         if (isActiveLensEvent) {
           setGenerating(true);
           if (genTimeoutRef.current) { clearTimeout(genTimeoutRef.current); genTimeoutRef.current = null; }
@@ -411,69 +461,62 @@ export default function SessionChatPage() {
         const data = p.data as Record<string, unknown> | undefined;
         const phase = p.phase as string | undefined;
         const toolItem = parseToolEventToContentItem(data, phase);
+        if (!toolItem) {
+          // No valid tool item parsed; still check for completion marker
+          if (isToolCompleted(data)) {
+            setChats((prev) => {
+              const last = prev[prev.length - 1];
+              if (last && last.status === 'in_progress') {
+                return [...prev.slice(0, -1), { ...last, status: 'completed' }];
+              }
+              return prev;
+            });
+          }
+          return;
+        }
+
+        const toolChatId = `${runId}-tool-${toolItem.call_id}`;
+        const toolStatus = isToolCompleted(data) ? 'completed' : (phase === 'error' ? 'failed' : 'in_progress');
+        const updatedToolItem = { ...toolItem, status: toolStatus };
 
         setChats((prev) => {
-          const last = prev[prev.length - 1];
+          const existingToolIdx = prev.findIndex((c) => c.id === toolChatId);
 
-          if (toolItem) {
-            // 找到或创建当前 run 的流式消息
-            if (last && last.id === runId && last.sourceSessionKey === sourceSessionKey && Array.isArray(last.content)) {
-              // 检查是否已有同名工具调用块需要更新（如状态变化）
-              const existingIdx = last.content.findIndex(
-                (c: ChatContentItem) => c.type === 'function_call' && c.name === toolItem.name && c.call_id === toolItem.call_id,
-              );
-              let newContent: ChatContentItem[];
-              if (existingIdx >= 0) {
-                newContent = [...last.content];
-                newContent[existingIdx] = { ...toolItem, status: toolItem.status || 'completed' };
-              } else {
-                newContent = [...last.content, toolItem];
-              }
-              return [...prev.slice(0, -1), { ...last, content: newContent }];
-            }
-
-            // 或创建新消息附带工具调用
-            return [
-              ...prev,
-              {
-                id: runId,
-                role: assistantRole,
-                content: [toolItem],
-                status: isToolCompleted(data) ? 'completed' : 'in_progress',
-                createAt: Date.now(),
-                sourceSessionKey,
-                agentId: getAgentIdFromSessionKey(sourceSessionKey),
-              },
-            ];
+          if (existingToolIdx >= 0) {
+            // Update existing tool chat entry status
+            const next = [...prev];
+            next[existingToolIdx] = {
+              ...next[existingToolIdx],
+              content: [updatedToolItem] as ChatContentItem[],
+              status: toolStatus === 'completed' ? 'completed' : 'in_progress',
+            };
+            return next;
           }
 
-          // 工具调用结果附着
-          if (isToolCompleted(data)) {
+          // Create new independent tool chat entry (separate from assistant text bubble)
+          const toolContent: ChatContentItem[] = [updatedToolItem];
+          // If the tool completed with output text, include it as a message block
+          if (toolStatus === 'completed') {
             const outputText = extractToolOutputText(data);
-            if (outputText && last && last.sourceSessionKey === sourceSessionKey) {
-              if (Array.isArray(last.content)) {
-                const content = last.content as ChatContentItem[];
-                return [
-                  ...prev.slice(0, -1),
-                  {
-                    ...last,
-                    content: appendTextToContent(content, outputText),
-                    status: 'completed',
-                  },
-                ];
-              }
-              return [
-                ...prev.slice(0, -1),
-                { ...last, content: (last.content || '') + outputText, status: 'completed' },
-              ];
-            }
-            // 完成最后流式消息
-            if (last && last.status === 'in_progress') {
-              return [...prev.slice(0, -1), { ...last, status: 'completed' }];
+            if (outputText) {
+              toolContent.push({
+                type: 'message',
+                content: [{ type: 'output_text', text: outputText }],
+              });
             }
           }
-
-          return prev;
+          return [
+            ...prev,
+            {
+              id: toolChatId,
+              role: assistantRole,
+              content: toolContent,
+              status: 'completed',
+              createAt: Date.now(),
+              sourceSessionKey,
+              agentId: getAgentIdFromSessionKey(sourceSessionKey),
+            },
+          ];
         });
       } else if (stream === 'lifecycle') {
         const data = p.data as Record<string, unknown> | undefined;
