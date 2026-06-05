@@ -306,42 +306,46 @@ export default function SessionChatPage() {
   }, [chats, displayLimit]);
 
   /**
-   * Auto-scroll only when user is already near the bottom.
-   * Uses a short delay to let the DOM settle.
+   * Auto-scroll ONLY when there is an in-progress (streaming) message.
+   * Initial history load and session switches do NOT scroll.
+   * Uses requestAnimationFrame for the actual scroll action instead of a
+   * fixed timer, so the measurement runs right after the browser layout pass
+   * and captures the true scrollHeight (including async-rendered content).
    */
   useEffect(() => {
     if (chats.length === 0) return;
+    const hasStreaming = chats.some((c) => c.status === 'in_progress');
+    if (!hasStreaming) return;
     const timer = setTimeout(() => {
-      if (chatContainerRef.current) {
-        const scrollable = chatContainerRef.current.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list');
-        const target = scrollable ?? chatContainerRef.current;
-        const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 200;
-        if (isNearBottom) {
-          // Scroll to the true bottom (scrollHeight - clientHeight, not scrollHeight)
-          target.scrollTop = target.scrollHeight;
-          // Set a flag so ResizeObserver can re-scroll if content renders later
-          scrollToBottomRef.current = true;
-        } else {
-          scrollToBottomRef.current = false;
+      requestAnimationFrame(() => {
+        if (chatContainerRef.current) {
+          const scrollable = chatContainerRef.current.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list');
+          const target = scrollable ?? chatContainerRef.current;
+          const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 200;
+          if (isNearBottom) target.scrollTop = target.scrollHeight;
         }
-      }
-    }, 200);
+      });
+    }, 50);
     return () => clearTimeout(timer);
   }, [chats]);
 
   /**
-   * Second auto-scroll pass — fires later (1000 ms) to catch layout
-   * shifts from images, code blocks, or other late-rendering content.
+   * Second pass — only fires if streaming continues, catches late
+   * content rendering. Uses requestAnimationFrame for accurate height.
    */
   useEffect(() => {
     if (chats.length === 0) return;
+    const hasStreaming = chats.some((c) => c.status === 'in_progress');
+    if (!hasStreaming) return;
     const timer = setTimeout(() => {
-      if (chatContainerRef.current) {
-        const scrollable = chatContainerRef.current.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list');
-        const target = scrollable ?? chatContainerRef.current;
-        const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 200;
-        if (isNearBottom) target.scrollTop = target.scrollHeight;
-      }
+      requestAnimationFrame(() => {
+        if (chatContainerRef.current) {
+          const scrollable = chatContainerRef.current.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list');
+          const target = scrollable ?? chatContainerRef.current;
+          const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 200;
+          if (isNearBottom) target.scrollTop = target.scrollHeight;
+        }
+      });
     }, 1000);
     return () => clearTimeout(timer);
   }, [chats]);
