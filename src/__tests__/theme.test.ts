@@ -54,6 +54,7 @@ describe('applyTheme', () => {
       connectAllInstancesOnStartup: false,
       externalLinkMode: 'system',
       agentSwitchStrategy: 'new-session',
+      openTuningOnStartup: false,
     });
 
     expect(body.style.getPropertyValue('--semi-color-primary')).toBe('#722ED1');
@@ -90,6 +91,7 @@ describe('applyTheme', () => {
       connectAllInstancesOnStartup: false,
       externalLinkMode: 'system',
       agentSwitchStrategy: 'new-session',
+      openTuningOnStartup: false,
     });
 
     expect(body.style.getPropertyValue('--semi-color-primary-light-default')).toBe('#f1eafa');

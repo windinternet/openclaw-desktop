@@ -29,6 +29,7 @@ export interface AppSettings {
   connectAllInstancesOnStartup: boolean;
   externalLinkMode: 'system' | 'internal';
   agentSwitchStrategy: AgentSwitchStrategy;
+  openTuningOnStartup: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -41,4 +42,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   connectAllInstancesOnStartup: false,
   externalLinkMode: 'system',
   agentSwitchStrategy: 'new-session',
+  openTuningOnStartup: false,
 };
