@@ -219,7 +219,7 @@ export default function SessionChatPage() {
   const [allHistory, setAllHistory] = useState<DisplayChat[]>([]);
   const restoreDistanceRef = useRef<number | null>(null);
   const prevDisplayLimitRef = useRef(PAGE_SIZE);
-  const scrollToBottomRef = useRef(false);
+  const initialLoadRef = useRef(true);
   
   const streamingIdRef = useRef<string | null>(null);
   const patchAppliedRef = useRef(false);
@@ -248,7 +248,7 @@ export default function SessionChatPage() {
       // Session switch: reset ALL scroll-related markers so the
       // new session does not inherit stale positioning from the old one.
       restoreDistanceRef.current = null;
-      scrollToBottomRef.current = false;
+      initialLoadRef.current = true;
       try {
         const el = chatContainerRef.current;
         const scrollable = el?.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list');
@@ -292,17 +292,26 @@ export default function SessionChatPage() {
    */
   useLayoutEffect(() => {
     if (chats.length === 0) return;
-    if (restoreDistanceRef.current === null) return;
     if (!chatContainerRef.current) return;
-    // Only restore scroll position when displayLimit actually increased
-    // (user scrolled up to load history).  On session switch the ref
-    // is explicitly cleared, so this guard is a safety net.
-    if (displayLimit <= prevDisplayLimitRef.current) return;
     const scrollable = chatContainerRef.current.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list');
     const target = scrollable ?? chatContainerRef.current;
-    const distance = restoreDistanceRef.current;
-    restoreDistanceRef.current = null;
-    target.scrollTop = target.scrollHeight - distance;
+
+    // 1. Restore scroll position when user scrolled up to load history
+    if (restoreDistanceRef.current !== null && displayLimit > prevDisplayLimitRef.current) {
+      const distance = restoreDistanceRef.current;
+      restoreDistanceRef.current = null;
+      target.scrollTop = target.scrollHeight - distance;
+      return;
+    }
+
+    // 2. Counter AIChatDialogue's internal auto-scroll on initial load / session switch.
+    //    AIChatDialogue's init() always calls scrollToBottomImmediately() on mount,
+    //    and componentDidUpdate also scrolls on any chats reference change.
+    //    We counter-scroll to 0 unless streaming has started.
+    //    initialLoadRef is set to true on session switch and false when streaming begins.
+    if (initialLoadRef.current) {
+      target.scrollTop = 0;
+    }
   }, [chats, displayLimit]);
 
   /**
@@ -487,6 +496,7 @@ export default function SessionChatPage() {
         if (isActiveLensEvent) {
           setGenerating(true);
           if (genTimeoutRef.current) { clearTimeout(genTimeoutRef.current); genTimeoutRef.current = null; }
+          initialLoadRef.current = false;
         }
         const data = p.data as Record<string, unknown> | undefined;
         const delta = (data?.delta ?? data?.text ?? data?.content ?? '') as string;
@@ -529,6 +539,7 @@ export default function SessionChatPage() {
         if (isActiveLensEvent) {
           setGenerating(true);
           if (genTimeoutRef.current) { clearTimeout(genTimeoutRef.current); genTimeoutRef.current = null; }
+          initialLoadRef.current = false;
         }
         const data = p.data as Record<string, unknown> | undefined;
         const phase = p.phase as string | undefined;
@@ -606,6 +617,7 @@ export default function SessionChatPage() {
           }
         } else if (phase === 'start' || phase === 'running') {
           if (isActiveLensEvent) setGenerating(true);
+          initialLoadRef.current = false;
           // 开始新 Stream 时创建占位消息
           if (phase === 'start') {
             setChats((prev) => {
@@ -945,6 +957,7 @@ export default function SessionChatPage() {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div ref={chatContainerRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: '16px 16px 0' }}>
         <AIChatDialogue
+          key={activeSessionKey || 'no-session'}
           chats={chats}
           roleConfig={roleConfig}
           chatBoxRenderConfig={{
