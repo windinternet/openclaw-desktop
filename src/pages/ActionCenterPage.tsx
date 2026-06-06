@@ -277,6 +277,9 @@ export default function ActionCenterPage() {
                   ...PANEL_STYLE,
                   padding: 14,
                   textAlign: 'left',
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  minWidth: 0,
                   cursor: 'pointer',
                   borderColor: selectedRun?.id === run.id ? 'var(--semi-color-primary)' : 'var(--semi-color-border)',
                   background:
