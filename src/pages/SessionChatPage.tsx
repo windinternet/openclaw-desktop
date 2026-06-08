@@ -1399,7 +1399,7 @@ export default function SessionChatPage() {
           cursor: 'pointer',
           width: 'clamp(180px, calc(100vw - 560px), 560px)',
           maxWidth: '100%',
-          textAlign: 'left',
+          justifyContent: 'flex-start',
           font: 'inherit',
           display: 'flex',
           alignItems: 'center',
