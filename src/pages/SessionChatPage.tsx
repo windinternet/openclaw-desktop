@@ -21,8 +21,10 @@ import {
   getHistoryMessageDisplayId,
   getStreamMessageDisplayId,
   mergeVisibleHistoryWithLiveChats,
+  mergeRealtimeToolChatIntoRun,
+  parseSessionContextSnapshot,
 } from '../lib/session-content';
-import type { ChatContentItem, SessionMessageDisplaySettings } from '../lib/session-content';
+import type { ChatContentItem, SessionContextSnapshot, SessionMessageDisplaySettings } from '../lib/session-content';
 import { isAssistantCompletionEvent } from '../lib/assistant-completion-notifier';
 import AgentSelectOption from '../components/AgentSelectOption';
 import ContextSummary from '../components/ContextSummary';
@@ -302,6 +304,20 @@ function formatPercent(value?: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
+function sumOptionalNumbers(...values: (number | undefined)[]): number | undefined {
+  const present = values.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+  if (present.length === 0) return undefined;
+  return present.reduce((sum, value) => sum + value, 0);
+}
+
+function contextSourceLabel(source?: SessionContextSnapshot['source']): string {
+  if (source === 'sessions.describe') return 'OpenClaw sessions.describe';
+  if (source === 'status') return 'OpenClaw status';
+  if (source === 'usage') return 'OpenClaw sessions.usage';
+  if (source === 'message') return '消息 usage';
+  return '本地估算';
+}
+
 function toolStatusColor(status?: string): 'green' | 'orange' | 'red' | 'blue' | 'grey' {
   const normalized = String(status ?? '').toLowerCase();
   if (['completed', 'done', 'success', 'end', 'result'].includes(normalized)) return 'green';
@@ -416,14 +432,29 @@ function SessionSidePanel({
               <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 6 }}>
                 已用 {formatNumber(insight.usedContextTokens)} / {formatNumber(insight.contextLimit)} tokens（{formatPercent(insight.contextUsageRatio)}）
               </Text>
+              <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>
+                {contextSourceLabel(insight.contextSource)}
+                {insight.contextFresh === false ? ' · 统计可能延迟' : ''}
+              </Text>
             </section>
 
             <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <Metric label="剩余上下文" value={formatNumber(insight.remainingContextTokens)} />
+              <Metric label="输入 tokens" value={formatNumber(insight.inputTokens)} />
+              <Metric label="输出 tokens" value={formatNumber(insight.outputTokens)} />
+              <Metric label="缓存 tokens" value={formatNumber(sumOptionalNumbers(insight.cacheReadTokens, insight.cacheWriteTokens))} />
               <Metric label="消息" value={formatNumber(insight.messageCount)} />
               <Metric label="工具调用" value={formatNumber(insight.toolCallCount)} />
               <Metric label="用户消息" value={formatNumber(insight.userMessageCount)} />
               <Metric label="Agent 回复" value={formatNumber(insight.assistantMessageCount)} />
             </section>
+
+            {(insight.contextModel || insight.contextStatus) && (
+              <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <Metric label="模型" value={insight.contextModel || '未知'} />
+                <Metric label="状态" value={insight.contextStatus || '未知'} />
+              </section>
+            )}
 
             <section>
               <Text strong style={{ display: 'block', marginBottom: 8 }}>后续洞察能力</Text>
@@ -552,6 +583,7 @@ export default function SessionChatPage() {
   const [allHistory, setAllHistory] = useState<DisplayChat[]>([]);
   const [selectedToolCall, setSelectedToolCall] = useState<SelectedToolCall | null>(null);
   const [sidePanelTab, setSidePanelTab] = useState('overview');
+  const [sessionContextSnapshot, setSessionContextSnapshot] = useState<SessionContextSnapshot | null>(null);
 
   
   const streamingIdRef = useRef<string | null>(null);
@@ -577,6 +609,7 @@ export default function SessionChatPage() {
   useEffect(() => {
     if (prevRootSessionKeyRef.current !== rootSessionKey) {
       setChats([]);
+      setSessionContextSnapshot(null);
       initialMessageSentRef.current = null;
     }
     prevRootSessionKeyRef.current = rootSessionKey;
@@ -713,6 +746,49 @@ export default function SessionChatPage() {
       cancelled = true;
     };
   }, [rootSessionKey, relatedSessionKeys, activeClient, connectionStatus, sessionMessageDisplaySettings]);
+
+  const sessionContextRefreshKey = useMemo(() => {
+    const lastChat = chats[chats.length - 1];
+    return `${chats.length}:${lastChat?.id ?? ''}:${lastChat?.status ?? ''}:${generating ? 'generating' : 'idle'}`;
+  }, [chats, generating]);
+
+  useEffect(() => {
+    if (!activeClient || !activeSessionKey || connectionStatus !== 'connected') {
+      setSessionContextSnapshot(null);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      (async () => {
+        let snapshot: SessionContextSnapshot | null = null;
+        try {
+          const result = await activeClient.request('sessions.describe', { key: activeSessionKey });
+          snapshot = parseSessionContextSnapshot(result, 'sessions.describe');
+        } catch {
+          try {
+            const status = await activeClient.request('status', {});
+            const statusRecord = asRecord(status);
+            const sessionsRecord = asRecord(statusRecord.sessions);
+            const recentSessions = Array.isArray(sessionsRecord.recent) ? sessionsRecord.recent : [];
+            const currentSession = recentSessions.find((session) => {
+              const record = asRecord(session);
+              return String(record.key ?? record.sessionKey ?? '') === activeSessionKey;
+            });
+            snapshot = parseSessionContextSnapshot(currentSession, 'status');
+          } catch {
+            snapshot = null;
+          }
+        }
+        if (!cancelled) setSessionContextSnapshot(snapshot);
+      })();
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [activeClient, activeSessionKey, connectionStatus, sessionContextRefreshKey]);
 
   const endGeneration = useCallback((status: string, runId?: string) => {
     setGenerating(false);
@@ -873,14 +949,29 @@ export default function SessionChatPage() {
           toolRecord.callId
           ?? toolRecord.call_id
           ?? toolRecord.toolCallId
+          ?? toolRecord.tool_call_id
+          ?? toolRecord.itemId
           ?? toolRecord.id
           ?? toolRecord.toolName
           ?? toolRecord.name
           ?? 'tool',
         )}`;
         const toolStatus = isToolCompleted(data) ? 'completed' : (phase === 'error' ? 'failed' : 'in_progress');
+        const toolChat: DisplayChat = {
+          id: toolChatId,
+          runId,
+          role: assistantRole,
+          content: toolContent,
+          status: toolStatus === 'completed' ? 'completed' : 'in_progress',
+          createAt: Date.now(),
+          sourceSessionKey,
+          agentId: getAgentIdFromSessionKey(sourceSessionKey),
+        };
 
         setChats((prev) => {
+          const merged = mergeRealtimeToolChatIntoRun(prev, toolChat);
+          if (merged.merged) return merged.chats;
+
           const existingToolIdx = prev.findIndex((c) => c.id === toolChatId);
 
           if (existingToolIdx >= 0) {
@@ -888,26 +979,13 @@ export default function SessionChatPage() {
             const next = [...prev];
             next[existingToolIdx] = {
               ...next[existingToolIdx],
-              content: toolContent,
-              status: toolStatus === 'completed' ? 'completed' : 'in_progress',
+              content: toolChat.content,
+              status: toolChat.status,
             };
             return next;
           }
 
-          // Create new independent tool chat entry (separate from assistant text bubble)
-          return [
-            ...prev,
-            {
-              id: toolChatId,
-              runId,
-              role: assistantRole,
-              content: toolContent,
-              status: toolStatus === 'completed' ? 'completed' : 'in_progress',
-              createAt: Date.now(),
-              sourceSessionKey,
-              agentId: getAgentIdFromSessionKey(sourceSessionKey),
-            },
-          ];
+          return [...prev, { ...toolChat, id: runId }];
         });
       } else if (stream === 'lifecycle') {
         const data = p.data as Record<string, unknown> | undefined;
@@ -1294,8 +1372,8 @@ export default function SessionChatPage() {
   );
 
   const sessionInsight = useMemo(
-    () => deriveSessionInsight(chats, currentModel),
-    [chats, currentModel],
+    () => deriveSessionInsight(chats, currentModel, sessionContextSnapshot),
+    [chats, currentModel, sessionContextSnapshot],
   );
 
   const displayChats = useMemo(

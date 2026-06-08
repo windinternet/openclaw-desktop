@@ -8,10 +8,12 @@ import {
   getHistoryMessageDisplayId,
   getStreamMessageDisplayId,
   isRealtimeToolStream,
+  mergeRealtimeToolChatIntoRun,
   mergeVisibleHistoryWithLiveChats,
   parseHistoryMessageToContentItems,
   parseToolEventToContentItems,
   parseContextualUserMessage,
+  parseSessionContextSnapshot,
   deriveSessionInsight,
 } from '../lib/session-content';
 import type { SessionTimelineChat } from '../lib/session-content';
@@ -290,6 +292,44 @@ describe('session content helpers', () => {
     ).toEqual([historyUserMessage, assistantPlaceholder]);
   });
 
+  it('merges realtime tool calls into the pending assistant run chat', () => {
+    const pendingAssistant = {
+      id: 'run-1',
+      runId: 'run-1',
+      role: 'assistant',
+      content: [],
+      status: 'in_progress',
+      sourceSessionKey: 'agent:main:demo',
+    };
+    const toolChat = {
+      id: 'run-1-tool-call-1',
+      runId: 'run-1',
+      role: 'assistant',
+      content: [
+        { type: 'function_call' as const, name: 'exec', call_id: 'call-1', arguments: 'pwd', status: 'running' },
+      ],
+      status: 'in_progress',
+      sourceSessionKey: 'agent:main:demo',
+    };
+    const updatedToolChat = {
+      ...toolChat,
+      content: [
+        { type: 'function_call' as const, name: 'exec', call_id: 'call-1', arguments: 'pwd', status: 'completed' },
+      ],
+      status: 'completed',
+    };
+
+    const firstMerge = mergeRealtimeToolChatIntoRun([pendingAssistant], toolChat);
+    expect(firstMerge.merged).toBe(true);
+    expect(firstMerge.chats).toHaveLength(1);
+    expect(firstMerge.chats[0].content).toEqual(toolChat.content);
+    expect(firstMerge.chats[0].status).toBe('in_progress');
+
+    const secondMerge = mergeRealtimeToolChatIntoRun(firstMerge.chats, updatedToolChat);
+    expect(secondMerge.chats).toHaveLength(1);
+    expect(secondMerge.chats[0].content).toEqual(updatedToolChat.content);
+  });
+
   it('derives session insight from messages, tool calls, usage, and model context', () => {
     const chats = [
       {
@@ -320,6 +360,61 @@ describe('session content helpers', () => {
       usedContextTokens: 1500,
       contextLimit: 6000,
       contextUsageRatio: 0.25,
+    }));
+  });
+
+  it('uses OpenClaw session context snapshots before local usage estimates', () => {
+    const snapshot = parseSessionContextSnapshot({
+      session: {
+        inputTokens: 335,
+        outputTokens: 1107,
+        totalTokens: 16469,
+        remainingTokens: 983531,
+        percentUsed: 2,
+        contextTokens: 1000000,
+        totalTokensFresh: true,
+        model: 'deepseek-v4-flash',
+        status: 'running',
+      },
+    });
+
+    expect(snapshot).toEqual(expect.objectContaining({
+      inputTokens: 335,
+      outputTokens: 1107,
+      totalTokens: 16469,
+      remainingTokens: 983531,
+      percentUsed: 2,
+      contextTokens: 1000000,
+      totalTokensFresh: true,
+      model: 'deepseek-v4-flash',
+      source: 'sessions.describe',
+    }));
+
+    expect(
+      deriveSessionInsight(
+        [{ role: 'assistant', content: [], usage: { totalTokens: 1500 } }],
+        { contextWindow: 6000 },
+        snapshot,
+      ),
+    ).toEqual(expect.objectContaining({
+      usedContextTokens: 16469,
+      contextLimit: 1000000,
+      contextUsageRatio: 0.02,
+      remainingContextTokens: 983531,
+      contextFresh: true,
+      contextModel: 'deepseek-v4-flash',
+      contextStatus: 'running',
+      contextSource: 'sessions.describe',
+    }));
+
+    expect(parseSessionContextSnapshot({
+      session: {
+        totalTokens: 16469,
+        contextTokens: 1000000,
+      },
+    })).toEqual(expect.objectContaining({
+      remainingTokens: 983531,
+      percentUsed: 1.6469,
     }));
   });
 

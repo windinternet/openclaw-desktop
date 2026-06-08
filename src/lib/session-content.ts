@@ -137,6 +137,7 @@ export type ChatContentItem = ChatTextContent | ChatToolCallContent | ChatReason
 
 export interface SessionTimelineChat {
   id: string;
+  runId?: string;
   status?: string;
   sourceSessionKey?: string;
   role?: string;
@@ -171,6 +172,65 @@ export function mergeVisibleHistoryWithLiveChats<T extends SessionTimelineChat>(
     return chat.localOnly === true && !hasMatchingHistoryChat(chat, loadedHistory);
   });
   return [...visibleHistory, ...liveOnly];
+}
+
+function isFunctionCallContent(value: unknown): value is ChatToolCallContent {
+  return isRecord(value) && value.type === 'function_call';
+}
+
+function upsertToolContent(
+  currentContent: unknown,
+  incomingContent: unknown,
+): ChatContentItem[] {
+  const currentItems = Array.isArray(currentContent) ? currentContent as ChatContentItem[] : [];
+  const incomingItems = Array.isArray(incomingContent)
+    ? incomingContent.filter(isFunctionCallContent)
+    : [];
+  if (incomingItems.length === 0) return currentItems;
+
+  const next = [...currentItems];
+  for (const incoming of incomingItems) {
+    const existingIndex = next.findIndex((item) => (
+      item.type === 'function_call'
+      && item.call_id === incoming.call_id
+    ));
+    if (existingIndex >= 0) {
+      next[existingIndex] = incoming;
+    } else {
+      next.push(incoming);
+    }
+  }
+  return next;
+}
+
+export function mergeRealtimeToolChatIntoRun<T extends SessionTimelineChat>(
+  currentChats: T[],
+  toolChat: T,
+): { chats: T[]; merged: boolean } {
+  if (!toolChat.runId || !Array.isArray(toolChat.content)) {
+    return { chats: currentChats, merged: false };
+  }
+
+  const targetIndex = currentChats.findIndex((chat) => (
+    chat.sourceSessionKey === toolChat.sourceSessionKey
+    && chat.role === toolChat.role
+    && (chat.id === toolChat.runId || chat.runId === toolChat.runId)
+    && Array.isArray(chat.content)
+  ));
+
+  if (targetIndex < 0) return { chats: currentChats, merged: false };
+
+  const next = [...currentChats];
+  const target = next[targetIndex];
+  next[targetIndex] = {
+    ...target,
+    runId: target.runId ?? toolChat.runId,
+    content: upsertToolContent(target.content, toolChat.content),
+    status: target.status === 'failed' || toolChat.status === 'failed'
+      ? 'failed'
+      : 'in_progress',
+  };
+  return { chats: next, merged: true };
 }
 
 /** ContentItem[] 的 display text 提取 */
@@ -457,9 +517,93 @@ function getUsageTotalTokens(chat: unknown): number | undefined {
   return typeof total === 'number' && Number.isFinite(total) ? total : undefined;
 }
 
+function getNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
+function getString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() !== '' ? value : undefined;
+}
+
+function getBoolean(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined;
+}
+
 function countToolCalls(content: unknown): number {
   if (!Array.isArray(content)) return 0;
   return content.filter((item) => isRecord(item) && item.type === 'function_call').length;
+}
+
+export interface SessionContextSnapshot {
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  totalTokens?: number;
+  remainingTokens?: number;
+  contextTokens?: number;
+  percentUsed?: number;
+  totalTokensFresh?: boolean;
+  model?: string;
+  configuredModel?: string;
+  selectedModel?: string;
+  status?: string;
+  estimatedCostUsd?: number;
+  runtimeMs?: number;
+  startedAt?: number;
+  endedAt?: number;
+  updatedAt?: number;
+  source?: 'sessions.describe' | 'status' | 'usage' | 'message';
+}
+
+export function parseSessionContextSnapshot(
+  value: unknown,
+  source: SessionContextSnapshot['source'] = 'sessions.describe',
+): SessionContextSnapshot | null {
+  if (!isRecord(value)) return null;
+  const session = isRecord(value.session) ? value.session : value;
+  const usage = isRecord(session.usage) ? session.usage : undefined;
+  const context = isRecord(session.context) ? session.context : undefined;
+
+  const totalTokens = getNumber(session.totalTokens ?? session.total_tokens ?? usage?.totalTokens ?? usage?.total);
+  const contextTokens = getNumber(session.contextTokens ?? session.context_tokens ?? session.contextWindow ?? session.context_window ?? context?.tokens ?? context?.limit);
+  const directRemainingTokens = getNumber(session.remainingTokens ?? session.remaining_tokens ?? context?.remainingTokens);
+  const directPercentUsed = getNumber(session.percentUsed ?? session.percent_used ?? context?.percentUsed);
+
+  const snapshot: SessionContextSnapshot = {
+    inputTokens: getNumber(session.inputTokens ?? session.input_tokens ?? usage?.inputTokens ?? usage?.input),
+    outputTokens: getNumber(session.outputTokens ?? session.output_tokens ?? usage?.outputTokens ?? usage?.output),
+    cacheReadTokens: getNumber(session.cacheReadTokens ?? session.cacheRead ?? usage?.cacheReadTokens ?? usage?.cacheRead),
+    cacheWriteTokens: getNumber(session.cacheWriteTokens ?? session.cacheWrite ?? usage?.cacheWriteTokens ?? usage?.cacheWrite),
+    totalTokens,
+    remainingTokens: directRemainingTokens ?? (totalTokens !== undefined && contextTokens !== undefined ? Math.max(0, contextTokens - totalTokens) : undefined),
+    contextTokens,
+    percentUsed: directPercentUsed ?? (totalTokens !== undefined && contextTokens ? (totalTokens / contextTokens) * 100 : undefined),
+    totalTokensFresh: getBoolean(session.totalTokensFresh ?? session.total_tokens_fresh),
+    model: getString(session.model),
+    configuredModel: getString(session.configuredModel ?? session.configured_model),
+    selectedModel: getString(session.selectedModel ?? session.selected_model),
+    status: getString(session.status),
+    estimatedCostUsd: getNumber(session.estimatedCostUsd ?? session.estimated_cost_usd),
+    runtimeMs: getNumber(session.runtimeMs ?? session.runtime_ms),
+    startedAt: getNumber(session.startedAt ?? session.started_at),
+    endedAt: getNumber(session.endedAt ?? session.ended_at),
+    updatedAt: Date.now(),
+    source,
+  };
+
+  const hasData = Object.entries(snapshot).some(([key, currentValue]) => (
+    key !== 'updatedAt'
+    && key !== 'source'
+    && currentValue !== undefined
+  ));
+
+  return hasData ? snapshot : null;
 }
 
 export interface SessionInsight {
@@ -470,12 +614,23 @@ export interface SessionInsight {
   usedContextTokens?: number;
   contextLimit?: number;
   contextUsageRatio?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  remainingContextTokens?: number;
+  contextPercentUsed?: number;
+  contextFresh?: boolean;
+  contextModel?: string;
+  contextStatus?: string;
+  contextSource?: SessionContextSnapshot['source'];
   lastActivityAt?: number;
 }
 
 export function deriveSessionInsight(
   chats: unknown[],
   model?: { contextWindow?: number },
+  contextSnapshot?: SessionContextSnapshot | null,
 ): SessionInsight {
   let usedContextTokens: number | undefined;
   let lastActivityAt: number | undefined;
@@ -496,19 +651,33 @@ export function deriveSessionInsight(
     if (createAt !== undefined) lastActivityAt = Math.max(lastActivityAt ?? createAt, createAt);
   }
 
-  const contextLimit = model?.contextWindow;
-  const contextUsageRatio = usedContextTokens !== undefined && contextLimit
-    ? Math.min(1, usedContextTokens / contextLimit)
+  const contextLimit = contextSnapshot?.contextTokens ?? model?.contextWindow;
+  const snapshotPercentRatio = contextSnapshot?.percentUsed !== undefined
+    ? Math.min(1, Math.max(0, contextSnapshot.percentUsed / 100))
     : undefined;
+  const actualUsedContextTokens = contextSnapshot?.totalTokens ?? usedContextTokens;
+  const contextUsageRatio = snapshotPercentRatio ?? (actualUsedContextTokens !== undefined && contextLimit
+    ? Math.min(1, actualUsedContextTokens / contextLimit)
+    : undefined);
 
   return {
     messageCount: chats.length,
     userMessageCount,
     assistantMessageCount,
     toolCallCount,
-    usedContextTokens,
+    usedContextTokens: actualUsedContextTokens,
     contextLimit,
     contextUsageRatio,
+    inputTokens: contextSnapshot?.inputTokens,
+    outputTokens: contextSnapshot?.outputTokens,
+    cacheReadTokens: contextSnapshot?.cacheReadTokens,
+    cacheWriteTokens: contextSnapshot?.cacheWriteTokens,
+    remainingContextTokens: contextSnapshot?.remainingTokens,
+    contextPercentUsed: contextSnapshot?.percentUsed,
+    contextFresh: contextSnapshot?.totalTokensFresh,
+    contextModel: contextSnapshot?.model ?? contextSnapshot?.configuredModel ?? contextSnapshot?.selectedModel,
+    contextStatus: contextSnapshot?.status,
+    contextSource: contextSnapshot?.source,
     lastActivityAt,
   };
 }
