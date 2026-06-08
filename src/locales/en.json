@@ -159,6 +159,19 @@
     "connectionsDesc": "Configure multi-instance connection behavior",
     "connectAllInstancesOnStartup": "Connect all instances on startup",
     "connectAllInstancesOnStartupDesc": "When disabled, only the current instance connects at startup. Other instances stay connected after first use.",
+    "sessionMessageDisplay": "Session Message Display",
+    "sessionMessageDisplayDesc": "Configure how the session detail page displays OpenClaw replies and tool events",
+    "sessionToolCallDisplay": "Tool call display",
+    "sessionToolCallDisplayOptions": {
+      "hidden": "Hide tool calls",
+      "compact": "Show tool call cards"
+    },
+    "assistantReplyGrouping": "Agent multi-part replies",
+    "assistantReplyGroupingOptions": {
+      "merged": "Merge by run",
+      "message-boundary": "Preserve OpenClaw message boundaries"
+    },
+    "sessionMessageDisplayOpenClawFact": "OpenClaw realtime events include assistant, tool, and lifecycle streams. History may store multiple assistant messages under the same runId. These settings apply to both realtime listening and history loading.",
     "agentSwitching": "Agent Switching",
     "agentSwitchingDesc": "Configure what happens when switching Agents in a conversation",
     "agentSwitchStrategy": "Global default strategy",

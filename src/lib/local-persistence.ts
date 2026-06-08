@@ -112,7 +112,7 @@ export async function loadAppSnapshot(): Promise<LocalAppSnapshot> {
     storedCurrentId && instances.some((instance) => instance.id === storedCurrentId)
       ? storedCurrentId
       : legacyCurrentId;
-  const settings = stored.settings ?? legacySettings ?? { ...DEFAULT_SETTINGS };
+  const settings = { ...DEFAULT_SETTINGS, ...(stored.settings ?? legacySettings ?? {}) };
 
   if (legacySettings || legacyInstances.length > 0 || legacyCurrentId) {
     await Promise.all([

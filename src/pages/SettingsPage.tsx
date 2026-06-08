@@ -14,6 +14,7 @@ import { useSettingsStore } from '../lib/settings-store';
 import { PRESET_THEME_COLORS } from '../lib/settings-types';
 import type { ThemeMode, SupportedLocale } from '../lib/settings-types';
 import type { AgentSwitchStrategy, InstanceAgentSwitchStrategy } from '../lib/agent-switch-settings';
+import type { AssistantReplyGrouping, SessionToolCallDisplay } from '../lib/session-content';
 import { useStore } from '../lib';
 
 const { Title, Text } = Typography;
@@ -37,6 +38,8 @@ const INSTANCE_AGENT_SWITCH_OPTIONS: InstanceAgentSwitchStrategy[] = [
   'new-session',
   'subagent-session',
 ];
+const SESSION_TOOL_CALL_DISPLAY_OPTIONS: SessionToolCallDisplay[] = ['hidden', 'compact'];
+const ASSISTANT_REPLY_GROUPING_OPTIONS: AssistantReplyGrouping[] = ['merged', 'message-boundary'];
 
 /* ── Section wrapper ── */
 function SectionCard({
@@ -311,6 +314,56 @@ export default function SettingsPage() {
               <Select.Option value="system">默认浏览器</Select.Option>
               <Select.Option value="internal">内部窗口</Select.Option>
             </Select>
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          icon="💬"
+          title={t('settings.sessionMessageDisplay')}
+          desc={t('settings.sessionMessageDisplayDesc')}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <Text size="small" style={{ display: 'block', marginBottom: 8, color: 'var(--semi-color-text-1)' }}>
+                {t('settings.sessionToolCallDisplay')}
+              </Text>
+              <Select
+                value={settings.sessionToolCallDisplay}
+                onChange={(value: unknown) =>
+                  updateSettings({ sessionToolCallDisplay: value as SessionToolCallDisplay })
+                }
+                style={{ width: 280 }}
+              >
+                {SESSION_TOOL_CALL_DISPLAY_OPTIONS.map((value) => (
+                  <Select.Option key={value} value={value}>
+                    {t(`settings.sessionToolCallDisplayOptions.${value}`)}
+                  </Select.Option>
+                ))}
+              </Select>
+            </div>
+
+            <div>
+              <Text size="small" style={{ display: 'block', marginBottom: 8, color: 'var(--semi-color-text-1)' }}>
+                {t('settings.assistantReplyGrouping')}
+              </Text>
+              <Select
+                value={settings.assistantReplyGrouping}
+                onChange={(value: unknown) =>
+                  updateSettings({ assistantReplyGrouping: value as AssistantReplyGrouping })
+                }
+                style={{ width: 280 }}
+              >
+                {ASSISTANT_REPLY_GROUPING_OPTIONS.map((value) => (
+                  <Select.Option key={value} value={value}>
+                    {t(`settings.assistantReplyGroupingOptions.${value}`)}
+                  </Select.Option>
+                ))}
+              </Select>
+            </div>
+
+            <Text type="tertiary" size="small" style={{ display: 'block', maxWidth: 620 }}>
+              {t('settings.sessionMessageDisplayOpenClawFact')}
+            </Text>
           </div>
         </SectionCard>
 

@@ -8,6 +8,28 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+export type SessionToolCallDisplay = 'hidden' | 'compact';
+export type AssistantReplyGrouping = 'merged' | 'message-boundary';
+
+export interface SessionMessageDisplaySettings {
+  toolCallDisplay: SessionToolCallDisplay;
+  assistantReplyGrouping: AssistantReplyGrouping;
+}
+
+export const DEFAULT_SESSION_MESSAGE_DISPLAY_SETTINGS: SessionMessageDisplaySettings = {
+  toolCallDisplay: 'hidden',
+  assistantReplyGrouping: 'merged',
+};
+
+export function normalizeSessionMessageDisplaySettings(
+  value?: Partial<SessionMessageDisplaySettings>,
+): SessionMessageDisplaySettings {
+  return {
+    toolCallDisplay: value?.toolCallDisplay === 'compact' ? 'compact' : 'hidden',
+    assistantReplyGrouping: value?.assistantReplyGrouping === 'message-boundary' ? 'message-boundary' : 'merged',
+  };
+}
+
 function joinText(parts: unknown[]): string {
   return parts.map(extractSessionMessageText).filter(Boolean).join('\n');
 }
@@ -99,6 +121,8 @@ export interface ChatToolCallContent {
   call_id: string;
   arguments: string;
   status?: string;
+  toolResult?: string;
+  raw?: unknown;
 }
 
 export interface ChatReasoningContent {
@@ -111,22 +135,61 @@ export interface ChatReasoningContent {
 /** ContentItem 联合类型 —— 可直接传入 AIChatDialogue Message.content */
 export type ChatContentItem = ChatTextContent | ChatToolCallContent | ChatReasoningContent;
 
+export interface SessionTimelineChat {
+  id: string;
+  status?: string;
+  sourceSessionKey?: string;
+  role?: string;
+  content?: unknown;
+  localOnly?: boolean;
+}
+
+function getTimelineChatKey(chat: SessionTimelineChat): string {
+  return `${chat.sourceSessionKey ?? ''}:${chat.id}`;
+}
+
+function hasMatchingHistoryChat(localChat: SessionTimelineChat, loadedHistory: SessionTimelineChat[]): boolean {
+  if (!localChat.localOnly) return false;
+  const localText = extractSessionMessageText(localChat.content);
+  if (!localText) return false;
+  return loadedHistory.some((historyChat) => (
+    historyChat.sourceSessionKey === localChat.sourceSessionKey
+    && historyChat.role === localChat.role
+    && extractSessionMessageText(historyChat.content) === localText
+  ));
+}
+
+export function mergeVisibleHistoryWithLiveChats<T extends SessionTimelineChat>(
+  visibleHistory: T[],
+  loadedHistory: T[],
+  currentChats: T[],
+): T[] {
+  const historyKeys = new Set(loadedHistory.map(getTimelineChatKey));
+  const liveOnly = currentChats.filter((chat) => {
+    if (historyKeys.has(getTimelineChatKey(chat))) return false;
+    if (chat.status === 'in_progress') return true;
+    return chat.localOnly === true && !hasMatchingHistoryChat(chat, loadedHistory);
+  });
+  return [...visibleHistory, ...liveOnly];
+}
+
 /** ContentItem[] 的 display text 提取 */
 export function extractContentText(items: ChatContentItem[]): string {
+  const chunks: string[] = [];
   for (const item of items) {
     if (item.type === 'message') {
       const text = item.content.map((c) => c.text).join('');
-      if (text) return text;
+      if (text) chunks.push(text);
     }
     if (item.type === 'function_call') {
-      return `🔧 ${item.name}`;
+      chunks.push(`工具调用：${item.name}（${toolStatusLabel(item.status)}）`);
     }
     if (item.type === 'reasoning') {
       const summary = item.summary.map((s) => s.text).join('\n');
-      if (summary) return summary;
+      if (summary) chunks.push(summary);
     }
   }
-  return '';
+  return chunks.join('\n');
 }
 
 /**
@@ -136,7 +199,36 @@ function extractToolCallsFromMessage(raw: unknown): unknown[] | null {
   if (!isRecord(raw)) return null;
   const tc = raw.toolCalls ?? raw.tool_calls ?? raw.functionCalls ?? raw.function_calls;
   if (Array.isArray(tc) && tc.length > 0) return tc;
+
+  if (Array.isArray(raw.content)) {
+    const contentToolCalls = raw.content.filter((item) => (
+      isRecord(item)
+      && ['toolCall', 'tool_call', 'function_call'].includes(String(item.type ?? ''))
+    ));
+    if (contentToolCalls.length > 0) return contentToolCalls;
+  }
+
   return null;
+}
+
+function isToolResultMessage(raw: unknown): boolean {
+  if (!isRecord(raw)) return false;
+  const role = String(raw.role ?? '');
+  return role === 'toolResult' || role === 'tool' || role === 'function';
+}
+
+function normalizeToolResult(raw: unknown): ChatToolCallContent | null {
+  if (!isRecord(raw)) return null;
+  const name = String(raw.toolName ?? raw.name ?? raw.functionName ?? raw.function_name ?? 'tool');
+  return {
+    type: 'function_call',
+    name,
+    call_id: String(raw.toolCallId ?? raw.tool_call_id ?? raw.callId ?? raw.call_id ?? raw.id ?? `${name}_${Date.now()}`),
+    arguments: '',
+    status: raw.isError === true ? 'failed' : 'completed',
+    toolResult: extractSessionMessageText(raw),
+    raw,
+  };
 }
 
 /**
@@ -156,6 +248,22 @@ function normalizeToolCall(tc: unknown): ChatToolCallContent | null {
       : typeof tc.args === 'string' ? tc.args
       : JSON.stringify(tc.arguments ?? tc.input ?? tc.args ?? {}),
     status: String(tc.status ?? tc.toolStatus ?? 'completed'),
+    raw: tc,
+  };
+}
+
+function toolStatusLabel(status: unknown): string {
+  const normalized = String(status ?? '').toLowerCase();
+  if (['completed', 'done', 'success', 'end', 'result'].includes(normalized)) return '完成';
+  if (['failed', 'error'].includes(normalized)) return '失败';
+  if (['in_progress', 'running', 'start', 'pending'].includes(normalized)) return '进行中';
+  return normalized || '进行中';
+}
+
+function visibleToolCallContent(toolCall: ChatToolCallContent): ChatToolCallContent {
+  return {
+    ...toolCall,
+    status: toolCall.status ?? 'completed',
   };
 }
 
@@ -164,14 +272,25 @@ function normalizeToolCall(tc: unknown): ChatToolCallContent | null {
  * - 纯文本消息 → [{ type: 'message', content: [{ type: 'output_text', text }] }]
  * - 带工具调用的消息 → [toolCall..., textMessage]
  */
-export function parseHistoryMessageToContentItems(raw: unknown): ChatContentItem[] {
+export function parseHistoryMessageToContentItems(
+  raw: unknown,
+  displaySettings?: Partial<SessionMessageDisplaySettings>,
+): ChatContentItem[] {
+  const settings = normalizeSessionMessageDisplaySettings(displaySettings);
   const items: ChatContentItem[] = [];
+
+  if (isToolResultMessage(raw)) {
+    if (settings.toolCallDisplay === 'hidden') return [];
+    const toolResult = normalizeToolResult(raw);
+    return toolResult ? [visibleToolCallContent(toolResult)] : [];
+  }
+
   const toolCalls = extractToolCallsFromMessage(raw);
 
-  if (toolCalls) {
+  if (toolCalls && settings.toolCallDisplay === 'compact') {
     for (const tc of toolCalls) {
       const normalized = normalizeToolCall(tc);
-      if (normalized) items.push(normalized);
+      if (normalized) items.push(visibleToolCallContent(normalized));
     }
   }
 
@@ -183,7 +302,7 @@ export function parseHistoryMessageToContentItems(raw: unknown): ChatContentItem
     });
   }
 
-  return items.length > 0 ? items : [{ type: 'message', content: [{ type: 'output_text', text: '' }] }];
+  return items;
 }
 
 /**
@@ -193,32 +312,62 @@ export function parseToolEventToContentItem(
   data: unknown,
   phase?: string,
 ): ChatToolCallContent | null {
-  if (!isRecord(data)) return null;
+  const record = normalizeToolEventRecord(data);
+  if (!record) return null;
 
-  const funcName = isRecord(data.function) ? String(data.function.name) : '';
-  const name = String(data.toolName ?? data.name ?? data.functionName ?? (funcName || ''));
+  const funcName = isRecord(record.function) ? String(record.function.name) : '';
+  const name = String(record.toolName ?? record.name ?? record.functionName ?? record.function_name ?? (funcName || ''));
   if (!name) return null;
 
-  const toolStatus = String(phase ?? data.toolStatus ?? data.status ?? 'in_progress');
+  const toolStatus = String(phase ?? record.toolStatus ?? record.status ?? 'in_progress');
 
   return {
     type: 'function_call',
     name,
-    call_id: String(data.callId ?? data.call_id ?? data.toolCallId ?? `${name}_${Date.now()}`),
-    arguments: typeof data.toolInput === 'string' ? data.toolInput
-      : typeof data.arguments === 'string' ? data.arguments
-      : typeof data.input === 'string' ? data.input
-      : JSON.stringify(data.toolInput ?? data.arguments ?? data.input ?? {}),
+    call_id: String(record.callId ?? record.call_id ?? record.toolCallId ?? record.tool_call_id ?? record.id ?? `${name}_${Date.now()}`),
+    arguments: typeof record.toolInput === 'string' ? record.toolInput
+      : typeof record.arguments === 'string' ? record.arguments
+      : typeof record.input === 'string' ? record.input
+      : typeof record.meta === 'string' ? record.meta
+      : typeof record.title === 'string' ? record.title
+      : JSON.stringify(record.toolInput ?? record.arguments ?? record.input ?? {}),
     status: toolStatus,
+    toolResult: extractToolOutputText(record),
+    raw: data,
   };
+}
+
+export function parseToolEventToContentItems(
+  data: unknown,
+  phase?: string,
+  displaySettings?: Partial<SessionMessageDisplaySettings>,
+): ChatContentItem[] {
+  const settings = normalizeSessionMessageDisplaySettings(displaySettings);
+  if (settings.toolCallDisplay === 'hidden') return [];
+
+  const toolItem = parseToolEventToContentItem(data, phase);
+  if (!toolItem) return [];
+
+  return [visibleToolCallContent({
+    ...toolItem,
+    status: isToolCompleted(data) ? 'completed' : toolItem.status,
+  })];
+}
+
+export function isRealtimeToolStream(stream: unknown, data: unknown): boolean {
+  if (stream === 'tool' || stream === 'command_output') return true;
+  if (stream !== 'item' || !isRecord(data)) return false;
+  const kind = String(data.kind ?? '');
+  return kind === 'tool' || kind === 'command';
 }
 
 /**
  * 判断 tool 事件是否表示工具调用已完成（含输出结果）
  */
 export function isToolCompleted(data: unknown): boolean {
-  if (!isRecord(data)) return false;
-  const status = String(data.toolStatus ?? data.status ?? data.phase ?? '');
+  const record = normalizeToolEventRecord(data);
+  if (!record) return false;
+  const status = String(record.toolStatus ?? record.status ?? record.phase ?? '');
   return ['completed', 'done', 'success', 'end', 'result'].includes(status);
 }
 
@@ -226,9 +375,140 @@ export function isToolCompleted(data: unknown): boolean {
  * 从 tool 事件数据中提取工具输出文本
  */
 export function extractToolOutputText(data: unknown): string {
-  if (!isRecord(data)) return '';
-  if (typeof data.toolOutput === 'string') return data.toolOutput;
-  if (typeof data.output === 'string') return data.output;
-  if (typeof data.result === 'string') return data.result;
-  return extractSessionMessageText(data.toolOutput ?? data.output ?? data.result);
+  const record = normalizeToolEventRecord(data);
+  if (!record) return '';
+  if (typeof record.toolOutput === 'string') return record.toolOutput;
+  if (typeof record.output === 'string') return record.output;
+  if (typeof record.result === 'string') return record.result;
+  return extractSessionMessageText(record.toolOutput ?? record.output ?? record.result);
+}
+
+function normalizeToolEventRecord(data: unknown): Record<string, unknown> | null {
+  if (!isRecord(data)) return null;
+  const nestedKeys = ['toolCall', 'tool_call', 'functionCall', 'function_call', 'call'];
+  for (const key of nestedKeys) {
+    const nested = data[key];
+    if (isRecord(nested)) {
+      return {
+        ...data,
+        ...nested,
+        toolOutput: nested.toolOutput ?? data.toolOutput ?? data.output ?? data.result,
+        output: nested.output ?? data.output,
+        result: nested.result ?? data.result,
+      };
+    }
+  }
+  return data;
+}
+
+export function getHistoryMessageDisplayId(
+  sessionKey: string,
+  message: unknown,
+  index: number,
+  displaySettings?: Partial<SessionMessageDisplaySettings>,
+): string {
+  const settings = normalizeSessionMessageDisplaySettings(displaySettings);
+  const record = isRecord(message) ? message : {};
+  const explicitId = record.id ?? record.messageId ?? record.message_id;
+  if (explicitId != null && explicitId !== '') return String(explicitId);
+
+  const runId = record.runId ?? record.run_id;
+  if (runId != null && runId !== '') {
+    return settings.assistantReplyGrouping === 'message-boundary'
+      ? `${String(runId)}:${index}`
+      : String(runId);
+  }
+
+  return `${sessionKey}:${String(record.timestamp ?? record.createdAt ?? index)}:${index}`;
+}
+
+function extractStreamMessageBoundary(payload: unknown): string | undefined {
+  if (!isRecord(payload)) return undefined;
+  const direct = payload.messageId ?? payload.message_id ?? payload.messageIndex ?? payload.message_index;
+  if (direct != null && direct !== '') return String(direct);
+
+  const data = isRecord(payload.data) ? payload.data : undefined;
+  const dataBoundary = data?.messageId ?? data?.message_id ?? data?.messageIndex ?? data?.message_index;
+  if (dataBoundary != null && dataBoundary !== '') return String(dataBoundary);
+
+  const message = isRecord(data?.message) ? data.message : undefined;
+  const messageBoundary = message?.id ?? message?.messageId ?? message?.message_id;
+  if (messageBoundary != null && messageBoundary !== '') return String(messageBoundary);
+
+  return undefined;
+}
+
+export function getStreamMessageDisplayId(
+  runId: string,
+  payload: unknown,
+  displaySettings?: Partial<SessionMessageDisplaySettings>,
+): string {
+  const settings = normalizeSessionMessageDisplaySettings(displaySettings);
+  if (settings.assistantReplyGrouping !== 'message-boundary') return runId;
+
+  const boundary = extractStreamMessageBoundary(payload);
+  return boundary ? `${runId}:message:${boundary}` : runId;
+}
+
+function getUsageTotalTokens(chat: unknown): number | undefined {
+  if (!isRecord(chat)) return undefined;
+  const usage = isRecord(chat.usage) ? chat.usage : undefined;
+  const total = usage?.totalTokens ?? usage?.total_tokens ?? usage?.total;
+  return typeof total === 'number' && Number.isFinite(total) ? total : undefined;
+}
+
+function countToolCalls(content: unknown): number {
+  if (!Array.isArray(content)) return 0;
+  return content.filter((item) => isRecord(item) && item.type === 'function_call').length;
+}
+
+export interface SessionInsight {
+  messageCount: number;
+  userMessageCount: number;
+  assistantMessageCount: number;
+  toolCallCount: number;
+  usedContextTokens?: number;
+  contextLimit?: number;
+  contextUsageRatio?: number;
+  lastActivityAt?: number;
+}
+
+export function deriveSessionInsight(
+  chats: unknown[],
+  model?: { contextWindow?: number },
+): SessionInsight {
+  let usedContextTokens: number | undefined;
+  let lastActivityAt: number | undefined;
+  let userMessageCount = 0;
+  let assistantMessageCount = 0;
+  let toolCallCount = 0;
+
+  for (const chat of chats) {
+    if (!isRecord(chat)) continue;
+    if (chat.role === 'user') userMessageCount += 1;
+    if (chat.role !== 'user' && chat.role !== 'system') assistantMessageCount += 1;
+    toolCallCount += countToolCalls(chat.content);
+
+    const usageTotal = getUsageTotalTokens(chat);
+    if (usageTotal !== undefined) usedContextTokens = usageTotal;
+
+    const createAt = typeof chat.createAt === 'number' ? chat.createAt : undefined;
+    if (createAt !== undefined) lastActivityAt = Math.max(lastActivityAt ?? createAt, createAt);
+  }
+
+  const contextLimit = model?.contextWindow;
+  const contextUsageRatio = usedContextTokens !== undefined && contextLimit
+    ? Math.min(1, usedContextTokens / contextLimit)
+    : undefined;
+
+  return {
+    messageCount: chats.length,
+    userMessageCount,
+    assistantMessageCount,
+    toolCallCount,
+    usedContextTokens,
+    contextLimit,
+    contextUsageRatio,
+    lastActivityAt,
+  };
 }

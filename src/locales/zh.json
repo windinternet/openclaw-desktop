@@ -159,6 +159,19 @@
     "connectionsDesc": "配置多实例连接策略",
     "connectAllInstancesOnStartup": "启动时连接全部实例",
     "connectAllInstancesOnStartupDesc": "关闭时只连接当前实例，其他实例在首次切换后保持常驻连接。",
+    "sessionMessageDisplay": "会话消息展示",
+    "sessionMessageDisplayDesc": "配置会话详情页如何展示 OpenClaw 回复与工具事件",
+    "sessionToolCallDisplay": "工具调用展示",
+    "sessionToolCallDisplayOptions": {
+      "hidden": "隐藏工具调用",
+      "compact": "显示工具调用卡片"
+    },
+    "assistantReplyGrouping": "Agent 多段回复",
+    "assistantReplyGroupingOptions": {
+      "merged": "按同一次运行合并",
+      "message-boundary": "保留 OpenClaw 消息边界"
+    },
+    "sessionMessageDisplayOpenClawFact": "OpenClaw 实时事件包含 assistant、tool、lifecycle 三类流；历史记录可能在同一 runId 下保存多条 assistant 消息。这里的设置会同时影响实时监听与历史加载。",
     "agentSwitching": "Agent 切换",
     "agentSwitchingDesc": "配置会话中切换 Agent 时的行为",
     "agentSwitchStrategy": "全局默认策略",

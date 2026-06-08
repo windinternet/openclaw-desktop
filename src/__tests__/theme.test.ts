@@ -45,16 +45,11 @@ describe('applyTheme', () => {
     });
 
     applyTheme({
+      ...DEFAULT_SETTINGS,
       initialized: false,
       themeMode: 'dark',
       themeColor: 'purple',
       locale: 'zh-CN',
-      userDisplayName: '',
-      aiCompletionSound: 'mixkit-message-pop-alert-2354.mp3',
-      connectAllInstancesOnStartup: false,
-      externalLinkMode: 'system',
-      agentSwitchStrategy: 'new-session',
-      openTuningOnStartup: false,
     });
 
     expect(body.style.getPropertyValue('--semi-color-primary')).toBe('#722ED1');
@@ -82,16 +77,11 @@ describe('applyTheme', () => {
     });
 
     applyTheme({
+      ...DEFAULT_SETTINGS,
       initialized: false,
       themeMode: 'light',
       themeColor: 'purple',
       locale: 'zh-CN',
-      userDisplayName: '',
-      aiCompletionSound: 'mixkit-message-pop-alert-2354.mp3',
-      connectAllInstancesOnStartup: false,
-      externalLinkMode: 'system',
-      agentSwitchStrategy: 'new-session',
-      openTuningOnStartup: false,
     });
 
     expect(body.style.getPropertyValue('--semi-color-primary-light-default')).toBe('#f1eafa');
@@ -106,5 +96,10 @@ describe('applyTheme', () => {
 
   it('defaults to creating a new visible session when switching agents', () => {
     expect(DEFAULT_SETTINGS.agentSwitchStrategy).toBe('new-session');
+  });
+
+  it('defaults to a simple session message display for non-technical users', () => {
+    expect(DEFAULT_SETTINGS.sessionToolCallDisplay).toBe('hidden');
+    expect(DEFAULT_SETTINGS.assistantReplyGrouping).toBe('merged');
   });
 });

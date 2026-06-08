@@ -1,20 +1,28 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AIChatDialogue, AIChatInput, Toast } from '@douyinfe/semi-ui';
-import type { RenderContentProps } from '@douyinfe/semi-ui/lib/es/chat/interface';
+import { AIChatDialogue, AIChatInput, Button, Progress, Tabs, Tag, Toast, Typography } from '@douyinfe/semi-ui';
+import { IconClose, IconInfoCircle, IconList, IconWrench } from '@douyinfe/semi-icons';
+import type {
+  DialogueContentItemRendererMap,
+  RenderContentProps,
+} from '@douyinfe/semi-ui/lib/es/aiChatDialogue/interface';
 import { useStore } from '../lib';
 import type { EventFrame } from '../lib/types';
 import {
   decodeSessionKeyParam,
+  deriveSessionInsight,
   extractSessionMessageText,
   extractSessionMessageItems,
   parseHistoryMessageToContentItems,
   parseContextualUserMessage,
-  parseToolEventToContentItem,
+  parseToolEventToContentItems,
   isToolCompleted,
-  extractToolOutputText,
+  isRealtimeToolStream,
+  getHistoryMessageDisplayId,
+  getStreamMessageDisplayId,
+  mergeVisibleHistoryWithLiveChats,
 } from '../lib/session-content';
-import type { ChatContentItem } from '../lib/session-content';
+import type { ChatContentItem, SessionMessageDisplaySettings } from '../lib/session-content';
 import { isAssistantCompletionEvent } from '../lib/assistant-completion-notifier';
 import AgentSelectOption from '../components/AgentSelectOption';
 import ContextSummary from '../components/ContextSummary';
@@ -51,6 +59,7 @@ import {
 } from '../lib/new-session';
 
 const { Configure } = AIChatInput;
+const { Text } = Typography;
 
 function generateIdempotencyKey(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
@@ -137,6 +146,7 @@ interface ChatLocationState {
 
 interface DisplayChat {
   id: string;
+  runId?: string;
   role: string;
   content: string | ChatContentItem[];
   createAt: number;
@@ -144,6 +154,15 @@ interface DisplayChat {
   sourceSessionKey: string;
   agentId?: string;
   contextSummary?: string;
+  usage?: unknown;
+  model?: string;
+  localOnly?: boolean;
+}
+
+interface SelectedToolCall {
+  item: Extract<ChatContentItem, { type: 'function_call' }>;
+  messageId?: string;
+  sourceSessionKey?: string;
 }
 
 function getMessageRole(role: unknown, sessionKey: string): string {
@@ -159,20 +178,22 @@ function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null ? value as Record<string, unknown> : {};
 }
 
-function getHistoryMessageId(sessionKey: string, message: unknown, index: number): string {
-  const record = asRecord(message);
-  return String(record.id ?? record.runId ?? record.run_id ?? `${sessionKey}:${record.timestamp ?? record.createdAt ?? index}:${index}`);
-}
-
-function buildDisplayChat(sessionKey: string, message: unknown, index: number): DisplayChat {
+function buildDisplayChat(
+  sessionKey: string,
+  message: unknown,
+  index: number,
+  displaySettings: SessionMessageDisplaySettings,
+): DisplayChat | null {
   const record = asRecord(message);
   const parsedContext = record.role === 'user' ? parseContextualUserMessage(record) : null;
   const contentSource = parsedContext ? { ...record, content: parsedContext.userMessage } : record;
+  const content = parseHistoryMessageToContentItems(contentSource, displaySettings);
+  if (content.length === 0) return null;
   const agentId = getAgentIdFromSessionKey(sessionKey);
   return {
-    id: getHistoryMessageId(sessionKey, record, index),
+    id: getHistoryMessageDisplayId(sessionKey, record, index, displaySettings),
     role: getMessageRole(record.role, sessionKey),
-    content: parseHistoryMessageToContentItems(contentSource),
+    content,
     createAt: Number(record.timestamp || record.createdAt || Date.now()),
     status: record.role === 'assistant' && (record.status === 'in_progress' || record.status === 'running')
       ? 'completed'
@@ -180,6 +201,8 @@ function buildDisplayChat(sessionKey: string, message: unknown, index: number): 
     sourceSessionKey: sessionKey,
     agentId,
     contextSummary: parsedContext?.summary,
+    usage: record.usage,
+    model: typeof record.model === 'string' ? record.model : undefined,
   };
 }
 
@@ -187,6 +210,310 @@ function mergeChats(chats: DisplayChat[]): DisplayChat[] {
   const byId = new Map<string, DisplayChat>();
   for (const chat of chats) byId.set(`${chat.sourceSessionKey}:${chat.id}`, chat);
   return [...byId.values()].sort((a, b) => a.createAt - b.createAt);
+}
+
+function isToolOnlyChat(chat: DisplayChat): boolean {
+  return (
+    Array.isArray(chat.content)
+    && chat.content.length > 0
+    && chat.content.every((item) => item.type === 'function_call')
+  );
+}
+
+function resolveGroupedStatus(group: DisplayChat[]): string {
+  if (group.some((chat) => chat.status === 'failed')) return 'failed';
+  if (group.some((chat) => chat.status === 'in_progress')) return 'in_progress';
+  return group[group.length - 1]?.status || 'completed';
+}
+
+function flushToolGroup(group: DisplayChat[], output: DisplayChat[]): void {
+  if (group.length === 0) return;
+  if (group.length === 1) {
+    output.push(group[0]);
+    return;
+  }
+
+  const first = group[0];
+  const last = group[group.length - 1];
+  output.push({
+    ...first,
+    id: `${first.id}:tool-group:${last.id}:${group.length}`,
+    content: group.flatMap((chat) => Array.isArray(chat.content) ? chat.content : []),
+    status: resolveGroupedStatus(group),
+    usage: last.usage ?? first.usage,
+    model: last.model ?? first.model,
+  });
+}
+
+function groupAdjacentToolCallChats(chats: DisplayChat[]): DisplayChat[] {
+  const output: DisplayChat[] = [];
+  let group: DisplayChat[] = [];
+
+  for (const chat of chats) {
+    const canJoinGroup = (
+      isToolOnlyChat(chat)
+      && (
+        group.length === 0
+        || (
+          chat.role === group[0].role
+          && chat.sourceSessionKey === group[0].sourceSessionKey
+          && chat.agentId === group[0].agentId
+        )
+      )
+    );
+
+    if (canJoinGroup) {
+      group.push(chat);
+      continue;
+    }
+
+    flushToolGroup(group, output);
+    group = [];
+    output.push(chat);
+  }
+
+  flushToolGroup(group, output);
+  return output;
+}
+
+function safePretty(value: unknown): string {
+  if (value == null || value === '') return '暂无数据';
+  if (typeof value === 'string') {
+    try {
+      return JSON.stringify(JSON.parse(value), null, 2);
+    } catch {
+      return value;
+    }
+  }
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function formatNumber(value?: number): string {
+  if (value === undefined || !Number.isFinite(value)) return '未知';
+  return new Intl.NumberFormat('zh-CN').format(Math.round(value));
+}
+
+function formatPercent(value?: number): string {
+  if (value === undefined || !Number.isFinite(value)) return '未知';
+  return `${Math.round(value * 100)}%`;
+}
+
+function toolStatusColor(status?: string): 'green' | 'orange' | 'red' | 'blue' | 'grey' {
+  const normalized = String(status ?? '').toLowerCase();
+  if (['completed', 'done', 'success', 'end', 'result'].includes(normalized)) return 'green';
+  if (['failed', 'error'].includes(normalized)) return 'red';
+  if (['in_progress', 'running', 'start', 'pending'].includes(normalized)) return 'orange';
+  return 'blue';
+}
+
+function DetailCodeBlock({ value }: { value: unknown }) {
+  return (
+    <pre
+      style={{
+        margin: 0,
+        padding: 10,
+        borderRadius: 6,
+        background: 'var(--semi-color-fill-0)',
+        border: '1px solid var(--semi-color-border)',
+        color: 'var(--semi-color-text-0)',
+        fontSize: 12,
+        lineHeight: 1.5,
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+        maxHeight: 220,
+        overflow: 'auto',
+      }}
+    >
+      {safePretty(value)}
+    </pre>
+  );
+}
+
+function isPendingDialogueMessage(message?: { content?: unknown; output_text?: unknown; status?: string }): boolean {
+  if (!message || message.status !== 'in_progress' || message.output_text) return false;
+  return Array.isArray(message.content) && message.content.length === 0;
+}
+
+function PendingDialogueLoading() {
+  return (
+    <span className="semi-ai-chat-dialogue-content-loading">
+      <span className="semi-ai-chat-dialogue-content-loading-item" />
+      <span className="semi-ai-chat-dialogue-content-loading-item" />
+      <span className="semi-ai-chat-dialogue-content-loading-item" />
+      <span className="semi-ai-chat-dialogue-content-loading-text">加载中</span>
+    </span>
+  );
+}
+
+function SessionSidePanel({
+  activeKey,
+  insight,
+  selectedTool,
+  onTabChange,
+  onClearTool,
+}: {
+  activeKey: string;
+  insight: ReturnType<typeof deriveSessionInsight>;
+  selectedTool: SelectedToolCall | null;
+  onTabChange: (key: string) => void;
+  onClearTool: () => void;
+}) {
+  const contextPercent = insight.contextUsageRatio !== undefined
+    ? Math.round(insight.contextUsageRatio * 100)
+    : 0;
+
+  return (
+    <aside
+      style={{
+        width: 340,
+        flexShrink: 0,
+        borderLeft: '1px solid var(--semi-color-border)',
+        background: 'var(--semi-color-bg-1)',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+      }}
+    >
+      <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid var(--semi-color-border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <IconInfoCircle size="small" />
+            <Text strong>AI Sider</Text>
+          </div>
+          {selectedTool && (
+            <Button
+              aria-label="清空工具详情"
+              icon={<IconClose size="small" />}
+              size="small"
+              theme="borderless"
+              onClick={onClearTool}
+            />
+          )}
+        </div>
+      </div>
+
+      <Tabs
+        activeKey={activeKey}
+        onChange={(key) => onTabChange(String(key))}
+        size="small"
+        style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+        contentStyle={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '12px 16px 16px' }}
+      >
+        <Tabs.TabPane tab="概况" itemKey="overview">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <section>
+              <Text strong style={{ display: 'block', marginBottom: 8 }}>上下文窗口</Text>
+              <Progress
+                percent={contextPercent}
+                showInfo
+                size="small"
+                stroke={insight.contextUsageRatio && insight.contextUsageRatio > 0.8 ? 'var(--semi-color-warning)' : 'var(--semi-color-primary)'}
+              />
+              <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 6 }}>
+                已用 {formatNumber(insight.usedContextTokens)} / {formatNumber(insight.contextLimit)} tokens（{formatPercent(insight.contextUsageRatio)}）
+              </Text>
+            </section>
+
+            <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <Metric label="消息" value={formatNumber(insight.messageCount)} />
+              <Metric label="工具调用" value={formatNumber(insight.toolCallCount)} />
+              <Metric label="用户消息" value={formatNumber(insight.userMessageCount)} />
+              <Metric label="Agent 回复" value={formatNumber(insight.assistantMessageCount)} />
+            </section>
+
+            <section>
+              <Text strong style={{ display: 'block', marginBottom: 8 }}>后续洞察能力</Text>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <FutureItem label="会话摘要" />
+                <FutureItem label="关键事实" />
+                <FutureItem label="TODO List" />
+              </div>
+            </section>
+          </div>
+        </Tabs.TabPane>
+
+        <Tabs.TabPane tab="工具" itemKey="tool">
+          {selectedTool ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                  <IconWrench size="small" />
+                  <Text strong ellipsis={{ showTooltip: true }} style={{ minWidth: 0 }}>
+                    {selectedTool.item.name}
+                  </Text>
+                </div>
+                <Tag color={toolStatusColor(selectedTool.item.status)} size="small">
+                  {selectedTool.item.status ?? 'unknown'}
+                </Tag>
+              </div>
+
+              <section>
+                <Text strong size="small" style={{ display: 'block', marginBottom: 6 }}>参数</Text>
+                <DetailCodeBlock value={selectedTool.item.arguments} />
+              </section>
+
+              <section>
+                <Text strong size="small" style={{ display: 'block', marginBottom: 6 }}>结果</Text>
+                <DetailCodeBlock value={selectedTool.item.toolResult} />
+              </section>
+
+              <section>
+                <Text strong size="small" style={{ display: 'block', marginBottom: 6 }}>原始结构</Text>
+                <DetailCodeBlock value={selectedTool.item.raw ?? selectedTool.item} />
+              </section>
+            </div>
+          ) : (
+            <div style={{ paddingTop: 32, textAlign: 'center', color: 'var(--semi-color-text-2)' }}>
+              <IconWrench />
+              <Text type="tertiary" style={{ display: 'block', marginTop: 8 }}>
+                点击聊天中的工具调用查看详情
+              </Text>
+            </div>
+          )}
+        </Tabs.TabPane>
+
+        <Tabs.TabPane tab="洞察" itemKey="insight">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <InsightPlaceholder title="会话摘要" desc="后续可接入 OpenClaw 或本地摘要生成。" />
+            <InsightPlaceholder title="关键事实" desc="沉淀用户确认过的重要事实与约束。" />
+            <InsightPlaceholder title="TODO List" desc="从会话中抽取未完成事项与负责人。" />
+          </div>
+        </Tabs.TabPane>
+      </Tabs>
+    </aside>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ padding: 10, borderRadius: 6, background: 'var(--semi-color-fill-0)' }}>
+      <Text type="tertiary" size="small" style={{ display: 'block' }}>{label}</Text>
+      <Text strong>{value}</Text>
+    </div>
+  );
+}
+
+function FutureItem({ label }: { label: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <IconList size="small" />
+      <Text size="small">{label}</Text>
+      <Tag color="grey" size="small">预留</Tag>
+    </div>
+  );
+}
+
+function InsightPlaceholder({ title, desc }: { title: string; desc: string }) {
+  return (
+    <div style={{ padding: 10, borderRadius: 6, border: '1px solid var(--semi-color-border)' }}>
+      <Text strong style={{ display: 'block', marginBottom: 4 }}>{title}</Text>
+      <Text type="tertiary" size="small">{desc}</Text>
+    </div>
+  );
 }
 
 export default function SessionChatPage() {
@@ -203,6 +530,12 @@ export default function SessionChatPage() {
     (s) => s.instances.find((instance) => instance.id === s.currentInstanceId) ?? null,
   );
   const globalAgentSwitchStrategy = useSettingsStore((s) => s.settings.agentSwitchStrategy);
+  const sessionToolCallDisplay = useSettingsStore((s) => s.settings.sessionToolCallDisplay);
+  const assistantReplyGrouping = useSettingsStore((s) => s.settings.assistantReplyGrouping);
+  const sessionMessageDisplaySettings = useMemo(
+    () => ({ toolCallDisplay: sessionToolCallDisplay, assistantReplyGrouping }),
+    [assistantReplyGrouping, sessionToolCallDisplay],
+  );
 
   const initialSessionKey = decodeSessionKeyParam(urlSessionKey);
   const [rootSessionKey, setRootSessionKey] = useState<string | undefined>(initialSessionKey);
@@ -217,6 +550,8 @@ export default function SessionChatPage() {
   const PAGE_SIZE = 30;
   const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
   const [allHistory, setAllHistory] = useState<DisplayChat[]>([]);
+  const [selectedToolCall, setSelectedToolCall] = useState<SelectedToolCall | null>(null);
+  const [sidePanelTab, setSidePanelTab] = useState('overview');
 
   
   const streamingIdRef = useRef<string | null>(null);
@@ -321,9 +656,7 @@ export default function SessionChatPage() {
     const visible = allHistory.slice(-displayLimit);
     
         setChats((prev) => {
-      const historyIds = new Set(allHistory.map((c) => c.id));
-      const streamingOnly = prev.filter((c) => !historyIds.has(c.id));
-      return mergeChats([...visible, ...streamingOnly]);
+      return mergeChats(mergeVisibleHistoryWithLiveChats(visible, allHistory, prev));
     });
   }, [displayLimit, allHistory]);
 
@@ -359,7 +692,9 @@ export default function SessionChatPage() {
           } catch {
             data = await activeClient.request('sessions.preview', { keys: [sessionKey] });
           }
-          return extractSessionMessageItems(data).map((message, index) => buildDisplayChat(sessionKey, message, index));
+          return extractSessionMessageItems(data)
+            .map((message, index) => buildDisplayChat(sessionKey, message, index, sessionMessageDisplaySettings))
+            .filter((chat): chat is DisplayChat => chat !== null);
         }));
         if (cancelled) return;
         const loadedChats = mergeChats(histories.flat());
@@ -367,10 +702,8 @@ export default function SessionChatPage() {
         setAllHistory(loadedChats);
         setDisplayLimit(newLimit);
         setChats((prev) => {
-          const historyIds = new Set(loadedChats.map((c) => c.id));
-          const streamingOnly = prev.filter((c) => !historyIds.has(c.id) && c.status === 'in_progress');
           const visible = loadedChats.slice(-newLimit);
-          return mergeChats([...visible, ...streamingOnly]);
+          return mergeChats(mergeVisibleHistoryWithLiveChats(visible, loadedChats, prev));
         });
       } catch {
         if (!cancelled) setChats((prev) => (prev.length > 0 ? prev : []));
@@ -379,7 +712,7 @@ export default function SessionChatPage() {
     return () => {
       cancelled = true;
     };
-  }, [rootSessionKey, relatedSessionKeys, activeClient, connectionStatus]);
+  }, [rootSessionKey, relatedSessionKeys, activeClient, connectionStatus, sessionMessageDisplaySettings]);
 
   const endGeneration = useCallback((status: string, runId?: string) => {
     setGenerating(false);
@@ -387,10 +720,13 @@ export default function SessionChatPage() {
     if (genTimeoutRef.current) { clearTimeout(genTimeoutRef.current); genTimeoutRef.current = null; }
     const sid = runId || streamingIdRef.current || 'done';
     setChats((prev) => {
-      const last = prev[prev.length - 1];
-      if (last && last.id === sid)
-        return [...prev.slice(0, -1), { ...last, status }];
-      return prev;
+      let changed = false;
+      const next = prev.map((chat) => {
+        if (chat.id !== sid && chat.runId !== sid) return chat;
+        changed = true;
+        return { ...chat, status };
+      });
+      return changed ? next : prev;
     });
     streamingIdRef.current = null;
     useStore.getState().fetchSessions();
@@ -421,9 +757,46 @@ export default function SessionChatPage() {
         }
         const data = p.data as Record<string, unknown> | undefined;
         const delta = (data?.delta ?? data?.text ?? data?.content ?? '') as string;
-        if (!delta) return;
+        const displayChatId = getStreamMessageDisplayId(runId, p, sessionMessageDisplaySettings);
+        if (!delta) {
+          const completeMessage = data?.message ?? data;
+          const completeRecord = asRecord(completeMessage);
+          const contentItems = parseHistoryMessageToContentItems(completeMessage, sessionMessageDisplaySettings);
+          if (contentItems.length === 0) return;
+          setChats((prev) => {
+            const existingIndex = prev.findIndex((chat) => chat.id === displayChatId && chat.sourceSessionKey === sourceSessionKey);
+            if (existingIndex >= 0) {
+              const next = [...prev];
+              next[existingIndex] = {
+                ...next[existingIndex],
+                runId,
+                content: contentItems,
+                usage: completeRecord.usage,
+                model: typeof completeRecord.model === 'string' ? completeRecord.model : next[existingIndex].model,
+              };
+              return next;
+            }
+            return [
+              ...prev,
+              {
+                id: displayChatId,
+                runId,
+                role: assistantRole,
+                content: contentItems,
+                status: 'in_progress',
+                createAt: Date.now(),
+                sourceSessionKey,
+                agentId: getAgentIdFromSessionKey(sourceSessionKey),
+                usage: completeRecord.usage,
+                model: typeof completeRecord.model === 'string' ? completeRecord.model : undefined,
+              },
+            ];
+          });
+          streamingIdRef.current = runId;
+          return;
+        }
         setChats((prev) => {
-          const existingIndex = prev.findIndex((chat) => chat.id === runId && chat.sourceSessionKey === sourceSessionKey);
+          const existingIndex = prev.findIndex((chat) => chat.id === displayChatId && chat.sourceSessionKey === sourceSessionKey);
           const existing = existingIndex >= 0 ? prev[existingIndex] : undefined;
           if (existing) {
             // 已有流式消息：直接拼接纯文本内容到最后一个 text block
@@ -440,11 +813,28 @@ export default function SessionChatPage() {
             next[existingIndex] = { ...existing, content: String(existing.content || '') + delta };
             return next;
           }
+          const placeholderIndex = prev.findIndex((chat) => (
+            chat.id === runId
+            && chat.sourceSessionKey === sourceSessionKey
+            && Array.isArray(chat.content)
+            && chat.content.length === 0
+          ));
+          if (placeholderIndex >= 0) {
+            const next = [...prev];
+            next[placeholderIndex] = {
+              ...next[placeholderIndex],
+              id: displayChatId,
+              runId,
+              content: appendTextToContent([], delta),
+            };
+            return next;
+          }
           // 新流式消息：创建 ContentItem[] 格式
           return [
             ...prev,
             {
-              id: runId,
+              id: displayChatId,
+              runId,
               role: assistantRole,
               content: appendTextToContent([], delta),
               status: 'in_progress',
@@ -455,16 +845,16 @@ export default function SessionChatPage() {
           ];
         });
         streamingIdRef.current = runId;
-      } else if (stream === 'tool') {
+      } else if (isRealtimeToolStream(stream, p.data)) {
         // ── 工具调用事件：独立为单独的 DisplayChat 条目 ──
         if (isActiveLensEvent) {
           setGenerating(true);
           if (genTimeoutRef.current) { clearTimeout(genTimeoutRef.current); genTimeoutRef.current = null; }
         }
         const data = p.data as Record<string, unknown> | undefined;
-        const phase = p.phase as string | undefined;
-        const toolItem = parseToolEventToContentItem(data, phase);
-        if (!toolItem) {
+        const phase = (p.phase ?? data?.phase) as string | undefined;
+        const toolContent = parseToolEventToContentItems(data, phase, sessionMessageDisplaySettings);
+        if (toolContent.length === 0) {
           // No valid tool item parsed; still check for completion marker
           if (isToolCompleted(data)) {
             setChats((prev) => {
@@ -478,9 +868,17 @@ export default function SessionChatPage() {
           return;
         }
 
-        const toolChatId = `${runId}-tool-${toolItem.call_id}`;
+        const toolRecord = asRecord(data);
+        const toolChatId = `${runId}-tool-${String(
+          toolRecord.callId
+          ?? toolRecord.call_id
+          ?? toolRecord.toolCallId
+          ?? toolRecord.id
+          ?? toolRecord.toolName
+          ?? toolRecord.name
+          ?? 'tool',
+        )}`;
         const toolStatus = isToolCompleted(data) ? 'completed' : (phase === 'error' ? 'failed' : 'in_progress');
-        const updatedToolItem = { ...toolItem, status: toolStatus };
 
         setChats((prev) => {
           const existingToolIdx = prev.findIndex((c) => c.id === toolChatId);
@@ -490,31 +888,21 @@ export default function SessionChatPage() {
             const next = [...prev];
             next[existingToolIdx] = {
               ...next[existingToolIdx],
-              content: [updatedToolItem] as ChatContentItem[],
+              content: toolContent,
               status: toolStatus === 'completed' ? 'completed' : 'in_progress',
             };
             return next;
           }
 
           // Create new independent tool chat entry (separate from assistant text bubble)
-          const toolContent: ChatContentItem[] = [updatedToolItem];
-          // If the tool completed with output text, include it as a message block
-          if (toolStatus === 'completed') {
-            const outputText = extractToolOutputText(data);
-            if (outputText) {
-              toolContent.push({
-                type: 'message',
-                content: [{ type: 'output_text', text: outputText }],
-              });
-            }
-          }
           return [
             ...prev,
             {
               id: toolChatId,
+              runId,
               role: assistantRole,
               content: toolContent,
-              status: 'completed',
+              status: toolStatus === 'completed' ? 'completed' : 'in_progress',
               createAt: Date.now(),
               sourceSessionKey,
               agentId: getAgentIdFromSessionKey(sourceSessionKey),
@@ -532,6 +920,8 @@ export default function SessionChatPage() {
             setChats((prev) => prev.map((chat) => (
               chat.id === runId && chat.sourceSessionKey === sourceSessionKey
                 ? { ...chat, status: 'completed' }
+                : chat.runId === runId && chat.sourceSessionKey === sourceSessionKey
+                  ? { ...chat, status: 'completed' }
                 : chat
             )));
           }
@@ -546,6 +936,7 @@ export default function SessionChatPage() {
                 ...prev,
                 {
                   id: runId,
+                  runId,
                   role: assistantRole,
                   content: [] as ChatContentItem[],
                   status: 'in_progress',
@@ -561,7 +952,7 @@ export default function SessionChatPage() {
       }
     };
     return activeClient.subscribeEvent(handleEvent);
-  }, [activeClient, activeSessionKey, rootSessionKey, relatedSessionKeys, endGeneration]);
+  }, [activeClient, activeSessionKey, rootSessionKey, relatedSessionKeys, endGeneration, sessionMessageDisplaySettings]);
 
   const patchSessionConfig = useCallback(async (options?: { model?: string; thinking?: string }) => {
     const model = options?.model || chatModel;
@@ -603,10 +994,12 @@ export default function SessionChatPage() {
       setGenerating(true);
       if (genTimeoutRef.current) clearTimeout(genTimeoutRef.current);
       genTimeoutRef.current = setTimeout(() => endGeneration('completed'), 300000);
+      const userMessageId = generateIdempotencyKey();
+      const pendingAssistantId = `pending-assistant-${userMessageId}`;
       setChats((prev) => [
         ...prev,
         {
-          id: generateIdempotencyKey(),
+          id: userMessageId,
           role: 'user',
           content: message.trim(),
           createAt: Date.now(),
@@ -614,16 +1007,44 @@ export default function SessionChatPage() {
           sourceSessionKey: activeSessionKey,
           agentId: getAgentIdFromSessionKey(activeSessionKey),
           contextSummary: pendingSummary?.summary,
+          localOnly: true,
+        },
+        {
+          id: pendingAssistantId,
+          role: getAgentRoleKey(getAgentIdFromSessionKey(activeSessionKey) || 'main'),
+          content: [] as ChatContentItem[],
+          createAt: Date.now() + 1,
+          status: 'in_progress',
+          sourceSessionKey: activeSessionKey,
+          agentId: getAgentIdFromSessionKey(activeSessionKey),
+          localOnly: true,
         },
       ]);
 
       try {
         await patchSessionConfig(options);
-        await activeClient.request('chat.send', {
+        const sendResult = await activeClient.request<{ runId?: string }>('chat.send', {
           message: gatewayMessage,
           sessionKey: activeSessionKey,
           idempotencyKey: generateIdempotencyKey(),
         });
+        if (sendResult?.runId) {
+          streamingIdRef.current = sendResult.runId;
+          setChats((prev) => {
+            const hasRunChat = prev.some((chat) => (
+              (chat.id === sendResult.runId || chat.runId === sendResult.runId)
+              && chat.sourceSessionKey === activeSessionKey
+            ));
+            if (hasRunChat) {
+              return prev.filter((chat) => chat.id !== pendingAssistantId);
+            }
+            return prev.map((chat) => (
+              chat.id === pendingAssistantId
+                ? { ...chat, id: sendResult.runId!, runId: sendResult.runId, localOnly: true }
+                : chat
+            ));
+          });
+        }
         if (currentInstanceId && pendingSummary) {
           consumePendingSummary(currentInstanceId, activeSessionKey);
         }
@@ -641,6 +1062,9 @@ export default function SessionChatPage() {
         Toast.error(err instanceof Error ? err.message : '发送失败');
         setGenerating(false);
         sendingRef.current = false;
+        setChats((prev) => prev.map((chat) => (
+          chat.id === pendingAssistantId ? { ...chat, status: 'failed' } : chat
+        )));
       }
     },
     [activeClient, activeSessionKey, chats.length, currentInstanceId, endGeneration, patchSessionConfig, rootSessionKey],
@@ -668,8 +1092,8 @@ export default function SessionChatPage() {
       thinking: initialMessage.thinking,
     });
 
-    navigate(window.location.hash, { replace: true, state: null });
-  }, [activeClient, activeSessionKey, connectionStatus, handleSend, location.state, navigate]);
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+  }, [activeClient, activeSessionKey, connectionStatus, handleSend, location.pathname, location.search, location.state, navigate]);
 
   const handleStop = useCallback(async () => {
     if (!activeClient || !activeSessionKey) return;
@@ -864,6 +1288,66 @@ export default function SessionChatPage() {
     if ('thinking' in changed) setChatThinking(changed.thinking as string);
   }, [handleAgentSwitch]);
 
+  const currentModel = useMemo(
+    () => models.find((model) => model.id === chatModel) ?? models[0],
+    [chatModel, models],
+  );
+
+  const sessionInsight = useMemo(
+    () => deriveSessionInsight(chats, currentModel),
+    [chats, currentModel],
+  );
+
+  const displayChats = useMemo(
+    () => groupAdjacentToolCallChats(chats),
+    [chats],
+  );
+
+  const renderDialogueContentItem = useMemo<DialogueContentItemRendererMap>(() => ({
+    function_call: (item: SelectedToolCall['item'], message?: { id?: string; sourceSessionKey?: string }) => (
+      <button
+        type="button"
+        className="semi-ai-chat-dialogue-content-tool-call"
+        onClick={() => {
+          setSelectedToolCall({
+            item,
+            messageId: message?.id,
+            sourceSessionKey: message?.sourceSessionKey,
+          });
+          setSidePanelTab('tool');
+        }}
+        style={{
+          border: 0,
+          cursor: 'pointer',
+          width: 'clamp(180px, calc(100vw - 560px), 560px)',
+          maxWidth: '100%',
+          textAlign: 'left',
+          font: 'inherit',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          overflow: 'hidden',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        <IconWrench style={{ flex: '0 0 auto' }} />
+        <span style={{ flex: '0 0 auto' }}>{item.name}</span>
+        {item.arguments ? (
+          <span
+            style={{
+              minWidth: 0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {item.arguments}
+          </span>
+        ) : null}
+      </button>
+    ),
+  }), []);
+
   if (!activeSessionKey) {
     return (
       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--semi-color-text-2)' }}>
@@ -873,40 +1357,54 @@ export default function SessionChatPage() {
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div ref={chatContainerRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: '16px 16px 0' }}>
-        <AIChatDialogue
-          chats={chats}
-          roleConfig={roleConfig}
-          chatBoxRenderConfig={{
-            renderChatBoxContent: ({ message, defaultContent }: RenderContentProps) => (
-              <>
-                {typeof message?.contextSummary === 'string' && message.contextSummary && (
-                  <ContextSummary summary={message.contextSummary} />
-                )}
-                {defaultContent}
-              </>
-            ),
-          }}
-          mode="bubble"
-          align="leftRight"
-          style={{ paddingBottom: 8 }}
-        />
+    <div style={{ height: '100%', display: 'flex', overflow: 'hidden' }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div ref={chatContainerRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: '16px 16px 0' }}>
+          <AIChatDialogue
+            chats={displayChats}
+            roleConfig={roleConfig}
+            dialogueRenderConfig={{
+              renderDialogueContent: ({ message, defaultContent }: RenderContentProps) => (
+                <>
+                  {typeof message?.contextSummary === 'string' && message.contextSummary && (
+                    <ContextSummary summary={message.contextSummary} />
+                  )}
+                  {defaultContent}
+                  {isPendingDialogueMessage(message) && <PendingDialogueLoading />}
+                </>
+              ),
+            }}
+            renderDialogueContentItem={renderDialogueContentItem}
+            mode="bubble"
+            align="leftRight"
+            style={{ paddingBottom: 8 }}
+          />
+        </div>
+        <div style={{ flexShrink: 0, borderTop: '1px solid var(--semi-color-border)', padding: '8px 16px 12px' }}>
+          <AIChatInput
+            placeholder="输入消息…"
+            generating={generating || switchingAgent}
+            uploadProps={{ action: '' }}
+            showUploadFile={false}
+            showReference={false}
+            round={false}
+            onMessageSend={handleSend}
+            onStopGenerate={handleStop}
+            renderConfigureArea={renderConfig}
+            onConfigureChange={handleConfigChange}
+          />
+        </div>
       </div>
-      <div style={{ flexShrink: 0, borderTop: '1px solid var(--semi-color-border)', padding: '8px 16px 12px' }}>
-        <AIChatInput
-          placeholder="输入消息…"
-          generating={generating || switchingAgent}
-          uploadProps={{ action: '' }}
-          showUploadFile={false}
-          showReference={false}
-          round={false}
-          onMessageSend={handleSend}
-          onStopGenerate={handleStop}
-          renderConfigureArea={renderConfig}
-          onConfigureChange={handleConfigChange}
-        />
-      </div>
+      <SessionSidePanel
+        activeKey={sidePanelTab}
+        insight={sessionInsight}
+        selectedTool={selectedToolCall}
+        onTabChange={setSidePanelTab}
+        onClearTool={() => {
+          setSelectedToolCall(null);
+          setSidePanelTab('overview');
+        }}
+      />
     </div>
   );
 }

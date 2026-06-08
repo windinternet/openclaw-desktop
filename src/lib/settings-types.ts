@@ -1,4 +1,5 @@
 import type { AgentSwitchStrategy } from './agent-switch-settings';
+import type { AssistantReplyGrouping, SessionToolCallDisplay } from './session-content';
 
 export type ThemeMode = 'light' | 'dark' | 'auto';
 
@@ -29,6 +30,8 @@ export interface AppSettings {
   connectAllInstancesOnStartup: boolean;
   externalLinkMode: 'system' | 'internal';
   agentSwitchStrategy: AgentSwitchStrategy;
+  sessionToolCallDisplay: SessionToolCallDisplay;
+  assistantReplyGrouping: AssistantReplyGrouping;
   openTuningOnStartup: boolean;
 }
 
@@ -42,5 +45,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   connectAllInstancesOnStartup: false,
   externalLinkMode: 'system',
   agentSwitchStrategy: 'new-session',
+  sessionToolCallDisplay: 'hidden',
+  assistantReplyGrouping: 'merged',
   openTuningOnStartup: false,
 };
