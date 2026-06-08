@@ -371,12 +371,14 @@ function SessionSidePanel({
   selectedTool,
   onTabChange,
   onClearTool,
+  onClose,
 }: {
   activeKey: string;
   insight: ReturnType<typeof deriveSessionInsight>;
   selectedTool: SelectedToolCall | null;
   onTabChange: (key: string) => void;
   onClearTool: () => void;
+  onClose?: () => void;
 }) {
   const contextPercent = insight.contextUsageRatio !== undefined
     ? Math.round(insight.contextUsageRatio * 100)
@@ -398,7 +400,14 @@ function SessionSidePanel({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <IconInfoCircle size="small" />
-            <Text strong>AI Sider</Text>
+            <Text strong>会话详情</Text>
+            <Button
+              aria-label="关闭侧边栏"
+              icon={<IconClose size="small" />}
+              size="small"
+              theme="borderless"
+              onClick={onClose}
+            />
           </div>
           {selectedTool && (
             <Button
@@ -583,6 +592,7 @@ export default function SessionChatPage() {
   const [allHistory, setAllHistory] = useState<DisplayChat[]>([]);
   const [selectedToolCall, setSelectedToolCall] = useState<SelectedToolCall | null>(null);
   const [sidePanelTab, setSidePanelTab] = useState('overview');
+  const [sidePanelVisible, setSidePanelVisible] = useState(true);
   const [sessionContextSnapshot, setSessionContextSnapshot] = useState<SessionContextSnapshot | null>(null);
 
   
@@ -1393,6 +1403,7 @@ export default function SessionChatPage() {
             sourceSessionKey: message?.sourceSessionKey,
           });
           setSidePanelTab('tool');
+          setSidePanelVisible(true);
         }}
         style={{
           border: 0,
@@ -1435,7 +1446,7 @@ export default function SessionChatPage() {
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', overflow: 'hidden' }}>
+    <div style={{ height: '100%', display: 'flex', overflow: 'hidden', position: 'relative' }}>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div ref={chatContainerRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: '16px 16px 0' }}>
           <AIChatDialogue
@@ -1473,15 +1484,33 @@ export default function SessionChatPage() {
           />
         </div>
       </div>
-      <SessionSidePanel
-        activeKey={sidePanelTab}
-        insight={sessionInsight}
-        selectedTool={selectedToolCall}
-        onTabChange={setSidePanelTab}
-        onClearTool={() => {
-          setSelectedToolCall(null);
-          setSidePanelTab('overview');
+      {sidePanelVisible ? (
+        <SessionSidePanel
+          activeKey={sidePanelTab}
+          insight={sessionInsight}
+          selectedTool={selectedToolCall}
+          onTabChange={setSidePanelTab}
+          onClose={() => {
+            setSidePanelVisible(false);
+            setSidePanelTab('overview');
+          }}
+          onClearTool={() => {
+            setSelectedToolCall(null);
+            setSidePanelTab('overview');
+          }}
+        />
+      ) : null}
+      <Button
+        icon={<IconList />}
+        size="small"
+        theme="borderless"
+        style={{
+          position: 'absolute',
+          right: sidePanelVisible ? 348 : 8,
+          top: 42,
+          zIndex: 10,
         }}
+        onClick={() => setSidePanelVisible(!sidePanelVisible)}
       />
     </div>
   );
