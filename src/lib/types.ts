@@ -315,6 +315,7 @@ export function formatCronSchedule(schedule: CronSchedule | string): string {
 /** cron.list RPC 返回的定时任务 */
 export interface CronJob {
   id: string;
+  name: string;
   title?: string;
   prompt?: string;
   schedule: CronSchedule | string;

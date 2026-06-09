@@ -124,7 +124,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
   const handleAdd = useCallback(async () => {
     if (!scheduleDraft.trim()) { Toast.error('请输入 Cron 表达式'); return; }
     const job: any = {
-      title: titleDraft || '',
+      name: titleDraft || '',
       prompt: promptDraft || undefined,
       schedule: scheduleDraft.trim(),
       enabled: true,
@@ -140,7 +140,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
     if (!editJob) return;
     try {
       await updateCronJob(editJob.id, {
-        title: '',
+        name: '',
         prompt: promptDraft || undefined,
         schedule: scheduleDraft.trim(),
         agentId: agentIdDraft || undefined,
@@ -210,7 +210,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
     (job: CronJob) => {
       Modal.confirm({
         title: '确认删除',
-        content: `确定要删除定时任务「${job.title || formatCronSchedule(job.schedule)}」吗？`,
+        content: `确定要删除定时任务「${job.name || job.title || formatCronSchedule(job.schedule)}」吗？`,
         onOk: async () => {
           try {
             await removeCronJob(job.id);
@@ -270,13 +270,13 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
 
   const columns = useMemo(() => [
     {
-      title: '标题',
-      dataIndex: 'title',
-      key: 'title',
+      title: '名称',
+      dataIndex: 'name',
+      key: 'name',
       width: 200,
       render: (_: unknown, record: CronJob) => (
-        <Text style={{ fontWeight: record.title ? 500 : 400 }}>
-          {record.title || '(未命名)'}
+        <Text style={{ fontWeight: (record.name || record.title) ? 500 : 400 }}>
+          {record.name || record.title || '(未命名)'}
         </Text>
       ),
     },
@@ -400,8 +400,8 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
   const cronFormFields = (isEdit: boolean) => (
     <>
       <Form.Input
-        field="title"
-        label="标题"
+        field="name"
+        label="名称"
         placeholder="定时任务名称"
         onChange={(v: string) => setTitleDraft(v)}
         rules={[{ required: false }]}
@@ -673,7 +673,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
             labelPosition="top"
             labelWidth={100}
             initValues={{
-              title: editJob.title || '',
+              name: editJob.name || editJob.title || '',
               schedule: formatCronSchedule(editJob.schedule),
               agentId: editJob.agentId || '',
               deliveryMode: editJob.delivery?.mode || 'none',
