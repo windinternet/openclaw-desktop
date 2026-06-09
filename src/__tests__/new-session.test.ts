@@ -133,4 +133,12 @@ describe('new session creation params', () => {
     expect(source).toContain('<AgentSelectOption agent={agent} />');
     expect(source).toContain("agentId: selectedAgentId || agent?.id || 'main'");
   });
+
+  it('documents that the new session page accepts file drops across the page', () => {
+    const source = readFileSync('src/pages/NewSessionPage.tsx', 'utf8');
+
+    expect(source).toContain('handlePageDrop');
+    expect(source).toContain('chatInputRef.current?.uploadRef?.current?.insert?.(files)');
+    expect(source).toContain("window.addEventListener('drop', handlePageDrop)");
+  });
 });

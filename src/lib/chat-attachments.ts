@@ -21,20 +21,6 @@ export interface GatewayChatSendPayload {
     contentType: string;
     extractedText?: string;
   }>;
-  content?: Array<
-    | { type: 'text'; text: string }
-    | {
-        type: 'file' | 'image';
-        id: string;
-        name: string;
-        contentType?: string;
-        mimeType?: string;
-        size?: number | string;
-        url?: string;
-        data?: string;
-        extractedText?: string | null;
-      }
-  >;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -231,22 +217,6 @@ export async function buildGatewayChatSendPayload(options: {
   const attachments = await normalizeChatInputAttachments(extractChatInputAttachments(options.inputContent));
   const inputText = extractChatInputText(options.inputContent).trim();
   const message = options.messageOverride?.trim() || inputText || getAttachmentFallbackMessage(attachments);
-  const content: GatewayChatSendPayload['content'] = [];
-
-  if (message) content.push({ type: 'text', text: message });
-  for (const attachment of attachments) {
-    content.push({
-      type: isImageAttachment(attachment) ? 'image' : 'file',
-      id: attachment.id,
-      name: attachment.name,
-      mimeType: attachment.mimeType,
-      contentType: attachment.contentType ?? attachment.mimeType,
-      size: attachment.size,
-      url: attachment.url,
-      data: attachment.data,
-      extractedText: attachment.extractedText,
-    });
-  }
 
   return {
     message,
@@ -260,6 +230,5 @@ export async function buildGatewayChatSendPayload(options: {
           extractedText: attachment.extractedText ?? undefined,
         }))
       : undefined,
-    content: content.length > 0 ? content : undefined,
   };
 }

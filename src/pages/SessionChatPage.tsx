@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, type Ref } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AIChatDialogue, AIChatInput, Button, Progress, Tabs, Tag, Toast, Typography } from '@douyinfe/semi-ui';
 import { IconClose, IconInfoCircle, IconList, IconWrench } from '@douyinfe/semi-icons';
@@ -68,6 +68,11 @@ import {
 
 const { Configure } = AIChatInput;
 const { Text } = Typography;
+
+interface FileDropEvent {
+  dataTransfer: DataTransfer | null;
+  preventDefault: () => void;
+}
 
 function generateIdempotencyKey(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
@@ -600,6 +605,7 @@ export default function SessionChatPage() {
   const [sidePanelTab, setSidePanelTab] = useState('overview');
   const [sidePanelVisible, setSidePanelVisible] = useState(true);
   const [sessionContextSnapshot, setSessionContextSnapshot] = useState<SessionContextSnapshot | null>(null);
+  const [pageDragActive, setPageDragActive] = useState(false);
 
   
   const streamingIdRef = useRef<string | null>(null);
@@ -609,8 +615,10 @@ export default function SessionChatPage() {
   const sendingRef = useRef(false);
   const genTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<{ uploadRef?: { current?: { insert?: (files: File[]) => void } } } | null>(null);
   const initialMessageSentRef = useRef<string | null>(null);
   const prevRootSessionKeyRef = useRef<string | undefined>();
+  const pageDragDepthRef = useRef(0);
 
   useEffect(() => {
     if (!urlSessionKey) return;
@@ -1208,6 +1216,56 @@ export default function SessionChatPage() {
     endGeneration('completed');
   }, [activeClient, activeSessionKey, endGeneration]);
 
+  const getPageDropFiles = useCallback((event: FileDropEvent): File[] => {
+    return Array.from(event.dataTransfer?.files ?? []).filter((file) => file.size > 0);
+  }, []);
+
+  const handlePageDragEnter = useCallback((event: FileDropEvent) => {
+    const files = getPageDropFiles(event);
+    if (files.length === 0) return;
+    event.preventDefault();
+    pageDragDepthRef.current += 1;
+    setPageDragActive(true);
+  }, [getPageDropFiles]);
+
+  const handlePageDragOver = useCallback((event: FileDropEvent) => {
+    const files = getPageDropFiles(event);
+    if (files.length === 0) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+    setPageDragActive(true);
+  }, [getPageDropFiles]);
+
+  const handlePageDragLeave = useCallback((event: FileDropEvent) => {
+    const files = getPageDropFiles(event);
+    if (files.length === 0) return;
+    event.preventDefault();
+    pageDragDepthRef.current = Math.max(0, pageDragDepthRef.current - 1);
+    if (pageDragDepthRef.current === 0) setPageDragActive(false);
+  }, [getPageDropFiles]);
+
+  const handlePageDrop = useCallback((event: FileDropEvent) => {
+    const files = getPageDropFiles(event);
+    if (files.length === 0) return;
+    event.preventDefault();
+    pageDragDepthRef.current = 0;
+    setPageDragActive(false);
+    chatInputRef.current?.uploadRef?.current?.insert?.(files);
+  }, [getPageDropFiles]);
+
+  useEffect(() => {
+    window.addEventListener('dragenter', handlePageDragEnter);
+    window.addEventListener('dragover', handlePageDragOver);
+    window.addEventListener('dragleave', handlePageDragLeave);
+    window.addEventListener('drop', handlePageDrop);
+    return () => {
+      window.removeEventListener('dragenter', handlePageDragEnter);
+      window.removeEventListener('dragover', handlePageDragOver);
+      window.removeEventListener('dragleave', handlePageDragLeave);
+      window.removeEventListener('drop', handlePageDrop);
+    };
+  }, [handlePageDragEnter, handlePageDragLeave, handlePageDragOver, handlePageDrop]);
+
   const roleConfig = useMemo(() => ({
     user: { name: 'You', avatar: '👤' },
     assistant: { name: 'AI', avatar: '🤖' },
@@ -1461,7 +1519,9 @@ export default function SessionChatPage() {
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', overflow: 'hidden', position: 'relative' }}>
+    <div
+      style={{ height: '100%', display: 'flex', overflow: 'hidden', position: 'relative' }}
+    >
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div ref={chatContainerRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: '16px 16px 0' }}>
           <AIChatDialogue
@@ -1486,6 +1546,7 @@ export default function SessionChatPage() {
         </div>
         <div style={{ flexShrink: 0, borderTop: '1px solid var(--semi-color-border)', padding: '8px 16px 12px' }}>
           <AIChatInput
+            ref={chatInputRef as Ref<AIChatInput>}
             placeholder="输入消息…"
             generating={generating || switchingAgent}
             uploadProps={{ action: '', beforeUpload: () => ({ shouldUpload: false }) }}
@@ -1528,6 +1589,25 @@ export default function SessionChatPage() {
         }}
         onClick={() => setSidePanelVisible(!sidePanelVisible)}
       />
+      {pageDragActive ? (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 30,
+            pointerEvents: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'color-mix(in srgb, var(--semi-color-primary) 12%, transparent)',
+            border: '2px dashed var(--semi-color-primary)',
+            color: 'var(--semi-color-primary)',
+            fontWeight: 600,
+          }}
+        >
+          松开以添加附件
+        </div>
+      ) : null}
     </div>
   );
 }

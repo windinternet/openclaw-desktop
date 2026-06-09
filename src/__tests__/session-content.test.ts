@@ -127,20 +127,7 @@ describe('session content helpers', () => {
         extractedText: 'hello',
       },
     ]);
-    expect(payload.content).toEqual([
-      {
-        type: 'text',
-        text: '请总结',
-      },
-      expect.objectContaining({
-        type: 'file',
-        name: 'notes.txt',
-        contentType: 'text/plain',
-        data: 'data:text/plain;base64,aGVsbG8=',
-        url: 'data:text/plain;base64,aGVsbG8=',
-        extractedText: 'hello',
-      }),
-    ]);
+    expect(payload).not.toHaveProperty('content');
   });
 
   it('uses attachment names as legacy message fallback for attachment-only sends', async () => {
@@ -175,6 +162,14 @@ describe('session content helpers', () => {
 
     expect(source).toContain("activeClient.request('chat.history', { sessionKey })");
     expect(source).not.toContain("activeClient.request('sessions.history'");
+  });
+
+  it('documents that the session page accepts file drops across the page', () => {
+    const source = readFileSync('src/pages/SessionChatPage.tsx', 'utf8');
+
+    expect(source).toContain('handlePageDrop');
+    expect(source).toContain('chatInputRef.current?.uploadRef?.current?.insert?.(files)');
+    expect(source).toContain("window.addEventListener('drop', handlePageDrop)");
   });
 
   it('parses desktop context summaries without obscuring the user message', () => {
