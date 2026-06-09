@@ -336,10 +336,13 @@ export interface CronJob {
 export interface CronRun {
   runId: string;
   jobId: string;
+  ts: number;
   startedAt: number;
   endedAt?: number;
-  status: 'running' | 'ok' | 'error' | 'timeout' | 'cancelled';
+  status: string;
   summary?: string;
+  error?: string;
+  durationMs?: number;
 }
 
 // ── Tool & Skill ───────────────────────────────────────────────────

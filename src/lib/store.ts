@@ -674,8 +674,20 @@ export const useStore = create<StoreState>((set, get) => ({
     const client = getClient(get());
     if (!client) return [];
     try {
-      const data = await client.request<{ runs?: CronRun[] }>('cron.runs', { jobId });
-      return data?.runs ?? [];
+      const data = await client.request<{ entries?: Array<Record<string, unknown>> }>('cron.runs', { jobId });
+      const entries = data?.entries ?? [];
+      return entries.map((entry) => ({
+        runId: String(entry.runId ?? ''),
+        jobId: String(entry.jobId ?? jobId),
+        ts: typeof entry.ts === 'number' ? entry.ts : 0,
+        startedAt: typeof entry.runAtMs === 'number' ? entry.runAtMs : (typeof entry.ts === 'number' ? entry.ts : 0),
+        endedAt: typeof entry.durationMs === 'number' && typeof entry.ts === 'number'
+          ? entry.ts + entry.durationMs : undefined,
+        status: String(entry.status ?? ''),
+        summary: typeof entry.summary === 'string' ? entry.summary : undefined,
+        error: typeof entry.error === 'string' ? entry.error : undefined,
+        durationMs: typeof entry.durationMs === 'number' ? entry.durationMs : undefined,
+      })) as CronRun[];
     } catch (err) {
       console.error('[fetchCronRuns]', err);
       return [];

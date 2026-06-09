@@ -53,6 +53,7 @@ function statusTag(status: string): React.ReactNode {
     timeout: { color: 'orange', icon: <IconAlertCircle /> },
     running: { color: 'orange', icon: <IconPlayCircle /> },
     cancelled: { color: 'grey', icon: <IconMinusCircle /> },
+    skipped: { color: 'grey', icon: <IconMinusCircle /> },
   };
   const m = map[status] ?? { color: 'grey' as const, icon: null };
   return (
