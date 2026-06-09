@@ -1216,33 +1216,36 @@ export default function SessionChatPage() {
     endGeneration('completed');
   }, [activeClient, activeSessionKey, endGeneration]);
 
+  const hasFilesInDrag = useCallback((event: FileDropEvent): boolean => {
+    const dt = event.dataTransfer;
+    if (!dt) return false;
+    return dt.types?.includes('Files') || dt.files?.length > 0;
+  }, []);
+
   const getPageDropFiles = useCallback((event: FileDropEvent): File[] => {
     return Array.from(event.dataTransfer?.files ?? []).filter((file) => file.size > 0);
   }, []);
 
   const handlePageDragEnter = useCallback((event: FileDropEvent) => {
-    const files = getPageDropFiles(event);
-    if (files.length === 0) return;
+    if (!hasFilesInDrag(event)) return;
     event.preventDefault();
     pageDragDepthRef.current += 1;
     setPageDragActive(true);
-  }, [getPageDropFiles]);
+  }, [hasFilesInDrag]);
 
   const handlePageDragOver = useCallback((event: FileDropEvent) => {
-    const files = getPageDropFiles(event);
-    if (files.length === 0) return;
+    if (!hasFilesInDrag(event)) return;
     event.preventDefault();
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
     setPageDragActive(true);
-  }, [getPageDropFiles]);
+  }, [hasFilesInDrag]);
 
   const handlePageDragLeave = useCallback((event: FileDropEvent) => {
-    const files = getPageDropFiles(event);
-    if (files.length === 0) return;
+    if (!hasFilesInDrag(event)) return;
     event.preventDefault();
     pageDragDepthRef.current = Math.max(0, pageDragDepthRef.current - 1);
     if (pageDragDepthRef.current === 0) setPageDragActive(false);
-  }, [getPageDropFiles]);
+  }, [hasFilesInDrag]);
 
   const handlePageDrop = useCallback((event: FileDropEvent) => {
     const files = getPageDropFiles(event);
@@ -1251,6 +1254,9 @@ export default function SessionChatPage() {
     pageDragDepthRef.current = 0;
     setPageDragActive(false);
     chatInputRef.current?.uploadRef?.current?.insert?.(files);
+    requestAnimationFrame(() => {
+      Toast.success(`已添加 ${files.length} 个附件`);
+    });
   }, [getPageDropFiles]);
 
   useEffect(() => {
@@ -1544,7 +1550,20 @@ export default function SessionChatPage() {
             style={{ paddingBottom: 8 }}
           />
         </div>
-        <div style={{ flexShrink: 0, borderTop: '1px solid var(--semi-color-border)', padding: '8px 16px 12px' }}>
+        <div
+          style={{
+            flexShrink: 0,
+            borderTop: '1px solid var(--semi-color-border)',
+            padding: '8px 16px 12px',
+            transition: 'box-shadow 0.2s, border-color 0.2s',
+            ...(pageDragActive
+              ? {
+                  boxShadow: 'inset 0 0 0 2px var(--semi-color-primary)',
+                  borderTopColor: 'var(--semi-color-primary)',
+                }
+              : {}),
+          }}
+        >
           <AIChatInput
             ref={chatInputRef as Ref<AIChatInput>}
             placeholder="输入消息…"
@@ -1597,15 +1616,19 @@ export default function SessionChatPage() {
             zIndex: 30,
             pointerEvents: 'none',
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
+            gap: 12,
             background: 'color-mix(in srgb, var(--semi-color-primary) 12%, transparent)',
             border: '2px dashed var(--semi-color-primary)',
             color: 'var(--semi-color-primary)',
             fontWeight: 600,
+            fontSize: 16,
           }}
         >
-          松开以添加附件
+          <span style={{ fontSize: 32 }}>📎</span>
+          <span>松开以添加附件</span>
         </div>
       ) : null}
     </div>
