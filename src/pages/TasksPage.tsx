@@ -11,6 +11,8 @@ import {
   Toast,
   Tooltip,
   Empty,
+  Input,
+  Select,
 } from '@douyinfe/semi-ui';
 import {
   IconPlayCircle,
@@ -21,6 +23,7 @@ import {
   IconMinusCircle,
   IconBolt,
   IconComment,
+  IconSearch,
 } from '@douyinfe/semi-icons';
 import { useStore } from '../lib';
 import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway, filterUserVisibleSessions } from '../lib/ai-action-center';
@@ -105,6 +108,9 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
   const [runHistory, setRunHistory] = useState<Record<string, CronRun[]>>({});
   const [runningJobs, setRunningJobs] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [enabledFilter, setEnabledFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [scheduleKindFilter, setScheduleKindFilter] = useState<string>('all');
 
   useEffect(() => {
     if (connectionStatus === 'connected') {
@@ -397,6 +403,26 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
     },
   ], [agents, handleToggle, handleRunNow, runningJobs, handleDelete]);
 
+  const filteredJobs = useMemo(() => {
+    return cronJobs.filter((job) => {
+      if (enabledFilter === 'enabled' && !job.enabled) return false;
+      if (enabledFilter === 'disabled' && job.enabled) return false;
+      if (scheduleKindFilter !== 'all') {
+        const schedule = job.schedule;
+        if (typeof schedule === 'object' && 'kind' in schedule) {
+          if (schedule.kind !== scheduleKindFilter) return false;
+        }
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        const name = (job.name || job.title || '').toLowerCase();
+        const scheduleStr = formatCronSchedule(job.schedule).toLowerCase();
+        if (!name.includes(q) && !scheduleStr.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [cronJobs, enabledFilter, searchQuery, scheduleKindFilter]);
+
   const cronFormFields = (isEdit: boolean) => (
     <>
       <Form.Input
@@ -506,6 +532,51 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
     >
 
 
+      {/* Filter bar */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          marginBottom: 12,
+          flexWrap: 'wrap',
+        }}
+      >
+        <Select
+          value={enabledFilter}
+          onChange={(v) => setEnabledFilter(String(v))}
+          style={{ width: 120 }}
+          size="small"
+        >
+          <Select.Option value="all">全部状态</Select.Option>
+          <Select.Option value="enabled">已启用</Select.Option>
+          <Select.Option value="disabled">已禁用</Select.Option>
+        </Select>
+        <Select
+          value={scheduleKindFilter}
+          onChange={(v) => setScheduleKindFilter(String(v))}
+          style={{ width: 120 }}
+          size="small"
+        >
+          <Select.Option value="all">全部类型</Select.Option>
+          <Select.Option value="cron">Cron</Select.Option>
+          <Select.Option value="at">一次性</Select.Option>
+          <Select.Option value="every">间隔</Select.Option>
+        </Select>
+        <Input
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder="搜索名称或调度…"
+          prefix={<IconSearch />}
+          showClear
+          size="small"
+          style={{ width: 200 }}
+        />
+        <Text type="tertiary" size="small" style={{ marginLeft: 'auto' }}>
+          {filteredJobs.length} 个任务
+        </Text>
+      </div>
+
       {/* Table */}
       <div style={{ flex: 1, overflow: 'auto', padding: embedded ? '0 24px' : 0 }}>
         {connectionStatus !== 'connected' ? (
@@ -521,7 +592,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
           </div>
         ) : (
           <Table
-            dataSource={cronJobs}
+            dataSource={filteredJobs}
             columns={columns}
             rowKey="id"
             loading={loading}

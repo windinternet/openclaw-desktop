@@ -662,7 +662,7 @@ export const useStore = create<StoreState>((set, get) => ({
     if (!target) return;
     const { instanceId, client } = target;
     try {
-      const data = await client.request<{ jobs?: CronJob[] } | CronJob[]>('cron.list');
+      const data = await client.request<{ jobs?: CronJob[] } | CronJob[]>('cron.list', { includeDisabled: true });
       const list = Array.isArray(data) ? data : (data?.jobs ?? []);
       set((state) => withInstanceRuntime(state, instanceId, { cronJobs: list as CronJob[] }));
     } catch (err) {
