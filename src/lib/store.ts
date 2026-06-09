@@ -858,7 +858,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const client = getClient(get());
     if (!client) return;
     try {
-      await client.request('cron.update', { id, ...updates });
+      await client.request('cron.update', { id, patch: updates });
       await get().fetchCronJobs();
     } catch (err) {
       console.error('[updateCronJob]', err);
@@ -880,11 +880,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const client = getClient(get());
     if (!client) return;
     try {
-      if (enabled) {
-        await client.request('cron.update', { id, enabled: true });
-      } else {
-        await client.request('cron.update', { id, enabled: false });
-      }
+      await client.request('cron.update', { id, patch: { enabled } });
       await get().fetchCronJobs();
     } catch (err) {
       console.error('[toggleCronJob]', err);
