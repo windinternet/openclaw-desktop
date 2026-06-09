@@ -124,12 +124,13 @@ export default function NewSessionPage() {
             key={`${agentOptions.length}:${modelOptions.length}`}
             placeholder="输入第一条消息"
             generating={creating}
-            uploadProps={{ action: '' }}
+            uploadProps={{ action: '', beforeUpload: () => ({ shouldUpload: false }) }}
             renderConfigureArea={renderConfig}
             onConfigureChange={handleConfigChange}
             onMessageSend={handleSend}
             onStopGenerate={() => setCreating(false)}
-            showUploadFile={false}
+            showUploadFile
+            showUploadButton
             showReference={false}
             round={false}
           />

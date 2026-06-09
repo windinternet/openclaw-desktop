@@ -70,6 +70,48 @@ describe('new session creation params', () => {
     });
   });
 
+  it('uses attachment names as the new session label when the first message has no text', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+    vi.spyOn(Math, 'random').mockReturnValue(0.123456789);
+
+    const params = buildNewSessionCreateParams({
+      agentId: 'main',
+      model: 'gpt-4.1',
+      content: {
+        inputContents: [],
+        attachments: [{ uid: 'file-1', name: '需求.md', url: 'data:text/markdown;base64,IyA=' }],
+      },
+    });
+
+    expect(params.title).toBe('需求.md');
+    expect(params.request.label).toBe('需求.md');
+  });
+
+  it('carries attachment-only first messages to the destination chat page', () => {
+    const content = {
+      inputContents: [],
+      attachments: [{ uid: 'file-1', name: '需求.md', url: 'data:text/markdown;base64,IyA=' }],
+    };
+
+    expect(
+      buildNewSessionNavigationTarget({
+        sessionKey: 'agent:main:dashboard:new',
+        content,
+        model: 'gpt-4.1',
+        thinking: 'high',
+      }),
+    ).toEqual({
+      to: '/chat/agent%3Amain%3Adashboard%3Anew',
+      state: {
+        initialMessage: {
+          content,
+          model: 'gpt-4.1',
+          thinking: 'high',
+        },
+      },
+    });
+  });
+
   it('navigates without initial message state when the input is blank', () => {
     expect(
       buildNewSessionNavigationTarget({

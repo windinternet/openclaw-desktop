@@ -16,6 +16,10 @@ import {
   parseSessionContextSnapshot,
   deriveSessionInsight,
 } from '../lib/session-content';
+import {
+  buildGatewayChatSendPayload,
+  normalizeChatInputAttachments,
+} from '../lib/chat-attachments';
 import type { SessionTimelineChat } from '../lib/session-content';
 import { buildContextualUserMessage } from '../lib/agent-switching';
 
@@ -34,6 +38,123 @@ describe('session content helpers', () => {
         ],
       }),
     ).toBe('第一段\n第二段\n第三段');
+  });
+
+  it('keeps attachment-only chat input as sendable message content', () => {
+    expect(
+      extractSessionMessageText({
+        inputContents: [],
+        attachments: [{ uid: 'file-1', name: '需求.md', url: 'blob:local-file' }],
+      }),
+    ).toBe('需求.md');
+  });
+
+  it('normalizes AIChatInput attachments for Gateway and Semi dialogue rendering', async () => {
+    const file = new File(['hello'], 'notes.txt', { type: 'text/plain' });
+
+    const attachments = await normalizeChatInputAttachments([
+      {
+        uid: 'file-1',
+        name: 'notes.txt',
+        url: 'blob:local-file',
+        size: '5B',
+        fileInstance: file,
+        status: 'success',
+      },
+      {
+        uid: 'image-1',
+        name: 'screen.png',
+        url: 'data:image/png;base64,abc',
+        status: 'success',
+      },
+    ]);
+
+    expect(attachments).toEqual([
+      expect.objectContaining({
+        id: 'file-1',
+        name: 'notes.txt',
+        contentType: 'text/plain',
+        mimeType: 'text/plain',
+        url: 'data:text/plain;base64,aGVsbG8=',
+        extractedText: 'hello',
+      }),
+      expect.objectContaining({
+        id: 'image-1',
+        name: 'screen.png',
+        contentType: 'image/png',
+        mimeType: 'image/png',
+        url: 'data:image/png;base64,abc',
+      }),
+    ]);
+
+    const content = parseHistoryMessageToContentItems({
+      role: 'user',
+      content: '看这两个附件',
+      attachments,
+    });
+
+    expect(content).toEqual([
+      {
+        type: 'message',
+        content: [
+          expect.objectContaining({ type: 'input_file', filename: 'notes.txt' }),
+          expect.objectContaining({ type: 'input_image', image_url: 'data:image/png;base64,abc' }),
+          { type: 'input_text', text: '看这两个附件' },
+        ],
+      },
+    ]);
+  });
+
+  it('builds chat.send payload that carries text and attachments together', async () => {
+    const file = new File(['hello'], 'notes.txt', { type: 'text/plain' });
+    const payload = await buildGatewayChatSendPayload({
+      inputContent: {
+        inputContents: [{ type: 'text', text: '请总结' }],
+        attachments: [{ uid: 'file-1', name: 'notes.txt', fileInstance: file, status: 'success' }],
+      },
+      sessionKey: 'agent:main:dashboard:test',
+      idempotencyKey: 'idem-1',
+    });
+
+    expect(payload.message).toBe('请总结');
+    expect(payload.sessionKey).toBe('agent:main:dashboard:test');
+    expect(payload.idempotencyKey).toBe('idem-1');
+    expect(payload.attachments).toEqual([
+      {
+        name: 'notes.txt',
+        url: 'data:text/plain;base64,aGVsbG8=',
+        contentType: 'text/plain',
+        extractedText: 'hello',
+      },
+    ]);
+    expect(payload.content).toEqual([
+      {
+        type: 'text',
+        text: '请总结',
+      },
+      expect.objectContaining({
+        type: 'file',
+        name: 'notes.txt',
+        contentType: 'text/plain',
+        data: 'data:text/plain;base64,aGVsbG8=',
+        url: 'data:text/plain;base64,aGVsbG8=',
+        extractedText: 'hello',
+      }),
+    ]);
+  });
+
+  it('uses attachment names as legacy message fallback for attachment-only sends', async () => {
+    const payload = await buildGatewayChatSendPayload({
+      inputContent: {
+        inputContents: [],
+        attachments: [{ uid: 'file-1', name: '需求.md', url: 'data:text/markdown;base64,IyA=' }],
+      },
+      sessionKey: 'agent:main:dashboard:test',
+      idempotencyKey: 'idem-2',
+    });
+
+    expect(payload.message).toBe('需求.md');
+    expect(payload.attachments?.[0]).toEqual(expect.objectContaining({ name: '需求.md' }));
   });
 
   it('finds full history items before falling back to preview-shaped items', () => {

@@ -59,6 +59,12 @@ import {
   getChatRoute,
   resolveCreatedSessionKey,
 } from '../lib/new-session';
+import {
+  buildGatewayChatSendPayload,
+  buildSemiMessageContent,
+  extractChatInputAttachments,
+  normalizeChatInputAttachments,
+} from '../lib/chat-attachments';
 
 const { Configure } = AIChatInput;
 const { Text } = Typography;
@@ -1069,12 +1075,16 @@ export default function SessionChatPage() {
     async (_content: unknown, options?: { model?: string; thinking?: string }) => {
       if (!activeClient || !activeSessionKey || sendingRef.current) return;
       const message = extractMessageText(_content);
-      if (!message.trim()) return;
+      const attachments = await normalizeChatInputAttachments(extractChatInputAttachments(_content));
+      if (!message.trim() && attachments.length === 0) return;
       const pendingSummary = currentInstanceId
         ? getPendingSummary(currentInstanceId, activeSessionKey)
         : undefined;
       const gatewayMessage = pendingSummary
         ? buildContextualUserMessage(pendingSummary.summary, message.trim())
+        : message.trim();
+      const displayContent = attachments.length > 0
+        ? buildSemiMessageContent(message.trim(), attachments)
         : message.trim();
 
       sendingRef.current = true;
@@ -1089,7 +1099,7 @@ export default function SessionChatPage() {
         {
           id: userMessageId,
           role: 'user',
-          content: message.trim(),
+          content: displayContent,
           createAt: Date.now(),
           status: 'completed',
           sourceSessionKey: activeSessionKey,
@@ -1111,10 +1121,14 @@ export default function SessionChatPage() {
 
       try {
         await patchSessionConfig(options);
-        const sendResult = await activeClient.request<{ runId?: string }>('chat.send', {
-          message: gatewayMessage,
+        const sendPayload = await buildGatewayChatSendPayload({
+          inputContent: _content,
+          messageOverride: gatewayMessage,
           sessionKey: activeSessionKey,
           idempotencyKey: generateIdempotencyKey(),
+        });
+        const sendResult = await activeClient.request<{ runId?: string }>('chat.send', {
+          ...sendPayload,
         });
         if (sendResult?.runId) {
           streamingIdRef.current = sendResult.runId;
@@ -1165,9 +1179,10 @@ export default function SessionChatPage() {
     if (!initialMessage) return;
 
     const message = extractMessageText(initialMessage.content).trim();
-    if (!message) return;
+    const attachments = extractChatInputAttachments(initialMessage.content);
+    if (!message && attachments.length === 0) return;
 
-    const sentKey = `${activeSessionKey}:${message}`;
+    const sentKey = `${activeSessionKey}:${message}:${attachments.map((item) => String(item.name ?? item.uid ?? '')).join(',')}`;
     if (initialMessageSentRef.current === sentKey) return;
     initialMessageSentRef.current = sentKey;
 
@@ -1473,8 +1488,9 @@ export default function SessionChatPage() {
           <AIChatInput
             placeholder="输入消息…"
             generating={generating || switchingAgent}
-            uploadProps={{ action: '' }}
-            showUploadFile={false}
+            uploadProps={{ action: '', beforeUpload: () => ({ shouldUpload: false }) }}
+            showUploadFile
+            showUploadButton
             showReference={false}
             round={false}
             onMessageSend={handleSend}

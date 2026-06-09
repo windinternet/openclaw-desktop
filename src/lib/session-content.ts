@@ -3,6 +3,10 @@ import {
   CONTEXT_SUMMARY_START,
   USER_MESSAGE_START,
 } from './agent-switching';
+import {
+  buildSemiMessageContent,
+  type GatewayChatAttachment,
+} from './chat-attachments';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -32,6 +36,53 @@ export function normalizeSessionMessageDisplaySettings(
 
 function joinText(parts: unknown[]): string {
   return parts.map(extractSessionMessageText).filter(Boolean).join('\n');
+}
+
+function getNonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() !== '' ? value : undefined;
+}
+
+function getAttachmentName(value: unknown): string {
+  if (!isRecord(value)) return '';
+  return getNonEmptyString(value.name ?? value.filename ?? value.fileName) ?? '';
+}
+
+function normalizeHistoryAttachment(value: unknown): GatewayChatAttachment | null {
+  if (!isRecord(value)) return null;
+  const name = getNonEmptyString(value.name ?? value.filename ?? value.fileName);
+  if (!name) return null;
+  const id = getNonEmptyString(value.id ?? value.uid ?? value.file_id) ?? name;
+  return {
+    id,
+    name,
+    contentType: getNonEmptyString(value.contentType ?? value.mimeType ?? value.file_type),
+    mimeType: getNonEmptyString(value.contentType ?? value.mimeType ?? value.file_type),
+    size: typeof value.size === 'number' || typeof value.size === 'string' ? value.size : undefined,
+    url: getNonEmptyString(value.url ?? value.file_url ?? value.image_url),
+    data: getNonEmptyString(value.data ?? value.file_data),
+    extractedText: getNonEmptyString(value.extractedText),
+  };
+}
+
+function extractHistoryAttachments(raw: unknown): GatewayChatAttachment[] {
+  if (!isRecord(raw)) return [];
+  const direct = Array.isArray(raw.attachments)
+    ? raw.attachments.map(normalizeHistoryAttachment).filter((item): item is GatewayChatAttachment => item !== null)
+    : [];
+  if (direct.length > 0) return direct;
+
+  if (!Array.isArray(raw.content)) return [];
+  const fromContent = raw.content
+    .map((item) => {
+      if (!isRecord(item)) return null;
+      const type = String(item.type ?? '');
+      if (type === 'input_file' || type === 'input_image' || type === 'file' || type === 'image') {
+        return normalizeHistoryAttachment(item);
+      }
+      return null;
+    })
+    .filter((item): item is GatewayChatAttachment => item !== null);
+  return fromContent;
 }
 
 export function decodeSessionKeyParam(value?: string): string | undefined {
@@ -77,6 +128,11 @@ export function extractSessionMessageText(value: unknown): string {
     if (text) return text;
   }
 
+  if (Array.isArray(value.attachments)) {
+    const names = value.attachments.map(getAttachmentName).filter(Boolean);
+    if (names.length > 0) return names.join('\n');
+  }
+
   return '';
 }
 
@@ -112,7 +168,24 @@ export function extractSessionMessageItems(value: unknown): unknown[] {
 
 export interface ChatTextContent {
   type: 'message';
-  content: { type: 'output_text'; text: string }[];
+  content: Array<
+    | { type: 'output_text'; text: string }
+    | { type: 'input_text'; text: string }
+    | {
+        type: 'input_file';
+        file_url?: string;
+        file_data?: string;
+        filename: string;
+        size?: string;
+        file_type?: string;
+      }
+    | {
+        type: 'input_image';
+        image_url?: string;
+        file_data?: string;
+        detail?: string;
+      }
+  >;
 }
 
 export interface ChatToolCallContent {
@@ -238,7 +311,7 @@ export function extractContentText(items: ChatContentItem[]): string {
   const chunks: string[] = [];
   for (const item of items) {
     if (item.type === 'message') {
-      const text = item.content.map((c) => c.text).join('');
+      const text = item.content.map((c) => ('text' in c ? c.text : '')).join('');
       if (text) chunks.push(text);
     }
     if (item.type === 'function_call') {
@@ -355,7 +428,10 @@ export function parseHistoryMessageToContentItems(
   }
 
   const text = extractSessionMessageText(raw);
-  if (text) {
+  const attachments = extractHistoryAttachments(raw);
+  if (attachments.length > 0) {
+    items.push(...buildSemiMessageContent(text, attachments));
+  } else if (text) {
     items.push({
       type: 'message',
       content: [{ type: 'output_text', text }],
