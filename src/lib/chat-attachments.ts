@@ -16,9 +16,9 @@ export interface GatewayChatSendPayload {
   sessionKey: string;
   idempotencyKey: string;
   attachments?: Array<{
-    name: string;
-    url: string;
-    contentType: string;
+    fileName: string;
+    content: string;
+    mimeType: string;
     extractedText?: string;
   }>;
 }
@@ -224,9 +224,9 @@ export async function buildGatewayChatSendPayload(options: {
     idempotencyKey: options.idempotencyKey,
     attachments: attachments.length > 0
       ? attachments.map((attachment) => ({
-          name: attachment.name,
-          url: attachment.url ?? attachment.data ?? '',
-          contentType: attachment.contentType ?? attachment.mimeType ?? 'application/octet-stream',
+          fileName: attachment.name,
+          content: attachment.url ?? attachment.data ?? '',
+          mimeType: attachment.contentType ?? attachment.mimeType ?? 'application/octet-stream',
           extractedText: attachment.extractedText ?? undefined,
         }))
       : undefined,

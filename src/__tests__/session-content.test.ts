@@ -121,9 +121,9 @@ describe('session content helpers', () => {
     expect(payload.idempotencyKey).toBe('idem-1');
     expect(payload.attachments).toEqual([
       {
-        name: 'notes.txt',
-        url: 'data:text/plain;base64,aGVsbG8=',
-        contentType: 'text/plain',
+        fileName: 'notes.txt',
+        content: 'data:text/plain;base64,aGVsbG8=',
+        mimeType: 'text/plain',
         extractedText: 'hello',
       },
     ]);
@@ -141,7 +141,7 @@ describe('session content helpers', () => {
     });
 
     expect(payload.message).toBe('需求.md');
-    expect(payload.attachments?.[0]).toEqual(expect.objectContaining({ name: '需求.md' }));
+    expect(payload.attachments?.[0]).toEqual(expect.objectContaining({ fileName: '需求.md' }));
   });
 
   it('finds full history items before falling back to preview-shaped items', () => {
