@@ -27,6 +27,7 @@ import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGa
 import { upsertAiActionRun } from '../lib/ai-action-run-store';
 import type { AiActionRun } from '../lib/types';
 import type { CronJob, CronRun } from '../lib/types';
+import { formatCronSchedule } from '../lib/types';
 
 const { Text } = Typography;
 
@@ -209,7 +210,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
     (job: CronJob) => {
       Modal.confirm({
         title: '确认删除',
-        content: `确定要删除定时任务「${job.title || job.schedule}」吗？`,
+        content: `确定要删除定时任务「${job.title || formatCronSchedule(job.schedule)}」吗？`,
         onOk: async () => {
           try {
             await removeCronJob(job.id);
@@ -284,9 +285,9 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
       dataIndex: 'schedule',
       key: 'schedule',
       width: 160,
-      render: (val: string) => (
+      render: (val: unknown) => (
         <Text code size="small">
-          {val}
+          {formatCronSchedule(val as Parameters<typeof formatCronSchedule>[0])}
         </Text>
       ),
     },
@@ -673,7 +674,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
             labelWidth={100}
             initValues={{
               title: editJob.title || '',
-              schedule: editJob.schedule,
+              schedule: formatCronSchedule(editJob.schedule),
               agentId: editJob.agentId || '',
               deliveryMode: editJob.delivery?.mode || 'none',
               deliveryTarget: editJob.delivery?.target || '',

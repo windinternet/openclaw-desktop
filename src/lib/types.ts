@@ -218,11 +218,17 @@ export interface SessionMessage {
 
 /** chat.send RPC 的请求参数 */
 export interface ChatSendParams {
-  input: string;
+  message: string;
   sessionKey?: string;
   model?: string;
   thinking?: string;
   idempotencyKey?: string;
+  attachments?: Array<{
+    fileName: string;
+    content: string;
+    mimeType: string;
+    extractedText?: string;
+  }>;
 }
 
 /** chat.send RPC 返回的 ack */
@@ -289,12 +295,29 @@ export interface AgentEventPayload {
 
 // ── Cron ───────────────────────────────────────────────────────────
 
+export type CronSchedule =
+  | { kind: 'at'; at: string }
+  | { kind: 'every'; everyMs: number; anchorMs?: number }
+  | { kind: 'cron'; expr: string; tz?: string; staggerMs?: number };
+
+export function formatCronSchedule(schedule: CronSchedule | string): string {
+  if (typeof schedule === 'string') return schedule;
+  switch (schedule.kind) {
+    case 'at':
+      return `at ${schedule.at}`;
+    case 'every':
+      return `每 ${schedule.everyMs}ms`;
+    case 'cron':
+      return schedule.tz ? `${schedule.expr} (${schedule.tz})` : schedule.expr;
+  }
+}
+
 /** cron.list RPC 返回的定时任务 */
 export interface CronJob {
   id: string;
   title?: string;
   prompt?: string;
-  schedule: string;
+  schedule: CronSchedule | string;
   enabled: boolean;
   agentId?: string;
   sessionKey?: string;
