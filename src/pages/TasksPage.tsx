@@ -327,28 +327,33 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
     },
     {
       title: '上次运行',
-      dataIndex: 'lastRunAt',
-      key: 'lastRunAt',
-      width: 160,
-      render: (val: number | undefined, record: CronJob) => (
-        <Space>
-          <Text size="small" type="tertiary">
-            {formatTime(val)}
-          </Text>
-          {record.lastRunStatus && statusTag(record.lastRunStatus)}
-        </Space>
-      ),
+      key: 'lastRun',
+      width: 180,
+      render: (_: unknown, record: CronJob) => {
+        const lastRunAt = record.lastRunAt ?? record.state?.lastRunAtMs;
+        const lastStatus = record.lastRunStatus ?? record.state?.lastRunStatus;
+        return (
+          <Space>
+            <Text size="small" type="tertiary">
+              {formatTime(lastRunAt)}
+            </Text>
+            {lastStatus && statusTag(lastStatus)}
+          </Space>
+        );
+      },
     },
     {
       title: '下次运行',
-      dataIndex: 'nextRunAt',
-      key: 'nextRunAt',
+      key: 'nextRun',
       width: 150,
-      render: (val: number | undefined) => (
-        <Text size="small" type="tertiary">
-          {formatTime(val)}
-        </Text>
-      ),
+      render: (_: unknown, record: CronJob) => {
+        const nextRunAt = record.nextRunAt ?? record.state?.nextRunAtMs;
+        return (
+          <Text size="small" type="tertiary">
+            {formatTime(nextRunAt)}
+          </Text>
+        );
+      },
     },
     {
       title: '操作',

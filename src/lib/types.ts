@@ -305,8 +305,22 @@ export function formatCronSchedule(schedule: CronSchedule | string): string {
   switch (schedule.kind) {
     case 'at':
       return `at ${schedule.at}`;
-    case 'every':
-      return `每 ${schedule.everyMs}ms`;
+    case 'every': {
+      let ms = schedule.everyMs;
+      const days = Math.floor(ms / 86400000);
+      ms %= 86400000;
+      const hours = Math.floor(ms / 3600000);
+      ms %= 3600000;
+      const minutes = Math.floor(ms / 60000);
+      ms %= 60000;
+      const seconds = Math.floor(ms / 1000);
+      const parts: string[] = [];
+      if (days > 0) parts.push(`${days}天`);
+      if (hours > 0) parts.push(`${hours}小时`);
+      if (minutes > 0) parts.push(`${minutes}分钟`);
+      if (seconds > 0 || parts.length === 0) parts.push(`${seconds}秒`);
+      return `每 ${parts.join(' ')}`;
+    }
     case 'cron':
       return schedule.tz ? `${schedule.expr} (${schedule.tz})` : schedule.expr;
   }
@@ -323,8 +337,15 @@ export interface CronJob {
   agentId?: string;
   sessionKey?: string;
   lastRunAt?: number;
-  lastRunStatus?: 'ok' | 'error' | 'timeout';
+  lastRunStatus?: string;
   nextRunAt?: number;
+  state?: {
+    lastRunAtMs?: number;
+    nextRunAtMs?: number;
+    lastRunStatus?: string;
+    lastError?: string;
+    consecutiveErrors?: number;
+  };
   delivery?: {
     mode: 'announce' | 'none' | 'webhook';
     target?: string;
