@@ -58,6 +58,8 @@ interface ActorState {
 interface SceneState {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
+  overlayScene: THREE.Scene;
+  overlayCamera: THREE.OrthographicCamera;
   camera: THREE.Camera;
   thirdPersonCamera: THREE.OrthographicCamera;
   firstPersonCamera: THREE.PerspectiveCamera;
@@ -344,8 +346,9 @@ function createInteractPrompt(theme: OfficeTheme): THREE.Sprite {
     ctx.fillText('[F] \u4e92\u52a8', 60, 28);
   }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true }));
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthTest: false, depthWrite: false }));
   s.scale.set(0.55, 0.26, 1); s.visible = false;
+  s.renderOrder = 999;
   return s;
 }
 
@@ -815,6 +818,10 @@ function createScene(container: HTMLDivElement, theme: OfficeTheme, companyName:
     ? new THREE.Fog(theme.scene.fog, 24, 54)
     : null;
 
+  // Overlay scene for HUD elements (interact prompt)
+  const overlayScene = new THREE.Scene();
+  const overlayCamera = new THREE.OrthographicCamera(0, 800, 600, 0, -1, 1);
+
   const thirdPersonCamera = new THREE.OrthographicCamera(-7, 7, 5, -5, 0.1, 120);
   const firstPersonCamera = new THREE.PerspectiveCamera(64, 1, 0.05, 90);
 
@@ -836,6 +843,8 @@ function createScene(container: HTMLDivElement, theme: OfficeTheme, companyName:
   const state = {
     renderer,
     scene,
+    overlayScene,
+    overlayCamera,
     camera: thirdPersonCamera,
     thirdPersonCamera,
     firstPersonCamera,
@@ -901,7 +910,7 @@ function createScene(container: HTMLDivElement, theme: OfficeTheme, companyName:
   state.bodyGlow = glow;
 
   const interactSprite = createInteractPrompt(theme);
-  scene.add(interactSprite);
+  overlayScene.add(interactSprite);
   state.interactPrompt = interactSprite;
 
   return state;
@@ -919,6 +928,11 @@ function resizeScene(state: SceneState, container: HTMLDivElement): void {
   state.thirdPersonCamera.updateProjectionMatrix();
   state.firstPersonCamera.aspect = aspect;
   state.firstPersonCamera.updateProjectionMatrix();
+  state.overlayCamera.right = width;
+  state.overlayCamera.bottom = 0;
+  state.overlayCamera.left = 0;
+  state.overlayCamera.top = height;
+  state.overlayCamera.updateProjectionMatrix();
   state.renderer.setSize(width, height, false);
 }
 
@@ -1654,9 +1668,8 @@ export default function OfficeScene({
             (state.interactRing.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.3 + Math.abs(Math.sin(now * 0.003)) * 0.3;
             state.bodyGlow.position.set(tp.x, tp.y + 0.8, tp.z);
             state.bodyGlow.visible = true;
-            // Prompt sprite: camera-relative 3D position
-            const ppt = pp.clone().add(cd.clone().multiplyScalar(1.8)).add(cu.clone().multiplyScalar(-0.3));
-            state.interactPrompt.position.copy(ppt);
+            // Prompt sprite: fixed HUD position at bottom-center of screen
+            state.interactPrompt.position.set(state.overlayCamera.right / 2, state.overlayCamera.top * 0.08, 0);
             // Canvas texture (no sprite disposal)
             if ((state.interactPrompt.material as THREE.SpriteMaterial).map) (state.interactPrompt.material as THREE.SpriteMaterial).map!.dispose();
             const cv = document.createElement('canvas');
@@ -1675,7 +1688,7 @@ export default function OfficeScene({
             const ntex = new THREE.CanvasTexture(cv);
             ntex.colorSpace = THREE.SRGBColorSpace;
             (state.interactPrompt.material as THREE.SpriteMaterial).map = ntex;
-            state.interactPrompt.scale.set(0.8, 0.15, 1);
+            state.interactPrompt.scale.set(300, 56, 1);
             (state.interactPrompt.material as THREE.SpriteMaterial).needsUpdate = true;
             state.interactPrompt.visible = true;
           } else {
@@ -1693,6 +1706,10 @@ export default function OfficeScene({
           resetCameraControl(state, container);
         }
         state.renderer.render(state.scene, state.camera);
+        state.renderer.autoClear = false;
+        state.renderer.clearDepth();
+        state.renderer.render(state.overlayScene, state.overlayCamera);
+        state.renderer.autoClear = true;
         state.frame = window.requestAnimationFrame(render);
       };
       state.frame = window.requestAnimationFrame(render);
