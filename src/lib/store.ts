@@ -19,6 +19,9 @@ import type {
   GatewayUser,
   GatewayRetryInfo,
 } from './types';
+import type { ArtifactMeta } from './artifact-types';
+import { artifactService, type GenerateParams } from './artifact-service';
+import { artifactPersistence } from './artifact-persistence';
 import { createGatewayClient, type GatewayClient } from './gateway';
 import { connectDesktopBridgeToGateway, disconnectDesktopBridge } from './desktop-bridge';
 import { fetchSkillMarketplaceSkills } from './skill-marketplace';
@@ -31,6 +34,7 @@ import {
   notifyAssistantCompletion,
 } from './assistant-completion-notifier';
 import { recoverInterruptedAiActionRuns, syncAiActionRunsWithGateway } from './ai-action-run-store';
+import { writeArtifactSkill } from './artifact-skill';
 import { loadAppSnapshot, removePersistedInstance, saveCurrentInstanceId, saveInstances } from './local-persistence';
 
 function generateId(): string {
@@ -66,6 +70,7 @@ export interface InstanceRuntime {
   agentIdentity: AgentIdentity | null;
   sessionActivityStates: Record<string, 'generating' | 'completed' | 'error'>;
   // per-session activity state for sidebar indicators (generating / completed / error)
+  artifacts: ArtifactMeta[];
 
 }
 
@@ -88,6 +93,7 @@ function createInstanceRuntime(): InstanceRuntime {
     gatewayStatus: null,
     agentIdentity: null,
     sessionActivityStates: {},
+    artifacts: [],
   };
 }
 
@@ -115,6 +121,7 @@ interface StoreState {
   gatewayStatus: GatewayStatus | null;
   agentIdentity: AgentIdentity | null;
   sessionActivityStates: Record<string, 'generating' | 'completed' | 'error'>;
+  artifacts: ArtifactMeta[];
 
   // ── Instance CRUD ──
   hydrateInstances: (instances: InstanceConfig[], currentInstanceId: string | null) => void;
@@ -164,6 +171,11 @@ interface StoreState {
   // Track per-session activity (generating/completed/error → sidebar indicators)
   patchSessionActivityState: (sessionKey: string, state: 'generating' | 'completed' | 'error') => void;
   clearSessionActivityState: (sessionKey: string) => void;
+  fetchArtifacts: () => Promise<void>;
+  generateArtifact: (params: GenerateParams) => Promise<ArtifactMeta>;
+  updateArtifact: (artifactId: string, updates: Partial<ArtifactMeta>) => Promise<void>;
+  openArtifactWindow: (artifactId: string, version?: number) => Promise<void>;
+  deleteArtifact: (artifactId: string) => Promise<void>;
 }
 
 function runtimeToCurrentView(runtime: InstanceRuntime): Partial<StoreState> {
@@ -184,6 +196,7 @@ function runtimeToCurrentView(runtime: InstanceRuntime): Partial<StoreState> {
     gatewayStatus: runtime.gatewayStatus,
     agentIdentity: runtime.agentIdentity,
     sessionActivityStates: runtime.sessionActivityStates,
+    artifacts: runtime.artifacts,
   };
 }
 
@@ -245,6 +258,7 @@ export const useStore = create<StoreState>((set, get) => ({
   gatewayStatus: null,
   agentIdentity: null,
   sessionActivityStates: {},
+  artifacts: [],
 
   // ── Instance CRUD ──
 
@@ -503,6 +517,7 @@ export const useStore = create<StoreState>((set, get) => ({
           );
           get().refreshAll(instance.id);
           void recoverInterruptedAiActionRuns(instance.id, client).catch(() => {});
+          void writeArtifactSkill(client).catch(() => {});
           void connectDesktopBridgeToGateway(instance).catch((err) => {
             void err;
           });
@@ -985,6 +1000,41 @@ export const useStore = create<StoreState>((set, get) => ({
     }));
 
     await client.request('sessions.patch', { key, label });
+  },
+  fetchArtifacts: async () => {
+    const artifacts = await artifactService.list();
+    set((s) => {
+      const runtime = s.instanceRuntimes[s.currentInstanceId ?? ''];
+      if (runtime) runtime.artifacts = artifacts;
+      return { artifacts: runtime ? runtime.artifacts : s.artifacts, instanceRuntimes: { ...s.instanceRuntimes } };
+    });
+  },
+
+  generateArtifact: async (params: GenerateParams) => {
+    const meta = await artifactService.generate(params);
+    const { fetchArtifacts } = get();
+    await fetchArtifacts();
+    return meta;
+  },
+
+  updateArtifact: async (artifactId: string, updates: Partial<ArtifactMeta>) => {
+    await artifactService.update(artifactId, updates);
+    const { fetchArtifacts } = get();
+    await fetchArtifacts();
+  },
+
+  openArtifactWindow: async (artifactId: string, version?: number) => {
+    const meta = get().artifacts.find((a) => a.id === artifactId);
+    if (!meta) return;
+    await artifactPersistence.openWindow(artifactId, version ?? meta.currentVersion);
+  },
+
+  deleteArtifact: async (artifactId: string) => {
+    const index = await artifactPersistence.list();
+    const filtered = index.filter((a) => a.id !== artifactId);
+    await artifactPersistence.updateIndex(filtered);
+    const { fetchArtifacts } = get();
+    await fetchArtifacts();
   },
 }));
 

@@ -29,6 +29,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     saveInstanceData: (instanceId: string, key: string, value: unknown) =>
       ipcRenderer.invoke('storage:saveInstanceData', instanceId, key, value),
   },
+  artifact: {
+    open: (artifactId: string, version: number) => ipcRenderer.invoke('artifact:open', artifactId, version),
+    getMeta: (artifactId: string) => ipcRenderer.invoke('artifact:getMeta', artifactId),
+    getHtml: (artifactId: string, version?: number) => ipcRenderer.invoke('artifact:getHtml', artifactId, version),
+    saveMeta: (artifactId: string, meta: unknown) => ipcRenderer.invoke('artifact:saveMeta', artifactId, meta),
+    saveHtml: (artifactId: string, version: number, html: string) => ipcRenderer.invoke('artifact:saveHtml', artifactId, version, html),
+    list: () => ipcRenderer.invoke('artifact:list'),
+    updateIndex: (entries: unknown) => ipcRenderer.invoke('artifact:updateIndex', entries),
+    requestAuth: (artifactId: string, capability: string, detail: string) => ipcRenderer.invoke('artifact:requestAuth', artifactId, capability, detail),
+    onAuthRequest: (cb: (_event: unknown, artifactId: string, capability: string, detail: string) => void) => { ipcRenderer.on('artifact:requestAuth', cb as (event: Electron.IpcRendererEvent, ...args: unknown[]) => void); },
+      grantAuth: (result: { granted: boolean; level: string }) => ipcRenderer.send('artifact:grantAuth', result),
+      writeSkill: (dummy: string, content: string) => ipcRenderer.invoke('artifact:writeSkill', dummy, content),
+  },
   device: {
     signChallenge: (params: {
       nonce: string;

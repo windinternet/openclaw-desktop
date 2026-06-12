@@ -12,6 +12,7 @@ const INSTANCE_DATA_KEYS = new Set([
   'office-layout-instructions',
   'agent-team-profile',
   'ai-action-runs',
+  'artifacts',
 ])
 
 interface StoredAppState {

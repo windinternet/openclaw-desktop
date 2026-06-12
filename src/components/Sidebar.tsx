@@ -22,6 +22,7 @@ import {
   IconSun,
   IconMoon,
   IconSetting,
+  IconAppCenter,
 } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
@@ -42,6 +43,7 @@ const ROUTE_MAP: Record<string, string> = {
   office: '/office',
   memory: '/tuning',
   settings: '/settings',
+  artifacts: '/artifacts',
 };
 
 interface InfiniteLoaderViewProps {
@@ -607,6 +609,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
           <linearGradient id="ig-office" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#d946ef"/><stop offset="100%" stopColor="#f0abfc"/></linearGradient>
           <linearGradient id="ig-memory" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#8b5cf6"/><stop offset="100%" stopColor="#c084fc"/></linearGradient>
           <linearGradient id="ig-actions" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#f43f5e"/><stop offset="100%" stopColor="#fb7185"/></linearGradient>
+          <linearGradient id="ig-artifacts" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#f59e0b"/><stop offset="100%" stopColor="#ef4444"/></linearGradient>
         </defs>
       </svg>
     <div style={{ position: 'relative', display: 'flex', flex: 1, minHeight: 0 }}>
@@ -641,6 +644,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
         <Nav.Item itemKey="extensions" text={t('nav.extensions')} icon={<IconPuzzle />} />
         <Nav.Item itemKey="taskkanban" text="任务看板" icon={<IconCheckList />} />
         <Nav.Item itemKey="actions" text={t('nav.actions')} icon={<IconBolt />} />
+        <Nav.Item itemKey="artifacts" text={t('nav.artifacts')} icon={<IconAppCenter />} />
 
         <NavSectionLabel label={t('nav.sectionCollaboration')} />
         <Nav.Item itemKey="teams" text={t('nav.teams')} icon={<IconUserGroup />} />

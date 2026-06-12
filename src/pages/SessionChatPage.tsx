@@ -7,6 +7,7 @@ import type {
   RenderContentProps,
 } from '@douyinfe/semi-ui/lib/es/aiChatDialogue/interface';
 import { useStore } from '../lib';
+import { parseArtifactFromText, saveArtifactFromChat } from '../lib/artifact-parser';
 import type { EventFrame } from '../lib/types';
 import {
   decodeSessionKeyParam,
@@ -576,6 +577,7 @@ export default function SessionChatPage() {
   const models = useStore((s) => s.models);
   const agents = useStore((s) => s.agents);
   const sessions = useStore((s) => s.sessions);
+  const fetchArtifacts = useStore((s) => s.fetchArtifacts);
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const currentInstance = useStore(
     (s) => s.instances.find((instance) => instance.id === s.currentInstanceId) ?? null,
@@ -1534,15 +1536,36 @@ export default function SessionChatPage() {
             chats={displayChats}
             roleConfig={roleConfig}
             dialogueRenderConfig={{
-              renderDialogueContent: ({ message, defaultContent }: RenderContentProps) => (
-                <>
-                  {typeof message?.contextSummary === 'string' && message.contextSummary && (
-                    <ContextSummary summary={message.contextSummary} />
-                  )}
-                  {defaultContent}
-                  {isPendingDialogueMessage(message) && <PendingDialogueLoading />}
-                </>
-              ),
+              renderDialogueContent: ({ message, defaultContent }: RenderContentProps) => {
+                // 打印 assistant 消息的 raw content 结构（仅首次）
+                if (String(message?.role).startsWith('assistant') && message?.content) {
+                  const raw = JSON.stringify(message.content).slice(0, 400);
+                  console.log('[Artifact Raw] content type:', Array.isArray(message.content) ? 'array' : typeof message.content, 'preview:', raw);
+                }
+                const msgText = extractMessageText(message?.content);
+                if (msgText && msgText !== '[object Object]' && String(message?.role).startsWith('assistant')) {
+                  console.log('[Artifact Debug] text:', msgText.slice(0, 300));
+                  const parsed = parseArtifactFromText(msgText);
+                  if (parsed) {
+                    console.log('[Artifact] Auto-saving:', parsed.title);
+                    saveArtifactFromChat(parsed, 'chat', urlSessionKey).then((meta) => {
+                      fetchArtifacts();
+                      console.log('[Artifact] Saved:', meta.id);
+                    }).catch((e: unknown) => {
+                      console.error('[Artifact] Save failed:', e);
+                    });
+                  }
+                }
+                return (
+                  <>
+                    {typeof message?.contextSummary === 'string' && message.contextSummary && (
+                      <ContextSummary summary={message.contextSummary} />
+                    )}
+                    {defaultContent}
+                    {isPendingDialogueMessage(message) && <PendingDialogueLoading />}
+                  </>
+                );
+              },
             }}
             renderDialogueContentItem={renderDialogueContentItem}
             mode="bubble"

@@ -51,5 +51,17 @@ interface Window {
     install: {
       run: () => Promise<void>;
     };
+    artifact?: {
+      open: (artifactId: string, version: number) => Promise<number>;
+      getMeta: (artifactId: string) => Promise<unknown>;
+      getHtml: (artifactId: string, version?: number) => Promise<string | null>;
+      saveMeta: (artifactId: string, meta: unknown) => Promise<void>;
+      saveHtml: (artifactId: string, version: number, html: string) => Promise<void>;
+      list: () => Promise<unknown[]>;
+      updateIndex: (entries: unknown) => Promise<void>;
+      requestAuth: (artifactId: string, capability: string, detail: string) => Promise<{ granted: boolean; level: string }>;
+      onAuthRequest: (cb: (...args: unknown[]) => void) => void;
+      grantAuth: (result: { granted: boolean; level: string }) => void;
+    };
   };
 }

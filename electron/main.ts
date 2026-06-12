@@ -8,6 +8,7 @@ import crypto from 'node:crypto'
 import { fetchSkillMarketplaceSkills } from '../src/lib/skill-marketplace'
 import type { SkillMarketplaceSearchParams } from '../src/lib/types'
 import { registerLocalFileStorageHandlers } from './local-storage'
+import { registerArtifactProtocol, registerArtifactIpcHandlers } from './artifact-handlers'
 
 const execFileAsync = promisify(execFile)
 
@@ -321,6 +322,7 @@ ipcMain.handle('marketplace:search', async (_event, params: SkillMarketplaceSear
 })
 
 registerLocalFileStorageHandlers()
+registerArtifactIpcHandlers()
 
 ipcMain.handle('device:signChallenge', async (_event, params: {
   nonce: string;
@@ -424,7 +426,10 @@ ipcMain.on('set-external-link-mode', (_event, mode: string) => {
   }
 });
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  registerArtifactProtocol()
+  createWindow()
+})
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

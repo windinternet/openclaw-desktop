@@ -611,3 +611,7 @@ export interface SearchResult {
   timestamp?: number;
   relevance: number;
 }
+
+// ── Artifact ──────────────────────────────────────────────────────
+
+export type { ArtifactMeta, ArtifactType, ArtifactSource, VersionEntry, ArtifactAuth, AuthLevel, ArtifactTemplate } from './artifact-types';

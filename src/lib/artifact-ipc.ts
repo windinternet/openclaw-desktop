@@ -1,0 +1,18 @@
+export const ARTIFACT_IPC = {
+  OPEN: 'artifact:open',
+  GET_META: 'artifact:getMeta',
+  GET_HTML: 'artifact:getHtml',
+  FETCH: 'artifact:fetch',
+  READ_FILE: 'artifact:readFile',
+  WRITE_FILE: 'artifact:writeFile',
+  EXPORT_AS: 'artifact:exportAs',
+  NOTIFY: 'artifact:notify',
+  EXEC: 'artifact:exec',
+  REQUEST_AUTH: 'artifact:requestAuth',
+  GRANT_AUTH: 'artifact:grantAuth',
+  LIST: 'artifact:list',
+  SAVE_META: 'artifact:saveMeta',
+  SAVE_HTML: 'artifact:saveHtml',
+  UPDATE_INDEX: 'artifact:updateIndex',
+  WRITE_SKILL: 'artifact:writeSkill',
+} as const;

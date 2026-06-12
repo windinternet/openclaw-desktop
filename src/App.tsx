@@ -13,6 +13,8 @@ import TeamsPage from './pages/TeamsPage';
 import Office3DPage from './pages/Office3DPage';
 import TuningPage from './pages/TuningPage';
 import SessionChatPage from './pages/SessionChatPage';
+import ArtifactsPage from './pages/ArtifactsPage';
+import { ArtifactDetailPage } from './pages/ArtifactDetailPage';
 import AppGuard from './components/AppGuard';
 
 function App() {
@@ -39,6 +41,8 @@ function App() {
           <Route path="teams" element={<TeamsPage />} />
           <Route path="office" element={<Office3DPage />} />
           <Route path="tuning" element={<TuningPage />} />
+          <Route path="artifacts" element={<ArtifactsPage />} />
+          <Route path="artifacts/:artifactId" element={<ArtifactDetailPage />} />
           <Route path="chat/:sessionKey" element={<SessionChatPage />} />
         </Route>
       </Routes>

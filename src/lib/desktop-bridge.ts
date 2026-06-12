@@ -1,4 +1,5 @@
 import { createGatewayClient, type GatewayClient } from './gateway';
+import { registerArtifactMcpTools } from './artifact-mcp-adapter';
 import type { HelloOk, InstanceConfig } from './types';
 
 export const DESKTOP_BRIDGE_CAPABILITIES = [
@@ -27,6 +28,10 @@ export async function connectDesktopBridgeToGateway(instance: InstanceConfig): P
     capabilities: DESKTOP_BRIDGE_CAPABILITIES,
   });
   bridgeClients.set(instance.id, client);
+
+  registerArtifactMcpTools(client).catch((err) => {
+    void err;
+  });
 
   return client.connect();
 }
