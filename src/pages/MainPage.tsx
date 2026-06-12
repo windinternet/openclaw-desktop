@@ -3,6 +3,11 @@ import {Layout, Modal, Toast} from '@douyinfe/semi-ui';
 import {Outlet} from 'react-router-dom';
 import {useTranslation} from 'react-i18next';
 import {useStore} from '../lib';
+import {
+    DESKTOP_COMPANION_INSTALL_SPEC,
+    DESKTOP_COMPANION_PLUGIN_ID,
+    detectDesktopCompanion,
+} from '../lib/desktop-companion';
 import {useSettingsStore} from '../lib/settings-store';
 import Sidebar from '../components/Sidebar';
 import InstanceDrawer from '../components/InstanceDrawer';
@@ -21,6 +26,7 @@ export default function MainPage() {
     const connectionStatus = useStore((s) => s.connectionStatus);
     const connectionError = useStore((s) => s.connectionError);
     const connectionRetry = useStore((s) => s.connectionRetry);
+    const activeClient = useStore((s) => s.activeClient);
     const [addModalVisible, setAddModalVisible] = useState(false);
     const [drawerVisible, setDrawerVisible] = useState(false);
     const connectingRef = useRef(new Set<string>());
@@ -28,6 +34,7 @@ export default function MainPage() {
     const prevStatusRef = useRef<string | null>(null);
     const prevRetryAttemptRef = useRef(0);
     const lastErrorToastRef = useRef(0);
+    const companionCheckedRef = useRef(new Set<string>());
 
     useEffect(() => {
         if (!currentId && instances.length > 0) {
@@ -79,6 +86,42 @@ export default function MainPage() {
             }
         }
     }, [connectionStatus, connectionError]);
+
+    useEffect(() => {
+        if (!currentId) return;
+        if (connectionStatus !== 'connected') {
+            companionCheckedRef.current.delete(currentId);
+            return;
+        }
+        if (!activeClient || companionCheckedRef.current.has(currentId)) return;
+
+        companionCheckedRef.current.add(currentId);
+        let cancelled = false;
+        void detectDesktopCompanion(activeClient).then((info) => {
+            if (cancelled) return;
+
+            if (info.status === 'ready') return;
+            if (info.status === 'missing' || info.status === 'disabled') {
+                Toast.warning({
+                    content: `OpenClaw Desktop Companion 未安装或未启用。请在 Gateway 主机执行：openclaw plugins install ${DESKTOP_COMPANION_INSTALL_SPEC}，然后执行：openclaw plugins enable ${DESKTOP_COMPANION_PLUGIN_ID}`,
+                    duration: 12,
+                    showClose: true,
+                });
+                return;
+            }
+
+            const detail = info.message ? `：${info.message}` : '';
+            Toast.warning({
+                content: `OpenClaw Desktop Companion 状态异常（${info.status}）${detail}`,
+                duration: TOAST_DURATION_SECONDS,
+                showClose: true,
+            });
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [activeClient, connectionStatus, currentId]);
 
     useEffect(() => {
         if (!connectionRetry || connectionRetry.attempt === prevRetryAttemptRef.current) return;

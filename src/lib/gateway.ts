@@ -78,6 +78,9 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
   const role = opts.role ?? 'operator';
   const scopes = opts.scopes ?? ['operator.read', 'operator.write', 'operator.admin'];
   const capabilities = opts.capabilities ?? [];
+  const caps = opts.caps ?? [];
+  const commands = opts.commands ?? [];
+  const permissions = opts.permissions ?? {};
   const platform = opts.platform ?? detectPlatform();
   const locale = opts.locale ?? 'en-US';
   const requestTimeoutMs = opts.requestTimeoutMs ?? 30000;
@@ -182,6 +185,9 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
         locale,
         userAgent: `${clientId}/${clientVersion}`,
         ...(capabilities.length > 0 ? { capabilities } : {}),
+        ...(caps.length > 0 ? { caps } : {}),
+        ...(commands.length > 0 ? { commands } : {}),
+        ...(Object.keys(permissions).length > 0 ? { permissions } : {}),
         ...(device ? { device } : {}),
       },
     };

@@ -530,6 +530,9 @@ export interface GatewayClientOptions {
   role?: 'operator' | 'node';
   scopes?: string[];
   capabilities?: string[];
+  caps?: string[];
+  commands?: string[];
+  permissions?: Record<string, boolean>;
   platform?: string;
   locale?: string;
   requestTimeoutMs?: number;

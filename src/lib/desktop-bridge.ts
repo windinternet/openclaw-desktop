@@ -1,14 +1,57 @@
 import { createGatewayClient, type GatewayClient } from './gateway';
 import { registerArtifactMcpTools } from './artifact-mcp-adapter';
+import { handleDesktopNodeCommand } from './desktop-node-commands';
 import type { HelloOk, InstanceConfig } from './types';
 
 export const DESKTOP_BRIDGE_CAPABILITIES = [
   'desktop.ai_action',
   'desktop.local_bridge',
   'desktop.mcp_bridge',
+  'desktop.artifact',
+  'desktop.artifact.generate',
+  'desktop.artifact.append',
+  'desktop.artifact.update',
 ];
 
+export const DESKTOP_NODE_CAPS = ['desktop', 'desktop.artifacts'];
+
+export const DESKTOP_NODE_COMMANDS = [
+  'desktop.artifacts.create',
+  'desktop.artifacts.open',
+  'desktop.artifacts.update',
+  'desktop.artifacts.append',
+  'desktop.notify',
+];
+
+export const DESKTOP_NODE_PERMISSIONS = {
+  'desktop.artifacts': true,
+};
+
 const bridgeClients = new Map<string, GatewayClient>();
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function registerDesktopNodeCommandHandler(client: GatewayClient): void {
+  client.subscribeEvent(async (frame) => {
+    if (frame.event !== 'node.invoke.request' || !isRecord(frame.payload)) return;
+
+    const command = typeof frame.payload.command === 'string' ? frame.payload.command : '';
+    const params = frame.payload.params;
+    const requestId = typeof frame.payload.requestId === 'string' ? frame.payload.requestId : undefined;
+    if (!command) return;
+
+    const result = await handleDesktopNodeCommand(command, params);
+    if (!requestId) return;
+
+    try {
+      await client.request('node.invoke.result', { requestId, result });
+    } catch {
+      // Gateway may disconnect while a local Desktop command is running.
+    }
+  });
+}
 
 export async function connectDesktopBridgeToGateway(instance: InstanceConfig): Promise<HelloOk> {
   const existingClient = bridgeClients.get(instance.id);
@@ -26,14 +69,16 @@ export async function connectDesktopBridgeToGateway(instance: InstanceConfig): P
     role: 'node',
     scopes: ['node.read', 'node.write'],
     capabilities: DESKTOP_BRIDGE_CAPABILITIES,
+    caps: DESKTOP_NODE_CAPS,
+    commands: DESKTOP_NODE_COMMANDS,
+    permissions: DESKTOP_NODE_PERMISSIONS,
   });
   bridgeClients.set(instance.id, client);
 
-  registerArtifactMcpTools(client).catch((err) => {
-    void err;
-  });
-
-  return client.connect();
+  const hello = await client.connect();
+  await registerArtifactMcpTools(client);
+  registerDesktopNodeCommandHandler(client);
+  return hello;
 }
 
 export function disconnectDesktopBridge(instanceId?: string): void {

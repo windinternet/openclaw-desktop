@@ -1,13 +1,18 @@
 import { useState, useEffect, useRef, useCallback, useMemo, type Ref } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AIChatDialogue, AIChatInput, Button, Progress, Tabs, Tag, Toast, Typography } from '@douyinfe/semi-ui';
-import { IconClose, IconInfoCircle, IconList, IconWrench } from '@douyinfe/semi-icons';
+import { AIChatDialogue, AIChatInput, Button, Empty, Progress, Tabs, Tag, Toast, Typography } from '@douyinfe/semi-ui';
+import { IconAppCenter, IconClose, IconInfoCircle, IconList, IconPlay, IconWrench } from '@douyinfe/semi-icons';
 import type {
   DialogueContentItemRendererMap,
   RenderContentProps,
 } from '@douyinfe/semi-ui/lib/es/aiChatDialogue/interface';
 import { useStore } from '../lib';
-import { parseArtifactFromText, saveArtifactFromChat } from '../lib/artifact-parser';
+import { saveArtifactFromChat } from '../lib/artifact-parser';
+import {
+  collectChatArtifactCandidates,
+  filterArtifactsForSessionKeys,
+} from '../lib/session-artifacts';
+import type { ArtifactMeta } from '../lib/artifact-types';
 import type { EventFrame } from '../lib/types';
 import {
   decodeSessionKeyParam,
@@ -381,15 +386,19 @@ function SessionSidePanel({
   activeKey,
   insight,
   selectedTool,
+  artifacts,
   onTabChange,
   onClearTool,
+  onOpenArtifact,
   onClose,
 }: {
   activeKey: string;
   insight: ReturnType<typeof deriveSessionInsight>;
   selectedTool: SelectedToolCall | null;
+  artifacts: ArtifactMeta[];
   onTabChange: (key: string) => void;
   onClearTool: () => void;
+  onOpenArtifact: (artifact: ArtifactMeta) => void;
   onClose?: () => void;
 }) {
   const contextPercent = insight.contextUsageRatio !== undefined
@@ -478,6 +487,11 @@ function SessionSidePanel({
             )}
 
             <section>
+              <Text strong style={{ display: 'block', marginBottom: 8 }}>会话产物</Text>
+              <Metric label="已识别产物" value={formatNumber(artifacts.length)} />
+            </section>
+
+            <section>
               <Text strong style={{ display: 'block', marginBottom: 8 }}>后续洞察能力</Text>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <FutureItem label="会话摘要" />
@@ -525,6 +539,47 @@ function SessionSidePanel({
                 点击聊天中的工具调用查看详情
               </Text>
             </div>
+          )}
+        </Tabs.TabPane>
+
+        <Tabs.TabPane tab="产物" itemKey="artifact">
+          {artifacts.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {artifacts.map((artifact) => (
+                <button
+                  key={artifact.id}
+                  type="button"
+                  onClick={() => onOpenArtifact(artifact)}
+                  style={{
+                    width: '100%',
+                    border: '1px solid var(--semi-color-border)',
+                    borderRadius: 6,
+                    background: 'var(--semi-color-bg-0)',
+                    color: 'var(--semi-color-text-0)',
+                    padding: 10,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  <span style={{ fontSize: 20, flex: '0 0 auto' }}>{artifact.icon}</span>
+                  <span style={{ minWidth: 0, flex: 1 }}>
+                    <Text strong ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>
+                      {artifact.title}
+                    </Text>
+                    <Text type="tertiary" size="small">
+                      v{artifact.currentVersion} · {new Date(artifact.updatedAt).toLocaleString()}
+                    </Text>
+                  </span>
+                  <Tag color="orange" size="small">{artifact.type}</Tag>
+                  <IconPlay size="small" />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <Empty image={<IconAppCenter />} description="当前会话暂无产物" />
           )}
         </Tabs.TabPane>
 
@@ -577,7 +632,9 @@ export default function SessionChatPage() {
   const models = useStore((s) => s.models);
   const agents = useStore((s) => s.agents);
   const sessions = useStore((s) => s.sessions);
+  const artifacts = useStore((s) => s.artifacts);
   const fetchArtifacts = useStore((s) => s.fetchArtifacts);
+  const openArtifactWindow = useStore((s) => s.openArtifactWindow);
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const currentInstance = useStore(
     (s) => s.instances.find((instance) => instance.id === s.currentInstanceId) ?? null,
@@ -621,6 +678,7 @@ export default function SessionChatPage() {
   const initialMessageSentRef = useRef<string | null>(null);
   const prevRootSessionKeyRef = useRef<string | undefined>();
   const pageDragDepthRef = useRef(0);
+  const savedArtifactKeysRef = useRef(new Set<string>());
 
   useEffect(() => {
     if (!urlSessionKey) return;
@@ -631,6 +689,11 @@ export default function SessionChatPage() {
       setRelatedSessionKeys(decoded ? [decoded] : []);
     });
   }, [urlSessionKey]);
+
+  useEffect(() => {
+    if (!currentInstanceId) return;
+    void fetchArtifacts();
+  }, [currentInstanceId, fetchArtifacts]);
 
   useEffect(() => {
     if (prevRootSessionKeyRef.current !== rootSessionKey) {
@@ -693,13 +756,14 @@ export default function SessionChatPage() {
    * Only triggers when there are older messages not yet displayed.
    */
   useEffect(() => {
-    if (!Array.isArray(allHistory) || allHistory.length <= PAGE_SIZE) return;
+    const historyLength = allHistory.length;
+    if (historyLength <= PAGE_SIZE) return;
     const el = chatContainerRef.current;
     if (!el) return;
     const scrollable = el.querySelector<HTMLDivElement>('.semi-ai-chat-dialogue-list') || el;
     const handleScroll = () => {
-      if (scrollable.scrollTop < 80 && displayLimit < allHistory.length) {
-        setDisplayLimit((prev) => Math.min(prev + PAGE_SIZE, allHistory.length));
+      if (scrollable.scrollTop < 80 && displayLimit < historyLength) {
+        setDisplayLimit((prev) => Math.min(prev + PAGE_SIZE, historyLength));
       }
     };
     scrollable.addEventListener('scroll', handleScroll, { passive: true });
@@ -713,10 +777,13 @@ export default function SessionChatPage() {
   useEffect(() => {
     if (allHistory.length === 0) return;
     const visible = allHistory.slice(-displayLimit);
-    
-        setChats((prev) => {
-      return mergeChats(mergeVisibleHistoryWithLiveChats(visible, allHistory, prev));
-    });
+
+    const timer = window.setTimeout(() => {
+      setChats((prev) => {
+        return mergeChats(mergeVisibleHistoryWithLiveChats(visible, allHistory, prev));
+      });
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [displayLimit, allHistory]);
 
   useEffect(() => {
@@ -736,6 +803,36 @@ export default function SessionChatPage() {
       })),
     );
   }, [chats, currentInstanceId, rootSessionKey]);
+
+  useEffect(() => {
+    const candidates = collectChatArtifactCandidates(chats);
+    if (candidates.length === 0) return;
+
+    for (const candidate of candidates) {
+      const alreadySaved = artifacts.some((artifact) => (
+        artifact.source.type === 'chat'
+        && artifact.source.id === candidate.sourceSessionKey
+        && artifact.source.name === candidate.sourceMessageId
+      ));
+      if (alreadySaved) {
+        savedArtifactKeysRef.current.add(candidate.key);
+        continue;
+      }
+      if (savedArtifactKeysRef.current.has(candidate.key)) continue;
+
+      savedArtifactKeysRef.current.add(candidate.key);
+      void saveArtifactFromChat(
+        candidate.parsed,
+        'chat',
+        candidate.sourceSessionKey,
+        candidate.sourceMessageId,
+      )
+        .then(() => fetchArtifacts())
+        .catch(() => {
+          savedArtifactKeysRef.current.delete(candidate.key);
+        });
+    }
+  }, [artifacts, chats, fetchArtifacts]);
 
   /* ── 加载历史消息 ── */
   useEffect(() => {
@@ -780,8 +877,8 @@ export default function SessionChatPage() {
 
   useEffect(() => {
     if (!activeClient || !activeSessionKey || connectionStatus !== 'connected') {
-      setSessionContextSnapshot(null);
-      return;
+      const resetTimer = window.setTimeout(() => setSessionContextSnapshot(null), 0);
+      return () => window.clearTimeout(resetTimer);
     }
 
     let cancelled = false;
@@ -1467,6 +1564,11 @@ export default function SessionChatPage() {
     [chats, currentModel, sessionContextSnapshot],
   );
 
+  const sessionArtifacts = useMemo(() => {
+    const sessionKeys = [...new Set([rootSessionKey, ...relatedSessionKeys].filter((key): key is string => !!key))];
+    return filterArtifactsForSessionKeys(artifacts, sessionKeys).sort((a, b) => b.updatedAt - a.updatedAt);
+  }, [artifacts, relatedSessionKeys, rootSessionKey]);
+
   const displayChats = useMemo(
     () => groupAdjacentToolCallChats(chats),
     [chats],
@@ -1537,25 +1639,6 @@ export default function SessionChatPage() {
             roleConfig={roleConfig}
             dialogueRenderConfig={{
               renderDialogueContent: ({ message, defaultContent }: RenderContentProps) => {
-                // 打印 assistant 消息的 raw content 结构（仅首次）
-                if (String(message?.role).startsWith('assistant') && message?.content) {
-                  const raw = JSON.stringify(message.content).slice(0, 400);
-                  console.log('[Artifact Raw] content type:', Array.isArray(message.content) ? 'array' : typeof message.content, 'preview:', raw);
-                }
-                const msgText = extractMessageText(message?.content);
-                if (msgText && msgText !== '[object Object]' && String(message?.role).startsWith('assistant')) {
-                  console.log('[Artifact Debug] text:', msgText.slice(0, 300));
-                  const parsed = parseArtifactFromText(msgText);
-                  if (parsed) {
-                    console.log('[Artifact] Auto-saving:', parsed.title);
-                    saveArtifactFromChat(parsed, 'chat', urlSessionKey).then((meta) => {
-                      fetchArtifacts();
-                      console.log('[Artifact] Saved:', meta.id);
-                    }).catch((e: unknown) => {
-                      console.error('[Artifact] Save failed:', e);
-                    });
-                  }
-                }
                 return (
                   <>
                     {typeof message?.contextSummary === 'string' && message.contextSummary && (
@@ -1608,6 +1691,7 @@ export default function SessionChatPage() {
           activeKey={sidePanelTab}
           insight={sessionInsight}
           selectedTool={selectedToolCall}
+          artifacts={sessionArtifacts}
           onTabChange={setSidePanelTab}
           onClose={() => {
             setSidePanelVisible(false);
@@ -1616,6 +1700,9 @@ export default function SessionChatPage() {
           onClearTool={() => {
             setSelectedToolCall(null);
             setSidePanelTab('overview');
+          }}
+          onOpenArtifact={(artifact) => {
+            void openArtifactWindow(artifact.id, artifact.currentVersion);
           }}
         />
       ) : null}

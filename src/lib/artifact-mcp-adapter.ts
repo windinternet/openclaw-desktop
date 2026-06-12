@@ -56,7 +56,9 @@ export const ARTIFACT_TOOLS: ToolDefinition[] = [
 ];
 
 export async function registerArtifactMcpTools(client: GatewayClient): Promise<void> {
-  // 1. 监听 Gateway 的 tool 调用事件
+  // Legacy bridge only. The official path is the OpenClaw Desktop Companion
+  // plugin registering real Gateway tools and forwarding execution via
+  // node.invoke to this Desktop app.
   client.subscribeEvent(async (frame) => {
     if (frame.event === 'mcp.tool.call' && frame.payload) {
       const payload = frame.payload as { name: string; args: Record<string, unknown>; requestId?: string };
@@ -87,12 +89,4 @@ export async function registerArtifactMcpTools(client: GatewayClient): Promise<v
       }
     }
   });
-
-  // 2. 主动向 Gateway 注册 Tools
-  try {
-    await client.request('mcp.register', { tools: ARTIFACT_TOOLS });
-    console.log('[Artifact MCP] Tools registered:', ARTIFACT_TOOLS.map((t) => t.name));
-  } catch (e) {
-    console.warn('[Artifact MCP] Gateway does not support mcp.register RPC:', e);
-  }
 }
