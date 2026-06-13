@@ -8,6 +8,8 @@ import {
   detectDesktopCompanion,
   extractDesktopCompanionApprovalRequestId,
   fetchDesktopCompanionApprovalRequest,
+  reinstallDesktopCompanion,
+  uninstallDesktopCompanion,
 } from '../lib/desktop-companion';
 
 function createClient(request: GatewayClient['request']): GatewayClient {
@@ -136,5 +138,42 @@ describe('desktop companion detection', () => {
       scopes: ['node.read', 'node.write'],
     });
     await expect(approveDesktopCompanionApprovalRequest(client, 'req-node-1')).resolves.toBeUndefined();
+  });
+
+  it('calls fixed companion plugin management RPC methods', async () => {
+    const request = vi.fn(async (method: string) => ({
+      ok: true,
+      source: 'cli',
+      action: method.endsWith('.reinstall') ? 'reinstall' : 'uninstall',
+      requiresGatewayRestart: true,
+      commands: [],
+      results: [],
+    }));
+    const client = createClient(request as GatewayClient['request']);
+
+    await expect(reinstallDesktopCompanion(client)).resolves.toMatchObject({
+      ok: true,
+      action: 'reinstall',
+      requiresGatewayRestart: true,
+    });
+    await expect(uninstallDesktopCompanion(client)).resolves.toMatchObject({
+      ok: true,
+      action: 'uninstall',
+      requiresGatewayRestart: true,
+    });
+
+    expect(request).toHaveBeenNthCalledWith(1, 'desktopCompanion.plugin.reinstall', { timeoutMs: 120000 });
+    expect(request).toHaveBeenNthCalledWith(2, 'desktopCompanion.plugin.uninstall', { timeoutMs: 120000 });
+  });
+
+  it('throws readable errors for failed companion plugin management responses', async () => {
+    const client = createClient(vi.fn(async () => ({
+      ok: false,
+      action: 'reinstall',
+      error: 'cli-exit-nonzero',
+      message: 'install failed',
+    })) as GatewayClient['request']);
+
+    await expect(reinstallDesktopCompanion(client)).rejects.toThrow('install failed');
   });
 });

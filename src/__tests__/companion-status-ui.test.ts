@@ -24,4 +24,16 @@ describe('companion status UI', () => {
     expect(source).toContain('detectDesktopCompanionForInstance');
     expect(source).toContain('Companion');
   });
+
+  it('renders per-instance companion reinstall and uninstall actions in the instance drawer', () => {
+    const source = readFileSync('src/components/InstanceDrawer.tsx', 'utf8');
+    const store = readFileSync('src/lib/store.ts', 'utf8');
+
+    expect(source).toContain('reinstallDesktopCompanionForInstance');
+    expect(source).toContain('uninstallDesktopCompanionForInstance');
+    expect(source).toContain('instance.companionReinstall');
+    expect(source).toContain('instance.companionUninstall');
+    expect(store).toContain('reinstallDesktopCompanionForInstance');
+    expect(store).toContain('uninstallDesktopCompanionForInstance');
+  });
 });

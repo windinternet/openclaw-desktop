@@ -368,14 +368,79 @@ export interface CronRun {
 
 // ── Tool & Skill ───────────────────────────────────────────────────
 
+/** tools.catalog RPC 响应体 */
+export interface ToolCatalogResponse {
+  agentId: string;
+  profiles: { id: string; label: string }[];
+  groups: ToolCatalogGroup[];
+}
+
+/** 工具分组 */
+export interface ToolCatalogGroup {
+  id: string;
+  label: string;
+  source: 'core' | 'plugin';
+  pluginId?: string;
+  tools: ToolInfo[];
+}
+
 /** tools.catalog RPC 返回的工具条目 */
 export interface ToolInfo {
-  name: string;
+  id: string;
+  label: string;
   description?: string;
   source: 'core' | 'plugin';
   pluginId?: string;
   optional?: boolean;
+  defaultProfiles?: string[];
 }
+
+// ── Plugin Inventory ───────────────────────────────────────────────
+
+export type PluginInventoryStatus = 'idle' | 'loading' | 'ready' | 'degraded' | 'unavailable';
+
+export interface OpenClawPluginInfo {
+  id: string;
+  name?: string;
+  version?: string;
+  description?: string;
+  format?: string;
+  source?: string;
+  rootDir?: string;
+  origin?: string;
+  enabled?: boolean;
+  status?: string;
+  dependencyStatus?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface DesktopCompanionPluginsListSuccess {
+  ok: true;
+  source: 'cli';
+  argv?: string[];
+  enabledOnly?: boolean;
+  capturedAt?: number;
+  durationMs?: number;
+  registry?: {
+    source?: string;
+    diagnostics?: unknown[];
+  };
+  plugins: OpenClawPluginInfo[];
+  diagnostics?: unknown[];
+}
+
+export interface DesktopCompanionPluginsListFailure {
+  ok: false;
+  source: 'cli';
+  error: string;
+  message: string;
+  durationMs?: number;
+  stderr?: string;
+}
+
+export type DesktopCompanionPluginsListResponse =
+  | DesktopCompanionPluginsListSuccess
+  | DesktopCompanionPluginsListFailure;
 
 /** skills.status RPC 返回的技能条目 */
 export interface SkillInfo {

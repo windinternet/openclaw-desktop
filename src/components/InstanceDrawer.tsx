@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { TagColor } from '@douyinfe/semi-ui/lib/es/tag';
-import { SideSheet, Button, Tag, Popconfirm, Typography } from '@douyinfe/semi-ui';
-import { IconServer, IconPlus, IconDeleteStroked, IconLink, IconPause, IconRefresh } from '@douyinfe/semi-icons';
+import { SideSheet, Button, Tag, Popconfirm, Typography, Toast } from '@douyinfe/semi-ui';
+import { IconServer, IconPlus, IconDeleteStroked, IconLink, IconPause, IconRefresh, IconSync } from '@douyinfe/semi-icons';
 import type { DesktopCompanionStatus } from '../lib/desktop-companion';
 import { useStore } from '../lib';
 
@@ -86,6 +86,23 @@ export default function InstanceDrawer({ visible, onClose, onAddInstance }: Inst
             const companionStatus = companionInfo?.status ?? 'unknown';
             const companionStatusInfo = COMPANION_STATUS_CONFIG[companionStatus];
             const companionDetail = companionInfo?.message || companionInfo?.version;
+            const companionManaging = Boolean(runtime?.companionPluginManaging);
+            const canManageCompanion = status === 'connected'
+              && (companionStatus === 'ready' || companionStatus === 'degraded');
+            const runCompanionAction = async (action: 'reinstall' | 'uninstall') => {
+              try {
+                if (action === 'reinstall') {
+                  await useStore.getState().reinstallDesktopCompanionForInstance(inst.id);
+                  Toast.success(t('instance.companionReinstallSuccess'));
+                } else {
+                  await useStore.getState().uninstallDesktopCompanionForInstance(inst.id);
+                  Toast.success(t('instance.companionUninstallSuccess'));
+                }
+              } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                Toast.error(`${t('instance.companionActionFailed')}: ${message}`);
+              }
+            };
 
             return (
               <div
@@ -187,14 +204,49 @@ export default function InstanceDrawer({ visible, onClose, onAddInstance }: Inst
                       size="small"
                       theme="borderless"
                       loading={Boolean(runtime?.companionChecking)}
-                      disabled={status !== 'connected'}
-                      title="重新检测 Companion"
+                      disabled={status !== 'connected' || companionManaging}
+                      title={t('instance.companionRefresh')}
                       onClick={(e) => {
                         e.stopPropagation();
                         void useStore.getState().detectDesktopCompanionForInstance(inst.id);
                       }}
                       style={{ flexShrink: 0 }}
                     />
+                    {canManageCompanion && (
+                      <>
+                        <Popconfirm
+                          title={t('instance.companionReinstallConfirm')}
+                          onConfirm={() => runCompanionAction('reinstall')}
+                        >
+                          <Button
+                            icon={<IconSync />}
+                            size="small"
+                            theme="borderless"
+                            loading={companionManaging}
+                            disabled={Boolean(runtime?.companionChecking)}
+                            title={t('instance.companionReinstall')}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ flexShrink: 0 }}
+                          />
+                        </Popconfirm>
+                        <Popconfirm
+                          title={t('instance.companionUninstallConfirm')}
+                          onConfirm={() => runCompanionAction('uninstall')}
+                        >
+                          <Button
+                            icon={<IconDeleteStroked />}
+                            size="small"
+                            theme="borderless"
+                            type="danger"
+                            loading={companionManaging}
+                            disabled={Boolean(runtime?.companionChecking)}
+                            title={t('instance.companionUninstall')}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ flexShrink: 0 }}
+                          />
+                        </Popconfirm>
+                      </>
+                    )}
                   </div>
                   {inst.lastActivitySummary && (
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 6, minWidth: 0 }}>

@@ -8,6 +8,11 @@ import type {
   ModelInfo,
   CronJob,
   CronRun,
+  DesktopCompanionPluginsListResponse,
+  OpenClawPluginInfo,
+  PluginInventoryStatus,
+  ToolCatalogGroup,
+  ToolCatalogResponse,
   ToolInfo,
   SkillInfo,
   SkillMarketplaceInstallResult,
@@ -34,9 +39,12 @@ import {
   extractDesktopCompanionApprovalRequestId,
   fetchDesktopCompanionApprovalRequest,
   listDesktopCompanionApprovalRequests,
+  reinstallDesktopCompanion,
+  uninstallDesktopCompanion,
   type DesktopCompanionApprovalRequest,
   type DesktopCompanionInfo,
   type DesktopCompanionInstallSessionResult,
+  type DesktopCompanionPluginManageResult,
 } from './desktop-companion';
 import {
   getAssistantCompletionSummary,
@@ -73,6 +81,10 @@ export interface InstanceRuntime {
   models: ModelInfo[];
   cronJobs: CronJob[];
   tools: ToolInfo[];
+  pluginGroups: ToolCatalogGroup[];
+  plugins: OpenClawPluginInfo[];
+  pluginInventoryStatus: PluginInventoryStatus;
+  pluginInventoryError: string | null;
   skills: SkillInfo[];
   skillMarketplaceResults: SkillMarketplaceSkill[];
   workspaceFiles: WorkspaceFile[];
@@ -88,6 +100,7 @@ export interface InstanceRuntime {
   companionApprovalApproving: boolean;
   companionChecking: boolean;
   companionInstallRunning: boolean;
+  companionPluginManaging: boolean;
 }
 
 function createInstanceRuntime(): InstanceRuntime {
@@ -102,6 +115,10 @@ function createInstanceRuntime(): InstanceRuntime {
     models: [],
     cronJobs: [],
     tools: [],
+    pluginGroups: [],
+    plugins: [],
+    pluginInventoryStatus: 'idle',
+    pluginInventoryError: null,
     skills: [],
     skillMarketplaceResults: [],
     workspaceFiles: [],
@@ -116,6 +133,7 @@ function createInstanceRuntime(): InstanceRuntime {
     companionApprovalApproving: false,
     companionChecking: false,
     companionInstallRunning: false,
+    companionPluginManaging: false,
   };
 }
 
@@ -136,6 +154,10 @@ interface StoreState {
   models: ModelInfo[];
   cronJobs: CronJob[];
   tools: ToolInfo[];
+  pluginGroups: ToolCatalogGroup[];
+  plugins: OpenClawPluginInfo[];
+  pluginInventoryStatus: PluginInventoryStatus;
+  pluginInventoryError: string | null;
   skills: SkillInfo[];
   skillMarketplaceResults: SkillMarketplaceSkill[];
   workspaceFiles: WorkspaceFile[];
@@ -150,6 +172,7 @@ interface StoreState {
   companionApprovalApproving: boolean;
   companionChecking: boolean;
   companionInstallRunning: boolean;
+  companionPluginManaging: boolean;
 
   // ── Instance CRUD ──
   hydrateInstances: (instances: InstanceConfig[], currentInstanceId: string | null) => void;
@@ -179,6 +202,7 @@ interface StoreState {
   fetchCronJobs: (instanceId?: string) => Promise<void>;
   fetchCronRuns: (jobId: string) => Promise<CronRun[]>;
   fetchTools: (instanceId?: string) => Promise<void>;
+  fetchPlugins: (instanceId?: string) => Promise<void>;
   fetchSkills: (instanceId?: string) => Promise<void>;
   searchSkillMarketplace: (params: SkillMarketplaceSearchParams) => Promise<SkillMarketplaceSkill[]>;
   installMarketplaceSkill: (skill: SkillMarketplaceSkill) => Promise<SkillMarketplaceInstallResult>;
@@ -192,6 +216,8 @@ interface StoreState {
   createDesktopCompanionInstallSessionForInstance: (
     instanceId?: string,
   ) => Promise<DesktopCompanionInstallSessionResult>;
+  reinstallDesktopCompanionForInstance: (instanceId?: string) => Promise<DesktopCompanionPluginManageResult>;
+  uninstallDesktopCompanionForInstance: (instanceId?: string) => Promise<DesktopCompanionPluginManageResult>;
   setDesktopCompanionApprovalVisible: (visible: boolean, instanceId?: string) => void;
   approveDesktopCompanionForInstance: (instanceId?: string) => Promise<void>;
 
@@ -223,6 +249,10 @@ function runtimeToCurrentView(runtime: InstanceRuntime): Partial<StoreState> {
     models: runtime.models,
     cronJobs: runtime.cronJobs,
     tools: runtime.tools,
+    pluginGroups: runtime.pluginGroups,
+    plugins: runtime.plugins,
+    pluginInventoryStatus: runtime.pluginInventoryStatus,
+    pluginInventoryError: runtime.pluginInventoryError,
     skills: runtime.skills,
     skillMarketplaceResults: runtime.skillMarketplaceResults,
     workspaceFiles: runtime.workspaceFiles,
@@ -237,6 +267,7 @@ function runtimeToCurrentView(runtime: InstanceRuntime): Partial<StoreState> {
     companionApprovalApproving: runtime.companionApprovalApproving,
     companionChecking: runtime.companionChecking,
     companionInstallRunning: runtime.companionInstallRunning,
+    companionPluginManaging: runtime.companionPluginManaging,
   };
 }
 
@@ -307,6 +338,10 @@ export const useStore = create<StoreState>((set, get) => ({
   models: [],
   cronJobs: [],
   tools: [],
+  pluginGroups: [],
+  plugins: [],
+  pluginInventoryStatus: 'idle',
+  pluginInventoryError: null,
   skills: [],
   skillMarketplaceResults: [],
   workspaceFiles: [],
@@ -321,6 +356,7 @@ export const useStore = create<StoreState>((set, get) => ({
   companionApprovalApproving: false,
   companionChecking: false,
   companionInstallRunning: false,
+  companionPluginManaging: false,
 
   // ── Instance CRUD ──
 
@@ -696,6 +732,7 @@ export const useStore = create<StoreState>((set, get) => ({
       get().fetchModels(instanceId),
       get().fetchCronJobs(instanceId),
       get().fetchTools(instanceId),
+      get().fetchPlugins(instanceId),
       get().fetchSkills(instanceId),
       get().fetchHealth(instanceId),
       get().fetchGatewayStatus(instanceId),
@@ -757,6 +794,52 @@ export const useStore = create<StoreState>((set, get) => ({
       return result;
     } finally {
       set((state) => withInstanceRuntime(state, instanceId, { companionInstallRunning: false }));
+    }
+  },
+
+  reinstallDesktopCompanionForInstance: async (requestedInstanceId) => {
+    const target = getInstanceClient(get(), requestedInstanceId);
+    if (!target) throw new Error('请先连接到 Gateway');
+    const { instanceId, client } = target;
+    set((state) => withInstanceRuntime(state, instanceId, { companionPluginManaging: true }));
+    try {
+      const result = await reinstallDesktopCompanion(client);
+      set((state) =>
+        withInstanceRuntime(state, instanceId, {
+          companionInfo: {
+            status: 'degraded',
+            pluginId: 'openclaw-desktop-companion',
+            capabilities: [],
+            message: 'Companion 已重新安装，请重启或重载 Gateway 后重新检测',
+          },
+        }),
+      );
+      return result;
+    } finally {
+      set((state) => withInstanceRuntime(state, instanceId, { companionPluginManaging: false }));
+    }
+  },
+
+  uninstallDesktopCompanionForInstance: async (requestedInstanceId) => {
+    const target = getInstanceClient(get(), requestedInstanceId);
+    if (!target) throw new Error('请先连接到 Gateway');
+    const { instanceId, client } = target;
+    set((state) => withInstanceRuntime(state, instanceId, { companionPluginManaging: true }));
+    try {
+      const result = await uninstallDesktopCompanion(client);
+      set((state) =>
+        withInstanceRuntime(state, instanceId, {
+          companionInfo: {
+            status: 'degraded',
+            pluginId: 'openclaw-desktop-companion',
+            capabilities: [],
+            message: 'Companion 已卸载，请重启或重载 Gateway 后重新检测',
+          },
+        }),
+      );
+      return result;
+    } finally {
+      set((state) => withInstanceRuntime(state, instanceId, { companionPluginManaging: false }));
     }
   },
 
@@ -903,10 +986,45 @@ export const useStore = create<StoreState>((set, get) => ({
     if (!target) return;
     const { instanceId, client } = target;
     try {
-      const data = await client.request<ToolInfo[]>('tools.catalog');
-      set((state) => withInstanceRuntime(state, instanceId, { tools: Array.isArray(data) ? data : [] }));
+      const data = await client.request<ToolCatalogResponse>('tools.catalog');
+      const list = data?.groups?.flatMap((g) => g.tools) ?? [];
+      const pluginGroups = data?.groups?.filter((g) => g.source === 'plugin') ?? [];
+      set((state) => withInstanceRuntime(state, instanceId, { tools: list, pluginGroups }));
     } catch (err) {
       console.error('[fetchTools]', err);
+    }
+  },
+
+  fetchPlugins: async (requestedInstanceId) => {
+    const target = getInstanceClient(get(), requestedInstanceId);
+    if (!target) return;
+    const { instanceId, client } = target;
+    set((state) => withInstanceRuntime(state, instanceId, {
+      pluginInventoryStatus: 'loading',
+      pluginInventoryError: null,
+    }));
+    try {
+      const data = await client.request<DesktopCompanionPluginsListResponse>('desktopCompanion.plugins.list', {
+        timeoutMs: 30000,
+      });
+      if (data?.ok === true) {
+        set((state) => withInstanceRuntime(state, instanceId, {
+          plugins: Array.isArray(data.plugins) ? data.plugins : [],
+          pluginInventoryStatus: 'ready',
+          pluginInventoryError: null,
+        }));
+        return;
+      }
+
+      set((state) => withInstanceRuntime(state, instanceId, {
+        pluginInventoryStatus: 'degraded',
+        pluginInventoryError: data?.message || data?.error || 'Companion plugin inventory unavailable',
+      }));
+    } catch (err) {
+      set((state) => withInstanceRuntime(state, instanceId, {
+        pluginInventoryStatus: 'degraded',
+        pluginInventoryError: err instanceof Error ? err.message : 'Companion plugin inventory unavailable',
+      }));
     }
   },
 

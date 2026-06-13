@@ -8,7 +8,7 @@ import {
   getSkillMarketplaceSource,
   useStore,
 } from '../lib';
-import type { SkillInfo, SkillMarketplaceSkill, SkillMarketplaceSourceId, ToolInfo } from '../lib/types';
+import type { OpenClawPluginInfo, SkillInfo, SkillMarketplaceSkill, SkillMarketplaceSourceId, ToolInfo } from '../lib/types';
 
 const { Title, Text } = Typography;
 
@@ -85,28 +85,31 @@ const TOOL_COLUMNS = (
 ) => [
   {
     title: t('extensions.name'),
-    dataIndex: 'name',
+    dataIndex: 'label',
     width: 200,
-    render: (_: string, record: ToolInfo) => (
-      <span style={{ fontWeight: 500, fontFamily: 'var(--semi-font-family-mono)' }}>
-        {record.name}
-      </span>
-    ),
+    render: (_: string, record: ToolInfo) =>
+      record ? (
+        <span style={{ fontWeight: 500, fontFamily: 'var(--semi-font-family-mono)' }}>
+          {record.label}
+        </span>
+      ) : null,
   },
   {
     title: t('extensions.description'),
     dataIndex: 'description',
-    render: (_: string, record: ToolInfo) => (
-      <span style={{ color: 'var(--semi-color-text-1)', fontSize: 13 }}>
-        {record.description || '—'}
-      </span>
-    ),
+    render: (_: string, record: ToolInfo) =>
+      record ? (
+        <span style={{ color: 'var(--semi-color-text-1)', fontSize: 13 }}>
+          {record.description || '—'}
+        </span>
+      ) : null,
   },
   {
     title: t('extensions.source'),
     dataIndex: 'source',
     width: 120,
     render: (_: string, record: ToolInfo) => {
+      if (!record) return null;
       const isCore = record.source === 'core';
       return (
         <Tag color={isCore ? 'blue' : 'violet'} size="small">
@@ -120,6 +123,101 @@ const TOOL_COLUMNS = (
     ],
     onFilter: (value: string, record?: ToolInfo) =>
       record ? record.source === value : true,
+  },
+];
+
+const PLUGIN_INVENTORY_COLUMNS = (
+  t: (key: string) => string,
+) => [
+  {
+    title: t('extensions.name'),
+    dataIndex: 'name',
+    width: 260,
+    render: (_: string, record: OpenClawPluginInfo) => (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span style={{ fontWeight: 600, fontFamily: 'var(--semi-font-family-mono)' }}>
+          {record.name || record.id}
+        </span>
+        {record.name && record.name !== record.id && (
+          <span style={{ color: 'var(--semi-color-text-2)', fontSize: 12, fontFamily: 'var(--semi-font-family-mono)' }}>
+            {record.id}
+          </span>
+        )}
+      </div>
+    ),
+  },
+  {
+    title: t('extensions.status'),
+    dataIndex: 'status',
+    width: 120,
+    render: (_: string, record: OpenClawPluginInfo) => {
+      const status = String(record.status ?? (record.enabled ? 'enabled' : 'disabled'));
+      const color = status === 'loaded' || status === 'enabled' ? 'green' : status === 'error' ? 'red' : 'grey';
+      return <Tag color={color} size="small">{status}</Tag>;
+    },
+  },
+  {
+    title: t('extensions.source'),
+    dataIndex: 'origin',
+    width: 130,
+    render: (_: string, record: OpenClawPluginInfo) => (
+      <Tag size="small">{String(record.origin ?? record.format ?? '—')}</Tag>
+    ),
+  },
+  {
+    title: t('extensions.version'),
+    dataIndex: 'version',
+    width: 120,
+    render: (_: string, record: OpenClawPluginInfo) => (
+      <span style={{ color: 'var(--semi-color-text-2)', fontSize: 12 }}>
+        {record.version || '—'}
+      </span>
+    ),
+  },
+  {
+    title: t('extensions.description'),
+    dataIndex: 'description',
+    render: (_: string, record: OpenClawPluginInfo) => {
+      const providerCount = [
+        record.providerIds,
+        record.embeddingProviderIds,
+        record.speechProviderIds,
+        record.webSearchProviderIds,
+      ].reduce<number>((sum, value) => sum + (Array.isArray(value) ? value.length : 0), 0);
+      const toolCount = Array.isArray(record.toolNames) ? record.toolNames.length : 0;
+      const commandCount = Array.isArray(record.commands) ? record.commands.length : 0;
+      const parts = [
+        providerCount > 0 ? `${providerCount} ${t('extensions.providers')}` : '',
+        toolCount > 0 ? `${toolCount} ${t('extensions.tools').toLowerCase()}` : '',
+        commandCount > 0 ? `${commandCount} ${t('extensions.commands')}` : '',
+      ].filter(Boolean);
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ color: 'var(--semi-color-text-1)', fontSize: 13 }}>
+            {record.description || '—'}
+          </span>
+          {parts.length > 0 && (
+            <span style={{ color: 'var(--semi-color-text-2)', fontSize: 12 }}>
+              {parts.join(' · ')}
+            </span>
+          )}
+        </div>
+      );
+    },
+  },
+  {
+    title: t('extensions.dependencies'),
+    dataIndex: 'dependencyStatus',
+    width: 150,
+    render: (_: unknown, record: OpenClawPluginInfo) => {
+      const dependencyStatus = record.dependencyStatus;
+      const installed = dependencyStatus && typeof dependencyStatus === 'object'
+        ? (dependencyStatus as Record<string, unknown>).requiredInstalled !== false
+        : true;
+      return installed
+        ? <Tag color="green" size="small">{t('extensions.installed')}</Tag>
+        : <Tag color="red" size="small">{t('extensions.missingDependencies')}</Tag>;
+    },
   },
 ];
 
@@ -226,11 +324,15 @@ export default function ExtensionsPage() {
   const { t } = useTranslation();
 
   const skills = useStore((s) => s.skills);
-  const tools = useStore((s) => s.tools);
+  const plugins = useStore((s) => s.plugins);
+  const pluginInventoryStatus = useStore((s) => s.pluginInventoryStatus);
+  const pluginInventoryError = useStore((s) => s.pluginInventoryError);
+  const pluginGroups = useStore((s) => s.pluginGroups);
   const skillMarketplaceResults = useStore((s) => s.skillMarketplaceResults);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const fetchSkills = useStore((s) => s.fetchSkills);
   const fetchTools = useStore((s) => s.fetchTools);
+  const fetchPlugins = useStore((s) => s.fetchPlugins);
   const searchSkillMarketplace = useStore((s) => s.searchSkillMarketplace);
   const installMarketplaceSkill = useStore((s) => s.installMarketplaceSkill);
 
@@ -250,11 +352,11 @@ export default function ExtensionsPage() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([fetchSkills(), fetchTools()]);
+      await Promise.all([fetchSkills(), fetchTools(), fetchPlugins()]);
     } finally {
       setRefreshing(false);
     }
-  }, [fetchSkills, fetchTools]);
+  }, [fetchPlugins, fetchSkills, fetchTools]);
 
   const filteredSkills = useMemo(() => {
     if (!eligibleOnly) return skills;
@@ -388,9 +490,55 @@ export default function ExtensionsPage() {
   );
 
   /* ── Tools tab ── */
+
+  const pluginFallbackGroups = pluginGroups;
+  const hasPluginInventory = plugins.length > 0;
+
+  const pluginColumns = useMemo(() => [
+    {
+      title: t('extensions.name'),
+      dataIndex: 'label',
+      width: 260,
+      render: (_: string, record: Record<string, unknown>) => (
+        <span style={{ fontWeight: 500, fontFamily: 'var(--semi-font-family-mono)' }}>
+          {String(record.label ?? record.pluginId ?? '')}
+        </span>
+      ),
+    },
+    {
+      title: t('extensions.description'),
+      dataIndex: 'pluginId',
+      render: (_: string, record: Record<string, unknown>) => {
+        const count = Array.isArray(record.tools) ? record.tools.length : 0;
+        return (
+          <span style={{ color: 'var(--semi-color-text-2)', fontSize: 13 }}>
+            {t('extensions.plugin')} · {count} {t('extensions.tools').toLowerCase()}
+          </span>
+        );
+      },
+    },
+  ], [t]);
+
   const toolsTab = (
     <div style={{ paddingTop: 16 }}>
-      {tools.length === 0 && !refreshing ? (
+      {pluginInventoryStatus === 'degraded' && (
+        <div
+          style={{
+            border: '1px solid var(--semi-color-warning-light-active)',
+            background: 'var(--semi-color-warning-light-default)',
+            borderRadius: 8,
+            padding: '10px 12px',
+            color: 'var(--semi-color-warning)',
+            fontSize: 13,
+            marginBottom: 12,
+          }}
+        >
+          {t('extensions.pluginInventoryDegraded')}
+          {pluginInventoryError ? `: ${pluginInventoryError}` : ''}
+        </div>
+      )}
+
+      {plugins.length === 0 && pluginFallbackGroups.length === 0 && !refreshing ? (
         <Empty
           title={t('extensions.noTools')}
           style={{ padding: '48px 0' }}
@@ -408,6 +556,11 @@ export default function ExtensionsPage() {
       ) : (
         <>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 12 }}>
+            {!hasPluginInventory && pluginFallbackGroups.length > 0 && (
+              <Text type="tertiary" size="small" style={{ marginRight: 'auto' }}>
+                {t('extensions.pluginToolFallback')}
+              </Text>
+            )}
             <Button
               icon={<IconRefresh />}
               onClick={handleRefresh}
@@ -418,48 +571,61 @@ export default function ExtensionsPage() {
               {t('extensions.refresh')}
             </Button>
           </div>
-          <Table
-            columns={TOOL_COLUMNS(t)}
-            dataSource={tools}
-            rowKey="name"
-            size="small"
-            pagination={false}
-            loading={refreshing}
-            groupBy="source"
-            renderGroupSection={(groupKey?: string | number) => {
-              const key = String(groupKey ?? '');
-              const count =
-                key === 'core'
-                  ? tools.filter((t) => t.source === 'core').length
-                  : key === 'plugin'
-                    ? tools.filter((t) => t.source === 'plugin').length
-                    : 0;
-              return (
-                <div
-                  style={{
-                    padding: '8px 12px',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: 'var(--semi-color-text-1)',
-                    backgroundColor: 'var(--semi-color-fill-0)',
-                    borderBottom: '1px solid var(--semi-color-border)',
-                  }}
-                >
-                  {key === 'core' ? t('extensions.core') : t('extensions.plugin')}
-                  <span
+          {hasPluginInventory ? (
+            <Table
+              columns={PLUGIN_INVENTORY_COLUMNS(t)}
+              dataSource={plugins}
+              rowKey="id"
+              size="small"
+              pagination={false}
+              loading={refreshing || pluginInventoryStatus === 'loading'}
+              expandedRowRender={(record?: OpenClawPluginInfo) => {
+                if (!record) return null;
+                return (
+                  <pre
                     style={{
-                      marginLeft: 8,
-                      fontWeight: 400,
+                      margin: 0,
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      fontSize: 12,
                       color: 'var(--semi-color-text-2)',
                     }}
                   >
-                    ({count})
-                  </span>
-                </div>
-              );
-            }}
-            empty={<Empty title={t('extensions.noTools')} />}
-          />
+                    {JSON.stringify({
+                      source: record.source,
+                      rootDir: record.rootDir,
+                      dependencyStatus: record.dependencyStatus,
+                    }, null, 2)}
+                  </pre>
+                );
+              }}
+              empty={<Empty title={t('extensions.noTools')} />}
+            />
+          ) : (
+            <Table
+              columns={pluginColumns}
+              dataSource={pluginFallbackGroups as unknown as Record<string, unknown>[]}
+              rowKey="id"
+              size="small"
+              pagination={false}
+              loading={refreshing}
+              expandAllRows
+              expandedRowRender={(record?: Record<string, unknown>) => {
+                if (!record) return null;
+                const tools = (Array.isArray(record.tools) ? record.tools : []) as ToolInfo[];
+                return (
+                  <Table
+                    columns={TOOL_COLUMNS(t)}
+                    dataSource={tools}
+                    rowKey="id"
+                    size="small"
+                    pagination={false}
+                  />
+                );
+              }}
+              empty={<Empty title={t('extensions.noTools')} />}
+            />
+          )}
         </>
       )}
     </div>

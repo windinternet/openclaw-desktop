@@ -20,6 +20,24 @@ export interface DesktopCompanionInstallSessionResult {
   runId?: string;
 }
 
+export type DesktopCompanionPluginAction = 'reinstall' | 'uninstall';
+
+export interface DesktopCompanionPluginManageResult {
+  ok: boolean;
+  source?: 'cli';
+  action: DesktopCompanionPluginAction;
+  error?: string;
+  message?: string;
+  requiresGatewayRestart?: boolean;
+  durationMs?: number;
+  commands?: string[][];
+  results?: Array<{
+    argv?: string[];
+    stdout?: string;
+    stderr?: string;
+  }>;
+}
+
 export interface DesktopCompanionApprovalRequest {
   requestId: string;
   deviceId?: string;
@@ -40,6 +58,8 @@ interface DesktopCompanionStatusPayload {
   capabilities?: unknown;
   message?: string;
 }
+
+const DESKTOP_COMPANION_MANAGE_TIMEOUT_MS = 120000;
 
 function isUnknownMethodError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
@@ -153,6 +173,34 @@ export async function createDesktopCompanionInstallSession(
     sessionKey: sendResult.sessionKey || sessionKey,
     runId: sendResult.runId,
   };
+}
+
+function assertDesktopCompanionManageResult(
+  payload: DesktopCompanionPluginManageResult | null | undefined,
+  action: DesktopCompanionPluginAction,
+): DesktopCompanionPluginManageResult {
+  if (!payload || payload.ok !== true) {
+    throw new Error(payload?.message || payload?.error || `Companion plugin ${action} failed`);
+  }
+  return payload;
+}
+
+export async function reinstallDesktopCompanion(
+  client: Pick<GatewayClient, 'request'>,
+): Promise<DesktopCompanionPluginManageResult> {
+  const payload = await client.request<DesktopCompanionPluginManageResult>('desktopCompanion.plugin.reinstall', {
+    timeoutMs: DESKTOP_COMPANION_MANAGE_TIMEOUT_MS,
+  });
+  return assertDesktopCompanionManageResult(payload, 'reinstall');
+}
+
+export async function uninstallDesktopCompanion(
+  client: Pick<GatewayClient, 'request'>,
+): Promise<DesktopCompanionPluginManageResult> {
+  const payload = await client.request<DesktopCompanionPluginManageResult>('desktopCompanion.plugin.uninstall', {
+    timeoutMs: DESKTOP_COMPANION_MANAGE_TIMEOUT_MS,
+  });
+  return assertDesktopCompanionManageResult(payload, 'uninstall');
 }
 
 export function extractDesktopCompanionApprovalRequestId(message: string): string | null {
