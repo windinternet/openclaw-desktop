@@ -77,8 +77,16 @@ describe('desktop companion detection', () => {
   });
 
   it('creates a Gateway session for fallback companion installation', async () => {
-    const request = vi.fn(async (method: string) => {
-      if (method === 'sessions.create') return { key: 'session:desktop-companion-install' };
+    const request = vi.fn(async (method: string, params?: unknown) => {
+      if (method === 'sessions.create') {
+        expect(params).toEqual(expect.objectContaining({
+          agentId: 'main',
+          key: expect.stringMatching(/^agent:main:desktop-companion-install:/),
+          label: expect.stringContaining('安装 OpenClaw Desktop Companion'),
+        }));
+        expect(params).not.toEqual(expect.objectContaining({ title: expect.anything() }));
+        return { key: 'session:desktop-companion-install' };
+      }
       if (method === 'chat.send') return { runId: 'run_1', status: 'accepted', sessionKey: 'session:desktop-companion-install' };
       throw new Error(`unexpected method ${method}`);
     });
@@ -90,7 +98,9 @@ describe('desktop companion detection', () => {
     });
 
     expect(request).toHaveBeenNthCalledWith(1, 'sessions.create', expect.objectContaining({
-      title: '安装 OpenClaw Desktop Companion',
+      agentId: 'main',
+      key: expect.stringMatching(/^agent:main:desktop-companion-install:/),
+      label: expect.stringContaining('安装 OpenClaw Desktop Companion'),
     }));
     expect(request).toHaveBeenNthCalledWith(2, 'chat.send', expect.objectContaining({
       sessionKey: 'session:desktop-companion-install',

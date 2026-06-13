@@ -61,6 +61,10 @@ interface DesktopCompanionStatusPayload {
 
 const DESKTOP_COMPANION_MANAGE_TIMEOUT_MS = 120000;
 
+function generateDesktopCompanionInstallSessionId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
+
 function isUnknownMethodError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return /unknown method|method not found|not found|unsupported/i.test(message);
@@ -157,10 +161,14 @@ export function buildDesktopCompanionInstallPrompt(): string {
 export async function createDesktopCompanionInstallSession(
   client: Pick<GatewayClient, 'request'>,
 ): Promise<DesktopCompanionInstallSessionResult> {
+  const sessionId = generateDesktopCompanionInstallSessionId();
+  const fallbackKey = `agent:main:desktop-companion-install:${sessionId}`;
   const sessionResult = await client.request<{ key?: string; sessionKey?: string }>('sessions.create', {
-    title: '安装 OpenClaw Desktop Companion',
+    agentId: 'main',
+    key: fallbackKey,
+    label: `安装 OpenClaw Desktop Companion - ${sessionId}`,
   });
-  const sessionKey = sessionResult.key || sessionResult.sessionKey;
+  const sessionKey = sessionResult.key || sessionResult.sessionKey || fallbackKey;
   if (!sessionKey) throw new Error('Gateway 未返回安装会话 key');
 
   const sendResult = await client.request<{ runId?: string; sessionKey?: string }>('chat.send', {
