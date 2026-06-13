@@ -102,12 +102,7 @@ describe('desktop bridge instance connections', () => {
     await connectDesktopBridgeToGateway(instanceA);
 
     expect(createGatewayClient).toHaveBeenCalledWith(expect.objectContaining({
-      capabilities: expect.arrayContaining([
-        'desktop.artifact',
-        'desktop.artifact.generate',
-        'desktop.artifact.append',
-        'desktop.artifact.update',
-      ]),
+      clientId: 'openclaw-tui',
       caps: ['desktop', 'desktop.artifacts'],
       commands: [
         'desktop.artifacts.create',
@@ -117,6 +112,9 @@ describe('desktop bridge instance connections', () => {
         'desktop.notify',
       ],
       permissions: { 'desktop.artifacts': true },
+    }));
+    expect(createGatewayClient).toHaveBeenCalledWith(expect.not.objectContaining({
+      capabilities: expect.any(Array),
     }));
   });
 

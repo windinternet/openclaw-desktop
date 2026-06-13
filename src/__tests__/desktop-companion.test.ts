@@ -2,8 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import type { GatewayClient } from '../lib/gateway';
 import {
+  approveDesktopCompanionApprovalRequest,
   buildDesktopCompanionInstallPrompt,
+  createDesktopCompanionInstallSession,
   detectDesktopCompanion,
+  extractDesktopCompanionApprovalRequestId,
+  fetchDesktopCompanionApprovalRequest,
 } from '../lib/desktop-companion';
 
 function createClient(request: GatewayClient['request']): GatewayClient {
@@ -63,10 +67,74 @@ describe('desktop companion detection', () => {
   it('checks companion plugin status after Desktop connects to a Gateway', () => {
     const source = readFileSync('src/pages/MainPage.tsx', 'utf8');
 
-    expect(source).toContain('detectDesktopCompanion(activeClient)');
+    expect(source).toContain('detectDesktopCompanionForInstance(currentId)');
     expect(source).toContain('connectionStatus !== \'connected\'');
     expect(source).toContain('OpenClaw Desktop Companion 未安装或未启用');
-    expect(source).toContain('openclaw plugins install ${DESKTOP_COMPANION_INSTALL_SPEC}');
-    expect(source).toContain('openclaw plugins enable ${DESKTOP_COMPANION_PLUGIN_ID}');
+    expect(source).toContain('openclaw plugins install {DESKTOP_COMPANION_INSTALL_SPEC}');
+    expect(source).toContain('openclaw plugins enable {DESKTOP_COMPANION_PLUGIN_ID}');
+  });
+
+  it('creates a Gateway session for fallback companion installation', async () => {
+    const request = vi.fn(async (method: string) => {
+      if (method === 'sessions.create') return { key: 'session:desktop-companion-install' };
+      if (method === 'chat.send') return { runId: 'run_1', status: 'accepted', sessionKey: 'session:desktop-companion-install' };
+      throw new Error(`unexpected method ${method}`);
+    });
+    const client = createClient(request as GatewayClient['request']);
+
+    await expect(createDesktopCompanionInstallSession(client)).resolves.toEqual({
+      sessionKey: 'session:desktop-companion-install',
+      runId: 'run_1',
+    });
+
+    expect(request).toHaveBeenNthCalledWith(1, 'sessions.create', expect.objectContaining({
+      title: '安装 OpenClaw Desktop Companion',
+    }));
+    expect(request).toHaveBeenNthCalledWith(2, 'chat.send', expect.objectContaining({
+      sessionKey: 'session:desktop-companion-install',
+      message: expect.stringContaining('openclaw plugins install git:github.com/windinternet/openclaw-desktop-companion@main'),
+      idempotencyKey: expect.stringContaining('desktop-companion-install:'),
+    }));
+  });
+
+  it('extracts and approves a pending Desktop node pairing request', async () => {
+    expect(
+      extractDesktopCompanionApprovalRequestId(
+        'pairing required: device is asking for a higher role than currently approved (requestId: req-node-1)',
+      ),
+    ).toBe('req-node-1');
+
+    const request = vi.fn(async (method: string, params?: unknown) => {
+      if (method === 'device.pair.list') {
+        return {
+          pending: [
+            {
+              requestId: 'req-node-1',
+              deviceId: 'device-1',
+              clientId: 'openclaw-tui',
+              clientMode: 'node',
+              role: 'node',
+              roles: ['node'],
+              scopes: ['node.read', 'node.write'],
+              platform: 'darwin',
+              isRepair: true,
+            },
+          ],
+        };
+      }
+      if (method === 'device.pair.approve') {
+        expect(params).toEqual({ requestId: 'req-node-1' });
+        return { ok: true };
+      }
+      throw new Error(`unexpected method ${method}`);
+    });
+    const client = createClient(request as GatewayClient['request']);
+
+    await expect(fetchDesktopCompanionApprovalRequest(client, 'req-node-1')).resolves.toMatchObject({
+      requestId: 'req-node-1',
+      role: 'node',
+      scopes: ['node.read', 'node.write'],
+    });
+    await expect(approveDesktopCompanionApprovalRequest(client, 'req-node-1')).resolves.toBeUndefined();
   });
 });

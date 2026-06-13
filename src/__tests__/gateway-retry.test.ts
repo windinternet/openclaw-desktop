@@ -164,7 +164,7 @@ describe('Gateway retry state', () => {
     client.disconnect();
   });
 
-  it('can connect as a Gateway node with declared desktop capabilities', async () => {
+  it('can connect as a Gateway node with declared desktop commands', async () => {
     vi.stubGlobal('WebSocket', FakeWebSocket);
     vi.stubGlobal('window', {
       electronAPI: {
@@ -184,11 +184,14 @@ describe('Gateway retry state', () => {
     const client = createGatewayClient({
       url: 'ws://127.0.0.1:18789',
       token: 'token',
-      clientId: 'openclaw-desktop-node',
+      clientId: 'openclaw-tui',
       clientMode: 'node',
       role: 'node',
       scopes: ['node.read', 'node.write'],
       capabilities: ['desktop.ai_action', 'desktop.local_bridge'],
+      caps: ['desktop', 'desktop.artifacts'],
+      commands: ['desktop.artifacts.create'],
+      permissions: { 'desktop.artifacts': true },
     });
 
     void client.connect();
@@ -206,12 +209,15 @@ describe('Gateway retry state', () => {
 
     const frame = JSON.parse(socket.sent[0]);
     expect(frame.params.client).toMatchObject({
-      id: 'openclaw-desktop-node',
+      id: 'openclaw-tui',
       mode: 'node',
     });
     expect(frame.params.role).toBe('node');
     expect(frame.params.scopes).toEqual(['node.read', 'node.write']);
-    expect(frame.params.capabilities).toEqual(['desktop.ai_action', 'desktop.local_bridge']);
+    expect(frame.params).not.toHaveProperty('capabilities');
+    expect(frame.params.caps).toEqual(['desktop', 'desktop.artifacts']);
+    expect(frame.params.commands).toEqual(['desktop.artifacts.create']);
+    expect(frame.params.permissions).toEqual({ 'desktop.artifacts': true });
 
     client.disconnect();
   });

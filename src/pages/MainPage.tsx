@@ -1,12 +1,11 @@
 import {useEffect, useRef, useState} from 'react';
-import {Layout, Modal, Toast} from '@douyinfe/semi-ui';
+import {Button, Layout, Modal, Space, Tag, Toast, Typography} from '@douyinfe/semi-ui';
 import {Outlet} from 'react-router-dom';
 import {useTranslation} from 'react-i18next';
 import {useStore} from '../lib';
 import {
     DESKTOP_COMPANION_INSTALL_SPEC,
     DESKTOP_COMPANION_PLUGIN_ID,
-    detectDesktopCompanion,
 } from '../lib/desktop-companion';
 import {useSettingsStore} from '../lib/settings-store';
 import Sidebar from '../components/Sidebar';
@@ -15,6 +14,7 @@ import ConnectionWizard from '../components/ConnectionWizard';
 import ContentBackground from '../components/ContentBackground';
 
 const {Sider, Content} = Layout;
+const {Text} = Typography;
 const TOAST_DURATION_SECONDS = 5;
 
 export default function MainPage() {
@@ -26,7 +26,9 @@ export default function MainPage() {
     const connectionStatus = useStore((s) => s.connectionStatus);
     const connectionError = useStore((s) => s.connectionError);
     const connectionRetry = useStore((s) => s.connectionRetry);
-    const activeClient = useStore((s) => s.activeClient);
+    const companionApprovalRequest = useStore((s) => s.companionApprovalRequest);
+    const companionApprovalVisible = useStore((s) => s.companionApprovalVisible);
+    const companionApprovalApproving = useStore((s) => s.companionApprovalApproving);
     const [addModalVisible, setAddModalVisible] = useState(false);
     const [drawerVisible, setDrawerVisible] = useState(false);
     const connectingRef = useRef(new Set<string>());
@@ -93,17 +95,36 @@ export default function MainPage() {
             companionCheckedRef.current.delete(currentId);
             return;
         }
-        if (!activeClient || companionCheckedRef.current.has(currentId)) return;
+        if (companionCheckedRef.current.has(currentId)) return;
 
         companionCheckedRef.current.add(currentId);
         let cancelled = false;
-        void detectDesktopCompanion(activeClient).then((info) => {
+        void useStore.getState().detectDesktopCompanionForInstance(currentId).then((info) => {
             if (cancelled) return;
+            if (!info) return;
 
             if (info.status === 'ready') return;
             if (info.status === 'missing' || info.status === 'disabled') {
+                const handleInstallSession = () => {
+                    void useStore.getState().createDesktopCompanionInstallSessionForInstance(currentId).then((result) => {
+                        Toast.success(`已创建安装会话：${result.sessionKey}`);
+                    }).catch((err) => {
+                        Toast.error(err instanceof Error ? err.message : '创建安装会话失败');
+                    });
+                };
                 Toast.warning({
-                    content: `OpenClaw Desktop Companion 未安装或未启用。请在 Gateway 主机执行：openclaw plugins install ${DESKTOP_COMPANION_INSTALL_SPEC}，然后执行：openclaw plugins enable ${DESKTOP_COMPANION_PLUGIN_ID}`,
+                    content: (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <span>
+                                OpenClaw Desktop Companion 未安装或未启用。请在 Gateway 主机执行：
+                                openclaw plugins install {DESKTOP_COMPANION_INSTALL_SPEC}，然后执行：
+                                openclaw plugins enable {DESKTOP_COMPANION_PLUGIN_ID}
+                            </span>
+                            <Button size="small" theme="solid" type="warning" onClick={handleInstallSession}>
+                                创建安装会话
+                            </Button>
+                        </div>
+                    ),
                     duration: 12,
                     showClose: true,
                 });
@@ -121,7 +142,7 @@ export default function MainPage() {
         return () => {
             cancelled = true;
         };
-    }, [activeClient, connectionStatus, currentId]);
+    }, [connectionStatus, currentId]);
 
     useEffect(() => {
         if (!connectionRetry || connectionRetry.attempt === prevRetryAttemptRef.current) return;
@@ -134,6 +155,15 @@ export default function MainPage() {
             showClose: true,
         });
     }, [connectionRetry]);
+
+    const handleApproveCompanion = () => {
+        if (!currentId) return;
+        void useStore.getState().approveDesktopCompanionForInstance(currentId).then(() => {
+            Toast.success('Desktop Companion 已授权并完成重连');
+        }).catch((err) => {
+            Toast.error(err instanceof Error ? err.message : 'Desktop Companion 授权失败');
+        });
+    };
 
     return (
         <Layout style={{height: '100vh', boxSizing: 'border-box'}}>
@@ -170,6 +200,65 @@ export default function MainPage() {
                 onClose={() => setDrawerVisible(false)}
                 onAddInstance={() => setAddModalVisible(true)}
             />
+            <Modal
+                title="授权 Desktop Companion Node"
+                visible={companionApprovalVisible && Boolean(companionApprovalRequest)}
+                onCancel={() => useStore.getState().setDesktopCompanionApprovalVisible(false, currentId ?? undefined)}
+                centered
+                closable={!companionApprovalApproving}
+                maskClosable={!companionApprovalApproving}
+                width={560}
+                footer={(
+                    <Space>
+                        <Button
+                            disabled={companionApprovalApproving}
+                            onClick={() => useStore.getState().setDesktopCompanionApprovalVisible(false, currentId ?? undefined)}
+                        >
+                            稍后处理
+                        </Button>
+                        <Button
+                            theme="solid"
+                            type="primary"
+                            loading={companionApprovalApproving}
+                            onClick={handleApproveCompanion}
+                        >
+                            授权并重连
+                        </Button>
+                    </Space>
+                )}
+            >
+                <div style={{display: 'flex', flexDirection: 'column', gap: 12}}>
+                    <Text>
+                        OpenClaw Desktop Companion 需要把当前 Desktop 设备升级为 Gateway node，
+                        才能接收 node.invoke 并在本地创建或打开产物。
+                    </Text>
+                    {companionApprovalRequest && (
+                        <div style={{display: 'grid', gridTemplateColumns: '88px minmax(0, 1fr)', gap: '8px 12px'}}>
+                            <Text type="tertiary">Request</Text>
+                            <Text code ellipsis>{companionApprovalRequest.requestId}</Text>
+                            <Text type="tertiary">Client</Text>
+                            <Text>{companionApprovalRequest.clientId || 'openclaw-tui'}</Text>
+                            <Text type="tertiary">Role</Text>
+                            <Text>{companionApprovalRequest.role || companionApprovalRequest.roles.join(', ') || 'node'}</Text>
+                            <Text type="tertiary">Scopes</Text>
+                            <Space spacing={4} wrap>
+                                {(companionApprovalRequest.scopes.length > 0
+                                    ? companionApprovalRequest.scopes
+                                    : ['node.read', 'node.write']
+                                ).map((scope) => (
+                                    <Tag key={scope} size="small" color="blue">{scope}</Tag>
+                                ))}
+                            </Space>
+                            {companionApprovalRequest.platform && (
+                                <>
+                                    <Text type="tertiary">Platform</Text>
+                                    <Text>{companionApprovalRequest.platform}</Text>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </Modal>
             <Modal
                 title={t('workspace.add')}
                 visible={addModalVisible}

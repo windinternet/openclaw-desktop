@@ -63,12 +63,11 @@ export async function connectDesktopBridgeToGateway(instance: InstanceConfig): P
   const client = createGatewayClient({
     url: instance.gatewayUrl,
     token: instance.token,
-    clientId: 'openclaw-desktop-node',
+    clientId: 'openclaw-tui',
     clientVersion: '0.1.0',
     clientMode: 'node',
     role: 'node',
     scopes: ['node.read', 'node.write'],
-    capabilities: DESKTOP_BRIDGE_CAPABILITIES,
     caps: DESKTOP_NODE_CAPS,
     commands: DESKTOP_NODE_COMMANDS,
     permissions: DESKTOP_NODE_PERMISSIONS,

@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import type { TagColor } from '@douyinfe/semi-ui/lib/es/tag';
 import { SideSheet, Button, Tag, Popconfirm, Typography } from '@douyinfe/semi-ui';
-import { IconServer, IconPlus, IconDeleteStroked, IconLink, IconPause } from '@douyinfe/semi-icons';
+import { IconServer, IconPlus, IconDeleteStroked, IconLink, IconPause, IconRefresh } from '@douyinfe/semi-icons';
+import type { DesktopCompanionStatus } from '../lib/desktop-companion';
 import { useStore } from '../lib';
 
 const { Text } = Typography;
@@ -24,6 +25,16 @@ const STATUS_CONFIG: Record<string, StatusStyle> = {
   disconnected: { color: 'grey', key: 'instance.statusDisconnected' },
   connecting: { color: 'blue', key: 'instance.statusConnecting' },
   error: { color: 'red', key: 'instance.statusError' },
+};
+
+const COMPANION_STATUS_CONFIG: Record<DesktopCompanionStatus | 'unknown', { color: TagColor; text: string }> = {
+  unknown: { color: 'grey', text: 'unknown' },
+  missing: { color: 'red', text: 'missing' },
+  disabled: { color: 'orange', text: 'disabled' },
+  incompatible: { color: 'red', text: 'incompatible' },
+  ready: { color: 'green', text: 'ready' },
+  degraded: { color: 'orange', text: 'degraded' },
+  approval_required: { color: 'amber', text: 'approval' },
 };
 
 function formatRelativeTime(timestamp?: number): string {
@@ -71,6 +82,10 @@ export default function InstanceDrawer({ visible, onClose, onAddInstance }: Inst
             const statusDetail = runtime?.connectionRetry
               ? t('instance.retrying', { attempt: runtime.connectionRetry.attempt })
               : runtime?.connectionError;
+            const companionInfo = runtime?.companionInfo;
+            const companionStatus = companionInfo?.status ?? 'unknown';
+            const companionStatusInfo = COMPANION_STATUS_CONFIG[companionStatus];
+            const companionDetail = companionInfo?.message || companionInfo?.version;
 
             return (
               <div
@@ -154,6 +169,32 @@ export default function InstanceDrawer({ visible, onClose, onAddInstance }: Inst
                         {statusDetail}
                       </Text>
                     )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, minWidth: 0 }}>
+                    <Text type="tertiary" size="small" style={{ flexShrink: 0 }}>
+                      Companion
+                    </Text>
+                    <Tag size="small" color={companionStatusInfo.color} style={{ flexShrink: 0 }}>
+                      {companionStatusInfo.text}
+                    </Tag>
+                    {companionDetail && (
+                      <Text type="tertiary" size="small" ellipsis style={{ minWidth: 0 }}>
+                        {companionDetail}
+                      </Text>
+                    )}
+                    <Button
+                      icon={<IconRefresh />}
+                      size="small"
+                      theme="borderless"
+                      loading={Boolean(runtime?.companionChecking)}
+                      disabled={status !== 'connected'}
+                      title="重新检测 Companion"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void useStore.getState().detectDesktopCompanionForInstance(inst.id);
+                      }}
+                      style={{ flexShrink: 0 }}
+                    />
                   </div>
                   {inst.lastActivitySummary && (
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 6, minWidth: 0 }}>

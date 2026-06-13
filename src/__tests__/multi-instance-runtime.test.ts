@@ -8,7 +8,7 @@ interface MockGatewayClient extends GatewayClient {
   disconnect: ReturnType<typeof vi.fn>;
 }
 
-const { clients, responses, createGatewayClient, disconnectDesktopBridge } = vi.hoisted(() => {
+const { clients, responses, createGatewayClient, connectDesktopBridgeToGateway, disconnectDesktopBridge } = vi.hoisted(() => {
   const hoistedClients = new Map<string, MockGatewayClient>();
   const hoistedResponses = new Map<string, Map<string, unknown>>();
   const hoistedCreateGatewayClient = vi.fn((options: GatewayClientOptions) => {
@@ -30,6 +30,7 @@ const { clients, responses, createGatewayClient, disconnectDesktopBridge } = vi.
     clients: hoistedClients,
     responses: hoistedResponses,
     createGatewayClient: hoistedCreateGatewayClient,
+    connectDesktopBridgeToGateway: vi.fn(async () => ({})),
     disconnectDesktopBridge: vi.fn(),
   };
 });
@@ -39,7 +40,7 @@ vi.mock('../lib/gateway', () => ({
 }));
 
 vi.mock('../lib/desktop-bridge', () => ({
-  connectDesktopBridgeToGateway: vi.fn(async () => ({})),
+  connectDesktopBridgeToGateway,
   disconnectDesktopBridge,
 }));
 
@@ -83,6 +84,8 @@ describe('multi-instance gateway runtime', () => {
     clients.clear();
     responses.clear();
     createGatewayClient.mockClear();
+    connectDesktopBridgeToGateway.mockReset();
+    connectDesktopBridgeToGateway.mockResolvedValue({});
     disconnectDesktopBridge.mockClear();
     useStore.setState({
       instances: [],
@@ -103,6 +106,12 @@ describe('multi-instance gateway runtime', () => {
       health: null,
       gatewayStatus: null,
       agentIdentity: null,
+      companionInfo: null,
+      companionApprovalRequest: null,
+      companionApprovalVisible: false,
+      companionApprovalApproving: false,
+      companionChecking: false,
+      companionInstallRunning: false,
     });
   });
 
@@ -253,6 +262,50 @@ describe('multi-instance gateway runtime', () => {
 
     expect(useStore.getState().instances[0].agentSwitchStrategy).toBe('subagent-session');
     expect(useStore.getState().instanceRuntimes[instanceA.id]).toBe(runtimeBefore);
+  });
+
+  it('opens a companion approval modal when the Desktop node role needs Gateway approval', async () => {
+    connectDesktopBridgeToGateway.mockRejectedValueOnce(
+      new Error('pairing required: device is asking for a higher role than currently approved (requestId: req-node-1)'),
+    );
+    responses.set(
+      instanceA.gatewayUrl,
+      new Map([
+        [
+          'device.pair.list',
+          {
+            pending: [
+              {
+                requestId: 'req-node-1',
+                deviceId: 'device-1',
+                clientId: 'openclaw-tui',
+                clientMode: 'node',
+                role: 'node',
+                roles: ['node'],
+                scopes: ['node.read', 'node.write'],
+                platform: 'darwin',
+              },
+            ],
+          },
+        ],
+      ]),
+    );
+    useStore.getState().hydrateInstances([instanceA], instanceA.id);
+    await useStore.getState().connectToGateway(instanceA.id);
+
+    clients.get(instanceA.gatewayUrl)?.options.onStatusChange?.('connected');
+
+    await vi.waitFor(() => {
+      expect(useStore.getState().instanceRuntimes[instanceA.id].companionApprovalVisible).toBe(true);
+    });
+    expect(useStore.getState().instanceRuntimes[instanceA.id].companionApprovalRequest).toMatchObject({
+      requestId: 'req-node-1',
+      role: 'node',
+      scopes: ['node.read', 'node.write'],
+    });
+    expect(useStore.getState().instanceRuntimes[instanceA.id].companionInfo).toMatchObject({
+      status: 'approval_required',
+    });
   });
 
   it('connects selected instances on demand and supports the all-instances startup setting', () => {

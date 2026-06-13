@@ -28,6 +28,17 @@ import { fetchSkillMarketplaceSkills } from './skill-marketplace';
 import { fetchGatewayUser, fetchUserProfile } from './user';
 import { fetchGatewayAgents } from './gateway-agents';
 import {
+  approveDesktopCompanionApprovalRequest,
+  createDesktopCompanionInstallSession,
+  detectDesktopCompanion,
+  extractDesktopCompanionApprovalRequestId,
+  fetchDesktopCompanionApprovalRequest,
+  listDesktopCompanionApprovalRequests,
+  type DesktopCompanionApprovalRequest,
+  type DesktopCompanionInfo,
+  type DesktopCompanionInstallSessionResult,
+} from './desktop-companion';
+import {
   getAssistantCompletionSummary,
   getAgentEventSessionKey,
   isAssistantCompletionEvent,
@@ -71,7 +82,12 @@ export interface InstanceRuntime {
   sessionActivityStates: Record<string, 'generating' | 'completed' | 'error'>;
   // per-session activity state for sidebar indicators (generating / completed / error)
   artifacts: ArtifactMeta[];
-
+  companionInfo: DesktopCompanionInfo | null;
+  companionApprovalRequest: DesktopCompanionApprovalRequest | null;
+  companionApprovalVisible: boolean;
+  companionApprovalApproving: boolean;
+  companionChecking: boolean;
+  companionInstallRunning: boolean;
 }
 
 function createInstanceRuntime(): InstanceRuntime {
@@ -94,6 +110,12 @@ function createInstanceRuntime(): InstanceRuntime {
     agentIdentity: null,
     sessionActivityStates: {},
     artifacts: [],
+    companionInfo: null,
+    companionApprovalRequest: null,
+    companionApprovalVisible: false,
+    companionApprovalApproving: false,
+    companionChecking: false,
+    companionInstallRunning: false,
   };
 }
 
@@ -122,6 +144,12 @@ interface StoreState {
   agentIdentity: AgentIdentity | null;
   sessionActivityStates: Record<string, 'generating' | 'completed' | 'error'>;
   artifacts: ArtifactMeta[];
+  companionInfo: DesktopCompanionInfo | null;
+  companionApprovalRequest: DesktopCompanionApprovalRequest | null;
+  companionApprovalVisible: boolean;
+  companionApprovalApproving: boolean;
+  companionChecking: boolean;
+  companionInstallRunning: boolean;
 
   // ── Instance CRUD ──
   hydrateInstances: (instances: InstanceConfig[], currentInstanceId: string | null) => void;
@@ -160,6 +188,12 @@ interface StoreState {
   fetchGatewayUserForCurrent: (instanceId?: string) => Promise<void>;
   fetchAgentIdentity: (agentId?: string, instanceId?: string) => Promise<void>;
   fetchAssistantInfo: (instanceId?: string) => Promise<void>;
+  detectDesktopCompanionForInstance: (instanceId?: string) => Promise<DesktopCompanionInfo | null>;
+  createDesktopCompanionInstallSessionForInstance: (
+    instanceId?: string,
+  ) => Promise<DesktopCompanionInstallSessionResult>;
+  setDesktopCompanionApprovalVisible: (visible: boolean, instanceId?: string) => void;
+  approveDesktopCompanionForInstance: (instanceId?: string) => Promise<void>;
 
   // ── Mutations ──
   createCronJob: (job: Omit<CronJob, 'id'>) => Promise<void>;
@@ -197,6 +231,12 @@ function runtimeToCurrentView(runtime: InstanceRuntime): Partial<StoreState> {
     agentIdentity: runtime.agentIdentity,
     sessionActivityStates: runtime.sessionActivityStates,
     artifacts: runtime.artifacts,
+    companionInfo: runtime.companionInfo,
+    companionApprovalRequest: runtime.companionApprovalRequest,
+    companionApprovalVisible: runtime.companionApprovalVisible,
+    companionApprovalApproving: runtime.companionApprovalApproving,
+    companionChecking: runtime.companionChecking,
+    companionInstallRunning: runtime.companionInstallRunning,
   };
 }
 
@@ -236,6 +276,22 @@ function getInstanceClient(state: StoreState, requestedInstanceId?: string): { i
   return { instanceId, client };
 }
 
+function isDesktopNodeApprovalRequest(request: DesktopCompanionApprovalRequest): boolean {
+  return request.clientId === 'openclaw-tui'
+    || request.clientMode === 'node'
+    || request.role === 'node'
+    || request.roles.includes('node');
+}
+
+function getCompanionApprovalInfo(message = 'Desktop node 需要 Gateway 授权'): DesktopCompanionInfo {
+  return {
+    status: 'approval_required',
+    pluginId: 'openclaw-desktop-companion',
+    capabilities: [],
+    message,
+  };
+}
+
 export const useStore = create<StoreState>((set, get) => ({
   instances: [],
   currentInstanceId: null,
@@ -259,6 +315,12 @@ export const useStore = create<StoreState>((set, get) => ({
   agentIdentity: null,
   sessionActivityStates: {},
   artifacts: [],
+  companionInfo: null,
+  companionApprovalRequest: null,
+  companionApprovalVisible: false,
+  companionApprovalApproving: false,
+  companionChecking: false,
+  companionInstallRunning: false,
 
   // ── Instance CRUD ──
 
@@ -518,9 +580,40 @@ export const useStore = create<StoreState>((set, get) => ({
           get().refreshAll(instance.id);
           void recoverInterruptedAiActionRuns(instance.id, client).catch(() => {});
           void writeArtifactSkill(client).catch(() => {});
-          void connectDesktopBridgeToGateway(instance).catch((err) => {
-            void err;
-          });
+          void connectDesktopBridgeToGateway(instance)
+            .then(() => {
+              set((current) =>
+                withInstanceRuntime(current, instance.id, {
+                  companionApprovalRequest: null,
+                  companionApprovalVisible: false,
+                  companionApprovalApproving: false,
+                }),
+              );
+            })
+            .catch((err) => {
+              const message = err instanceof Error ? err.message : String(err);
+              const requestId = extractDesktopCompanionApprovalRequestId(message);
+              if (!requestId) return;
+
+              void fetchDesktopCompanionApprovalRequest(client, requestId)
+                .catch(() => null)
+                .then((request) => {
+                  if (get().instanceRuntimes[instance.id]?.client !== client) return;
+                  const companionApprovalRequest: DesktopCompanionApprovalRequest = request ?? {
+                    requestId,
+                    roles: ['node'],
+                    scopes: ['node.read', 'node.write'],
+                  };
+                  set((current) =>
+                    withInstanceRuntime(current, instance.id, {
+                      companionApprovalRequest,
+                      companionApprovalVisible: true,
+                      companionApprovalApproving: false,
+                      companionInfo: getCompanionApprovalInfo(),
+                    }),
+                  );
+                });
+            });
         } else if (status === 'error') {
           set((current) =>
             withInstanceRuntime(current, instance.id, {
@@ -589,6 +682,9 @@ export const useStore = create<StoreState>((set, get) => ({
         connectionStatus: 'disconnected',
         connectionError: null,
         connectionRetry: null,
+        companionApprovalRequest: null,
+        companionApprovalVisible: false,
+        companionApprovalApproving: false,
       }),
     );
   },
@@ -607,6 +703,99 @@ export const useStore = create<StoreState>((set, get) => ({
       get().fetchAgentIdentity('main', instanceId),
       get().fetchAssistantInfo(instanceId),
     ]);
+  },
+
+  detectDesktopCompanionForInstance: async (requestedInstanceId) => {
+    const target = getInstanceClient(get(), requestedInstanceId);
+    if (!target) return null;
+    const { instanceId, client } = target;
+    set((state) => withInstanceRuntime(state, instanceId, { companionChecking: true }));
+    try {
+      const info = await detectDesktopCompanion(client);
+      const runtime = get().instanceRuntimes[instanceId];
+      if (runtime?.companionApprovalRequest && runtime.companionApprovalVisible) {
+        set((state) => withInstanceRuntime(state, instanceId, { companionChecking: false }));
+        return runtime.companionInfo ?? info;
+      }
+      const pendingRequests = await listDesktopCompanionApprovalRequests(client).catch(() => []);
+      const approvalRequest = pendingRequests.find(isDesktopNodeApprovalRequest);
+      if (approvalRequest) {
+        const approvalInfo = getCompanionApprovalInfo();
+        set((state) =>
+          withInstanceRuntime(state, instanceId, {
+            companionInfo: approvalInfo,
+            companionApprovalRequest: approvalRequest,
+            companionApprovalVisible: true,
+            companionApprovalApproving: false,
+            companionChecking: false,
+          }),
+        );
+        return approvalInfo;
+      }
+      set((state) => withInstanceRuntime(state, instanceId, { companionInfo: info, companionChecking: false }));
+      return info;
+    } catch (err) {
+      const info: DesktopCompanionInfo = {
+        status: 'degraded',
+        pluginId: 'openclaw-desktop-companion',
+        capabilities: [],
+        message: err instanceof Error ? err.message : String(err),
+      };
+      set((state) => withInstanceRuntime(state, instanceId, { companionInfo: info, companionChecking: false }));
+      return info;
+    }
+  },
+
+  createDesktopCompanionInstallSessionForInstance: async (requestedInstanceId) => {
+    const target = getInstanceClient(get(), requestedInstanceId);
+    if (!target) throw new Error('请先连接到 Gateway');
+    const { instanceId, client } = target;
+    set((state) => withInstanceRuntime(state, instanceId, { companionInstallRunning: true }));
+    try {
+      const result = await createDesktopCompanionInstallSession(client);
+      await get().fetchSessions(instanceId);
+      return result;
+    } finally {
+      set((state) => withInstanceRuntime(state, instanceId, { companionInstallRunning: false }));
+    }
+  },
+
+  setDesktopCompanionApprovalVisible: (visible, requestedInstanceId) => {
+    const state = get();
+    const instanceId = requestedInstanceId ?? state.currentInstanceId;
+    if (!instanceId) return;
+    set((current) => withInstanceRuntime(current, instanceId, { companionApprovalVisible: visible }));
+  },
+
+  approveDesktopCompanionForInstance: async (requestedInstanceId) => {
+    const target = getInstanceClient(get(), requestedInstanceId);
+    if (!target) throw new Error('请先连接到 Gateway');
+    const { instanceId, client } = target;
+    const request = get().instanceRuntimes[instanceId]?.companionApprovalRequest;
+    if (!request) throw new Error('没有待授权的 Desktop Companion 请求');
+    const instance = get().instances.find((item) => item.id === instanceId);
+    if (!instance) throw new Error('找不到当前 Gateway 实例');
+
+    set((state) => withInstanceRuntime(state, instanceId, { companionApprovalApproving: true }));
+    try {
+      await approveDesktopCompanionApprovalRequest(client, request.requestId);
+      set((state) =>
+        withInstanceRuntime(state, instanceId, {
+          companionApprovalRequest: null,
+          companionApprovalVisible: false,
+          companionInfo: {
+            status: 'degraded',
+            pluginId: 'openclaw-desktop-companion',
+            capabilities: [],
+            message: '已授权，正在重连 Desktop node',
+          },
+        }),
+      );
+      await connectDesktopBridgeToGateway(instance);
+      await get().detectDesktopCompanionForInstance(instanceId);
+    } finally {
+      set((state) => withInstanceRuntime(state, instanceId, { companionApprovalApproving: false }));
+    }
   },
 
   // ── Data Fetching ──
@@ -948,17 +1137,13 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => {
       const id = s.currentInstanceId;
       if (!id) return s;
-      const runtime = s.instanceRuntimes[id] ?? {
-        client: null, autoConnectSuppressed: false, connectionStatus: "disconnected",
-        connectionError: null, connectionRetry: null,
-        sessions: [], agents: [], models: [], cronJobs: [], tools: [], skills: [],
-        skillMarketplaceResults: [], workspaceFiles: [], health: null,
-        gatewayStatus: null, agentIdentity: null, sessionActivityStates: {}
-      };
+      const runtime = s.instanceRuntimes[id] ?? createInstanceRuntime();
       const next = { ...runtime.sessionActivityStates, [sessionKey]: state };
       // Persist completed/error states to localStorage (generating state is not persisted)
       if (state !== 'generating') {
-        try { localStorage.setItem('openclaw-session-activity-states', JSON.stringify(next)); } catch {}
+        try { localStorage.setItem('openclaw-session-activity-states', JSON.stringify(next)); } catch {
+          /* ignore unavailable localStorage */
+        }
       }
       return {
         ...s,
@@ -980,7 +1165,9 @@ export const useStore = create<StoreState>((set, get) => ({
       const next = { ...runtime.sessionActivityStates };
       delete next[sessionKey];
       // Sync to localStorage
-      try { localStorage.setItem('openclaw-session-activity-states', JSON.stringify(next)); } catch {}
+      try { localStorage.setItem('openclaw-session-activity-states', JSON.stringify(next)); } catch {
+        /* ignore unavailable localStorage */
+      }
       return {
         ...s,
         sessionActivityStates: next,
