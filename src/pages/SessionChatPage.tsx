@@ -408,10 +408,17 @@ function SessionSidePanel({
   return (
     <aside
       style={{
-        width: 340,
-        flexShrink: 0,
-        borderLeft: '1px solid var(--semi-color-border)',
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        width: 360,
+        zIndex: 20,
         background: 'var(--semi-color-bg-1)',
+        boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
+        borderLeft: '1px solid var(--semi-color-border)',
+        borderTopLeftRadius: 12,
+        borderBottomLeftRadius: 12,
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
@@ -1702,33 +1709,47 @@ export default function SessionChatPage() {
           />
         </div>
       </div>
-      {sidePanelVisible ? (
-        <SessionSidePanel
-          activeKey={sidePanelTab}
-          insight={sessionInsight}
-          selectedTool={selectedToolCall}
-          artifacts={sessionArtifacts}
-          onTabChange={setSidePanelTab}
-          onClose={() => {
-            setSidePanelVisible(false);
-            setSidePanelTab('overview');
-          }}
-          onClearTool={() => {
-            setSelectedToolCall(null);
-            setSidePanelTab('overview');
-          }}
-          onOpenArtifact={(artifact) => {
-            void openArtifactWindow(artifact.id, artifact.currentVersion);
-          }}
-        />
-      ) : null}
+      {sidePanelVisible && (
+        <>
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 19,
+              background: 'rgba(0,0,0,0.25)',
+            }}
+            onClick={() => {
+              setSidePanelVisible(false);
+              setSidePanelTab('overview');
+            }}
+          />
+          <SessionSidePanel
+            activeKey={sidePanelTab}
+            insight={sessionInsight}
+            selectedTool={selectedToolCall}
+            artifacts={sessionArtifacts}
+            onTabChange={setSidePanelTab}
+            onClose={() => {
+              setSidePanelVisible(false);
+              setSidePanelTab('overview');
+            }}
+            onClearTool={() => {
+              setSelectedToolCall(null);
+              setSidePanelTab('overview');
+            }}
+            onOpenArtifact={(artifact) => {
+              void openArtifactWindow(artifact.id, artifact.currentVersion);
+            }}
+          />
+        </>
+      )}
       <Button
         icon={<IconList />}
         size="small"
         theme="borderless"
         style={{
           position: 'absolute',
-          right: sidePanelVisible ? 348 : 8,
+          right: 8,
           top: 42,
           zIndex: 10,
         }}
