@@ -1649,6 +1649,22 @@ export default function SessionChatPage() {
                   </>
                 );
               },
+              renderDialogueTitle: ({ role: _role, message, defaultTitle }) => {
+                const ts = (message as Record<string, unknown> | undefined)?.createAt;
+                const timeStr = typeof ts === 'number'
+                  ? new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+                  : '';
+                return (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    {defaultTitle}
+                    {timeStr && (
+                      <span style={{ fontSize: 12, color: 'var(--semi-color-text-2)', fontWeight: 400 }}>
+                        {timeStr}
+                      </span>
+                    )}
+                  </span>
+                );
+              },
             }}
             renderDialogueContentItem={renderDialogueContentItem}
             mode="bubble"
