@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, type Ref } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AIChatDialogue, AIChatInput, Button, Empty, Progress, Tabs, Tag, Toast, Typography } from '@douyinfe/semi-ui';
+import { AIChatDialogue, AIChatInput, Button, Empty, Progress, SideSheet, Tabs, Tag, Toast, Typography } from '@douyinfe/semi-ui';
 import { IconAppCenter, IconClose, IconInfoCircle, IconList, IconPlay, IconWrench } from '@douyinfe/semi-icons';
 import type {
   DialogueContentItemRendererMap,
@@ -383,6 +383,7 @@ function PendingDialogueLoading() {
 }
 
 function SessionSidePanel({
+  visible,
   activeKey,
   insight,
   selectedTool,
@@ -391,7 +392,9 @@ function SessionSidePanel({
   onClearTool,
   onOpenArtifact,
   onClose,
+  getPopupContainer,
 }: {
+  visible: boolean;
   activeKey: string;
   insight: ReturnType<typeof deriveSessionInsight>;
   selectedTool: SelectedToolCall | null;
@@ -400,55 +403,26 @@ function SessionSidePanel({
   onClearTool: () => void;
   onOpenArtifact: (artifact: ArtifactMeta) => void;
   onClose?: () => void;
+  getPopupContainer?: () => HTMLElement;
 }) {
   const contextPercent = insight.contextUsageRatio !== undefined
     ? Math.round(insight.contextUsageRatio * 100)
     : 0;
 
   return (
-    <aside
-      style={{
-        position: 'absolute',
-        top: 0,
-        right: 0,
-        bottom: 0,
-        width: 360,
-        zIndex: 20,
-        background: 'var(--semi-color-bg-1)',
-        boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
-        borderLeft: '1px solid var(--semi-color-border)',
-        borderTopLeftRadius: 12,
-        borderBottomLeftRadius: 12,
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: 0,
-      }}
-    >
-      <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid var(--semi-color-border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <IconInfoCircle size="small" />
-            <Text strong>会话详情</Text>
-            <Button
-              aria-label="关闭侧边栏"
-              icon={<IconClose size="small" />}
-              size="small"
-              theme="borderless"
-              onClick={onClose}
-            />
-          </div>
-          {selectedTool && (
-            <Button
-              aria-label="清空工具详情"
-              icon={<IconClose size="small" />}
-              size="small"
-              theme="borderless"
-              onClick={onClearTool}
-            />
-          )}
+    <SideSheet
+      visible={visible}
+      onCancel={onClose}
+      width={400}
+      getPopupContainer={getPopupContainer}
+      title={
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <IconInfoCircle size="small" />
+          <Text strong>会话详情</Text>
         </div>
-      </div>
-
+      }
+      bodyStyle={{ padding: 0 }}
+    >
       <Tabs
         activeKey={activeKey}
         onChange={(key) => onTabChange(String(key))}
@@ -519,9 +493,18 @@ function SessionSidePanel({
                     {selectedTool.item.name}
                   </Text>
                 </div>
-                <Tag color={toolStatusColor(selectedTool.item.status)} size="small">
-                  {selectedTool.item.status ?? 'unknown'}
-                </Tag>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Tag color={toolStatusColor(selectedTool.item.status)} size="small">
+                    {selectedTool.item.status ?? 'unknown'}
+                  </Tag>
+                  <Button
+                    aria-label="清空工具详情"
+                    icon={<IconClose size="small" />}
+                    size="small"
+                    theme="borderless"
+                    onClick={onClearTool}
+                  />
+                </div>
               </div>
 
               <section>
@@ -598,7 +581,7 @@ function SessionSidePanel({
           </div>
         </Tabs.TabPane>
       </Tabs>
-    </aside>
+    </SideSheet>
   );
 }
 
@@ -681,6 +664,7 @@ export default function SessionChatPage() {
   const sendingRef = useRef(false);
   const genTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const panelContainerRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<{ uploadRef?: { current?: { insert?: (files: File[]) => void } } } | null>(null);
   const initialMessageSentRef = useRef<string | null>(null);
   const prevRootSessionKeyRef = useRef<string | undefined>();
@@ -1637,6 +1621,7 @@ export default function SessionChatPage() {
 
   return (
     <div
+      ref={panelContainerRef}
       style={{ height: '100%', display: 'flex', overflow: 'hidden', position: 'relative' }}
     >
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -1709,40 +1694,26 @@ export default function SessionChatPage() {
           />
         </div>
       </div>
-      {sidePanelVisible && (
-        <>
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              zIndex: 19,
-              background: 'rgba(0,0,0,0.25)',
-            }}
-            onClick={() => {
-              setSidePanelVisible(false);
-              setSidePanelTab('overview');
-            }}
-          />
-          <SessionSidePanel
-            activeKey={sidePanelTab}
-            insight={sessionInsight}
-            selectedTool={selectedToolCall}
-            artifacts={sessionArtifacts}
-            onTabChange={setSidePanelTab}
-            onClose={() => {
-              setSidePanelVisible(false);
-              setSidePanelTab('overview');
-            }}
-            onClearTool={() => {
-              setSelectedToolCall(null);
-              setSidePanelTab('overview');
-            }}
-            onOpenArtifact={(artifact) => {
-              void openArtifactWindow(artifact.id, artifact.currentVersion);
-            }}
-          />
-        </>
-      )}
+      <SessionSidePanel
+        visible={sidePanelVisible}
+        activeKey={sidePanelTab}
+        insight={sessionInsight}
+        selectedTool={selectedToolCall}
+        artifacts={sessionArtifacts}
+        onTabChange={setSidePanelTab}
+        onClose={() => {
+          setSidePanelVisible(false);
+          setSidePanelTab('overview');
+        }}
+        onClearTool={() => {
+          setSelectedToolCall(null);
+          setSidePanelTab('overview');
+        }}
+        onOpenArtifact={(artifact) => {
+          void openArtifactWindow(artifact.id, artifact.currentVersion);
+        }}
+        getPopupContainer={() => panelContainerRef.current ?? document.body}
+      />
       <Button
         icon={<IconList />}
         size="small"
