@@ -392,7 +392,6 @@ function SessionSidePanel({
   onClearTool,
   onOpenArtifact,
   onClose,
-  getPopupContainer,
 }: {
   visible: boolean;
   activeKey: string;
@@ -403,7 +402,6 @@ function SessionSidePanel({
   onClearTool: () => void;
   onOpenArtifact: (artifact: ArtifactMeta) => void;
   onClose?: () => void;
-  getPopupContainer?: () => HTMLElement;
 }) {
   const contextPercent = insight.contextUsageRatio !== undefined
     ? Math.round(insight.contextUsageRatio * 100)
@@ -414,7 +412,7 @@ function SessionSidePanel({
       visible={visible}
       onCancel={onClose}
       width={400}
-      getPopupContainer={getPopupContainer}
+      disableScroll={false}
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <IconInfoCircle size="small" />
@@ -664,7 +662,6 @@ export default function SessionChatPage() {
   const sendingRef = useRef(false);
   const genTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const panelContainerRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<{ uploadRef?: { current?: { insert?: (files: File[]) => void } } } | null>(null);
   const initialMessageSentRef = useRef<string | null>(null);
   const prevRootSessionKeyRef = useRef<string | undefined>();
@@ -1621,7 +1618,6 @@ export default function SessionChatPage() {
 
   return (
     <div
-      ref={panelContainerRef}
       style={{ height: '100%', display: 'flex', overflow: 'hidden', position: 'relative' }}
     >
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -1712,7 +1708,6 @@ export default function SessionChatPage() {
         onOpenArtifact={(artifact) => {
           void openArtifactWindow(artifact.id, artifact.currentVersion);
         }}
-        getPopupContainer={() => panelContainerRef.current ?? document.body}
       />
       <Button
         icon={<IconList />}
