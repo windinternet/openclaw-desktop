@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Tabs, Typography, Tag, Button, Spin, Empty, Space, Card, Input, Select, Toast, Modal, Switch } from '@douyinfe/semi-ui';
 import {
   IconPlusCircle,
@@ -51,12 +52,13 @@ function parseDateFromFilename(name: string): string | null {
   return m ? m[1] : null;
 }
 
-function formatDateLabel(dateStr: string): string {
+function formatDateLabel(dateStr: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
   const [y, m, d] = dateStr.split('-');
-  return `${y} 年 ${parseInt(m, 10)} 月 ${parseInt(d, 10)} 日`;
+  return t('tuning.dateFormat', { year: y, month: parseInt(m, 10), day: parseInt(d, 10) });
 }
 
 function MemoryTab() {
+  const { t } = useTranslation();
   const activeClient = useStore((s) => s.activeClient);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const workspaceFiles = useStore((s) => s.workspaceFiles);
@@ -132,16 +134,16 @@ function MemoryTab() {
         onKeyDown={(e) => { if (e.key === 'Enter') handleToggleExpand(file); }}
         style={{ marginBottom: 8, borderRadius: 8, border: isToday ? '1px solid var(--semi-color-primary)' : '1px solid var(--semi-color-border)', backgroundColor: 'var(--semi-color-bg-1)', overflow: 'hidden', cursor: 'pointer', transition: 'box-shadow 0.2s' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px' }}>
-          <Space><IconCalendar size="small" /><Text weight={600}>{dateStr ? formatDateLabel(dateStr) : file.name}</Text>{isToday && <Tag color="blue" size="small">今天</Tag>}</Space>
+          <Space><IconCalendar size="small" /><Text weight={600}>{dateStr ? formatDateLabel(dateStr, t) : file.name}</Text>{isToday && <Tag color="blue" size="small">{t('tuning.today')}</Tag>}</Space>
           <Space>
             {file.modifiedAt && <Text size="small" type="tertiary">{new Date(file.modifiedAt).toLocaleDateString()}</Text>}
             {file.size !== undefined && <Text size="small" type="tertiary">{file.size < 1024 ? `${file.size}B` : `${(file.size / 1024).toFixed(1)}KB`}</Text>}
-            {!isExpanded && !isLoadingContent && <Text type="tertiary" size="small">点击查看</Text>}
+            {!isExpanded && !isLoadingContent && <Text type="tertiary" size="small">{t('tuning.clickToView')}</Text>}
             {isLoadingContent && <Spin size="small" />}
           </Space>
         </div>
         {isExpanded && content && <div style={{ maxHeight: 400, overflow: 'auto', whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.6, color: 'var(--semi-color-text-0)', padding: 16, backgroundColor: 'var(--semi-color-bg-0)', borderTop: '1px solid var(--semi-color-border)', fontFamily: 'monospace' }}>{content}</div>}
-        {isExpanded && !content && !isLoadingContent && <div style={{ padding: 16, borderTop: '1px solid var(--semi-color-border)' }}><Text type="tertiary">无内容</Text></div>}
+        {isExpanded && !content && !isLoadingContent && <div style={{ padding: 16, borderTop: '1px solid var(--semi-color-border)' }}><Text type="tertiary">{t('tuning.noContent')}</Text></div>}
       </div>
     );
   };
@@ -149,20 +151,20 @@ function MemoryTab() {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div><Text strong style={{ fontSize: 15 }}>记忆概览</Text><Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>Agent 每天自动生成，记录对话中的重要信息</Text></div>
-        <Button icon={<IconRefresh />} onClick={handleRefresh} loading={loading} theme="outline" size="small">刷新</Button>
+        <div><Text strong style={{ fontSize: 15 }}>{t('tuning.memoryOverview')}</Text><Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>{t('tuning.memoryOverviewDesc')}</Text></div>
+        <Button icon={<IconRefresh />} onClick={handleRefresh} loading={loading} theme="outline" size="small">{t('common.refresh')}</Button>
       </div>
       <div style={{ marginBottom: 20, padding: 16, borderRadius: 8, border: '1px solid var(--semi-color-border)', backgroundColor: 'var(--semi-color-bg-1)', display: 'flex', gap: 32, flexWrap: 'wrap' }}>
-        <div><Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 4 }}>连接状态</Text><Tag color={isConnected ? 'green' : 'red'}>{isConnected ? '已连接' : '未连接'}</Tag></div>
-        <div><Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 4 }}>记忆文件</Text><Tag color={memoryFiles.length > 0 ? 'blue' : 'grey'}>{memoryFiles.length} 个</Tag></div>
-        <div><Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 4 }}>今日记忆</Text><Tag color={todayFiles.length > 0 ? 'green' : 'grey'}>{todayFiles.length > 0 ? `${todayFiles.length} 条` : '无'}</Tag></div>
+        <div><Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 4 }}>{t('tuning.connectionStatus')}</Text><Tag color={isConnected ? 'green' : 'red'}>{isConnected ? t('tuning.connected') : t('tuning.notConnected')}</Tag></div>
+        <div><Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 4 }}>{t('tuning.memoryFiles')}</Text><Tag color={memoryFiles.length > 0 ? 'blue' : 'grey'}>{t('tuning.nFiles', { count: memoryFiles.length })}</Tag></div>
+        <div><Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 4 }}>{t('tuning.todayMemory')}</Text><Tag color={todayFiles.length > 0 ? 'green' : 'grey'}>{todayFiles.length > 0 ? t('tuning.nEntries', { count: todayFiles.length }) : t('common.none')}</Tag></div>
       </div>
-      {loading && <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}><Spin tip="加载记忆中…" /></div>}
-      {!isConnected && !loading && <Empty description="未连接到 Gateway，无法读取记忆" style={{ marginTop: 48 }} />}
-      {isConnected && !loading && memoryFiles.length === 0 && <Empty description="尚无记忆文件" style={{ marginTop: 48 }} />}
-      {todayFiles.length > 0 && <div style={{ marginBottom: 24 }}><Text strong style={{ display: 'block', marginBottom: 12 }}>今日记忆 <Tag size="small" color="blue">{today}</Tag></Text>{todayFiles.map((f) => renderMemoryEntry(f, true))}</div>}
-      {yesterdayFiles.length > 0 && <div style={{ marginBottom: 24 }}><Text strong style={{ display: 'block', marginBottom: 12 }}>昨日记忆 <Tag size="small">{yesterday}</Tag></Text>{yesterdayFiles.map((f) => renderMemoryEntry(f, false))}</div>}
-      {olderFiles.length > 0 && <div style={{ marginBottom: 24 }}><Text strong style={{ display: 'block', marginBottom: 12 }}>历史记忆 <Tag size="small">{olderFiles.length} 条</Tag></Text>{olderFiles.map((f) => renderMemoryEntry(f, false))}</div>}
+      {loading && <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}><Spin tip={t('tuning.loadingMemory')} /></div>}
+      {!isConnected && !loading && <Empty description={t('tuning.notConnectedMemory')} style={{ marginTop: 48 }} />}
+      {isConnected && !loading && memoryFiles.length === 0 && <Empty description={t('tuning.noMemory')} style={{ marginTop: 48 }} />}
+      {todayFiles.length > 0 && <div style={{ marginBottom: 24 }}><Text strong style={{ display: 'block', marginBottom: 12 }}>{t('tuning.todayMemory')} <Tag size="small" color="blue">{today}</Tag></Text>{todayFiles.map((f) => renderMemoryEntry(f, true))}</div>}
+      {yesterdayFiles.length > 0 && <div style={{ marginBottom: 24 }}><Text strong style={{ display: 'block', marginBottom: 12 }}>{t('tuning.yesterdayMemory')} <Tag size="small">{yesterday}</Tag></Text>{yesterdayFiles.map((f) => renderMemoryEntry(f, false))}</div>}
+      {olderFiles.length > 0 && <div style={{ marginBottom: 24 }}><Text strong style={{ display: 'block', marginBottom: 12 }}>{t('tuning.olderMemory')} <Tag size="small">{t('tuning.nEntries', { count: olderFiles.length })}</Tag></Text>{olderFiles.map((f) => renderMemoryEntry(f, false))}</div>}
     </div>
   );
 }
@@ -189,6 +191,7 @@ const CONTEXT_PRESETS: ContextPreset[] = [
 /* ── Persona Tab ──────────────────────────────────────────────── */
 
 function PersonaTab() {
+  const { t } = useTranslation();
   const currentInstance = useStore((s) => s.instances.find((i) => i.id === s.currentInstanceId) ?? null);
   const agentIdentity = useStore((s) => s.agentIdentity);
   const activeClient = useStore((s) => s.activeClient);
@@ -214,14 +217,14 @@ function PersonaTab() {
     try {
       await activeClient.request('agent.identity.set', { agentId: agentIdentity?.agentId || 'main', name: assistantDraft.trim() });
       await useStore.getState().fetchAgentIdentity();
-      Toast.success('已更新 AI 名称');
+      Toast.success(t('tuning.aiNameUpdated'));
       setEditingAssistant(false);
     } catch (err) {
-      Toast.error(err instanceof Error ? err.message : '保存失败');
+      Toast.error(err instanceof Error ? err.message : t('tuning.saveFailed'));
     } finally {
       setSavingAssistant(false);
     }
-  }, [activeClient, agentIdentity?.agentId, assistantDraft]);
+  }, [activeClient, agentIdentity?.agentId, assistantDraft, t]);
 
   const saveUser = useCallback(async () => {
     if (!activeClient || !userDraft.trim()) return;
@@ -230,14 +233,14 @@ function PersonaTab() {
       await activeClient.request('gateway.user.set', { whatToCall: userDraft.trim() });
       await useStore.getState().fetchGatewayUserForCurrent();
       updateSettings({ userDisplayName: userDraft.trim() });
-      Toast.success('已更新称呼');
+      Toast.success(t('tuning.nameUpdated'));
       setEditingUser(false);
     } catch (err) {
-      Toast.error(err instanceof Error ? err.message : '保存失败');
+      Toast.error(err instanceof Error ? err.message : t('tuning.saveFailed'));
     } finally {
       setSavingUser(false);
     }
-  }, [activeClient, userDraft, updateSettings]);
+  }, [activeClient, userDraft, updateSettings, t]);
 
   /* config editing */
   const [loading, setLoading] = useState(false);
@@ -298,27 +301,27 @@ function PersonaTab() {
       setCurrentPresetId(preset.id);
       setPerFileChars(preset.perFileChars); setTotalChars(preset.totalChars); setFollowUp(preset.followUp);
       setDraftPerFile(String(preset.perFileChars)); setDraftTotal(String(preset.totalChars)); setDraftFollowUp(preset.followUp);
-      Toast.success(`已应用「${preset.name}」预设`);
+      Toast.success(t('tuning.presetApplied', { name: preset.name }));
     } catch (err) {
-      Toast.error(err instanceof Error ? err.message : '应用预设失败');
+      Toast.error(err instanceof Error ? err.message : t('tuning.presetApplyFailed'));
     } finally { setApplying(null); }
-  }, [activeClient, isConnected]);
+  }, [activeClient, isConnected, t]);
 
   const saveCustomValues = useCallback(async () => {
     if (!activeClient || !isConnected) return;
     const pf = parseInt(draftPerFile, 10); const tot = parseInt(draftTotal, 10);
-    if (!pf || !tot || pf < 1000 || tot < 1000) { Toast.warning('请输入有效的数值（至少 1000 字符）'); return; }
+    if (!pf || !tot || pf < 1000 || tot < 1000) { Toast.warning(t('tuning.invalidValue')); return; }
     setSaving(true);
     try {
       await activeClient.request('config.patch', { raw: { agents: { defaults: { bootstrapMaxFileChars: pf, bootstrapMaxTotalChars: tot, bootstrapFollowUp: draftFollowUp } } } });
       setPerFileChars(pf); setTotalChars(tot); setFollowUp(draftFollowUp);
       const match = CONTEXT_PRESETS.find((p) => p.perFileChars === pf && p.totalChars === tot && p.followUp === draftFollowUp);
       setCurrentPresetId(match ? match.id : null);
-      Toast.success('已保存');
+      Toast.success(t('tuning.saved'));
     } catch (err) {
-      Toast.error(err instanceof Error ? err.message : '保存失败');
+      Toast.error(err instanceof Error ? err.message : t('tuning.saveFailed'));
     } finally { setSaving(false); }
-  }, [activeClient, isConnected, draftPerFile, draftTotal, draftFollowUp]);
+  }, [activeClient, isConnected, draftPerFile, draftTotal, draftFollowUp, t]);
 
   const dirty = perFileChars != null && (String(perFileChars) !== draftPerFile || String(totalChars) !== draftTotal || (followUp || 'every-turn') !== draftFollowUp);
   const currentPreset = currentPresetId ? CONTEXT_PRESETS.find((p) => p.id === currentPresetId) : null;
@@ -326,26 +329,26 @@ function PersonaTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <Text strong style={{ fontSize: 15 }}>Context Profile</Text>
-        {!isConnected && <Tag color="orange">未连接 Gateway</Tag>}
+        <Text strong style={{ fontSize: 15 }}>{t('tuning.contextProfile')}</Text>
+        {!isConnected && <Tag color="orange">{t('tuning.notConnectedGateway')}</Tag>}
       </div>
 
       {/* Identity */}
       <Card style={{ border: '1px solid var(--semi-color-border)', borderRadius: 8, backgroundColor: 'var(--semi-color-bg-1)' }} bodyStyle={{ padding: 20 }}>
-        <Text strong style={{ display: 'block', marginBottom: 16 }}>身份</Text>
+        <Text strong style={{ display: 'block', marginBottom: 16 }}>{t('tuning.identity')}</Text>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--semi-color-border)' }}>
-            <div><Text weight={600}>AI 名称</Text><Text type="tertiary" size="small">{agentIdentity?.agentId ? `Agent: ${agentIdentity.agentId}` : ''}</Text></div>
+            <div><Text weight={600}>{t('tuning.aiName')}</Text><Text type="tertiary" size="small">{agentIdentity?.agentId ? `Agent: ${agentIdentity.agentId}` : ''}</Text></div>
             {editingAssistant ? (
-              <Space><Input size="small" value={assistantDraft} onChange={setAssistantDraft} style={{ width: 180 }} placeholder="输入新名称" /><Button size="small" onClick={saveAssistant} loading={savingAssistant} theme="solid">保存</Button><Button size="small" onClick={() => setEditingAssistant(false)} theme="outline">取消</Button></Space>
+              <Space><Input size="small" value={assistantDraft} onChange={setAssistantDraft} style={{ width: 180 }} placeholder={t('tuning.aiNamePlaceholder')} /><Button size="small" onClick={saveAssistant} loading={savingAssistant} theme="solid">{t('common.save')}</Button><Button size="small" onClick={() => setEditingAssistant(false)} theme="outline">{t('common.cancel')}</Button></Space>
             ) : (
               <Space><Text style={{ fontFamily: 'monospace', fontSize: 14, fontWeight: 500 }}>{assistantName}</Text><Button icon={<IconEdit />} size="small" onClick={() => { setAssistantDraft(assistantName); setEditingAssistant(true); }} theme="borderless" /></Space>
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--semi-color-border)' }}>
-            <div><Text weight={600}>用户称呼</Text><Text type="tertiary" size="small">Agent 对你的称呼</Text></div>
+            <div><Text weight={600}>{t('tuning.userName')}</Text><Text type="tertiary" size="small">{t('tuning.userNameDesc')}</Text></div>
             {editingUser ? (
-              <Space><Input size="small" value={userDraft} onChange={setUserDraft} style={{ width: 180 }} placeholder="输入称呼" /><Button size="small" onClick={saveUser} loading={savingUser} theme="solid">保存</Button><Button size="small" onClick={() => setEditingUser(false)} theme="outline">取消</Button></Space>
+              <Space><Input size="small" value={userDraft} onChange={setUserDraft} style={{ width: 180 }} placeholder={t('tuning.userNamePlaceholder')} /><Button size="small" onClick={saveUser} loading={savingUser} theme="solid">{t('common.save')}</Button><Button size="small" onClick={() => setEditingUser(false)} theme="outline">{t('common.cancel')}</Button></Space>
             ) : (
               <Space><Text style={{ fontFamily: 'monospace', fontSize: 14, fontWeight: 500 }}>{displayName}</Text><Button icon={<IconEdit />} size="small" onClick={() => { setUserDraft(displayName); setEditingUser(true); }} theme="borderless" /></Space>
             )}
@@ -353,37 +356,37 @@ function PersonaTab() {
         </div>
       </Card>
 
-      {isConnected && loading && <Spin tip="加载配置…" />}
+      {isConnected && loading && <Spin tip={t('common.loading')} />}
 
       {isConnected && !loading && (
         <>
           {/* Custom values */}
           <Card style={{ border: '1px solid var(--semi-color-border)', borderRadius: 8, backgroundColor: 'var(--semi-color-bg-1)' }} bodyStyle={{ padding: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <Text strong>Context 预算 <Tag size="small" color="blue">可修改</Tag></Text>
+              <Text strong>{t('tuning.contextBudget')} <Tag size="small" color="blue">{t('tuning.editable')}</Tag></Text>
               <Space>
-                {currentPreset && <Tag color="green" size="small">匹配预设: {currentPreset.name}</Tag>}
-                <Button icon={<IconSave />} size="small" theme="borderless" onClick={saveCustomValues} loading={saving} disabled={!dirty}>保存</Button>
+                {currentPreset && <Tag color="green" size="small">{t('tuning.presetMatch', { name: currentPreset.name })}</Tag>}
+                <Button icon={<IconSave />} size="small" theme="borderless" onClick={saveCustomValues} loading={saving} disabled={!dirty}>{t('common.save')}</Button>
               </Space>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
               <div>
-                <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 6 }}>Bootstrap Per File</Text>
+                <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 6 }}>{t('tuning.bootstrapPerFile')}</Text>
                 <Input value={draftPerFile} onChange={setDraftPerFile} size="small" placeholder="12000" />
-                <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>单个引导文件最大注入字符数</Text>
+                <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>{t('tuning.bootstrapPerFileDesc')}</Text>
               </div>
               <div>
-                <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 6 }}>Bootstrap Total</Text>
+                <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 6 }}>{t('tuning.bootstrapTotal')}</Text>
                 <Input value={draftTotal} onChange={setDraftTotal} size="small" placeholder="60000" />
-                <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>所有引导文件合计最大字符数</Text>
+                <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>{t('tuning.bootstrapTotalDesc')}</Text>
               </div>
               <div>
-                <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 6 }}>Follow-up Turns</Text>
+                <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 6 }}>{t('tuning.followUpTurns')}</Text>
                 <Select value={draftFollowUp} onChange={(v) => setDraftFollowUp(v as string)} size="small" style={{ width: '100%' }}>
-                  <Select.Option value="every-turn">Every turn</Select.Option>
-                  <Select.Option value="skip-safe">Skip safe follow-ups</Select.Option>
+                  <Select.Option value="every-turn">{t('tuning.everyTurn')}</Select.Option>
+                  <Select.Option value="skip-safe">{t('tuning.skipSafeFollowUps')}</Select.Option>
                 </Select>
-                <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>安全跟进时可跳过上下文注入</Text>
+                <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>{t('tuning.followUpTurnsDesc')}</Text>
               </div>
             </div>
           </Card>
@@ -404,12 +407,12 @@ function PersonaTab() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--semi-color-text-2)' }}>
-                    <span>{preset.perFileChars.toLocaleString()} /文件</span>
-                    <span>{preset.totalChars.toLocaleString()} 总计</span>
-                    <span>{preset.followUp === 'every-turn' ? '每轮' : '跳过'}</span>
+                    <span>{preset.perFileChars.toLocaleString()}{t('tuning.perFileUnit')}</span>
+                    <span>{preset.totalChars.toLocaleString()}{t('tuning.totalCharsUnit')}</span>
+                    <span>{preset.followUp === 'every-turn' ? t('tuning.everyTurnShort') : t('tuning.skipTurn')}</span>
                   </div>
                   <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {active ? <Tag color="green" size="small">当前</Tag> : <Tag color="blue" size="small" style={{ opacity: 0 }}>&nbsp;</Tag>}
+                    {active ? <Tag color="green" size="small">{t('tuning.current')}</Tag> : <Tag color="blue" size="small" style={{ opacity: 0 }}>&nbsp;</Tag>}
                     {isApplying && <Spin size="small" />}
                   </div>
                 </button>
@@ -437,6 +440,7 @@ const DM_POLICY_OPTIONS = [
 ];
 
 function ChannelsTab() {
+  const { t } = useTranslation();
   const activeClient = useStore((s) => s.activeClient);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const isConnected = connectionStatus === 'connected' && activeClient !== null;
@@ -486,11 +490,11 @@ function ChannelsTab() {
       if (key === 'dmScope') setDmScope(value);
       else if (key === 'dmPolicy') setDmPolicy(value);
       else if (key === 'resetTime') setResetTime(value);
-      Toast.success('已保存');
+      Toast.success(t('tuning.saved'));
     } catch (err) {
-      Toast.error(err instanceof Error ? err.message : '保存失败');
+      Toast.error(err instanceof Error ? err.message : t('tuning.saveFailed'));
     } finally { setSaving(null); }
-  }, [activeClient, isConnected]);
+  }, [activeClient, isConnected, t]);
 
   const dirtyDmScope = dmScope !== draftDmScope;
   const dirtyDmPolicy = dmPolicy !== draftDmPolicy;
@@ -526,10 +530,10 @@ function ChannelsTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <div><Text strong style={{ fontSize: 15 }}>消息渠道</Text><Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>管理 OpenClaw 连接的消息平台</Text></div>
+        <div><Text strong style={{ fontSize: 15 }}>{t('tuning.channelsTitle')}</Text><Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>{t('tuning.channelsDesc')}</Text></div>
         <Space>
           {loading && <Spin size="small" />}
-          {!isConnected && <Tag color="orange">未连接 Gateway</Tag>}
+          {!isConnected && <Tag color="orange">{t('tuning.notConnectedGateway')}</Tag>}
         </Space>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
@@ -543,12 +547,12 @@ function ChannelsTab() {
               backgroundColor: 'var(--semi-color-bg-1)', borderLeft: `4px solid ${ch.enabled ? color : 'var(--semi-color-border)'}` }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <Text strong style={{ textTransform: 'capitalize' }}>{ch.id}</Text>
-                <Tag color={connected ? 'green' : ch.enabled ? 'blue' : 'grey'} size="small">{connected ? '已连接' : ch.enabled ? '已启用' : '未启用'}</Tag>
+                <Tag color={connected ? 'green' : ch.enabled ? 'blue' : 'grey'} size="small">{connected ? t('tuning.connected') : ch.enabled ? t('tuning.enabled') : t('tuning.notEnabled')}</Tag>
               </div>
               {ch.accounts?.map((acc) => (
                 <div key={acc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Text size="small" type="tertiary">{acc.name}</Text>
-                  <Tag color={acc.connected ? 'green' : 'grey'} size="small">{acc.connected ? '在线' : '离线'}</Tag>
+                  <Tag color={acc.connected ? 'green' : 'grey'} size="small">{acc.connected ? t('tuning.online') : t('tuning.offline')}</Tag>
                 </div>
               ))}
             </div>
@@ -556,15 +560,15 @@ function ChannelsTab() {
         })}
       </div>
       <Card style={{ border: '1px solid var(--semi-color-border)', borderRadius: 8, backgroundColor: 'var(--semi-color-bg-1)' }} bodyStyle={{ padding: 20 }}>
-        <Text strong style={{ display: 'block', marginBottom: 16 }}>消息策略 <Tag size="small" color="blue">可修改</Tag></Text>
+        <Text strong style={{ display: 'block', marginBottom: 16 }}>{t('tuning.messageStrategy')} <Tag size="small" color="blue">{t('tuning.editable')}</Tag></Text>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <Text size="small" style={{ color: 'var(--semi-color-text-1)' }}>DM 隔离策略</Text>
+              <Text size="small" style={{ color: 'var(--semi-color-text-1)' }}>{t('tuning.dmScope')}</Text>
               <Button size="small" theme="borderless" icon={<IconSave />}
                 onClick={() => saveChannelConfig('dmScope', draftDmScope)}
                 loading={saving === 'dmScope'} disabled={!dirtyDmScope || !isConnected}>
-                保存
+                {t('common.save')}
               </Button>
             </div>
             <Select value={draftDmScope} onChange={(v) => setDraftDmScope(v as string)} style={{ width: 280 }} size="small">
@@ -573,16 +577,16 @@ function ChannelsTab() {
               ))}
             </Select>
             <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>
-              {dmScope !== null ? `当前: ${DM_SCOPE_OPTIONS.find(o => o.value === dmScope)?.label || dmScope}` : '未设置（使用默认）'}
+              {dmScope !== null ? t('tuning.currentValue', { value: DM_SCOPE_OPTIONS.find(o => o.value === dmScope)?.label || dmScope }) : t('tuning.notSetDefault')}
             </Text>
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <Text size="small" style={{ color: 'var(--semi-color-text-1)' }}>DM 安全策略</Text>
+              <Text size="small" style={{ color: 'var(--semi-color-text-1)' }}>{t('tuning.dmPolicy')}</Text>
               <Button size="small" theme="borderless" icon={<IconSave />}
                 onClick={() => saveChannelConfig('dmPolicy', draftDmPolicy)}
                 loading={saving === 'dmPolicy'} disabled={!dirtyDmPolicy || !isConnected}>
-                保存
+                {t('common.save')}
               </Button>
             </div>
             <Select value={draftDmPolicy} onChange={(v) => setDraftDmPolicy(v as string)} style={{ width: 240 }} size="small">
@@ -591,31 +595,31 @@ function ChannelsTab() {
               ))}
             </Select>
             <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>
-              {dmPolicy !== null ? `当前: ${DM_POLICY_OPTIONS.find(o => o.value === dmPolicy)?.label || dmPolicy}` : '默认: 配对模式'}
+              {dmPolicy !== null ? t('tuning.currentValue', { value: DM_POLICY_OPTIONS.find(o => o.value === dmPolicy)?.label || dmPolicy }) : t('tuning.defaultPairing')}
             </Text>
           </div>
         </div>
       </Card>
       <Card style={{ border: '1px solid var(--semi-color-border)', borderRadius: 8, backgroundColor: 'var(--semi-color-bg-1)' }} bodyStyle={{ padding: 20 }}>
-        <Text strong style={{ display: 'block', marginBottom: 16 }}>会话设置 <Tag size="small" color="blue">可修改</Tag></Text>
+        <Text strong style={{ display: 'block', marginBottom: 16 }}>{t('tuning.sessionSettings')} <Tag size="small" color="blue">{t('tuning.editable')}</Tag></Text>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <Text size="small" style={{ color: 'var(--semi-color-text-1)' }}>每日重置时间</Text>
+              <Text size="small" style={{ color: 'var(--semi-color-text-1)' }}>{t('tuning.resetTime')}</Text>
               <Button size="small" theme="borderless" icon={<IconSave />}
                 onClick={() => saveChannelConfig('resetTime', draftResetTime)}
                 loading={saving === 'resetTime'} disabled={!dirtyResetTime || !isConnected}>
-                保存
+                {t('common.save')}
               </Button>
             </div>
             <Select value={draftResetTime} onChange={(v) => setDraftResetTime(v as string)} style={{ width: 180 }} size="small">
               <Select.Option value="00:00">00:00</Select.Option>
-              <Select.Option value="04:00">04:00 (默认)</Select.Option>
+              <Select.Option value="04:00">{t('tuning.defaultTime0400')}</Select.Option>
               <Select.Option value="06:00">06:00</Select.Option>
               <Select.Option value="08:00">08:00</Select.Option>
             </Select>
             <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>
-              {resetTime !== null ? `当前: ${resetTime}` : '默认: 04:00'}
+              {resetTime !== null ? t('tuning.currentTime', { value: resetTime }) : t('tuning.default0400')}
             </Text>
           </div>
         </div>
@@ -627,6 +631,7 @@ function ChannelsTab() {
 /* ── Models Tab ────────────────────────────────────────────────── */
 
 function ModelsTab() {
+  const { t } = useTranslation();
   const models = useStore((s) => s.models);
   const activeClient = useStore((s) => s.activeClient);
   const connectionStatus = useStore((s) => s.connectionStatus);
@@ -691,16 +696,16 @@ function ModelsTab() {
         raw: { agents: { defaults: { model: { primary: draftDefaultModel } } } },
       });
       setDefaultModel(draftDefaultModel);
-      Toast.success('已更新默认模型');
+      Toast.success(t('tuning.modelUpdated'));
     } catch (err) {
-      Toast.error(err instanceof Error ? err.message : '保存失败');
+      Toast.error(err instanceof Error ? err.message : t('tuning.saveFailed'));
     } finally { setSavingModel(false); }
-  }, [activeClient, draftDefaultModel, isConnected]);
+  }, [activeClient, draftDefaultModel, isConnected, t]);
 
   const handleAddModel = useCallback(async () => {
     if (!activeClient || !isConnected) return;
     if (!providerId.trim() || !modelId.trim()) {
-      Toast.warning('请填写 Provider ID 和 Model ID');
+      Toast.warning(t('tuning.fillProviderAndModel'));
       return;
     }
     const provId = providerId.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
@@ -746,15 +751,15 @@ function ModelsTab() {
       authProfiles[`${provId}:default`].apiKey = apiKey.trim();
       }
       await activeClient.request('config.patch', patch);
-      Toast.success(`已添加模型提供者「${provId}」`);
+      Toast.success(t('tuning.modelAdded', { name: provId }));
       setModalVisible(false);
       setProviderId(''); setProviderBaseUrl(''); setApiType('openai-completions');
       setModelId(''); setModelName(''); setApiKey(''); setHasReasoning(false); setHasVision(false);
       await fetchModels();
     } catch (err) {
-      Toast.error(err instanceof Error ? err.message : '添加失败');
+      Toast.error(err instanceof Error ? err.message : t('tuning.addFailed'));
     } finally { setAddingModel(false); }
-  }, [activeClient, isConnected, providerId, providerBaseUrl, apiType, modelId, modelName, apiKey, hasReasoning, hasVision, fetchModels]);
+  }, [activeClient, isConnected, providerId, providerBaseUrl, apiType, modelId, modelName, apiKey, hasReasoning, hasVision, fetchModels, t]);
 
   const modelsNeedSave = defaultModel !== null && draftDefaultModel !== null && defaultModel !== draftDefaultModel;
   const providerList = useMemo(() => {
@@ -778,22 +783,22 @@ function ModelsTab() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
-          <Text strong style={{ fontSize: 15 }}>模型管理</Text>
-          <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>管理 AI 大模型的接入与默认配置</Text>
+          <Text strong style={{ fontSize: 15 }}>{t('tuning.modelsTitle')}</Text>
+          <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>{t('tuning.modelsTitleDesc')}</Text>
         </div>
         <Space>
-          {!isConnected && <Tag color="orange">未连接</Tag>}
-          <Button icon={<IconPlusCircle />} onClick={() => setModalVisible(true)} theme="solid" size="small" disabled={!isConnected}>对接模型</Button>
-          <Button icon={<IconRefresh />} onClick={handleRefresh} loading={loading} theme="outline" size="small">刷新</Button>
+          {!isConnected && <Tag color="orange">{t('tuning.notConnected')}</Tag>}
+          <Button icon={<IconPlusCircle />} onClick={() => setModalVisible(true)} theme="solid" size="small" disabled={!isConnected}>{t('tuning.addModel')}</Button>
+          <Button icon={<IconRefresh />} onClick={handleRefresh} loading={loading} theme="outline" size="small">{t('common.refresh')}</Button>
         </Space>
       </div>
-      {!isConnected && !loading && defaultModelLoaded && <Empty description="未连接到 Gateway" style={{ marginTop: 48 }} />}
-      {loading && !defaultModelLoaded && <Spin tip="加载模型列表…" />}
+      {!isConnected && !loading && defaultModelLoaded && <Empty description={t('tuning.notConnectedGateway')} style={{ marginTop: 48 }} />}
+      {loading && !defaultModelLoaded && <Spin tip={t('tuning.loadingModels')} />}
       {defaultModelLoaded && (
         <>
           <Card style={{ border: '1px solid var(--semi-color-border)', borderRadius: 8, backgroundColor: 'var(--semi-color-bg-1)' }} bodyStyle={{ padding: 20 }}>
-            <Text strong style={{ display: 'block', marginBottom: 12 }}>已接入模型 <Tag color="green" size="small">{models.length}</Tag></Text>
-            {models.length === 0 && !loading && <Empty description="尚无已接入模型，点击「对接模型」添加" style={{ padding: 20 }} />}
+            <Text strong style={{ display: 'block', marginBottom: 12 }}>{t('tuning.connectedModels')} <Tag color="green" size="small">{models.length}</Tag></Text>
+            {models.length === 0 && !loading && <Empty description={t('tuning.noModelsDesc')} style={{ padding: 20 }} />}
             {models.length > 0 && (
               <div style={{ display: 'grid', gap: 8 }}>
                 {models.map((m) => (
@@ -812,9 +817,9 @@ function ModelsTab() {
                     </div>
                     <Space>
                       {m.provider && <Tag color="grey" size="small">{m.provider}</Tag>}
-                      {m.vision && <Tag color="violet" size="small">视觉</Tag>}
-                      {m.thinking && <Tag color="blue" size="small">思维链</Tag>}
-                      <Tag color="green" size="small">已接入</Tag>
+                      {m.vision && <Tag color="violet" size="small">{t('tuning.visual')}</Tag>}
+                      {m.thinking && <Tag color="blue" size="small">{t('tuning.reasoning')}</Tag>}
+                      <Tag color="green" size="small">{t('tuning.connected')}</Tag>
                     </Space>
                   </div>
                 ))}
@@ -823,11 +828,11 @@ function ModelsTab() {
           </Card>
           <Card style={{ border: '1px solid var(--semi-color-border)', borderRadius: 8, backgroundColor: 'var(--semi-color-bg-1)' }} bodyStyle={{ padding: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <Text strong>默认模型 <Tag size="small" color="blue">可修改</Tag></Text>
+              <Text strong>{t('tuning.defaultModel')} <Tag size="small" color="blue">{t('tuning.editable')}</Tag></Text>
               <Button size="small" theme="borderless" icon={<IconSave />}
                 onClick={handleSaveDefaultModel}
                 loading={savingModel} disabled={!modelsNeedSave || !isConnected}>
-                保存
+                {t('common.save')}
               </Button>
             </div>
             <Select
@@ -836,7 +841,7 @@ function ModelsTab() {
               style={{ width: 320 }}
               size="small"
               filter
-              emptyContent={<Text type="tertiary" size="small">无匹配模型</Text>}
+              emptyContent={<Text type="tertiary" size="small">{t('tuning.noMatchModel')}</Text>}
             >
               {models.map((m) => (
                 <Select.Option key={m.id} value={m.id}>
@@ -846,12 +851,12 @@ function ModelsTab() {
               ))}
             </Select>
             <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>
-              {defaultModel ? `当前: ${defaultModel}` : '未设置默认模型'}
+              {defaultModel ? t('tuning.currentModel', { value: defaultModel }) : t('tuning.noDefaultModel')}
             </Text>
           </Card>
           {/* Provider overview */}
           <Card style={{ border: '1px solid var(--semi-color-border)', borderRadius: 8, backgroundColor: 'var(--semi-color-bg-1)' }} bodyStyle={{ padding: 20 }}>
-            <Text strong style={{ display: 'block', marginBottom: 12 }}>模型提供者分布 <Tag size="small">{providerList.length}</Tag></Text>
+            <Text strong style={{ display: 'block', marginBottom: 12 }}>{t('tuning.providerDistribution')} <Tag size="small">{providerList.length}</Tag></Text>
             {providerList.length > 0 ? (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {providerList.map((m) => (
@@ -859,7 +864,7 @@ function ModelsTab() {
                 ))}
               </div>
             ) : (
-              <Text type="tertiary" size="small">未检测到提供者信息</Text>
+              <Text type="tertiary" size="small">{t('tuning.noProviderDetected')}</Text>
             )}
           </Card>
         </>
@@ -867,14 +872,14 @@ function ModelsTab() {
 
       {/* ── Add Model Modal ── */}
       <Modal
-        title="对接新模型"
+        title={t('tuning.addModelTitle')}
         visible={modalVisible}
         onCancel={() => { setModalVisible(false); }}
         footer={
           <Space>
-            <Button onClick={() => setModalVisible(false)} theme="light">取消</Button>
+            <Button onClick={() => setModalVisible(false)} theme="light">{t('common.cancel')}</Button>
             <Button onClick={handleAddModel} theme="solid" loading={addingModel} disabled={!providerId.trim() || !modelId.trim()}>
-              对接
+              {t('tuning.add')}
             </Button>
           </Space>
         }
@@ -883,18 +888,18 @@ function ModelsTab() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <Text size="small" style={{ display: 'block', marginBottom: 6, color: 'var(--semi-color-text-1)' }}>
-              Provider ID <Tag size="small" color="red">必填</Tag>
+              {t('tuning.providerId')} <Tag size="small" color="red">{t('tuning.providerIdRequired')}</Tag>
             </Text>
             <Input value={providerId} onChange={setProviderId} placeholder="my-local" size="small" />
-            <Text type="tertiary" size="small" style={{ marginTop: 2 }}>唯一标识，小写字母数字和连字符</Text>
+            <Text type="tertiary" size="small" style={{ marginTop: 2 }}>{t('tuning.providerIdDesc')}</Text>
           </div>
           <div>
-            <Text size="small" style={{ display: 'block', marginBottom: 6, color: 'var(--semi-color-text-1)' }}>Base URL</Text>
+            <Text size="small" style={{ display: 'block', marginBottom: 6, color: 'var(--semi-color-text-1)' }}>{t('tuning.baseUrl')}</Text>
             <Input value={providerBaseUrl} onChange={setProviderBaseUrl} placeholder="https://api.openai.com" size="small" />
-            <Text type="tertiary" size="small" style={{ marginTop: 2 }}>API 接口地址，留空使用默认</Text>
+            <Text type="tertiary" size="small" style={{ marginTop: 2 }}>{t('tuning.baseUrlDesc')}</Text>
           </div>
           <div>
-            <Text size="small" style={{ display: 'block', marginBottom: 6, color: 'var(--semi-color-text-1)' }}>API 类型</Text>
+            <Text size="small" style={{ display: 'block', marginBottom: 6, color: 'var(--semi-color-text-1)' }}>{t('tuning.apiType')}</Text>
             <Select value={apiType} onChange={(v) => setApiType(v as string)} style={{ width: '100%' }} size="small">
               {apiTypeOptions.map((opt) => (
                 <Select.Option key={opt.value} value={opt.value}>{opt.label}</Select.Option>
@@ -904,27 +909,27 @@ function ModelsTab() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <Text size="small" style={{ display: 'block', marginBottom: 6, color: 'var(--semi-color-text-1)' }}>
-                Model ID <Tag size="small" color="red">必填</Tag>
+                {t('tuning.modelId')} <Tag size="small" color="red">{t('tuning.modelIdRequired')}</Tag>
               </Text>
               <Input value={modelId} onChange={setModelId} placeholder="gpt-4o" size="small" />
             </div>
             <div>
-              <Text size="small" style={{ display: 'block', marginBottom: 6, color: 'var(--semi-color-text-1)' }}>显示名称</Text>
+              <Text size="small" style={{ display: 'block', marginBottom: 6, color: 'var(--semi-color-text-1)' }}>{t('tuning.displayName')}</Text>
               <Input value={modelName} onChange={setModelName} placeholder="GPT-4o" size="small" />
             </div>
           </div>
           <div>
-            <Text size="small" style={{ display: 'block', marginBottom: 6, color: 'var(--semi-color-text-1)' }}>API Key</Text>
+            <Text size="small" style={{ display: 'block', marginBottom: 6, color: 'var(--semi-color-text-1)' }}>{t('tuning.apiKey')}</Text>
             <Input value={apiKey} onChange={setApiKey} placeholder="sk-..." mode="password" size="small" />
-            <Text type="tertiary" size="small" style={{ marginTop: 2 }}>可选，留空表示无认证</Text>
+            <Text type="tertiary" size="small" style={{ marginTop: 2 }}>{t('tuning.apiKeyDesc')}</Text>
           </div>
           <div style={{ display: 'flex', gap: 24 }}>
             <Switch checked={hasReasoning} onChange={setHasReasoning} />
-            <Text size="small">支持思维链 (Reasoning)</Text>
+            <Text size="small">{t('tuning.supportReasoning')}</Text>
           </div>
           <div style={{ display: 'flex', gap: 24 }}>
             <Switch checked={hasVision} onChange={setHasVision} />
-            <Text size="small">支持视觉 (Vision)</Text>
+            <Text size="small">{t('tuning.supportVision')}</Text>
           </div>
         </div>
       </Modal>
@@ -935,6 +940,7 @@ function ModelsTab() {
 /* ── General Tab ───────────────────────────────────────────────── */
 
 function GeneralTab() {
+  const { t } = useTranslation();
   const currentInstance = useStore((s) => s.instances.find((i) => i.id === s.currentInstanceId) ?? null);
   const health = useStore((s) => s.health);
   const activeClient = useStore((s) => s.activeClient);
@@ -966,27 +972,35 @@ function GeneralTab() {
     try {
       await activeClient.request('config.patch', { raw: { gateway: { bind: draftBindMode } } });
       setBindMode(draftBindMode);
-      Toast.success('已更新绑定模式');
+      Toast.success(t('tuning.bindModeUpdated'));
     } catch (err) {
-      Toast.error(err instanceof Error ? err.message : '保存失败');
+      Toast.error(err instanceof Error ? err.message : t('tuning.saveFailed'));
     } finally { setSaving(false); }
-  }, [activeClient, draftBindMode, isConnected]);
+  }, [activeClient, draftBindMode, isConnected, t]);
 
   const dirty = bindMode !== null && bindMode !== draftBindMode;
 
+  const connectionStatusLabel = connectionStatus === 'connected'
+    ? t('tuning.connected')
+    : connectionStatus === 'connecting'
+      ? t('instance.statusConnecting')
+      : connectionStatus === 'error'
+        ? t('instance.statusError')
+        : t('tuning.notConnected');
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div><Text strong style={{ fontSize: 15 }}>通用配置</Text><Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>Gateway 网络绑定、认证、SSL 等基础设置</Text></div>
+      <div><Text strong style={{ fontSize: 15 }}>{t('tuning.generalTitle')}</Text><Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>{t('tuning.generalTitleDesc')}</Text></div>
       <Card style={{ border: '1px solid var(--semi-color-border)', borderRadius: 8, backgroundColor: 'var(--semi-color-bg-1)' }} bodyStyle={{ padding: 20 }}>
-        <Text strong style={{ display: 'block', marginBottom: 16 }}>当前连接</Text>
+        <Text strong style={{ display: 'block', marginBottom: 16 }}>{t('tuning.currentConnection')}</Text>
         <div style={{ display: 'grid', gap: 8 }}>
           {([
-            ['Gateway 地址', currentInstance?.gatewayUrl || '—', 'monospace'],
-            ['连接状态', connectionStatus === 'connected' ? '已连接' : connectionStatus === 'connecting' ? '连接中…' : connectionStatus === 'error' ? '错误' : '未连接', null],
-            ['实例名称', currentInstance?.name || '—', 'monospace'],
-            ['认证模式', 'Token', null],
-            ['Gateway 版本', health?.version || '—', 'monospace'],
-            ['运行时长', formatUptime(health?.uptime), 'monospace'],
+            [t('tuning.gatewayAddress'), currentInstance?.gatewayUrl || '—', 'monospace'],
+            [t('tuning.connectionStatus'), connectionStatusLabel, null],
+            [t('tuning.instanceName'), currentInstance?.name || '—', 'monospace'],
+            [t('tuning.authMode'), 'Token', null],
+            [t('tuning.gatewayVersion'), health?.version || '—', 'monospace'],
+            [t('tuning.uptime'), formatUptime(health?.uptime), 'monospace'],
           ] as const).map(([label, value, font]) => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--semi-color-border)' }}>
               <Text type="tertiary" size="small">{label}</Text>
@@ -997,54 +1011,54 @@ function GeneralTab() {
       </Card>
       <Card style={{ border: '1px solid var(--semi-color-border)', borderRadius: 8, backgroundColor: 'var(--semi-color-bg-1)' }} bodyStyle={{ padding: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <Text strong>网络 <Tag size="small" color="blue">可修改</Tag></Text>
+          <Text strong>{t('tuning.network')} <Tag size="small" color="blue">{t('tuning.editable')}</Tag></Text>
           <Space>
             {loading && <Spin size="small" />}
             <Button size="small" theme="borderless" icon={<IconSave />}
               onClick={handleSaveBindMode}
               loading={saving} disabled={!dirty || !isConnected}>
-              保存
+              {t('common.save')}
             </Button>
           </Space>
         </div>
         <div>
           <Select value={draftBindMode} onChange={(v) => setDraftBindMode(v as string)} style={{ width: 240 }} size="small">
-            <Select.Option value="loopback">仅本地 Loopback (推荐)</Select.Option>
-            <Select.Option value="lan">局域网 LAN</Select.Option>
-            <Select.Option value="tailnet">Tailscale 网络</Select.Option>
+            <Select.Option value="loopback">{t('tuning.bindLoopback')}</Select.Option>
+            <Select.Option value="lan">{t('tuning.bindLan')}</Select.Option>
+            <Select.Option value="tailnet">{t('tuning.bindTailscale')}</Select.Option>
           </Select>
           <div style={{ marginTop: 12, padding: 12, borderRadius: 6, backgroundColor: 'var(--semi-color-warning-light-default)', border: '1px solid var(--semi-color-warning)' }}>
-            <Text size="small" style={{ color: 'var(--semi-color-warning)' }}>修改绑定模式后需要重启 Gateway 才能生效</Text>
+            <Text size="small" style={{ color: 'var(--semi-color-warning)' }}>{t('tuning.bindRestartWarning')}</Text>
           </div>
           <div style={{ marginTop: 16 }}>
-            <Text size="small" style={{ display: 'block', marginBottom: 8, color: 'var(--semi-color-text-1)' }}>控制端口</Text>
+            <Text size="small" style={{ display: 'block', marginBottom: 8, color: 'var(--semi-color-text-1)' }}>{t('tuning.controlPort')}</Text>
             <Input defaultValue="18789" style={{ width: 140 }} size="small" disabled />
-            <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>固化为 18789，不可修改</Text>
+            <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>{t('tuning.portFixed')}</Text>
           </div>
         </div>
       </Card>
       <Card style={{ border: '1px solid var(--semi-color-border)', borderRadius: 8, backgroundColor: 'var(--semi-color-bg-1)' }} bodyStyle={{ padding: 20 }}>
-        <Text strong style={{ display: 'block', marginBottom: 16 }}>Desktop 行为</Text>
+        <Text strong style={{ display: 'block', marginBottom: 16 }}>{t('tuning.desktopBehavior')}</Text>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <Text style={{ color: 'var(--semi-color-text-0)' }}>启动时自动连接所有实例</Text>
-            <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 2 }}>仅影响 Desktop 本地行为</Text>
+            <Text style={{ color: 'var(--semi-color-text-0)' }}>{t('tuning.connectAllOnStartup')}</Text>
+            <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 2 }}>{t('tuning.desktopOnly')}</Text>
           </div>
           <Select value={useSettingsStore((s) => s.settings.connectAllInstancesOnStartup ? 'yes' : 'no')}
             onChange={(v) => useSettingsStore.getState().updateSettings({ connectAllInstancesOnStartup: v === 'yes' })} style={{ width: 80 }} size="small">
-            <Select.Option value="yes">是</Select.Option>
-            <Select.Option value="no">否</Select.Option>
+            <Select.Option value="yes">{t('common.yes')}</Select.Option>
+            <Select.Option value="no">{t('common.no')}</Select.Option>
           </Select>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
           <div>
-            <Text style={{ color: 'var(--semi-color-text-0)' }}>启动时打开调教页面</Text>
-            <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 2 }}>启动后默认打开 Tuning 页面</Text>
+            <Text style={{ color: 'var(--semi-color-text-0)' }}>{t('tuning.openTuningOnStartup')}</Text>
+            <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 2 }}>{t('tuning.openTuningOnStartupDesc')}</Text>
           </div>
           <Select value={useSettingsStore((s) => s.settings.openTuningOnStartup ? 'yes' : 'no')}
             onChange={(v) => useSettingsStore.getState().updateSettings({ openTuningOnStartup: v === 'yes' })} style={{ width: 80 }} size="small">
-            <Select.Option value="yes">是</Select.Option>
-            <Select.Option value="no">否</Select.Option>
+            <Select.Option value="yes">{t('common.yes')}</Select.Option>
+            <Select.Option value="no">{t('common.no')}</Select.Option>
           </Select>
         </div>
       </Card>
@@ -1055,21 +1069,22 @@ function GeneralTab() {
 /* ── Main Page ─────────────────────────────────────────────────── */
 
 export default function TuningPage() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('persona');
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={{ padding: '24px 28px 8px', flexShrink: 0 }}>
-        <Title heading={3} style={{ marginBottom: 4 }}>调教</Title>
-        <Text type="tertiary">管理 Agent 人设、记忆、通信渠道、模型接入与 Gateway 配置</Text>
+        <Title heading={3} style={{ marginBottom: 4 }}>{t('tuning.title')}</Title>
+        <Text type="tertiary">{t('tuning.pageDesc')}</Text>
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: '0 28px 28px', minHeight: 0 }}>
         <Tabs type="line" activeKey={activeTab} onChange={setActiveTab}>
-          <TabPane tab="记忆" itemKey="memory"><MemoryTab /></TabPane>
-          <TabPane tab="人设" itemKey="persona"><PersonaTab /></TabPane>
-          <TabPane tab="通信" itemKey="channels"><ChannelsTab /></TabPane>
-          <TabPane tab="模型" itemKey="models"><ModelsTab /></TabPane>
-          <TabPane tab="通用" itemKey="general"><GeneralTab /></TabPane>
+          <TabPane tab={t('tuning.memory')} itemKey="memory"><MemoryTab /></TabPane>
+          <TabPane tab={t('tuning.persona')} itemKey="persona"><PersonaTab /></TabPane>
+          <TabPane tab={t('tuning.communication')} itemKey="channels"><ChannelsTab /></TabPane>
+          <TabPane tab={t('tuning.models')} itemKey="models"><ModelsTab /></TabPane>
+          <TabPane tab={t('tuning.general')} itemKey="general"><GeneralTab /></TabPane>
         </Tabs>
       </div>
     </div>

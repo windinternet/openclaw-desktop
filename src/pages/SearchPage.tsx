@@ -107,13 +107,13 @@ export default function SearchPage() {
 
     const toolName = toolMap[provider];
     if (!toolName) {
-      setWebError(`Unknown provider: ${provider}`);
+      setWebError(t('search.unknownProvider', { provider }));
       setWebLoading(false);
       return;
     }
 
     if (!isConnected) {
-      setWebError('Not connected to gateway');
+      setWebError(t('search.notConnected'));
       setWebLoading(false);
       return;
     }
@@ -137,23 +137,23 @@ export default function SearchPage() {
       }
 
       if (items.length === 0) {
-        setWebError('No results returned. The search provider may not be configured on Gateway.');
+        setWebError(t('search.noResultsReturned'));
         setWebLoading(false);
         return;
       }
 
       setWebResults(items);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Search request failed';
+      const msg = err instanceof Error ? err.message : t('search.requestFailed');
       if (msg.includes('not found') || msg.includes('not configured') || msg.includes('not available')) {
-        setWebError(`Tool "${toolName}" is not available on Gateway. Please configure ${provider} search on your OpenClaw Gateway.`);
+        setWebError(t('search.toolNotAvailable', { tool: toolName, provider }));
       } else {
         setWebError(msg);
       }
     } finally {
       setWebLoading(false);
     }
-  }, [webQuery, provider, isConnected, activeClient]);
+  }, [webQuery, provider, isConnected, activeClient, t]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleWebSearch();
@@ -173,12 +173,12 @@ export default function SearchPage() {
         tabBarStyle={{ marginBottom: 16 }}
       >
         {/* ─── Session Search ─── */}
-        <Tabs.TabPane tab="会话搜索" itemKey="session">
+        <Tabs.TabPane tab={t('search.sessionSearch')} itemKey="session">
           <div style={{ flex: 1, overflow: 'auto' }}>
             <div style={{ marginBottom: 16 }}>
               <Input
                 prefix={<IconSearch />}
-                placeholder="搜索会话标题或关键词…"
+                placeholder={t('search.sessionPlaceholder')}
                 value={sessionQuery}
                 onChange={(v) => setSessionQuery(v)}
                 showClear
@@ -187,11 +187,11 @@ export default function SearchPage() {
             </div>
 
             {!debouncedQuery.trim() && (
-              <Empty description="输入关键词搜索本地会话" style={{ marginTop: 48 }} />
+              <Empty description={t('search.enterKeyword')} style={{ marginTop: 48 }} />
             )}
 
             {debouncedQuery.trim() && filteredSessions.length === 0 && (
-              <Empty description="未找到匹配的会话" style={{ marginTop: 48 }} />
+              <Empty description={t('search.noMatchingSessions')} style={{ marginTop: 48 }} />
             )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -226,7 +226,7 @@ export default function SearchPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 13, color: 'var(--semi-color-text-2)' }}>
                       <span>{formatTimestamp(s.updatedAt || s.createdAt)}</span>
                       {s.messageCount !== undefined && (
-                        <span>{s.messageCount} 条消息</span>
+                        <span>{t('chat.messageCount', { count: s.messageCount })}</span>
                       )}
                       {s.sessionKey && s.sessionKey !== s.key && (
                         <span style={{ fontSize: 12, color: 'var(--semi-color-text-2)' }}>
@@ -242,7 +242,7 @@ export default function SearchPage() {
         </Tabs.TabPane>
 
         {/* ─── Web Search ─── */}
-        <Tabs.TabPane tab="网络搜索" itemKey="web">
+        <Tabs.TabPane tab={t('search.webSearch')} itemKey="web">
           <div style={{ flex: 1, overflow: 'auto' }}>
             <Space style={{ marginBottom: 16, width: '100%' }} align="start">
               <Select
@@ -259,7 +259,7 @@ export default function SearchPage() {
               </Select>
               <Input
                 prefix={<IconGlobe />}
-                placeholder="输入搜索关键词…"
+                placeholder={t('search.webPlaceholder')}
                 value={webQuery}
                 onChange={(v) => setWebQuery(v)}
                 onKeyDown={handleKeyDown}
@@ -274,13 +274,13 @@ export default function SearchPage() {
                 loading={webLoading}
                 size="large"
               >
-                搜索
+                {t('common.search')}
               </Button>
             </Space>
 
             {webLoading && (
               <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-                <Spin tip="正在搜索…" />
+                <Spin tip={t('search.searching')} />
               </div>
             )}
 
@@ -292,11 +292,11 @@ export default function SearchPage() {
             )}
 
             {!webLoading && !webError && hasSearched && webResults.length === 0 && (
-              <Empty description="未找到结果" style={{ marginTop: 48 }} />
+              <Empty description={t('search.noResults')} style={{ marginTop: 48 }} />
             )}
 
             {!hasSearched && !webLoading && (
-              <Empty description="输入关键词并点击搜索" style={{ marginTop: 48 }} />
+              <Empty description={t('search.enterToSearch')} style={{ marginTop: 48 }} />
             )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

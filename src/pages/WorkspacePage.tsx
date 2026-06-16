@@ -166,13 +166,13 @@ export default function WorkspacePage() {
     setFileContent(null);
     setSelectedFile(null);
     loadFiles(selectedAgent);
-    Toast.success('已刷新文件列表');
-  }, [loadFiles, selectedAgent]);
+    Toast.success(t('workspace.filesRefreshed'));
+  }, [loadFiles, selectedAgent, t]);
 
   const handleFileClick = useCallback(
     async (file: WorkspaceFile) => {
       if (!isTextFile(file.name)) {
-        Toast.warning('仅支持查看文本文件');
+        Toast.warning(t('workspace.textOnly'));
         return;
       }
       setSelectedFile(file);
@@ -182,7 +182,7 @@ export default function WorkspacePage() {
       try {
         const client = useStore.getState().activeClient;
         if (!client) {
-          Toast.error('未连接到 Gateway');
+          Toast.error(t('workspace.notConnected'));
           return;
         }
         const result = await client.request<WorkspaceFileContent>('agents.files.get', {
@@ -191,14 +191,14 @@ export default function WorkspacePage() {
         });
         setFileContent(result.content ?? '');
       } catch (err) {
-        const msg = err instanceof Error ? err.message : '读取文件失败';
+        const msg = err instanceof Error ? err.message : t('workspace.readFileFailed');
         Toast.error(msg);
-        setFileContent('// 读取失败: ' + msg);
+        setFileContent(t('workspace.readFailedPrefix') + ': ' + msg);
       } finally {
         setContentLoading(false);
       }
     },
-    [selectedAgent],
+    [selectedAgent, t],
   );
 
   const isBootstrap = (name: string) => BOOTSTRAP_FILES.has(name);
@@ -206,7 +206,7 @@ export default function WorkspacePage() {
   const columns = useMemo(
     () => [
       {
-        title: '文件名',
+        title: t('workspace.fileName'),
         dataIndex: 'name',
         key: 'name',
         width: 280,
@@ -231,7 +231,7 @@ export default function WorkspacePage() {
               </Text>
               {boot && (
                 <Tag color="blue" size="small" type="light">
-                  启动文件
+                  {t('workspace.bootstrapFile')}
                 </Tag>
               )}
             </Space>
@@ -239,7 +239,7 @@ export default function WorkspacePage() {
         },
       },
       {
-        title: '大小',
+        title: t('workspace.fileSize'),
         dataIndex: 'size',
         key: 'size',
         width: 100,
@@ -250,7 +250,7 @@ export default function WorkspacePage() {
         ),
       },
       {
-        title: '修改时间',
+        title: t('workspace.modifiedAt'),
         dataIndex: 'modifiedAt',
         key: 'modifiedAt',
         width: 160,
@@ -261,7 +261,7 @@ export default function WorkspacePage() {
         ),
       },
     ],
-    [selectedFile, handleFileClick],
+    [selectedFile, handleFileClick, t],
   );
 
   const renderContent = () => {
@@ -279,7 +279,7 @@ export default function WorkspacePage() {
           }}
         >
           <IconFolderStroked size="extra-large" />
-          <Text type="tertiary">选择一个文件查看内容</Text>
+          <Text type="tertiary">{t('workspace.selectFileHint')}</Text>
         </div>
       );
     }
@@ -358,12 +358,12 @@ export default function WorkspacePage() {
             📁 {t('workspace.title')}
           </Title>
           <Text type="tertiary" size="small">
-            浏览和管理 Agent 工作区文件
+            {t('page.workspaceDesc')}
           </Text>
         </div>
         <Space>
           <Select
-            placeholder="选择 Agent"
+            placeholder={t('workspace.selectAgent')}
             value={selectedAgent}
             onChange={handleAgentChange as (value: unknown) => void}
             style={{ width: 180 }}
@@ -379,7 +379,7 @@ export default function WorkspacePage() {
               ))}
           </Select>
           <Button icon={<IconRefresh />} onClick={handleRefresh} loading={fileLoading}>
-            刷新
+            {t('common.refresh')}
           </Button>
         </Space>
       </div>
@@ -406,7 +406,7 @@ export default function WorkspacePage() {
                 height: 200,
               }}
             >
-              <Empty description="请先连接到 Gateway" />
+              <Empty description={t('errors.connectFirst')} />
             </div>
           ) : (
             <Table
@@ -416,7 +416,7 @@ export default function WorkspacePage() {
               loading={fileLoading}
               size="small"
               pagination={false}
-              empty={<Empty description="暂无文件" />}
+              empty={<Empty description={t('workspace.noFiles')} />}
               onRow={(record, _index) => ({
                 style: {
                   cursor: 'pointer',
@@ -455,7 +455,7 @@ export default function WorkspacePage() {
                 </Text>
                 {isBootstrap(selectedFile.name) && (
                   <Tag color="blue" size="small" type="light">
-                    启动文件
+                    {t('workspace.bootstrapFile')}
                   </Tag>
                 )}
                 <Text type="tertiary" size="small">

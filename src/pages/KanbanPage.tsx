@@ -1,4 +1,5 @@
 import { forwardRef, useImperativeHandle, useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { CSSProperties, DragEvent } from 'react';
 import {
   Card,
@@ -339,6 +340,7 @@ interface KanbanCardItemProps {
 }
 
 function KanbanCardItem({ card, agentName, onDelete, onDragStart }: KanbanCardItemProps) {
+  const { t } = useTranslation();
   const visualStyle = getKanbanCardVisualStyle(card.status);
 
   return (
@@ -371,7 +373,7 @@ function KanbanCardItem({ card, agentName, onDelete, onDragStart }: KanbanCardIt
           }}
         >
           <IconHandle style={{ ...visualStyle.handle, fontSize: 14, cursor: 'grab' }} />
-          <Tooltip content="删除卡片">
+          <Tooltip content={t('kanban.deleteCard')}>
             <Button
               icon={<IconDelete />}
               size="small"
@@ -437,6 +439,7 @@ export interface KanbanPageHandle {
 }
 
 const KanbanPage = forwardRef<KanbanPageHandle, { embedded?: boolean }>(function KanbanPage({ embedded: _embedded = false }, ref) {
+  const { t } = useTranslation();
   const agents = useStore((s) => s.agents);
   const currentInstanceId = useStore((s) => s.currentInstanceId);
 
@@ -554,14 +557,14 @@ const KanbanPage = forwardRef<KanbanPageHandle, { embedded?: boolean }>(function
         cards: col.cards.filter((c) => c.id !== cardId),
       })),
     );
-    Toast.success('卡片已删除');
-  }, []);
+    Toast.success(t('kanban.cardDeleted'));
+  }, [t]);
 
   const handleAddCard = useCallback(
     (values: Record<string, unknown>) => {
       const title = String(values.title ?? '').trim();
       if (!title) {
-        Toast.error('请输入任务标题');
+        Toast.error(t('kanban.cardTitleRequired'));
         return;
       }
 
@@ -582,9 +585,9 @@ const KanbanPage = forwardRef<KanbanPageHandle, { embedded?: boolean }>(function
         ),
       );
       setAddModalVisible(false);
-      Toast.success('卡片已添加');
+      Toast.success(t('kanban.cardAdded'));
     },
-    [addTargetColumn],
+    [addTargetColumn, t],
   );
 
   const openAddModal = useCallback((status: string) => {
@@ -711,7 +714,7 @@ const KanbanPage = forwardRef<KanbanPageHandle, { embedded?: boolean }>(function
                   }}
                 >
                   <Text type="tertiary" size="small">
-                    拖拽卡片到此处
+                    {t('kanban.dragHere')}
                   </Text>
                 </div>
               ) : (
@@ -733,7 +736,7 @@ const KanbanPage = forwardRef<KanbanPageHandle, { embedded?: boolean }>(function
 
       {/* ── Add Card Modal ───────────────────────────────────── */}
       <Modal
-        title={`添加卡片 — ${COLUMN_DEFS.find((d) => d.id === addTargetColumn)?.title}`}
+        title={t('kanban.addCardFor', { title: COLUMN_DEFS.find((d) => d.id === addTargetColumn)?.title })}
         visible={addModalVisible}
         onCancel={() => setAddModalVisible(false)}
         footer={null}
@@ -743,40 +746,40 @@ const KanbanPage = forwardRef<KanbanPageHandle, { embedded?: boolean }>(function
         <Form onSubmit={handleAddCard} labelPosition="top" labelWidth={80}>
           <Form.Input
             field="title"
-            label="任务标题"
-            placeholder="输入任务标题…"
-            rules={[{ required: true, message: '请输入任务标题' }]}
+            label={t('kanban.cardTitle')}
+            placeholder={t('kanban.cardTitlePlaceholder')}
+            rules={[{ required: true, message: t('kanban.cardTitleRequired') }]}
             style={{ width: '100%' }}
           />
           <Form.Select
             field="priority"
-            label="优先级"
+            label={t('kanban.cardPriority')}
             style={{ width: '100%' }}
             initValue="medium"
           >
             <Form.Select.Option value="high">
               <Space>
-                <Tag color="red" size="small">高</Tag>
-                <span>高优先级</span>
+                <Tag color="red" size="small">{t('kanban.priorityHigh')}</Tag>
+                <span>{t('kanban.priorityHigh')}</span>
               </Space>
             </Form.Select.Option>
             <Form.Select.Option value="medium">
               <Space>
-                <Tag color="orange" size="small">中</Tag>
-                <span>中优先级</span>
+                <Tag color="orange" size="small">{t('kanban.priorityMedium')}</Tag>
+                <span>{t('kanban.priorityMedium')}</span>
               </Space>
             </Form.Select.Option>
             <Form.Select.Option value="low">
               <Space>
-                <Tag color="grey" size="small">低</Tag>
-                <span>低优先级</span>
+                <Tag color="grey" size="small">{t('kanban.priorityLow')}</Tag>
+                <span>{t('kanban.priorityLow')}</span>
               </Space>
             </Form.Select.Option>
           </Form.Select>
           <Form.Select
             field="agentId"
-            label="分配 Agent"
-            placeholder="选择 Agent（可选）"
+            label={t('kanban.assignAgent')}
+            placeholder={t('kanban.assignAgentPlaceholder')}
             style={{ width: '100%' }}
             showClear
           >
@@ -794,9 +797,9 @@ const KanbanPage = forwardRef<KanbanPageHandle, { embedded?: boolean }>(function
               marginTop: 16,
             }}
           >
-            <Button onClick={() => setAddModalVisible(false)}>取消</Button>
+            <Button onClick={() => setAddModalVisible(false)}>{t('common.cancel')}</Button>
             <Button type="primary" htmlType="submit">
-              添加
+              {t('kanban.add')}
             </Button>
           </div>
         </Form>

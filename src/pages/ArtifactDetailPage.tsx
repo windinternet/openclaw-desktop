@@ -11,7 +11,7 @@ const { Text, Title } = Typography;
 export default function ArtifactDetailPage() {
   const { artifactId } = useParams<{ artifactId: string }>();
   const navigate = useNavigate();
-  void useTranslation();
+  const { t } = useTranslation();
   const artifacts = useStore((s) => s.artifacts);
   const openArtifactWindow = useStore((s) => s.openArtifactWindow);
   const deleteArtifact = useStore((s) => s.deleteArtifact);
@@ -36,23 +36,23 @@ export default function ArtifactDetailPage() {
   }
 
   const statusText = (status: string) => {
-    if (status === 'draft') return '草稿';
-    if (status === 'published') return '已发布';
-    return '已归档';
+    if (status === 'draft') return t('artifact.statusDraft');
+    if (status === 'published') return t('artifact.statusPublished');
+    return t('artifact.statusArchived');
   };
 
   const handleSaveMeta = async () => {
     if (!artifactId) return;
     await updateArtifact(artifactId, metaForm);
     setEditingMeta(false);
-    Toast.success('已保存');
+    Toast.success(t('artifact.saved'));
   };
 
   const handleDelete = async () => {
     if (!artifactId) return;
     await deleteArtifact(artifactId);
     navigate('/artifacts');
-    Toast.success('已删除');
+    Toast.success(t('artifact.deleted'));
   };
 
   return (
@@ -64,41 +64,41 @@ export default function ArtifactDetailPage() {
         <Tag size="large" color={meta.status === 'published' ? 'green' : meta.status === 'draft' ? 'orange' : 'grey'} type="light">
           {statusText(meta.status)}
         </Tag>
-        <Button icon={<IconPlay />} theme="solid" onClick={() => openArtifactWindow(meta.id)}>查看</Button>
+        <Button icon={<IconPlay />} theme="solid" onClick={() => openArtifactWindow(meta.id)}>{t('artifact.view')}</Button>
         {meta.status !== 'published' && (
-          <Button onClick={() => { updateArtifact(meta.id, { status: 'published' }); }}>发布</Button>
+          <Button onClick={() => { updateArtifact(meta.id, { status: 'published' }); }}>{t('artifact.publish')}</Button>
         )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-        <Card title="元数据"
+        <Card title={t('artifact.meta')}
           headerExtraContent={
             <Button size="small" onClick={() => editingMeta ? handleSaveMeta() : setEditingMeta(true)}>
-              {editingMeta ? '保存' : '编辑'}
+              {editingMeta ? t('artifact.save') : t('artifact.edit')}
             </Button>
           }
         >
           {editingMeta ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <Input addonBefore="名称" value={metaForm.title ?? ''} onChange={(v) => setMetaForm((p) => ({ ...p, title: v }))} />
-              <Input addonBefore="图标" value={metaForm.icon ?? ''} onChange={(v) => setMetaForm((p) => ({ ...p, icon: v }))} />
+              <Input addonBefore={t('artifact.title')} value={metaForm.title ?? ''} onChange={(v) => setMetaForm((p) => ({ ...p, title: v }))} />
+              <Input addonBefore={t('artifact.icon')} value={metaForm.icon ?? ''} onChange={(v) => setMetaForm((p) => ({ ...p, icon: v }))} />
               <Select value={metaForm.type} onChange={(v) => setMetaForm((p) => ({ ...p, type: v as ArtifactMeta['type'] }))}
                 optionList={[
-                  { value: 'report', label: '报告' }, { value: 'dashboard', label: '仪表盘' },
-                  { value: 'analysis', label: '分析' }, { value: 'checklist', label: '清单' },
-                  { value: 'code', label: '代码' }, { value: 'document', label: '文档' },
-                  { value: 'other', label: '其他' },
+                  { value: 'report', label: t('artifact.typeReport') }, { value: 'dashboard', label: t('artifact.typeDashboard') },
+                  { value: 'analysis', label: t('artifact.typeAnalysis') }, { value: 'checklist', label: t('artifact.typeChecklist') },
+                  { value: 'code', label: t('artifact.typeCode') }, { value: 'document', label: t('artifact.typeDoc') },
+                  { value: 'other', label: t('artifact.typeOther') },
                 ]}
               />
-              <Input addonBefore="描述" value={metaForm.description ?? ''} onChange={(v) => setMetaForm((p) => ({ ...p, description: v }))} />
+              <Input addonBefore={t('artifact.desc')} value={metaForm.description ?? ''} onChange={(v) => setMetaForm((p) => ({ ...p, description: v }))} />
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div><Text type="tertiary">名称: </Text><Text>{meta.title}</Text></div>
-              <div><Text type="tertiary">图标: </Text><span style={{ fontSize: 20 }}>{meta.icon}</span></div>
-              <div><Text type="tertiary">类型: </Text><Tag size="small">{meta.type}</Tag></div>
-              <div><Text type="tertiary">来源: </Text><Text>{meta.source.name ?? meta.source.type}</Text></div>
-              {meta.description && <div><Text type="tertiary">描述: </Text><Text>{meta.description}</Text></div>}
+              <div><Text type="tertiary">{t('artifact.title')}: </Text><Text>{meta.title}</Text></div>
+              <div><Text type="tertiary">{t('artifact.icon')}: </Text><span style={{ fontSize: 20 }}>{meta.icon}</span></div>
+              <div><Text type="tertiary">{t('artifact.type')}: </Text><Tag size="small">{meta.type}</Tag></div>
+              <div><Text type="tertiary">{t('artifact.source')}: </Text><Text>{meta.source.name ?? meta.source.type}</Text></div>
+              {meta.description && <div><Text type="tertiary">{t('artifact.desc')}: </Text><Text>{meta.description}</Text></div>}
               {meta.tags.length > 0 && (
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                   {meta.tags.map((tag) => <Tag key={tag} size="small" type="light">{tag}</Tag>)}
@@ -108,24 +108,24 @@ export default function ArtifactDetailPage() {
           )}
         </Card>
 
-        <Card title="版本历史">
-          <Empty title="暂无版本" />
+        <Card title={t('artifact.versions')}>
+          <Empty title={t('artifact.noVersions')} />
         </Card>
       </div>
 
       <div style={{ marginTop: 24 }}>
-        <Card title="操作">
+        <Card title={t('artifact.actions')}>
           <div style={{ display: 'flex', gap: 12 }}>
-            <Button icon={<IconRefresh />} onClick={() => Toast.info('重新生成即将支持')}>
-              基于此重新生成
+            <Button icon={<IconRefresh />} onClick={() => Toast.info(t('artifact.regenNotImplemented'))}>
+              {t('artifact.regen')}
             </Button>
             {meta.source.type === 'chat' && meta.source.id && (
               <Button onClick={() => navigate(`/chat/${encodeURIComponent(meta.source.id!)}`)}>
-                跳转到来源会话
+                {t('artifact.goToChat')}
               </Button>
             )}
-            <Popconfirm title="确认删除产物？" onConfirm={handleDelete}>
-              <Button type="danger" icon={<IconDeleteStroked />}>删除产物</Button>
+            <Popconfirm title={t('artifact.deleteConfirm')} onConfirm={handleDelete}>
+              <Button type="danger" icon={<IconDeleteStroked />}>{t('artifact.delete')}</Button>
             </Popconfirm>
           </div>
         </Card>

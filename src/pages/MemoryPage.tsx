@@ -171,7 +171,7 @@ export default function MemoryPage() {
               {dateStr ? formatDateLabel(dateStr) : file.name}
             </Text>
             {isToday && (
-              <Tag color="blue" size="small">今天</Tag>
+              <Tag color="blue" size="small">{t('common.today')}</Tag>
             )}
           </Space>
           <Space>
@@ -186,7 +186,7 @@ export default function MemoryPage() {
               </Text>
             )}
             {!isExpanded && !isLoadingContent && (
-              <Text type="tertiary" size="small">点击查看</Text>
+              <Text type="tertiary" size="small">{t('common.clickToView')}</Text>
             )}
             {isLoadingContent && (
               <Spin size="small" />
@@ -220,7 +220,7 @@ export default function MemoryPage() {
               borderTop: '1px solid var(--semi-color-border)',
             }}
           >
-            <Text type="tertiary">无内容</Text>
+            <Text type="tertiary">{t('common.noContent')}</Text>
           </div>
         )}
       </div>
@@ -241,7 +241,7 @@ export default function MemoryPage() {
           loading={loading}
           theme="outline"
         >
-          刷新
+          {t('common.refresh')}
         </Button>
       </div>
 
@@ -255,24 +255,24 @@ export default function MemoryPage() {
           backgroundColor: 'var(--semi-color-bg-1)',
         }}
       >
-        <Text weight={600} style={{ display: 'block', marginBottom: 12 }}>记忆概览</Text>
+        <Text weight={600} style={{ display: 'block', marginBottom: 12 }}>{t('memory.overview')}</Text>
         <div style={{ display: 'flex', gap: 32 }}>
           <div>
-            <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 4 }}>连接状态</Text>
+            <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 4 }}>{t('memory.connectionStatus')}</Text>
             <Tag color={isConnected ? 'green' : 'red'}>
-              {isConnected ? '已连接' : '未连接'}
+              {isConnected ? t('instance.statusConnected') : t('instance.statusDisconnected')}
             </Tag>
           </div>
           <div>
-            <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 4 }}>记忆文件</Text>
+            <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 4 }}>{t('memory.memoryFiles')}</Text>
             <Tag color={memoryFiles.length > 0 ? 'blue' : 'grey'}>
-              {memoryFiles.length} 个文件
+              {t('memory.nFiles', { count: memoryFiles.length })}
             </Tag>
           </div>
           <div>
-            <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 4 }}>今日记忆</Text>
+            <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 4 }}>{t('memory.todayMemory')}</Text>
             <Tag color={todayFiles.length > 0 ? 'green' : 'grey'}>
-              {todayFiles.length > 0 ? `${todayFiles.length} 条` : '无'}
+              {todayFiles.length > 0 ? t('memory.nEntries', { count: todayFiles.length }) : t('common.none')}
             </Tag>
           </div>
         </div>
@@ -281,19 +281,19 @@ export default function MemoryPage() {
       {/* ─── Loading ─── */}
       {loading && (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-          <Spin tip="加载记忆中…" />
+          <Spin tip={t('memory.loading')} />
         </div>
       )}
 
       {/* ─── No Connection ─── */}
       {!isConnected && !loading && (
-        <Empty description="未连接到 Gateway，无法读取记忆" style={{ marginTop: 48 }} />
+        <Empty description={t('memory.notConnected')} style={{ marginTop: 48 }} />
       )}
 
       {/* ─── No Memory Files ─── */}
       {isConnected && !loading && memoryFiles.length === 0 && (
         <Empty
-          description="尚无记忆文件，Agent 会在对话中自动生成记忆"
+          description={t('memory.noFiles')}
           style={{ marginTop: 48 }}
         />
       )}
@@ -303,7 +303,7 @@ export default function MemoryPage() {
         <div style={{ marginBottom: 24 }}>
           <Title heading={5} style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
             <IconCalendar />
-            今日记忆
+            {t('memory.todayMemory')}
             <Tag size="small" color="blue">{today}</Tag>
           </Title>
           {todayFiles.map((f) => renderMemoryEntry(f, true))}
@@ -315,7 +315,7 @@ export default function MemoryPage() {
         <div style={{ marginBottom: 24 }}>
           <Title heading={5} style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
             <IconCalendar />
-            昨日记忆
+            {t('memory.yesterdayMemory')}
             <Tag size="small">{yesterday}</Tag>
           </Title>
           {yesterdayFiles.map((f) => renderMemoryEntry(f, false))}
@@ -327,8 +327,8 @@ export default function MemoryPage() {
         <div style={{ marginBottom: 24 }}>
           <Title heading={5} style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
             <IconFile />
-            历史记忆
-            <Tag size="small">{olderFiles.length} 条</Tag>
+            {t('memory.historyMemory')}
+            <Tag size="small">{t('memory.nEntries', { count: olderFiles.length })}</Tag>
           </Title>
           {olderFiles.map((f) => renderMemoryEntry(f, false))}
         </div>

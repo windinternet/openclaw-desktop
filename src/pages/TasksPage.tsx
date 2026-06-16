@@ -1,4 +1,5 @@
 import { forwardRef, useImperativeHandle, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Table,
   Button,
@@ -78,6 +79,7 @@ export interface TasksPageHandle {
 }
 
 const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function TasksPage({ embedded = false }, ref) {
+  const { t } = useTranslation();
   const cronJobs = useStore((s) => s.cronJobs);
   const agents = useStore((s) => s.agents);
   const connectionStatus = useStore((s) => s.connectionStatus);
@@ -129,7 +131,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
   }), [fetchCronJobs]);
 
   const handleAdd = useCallback(async () => {
-    if (!scheduleDraft.trim()) { Toast.error('请输入 Cron 表达式'); return; }
+    if (!scheduleDraft.trim()) { Toast.error(t('tasks.cronRequired')); return; }
     const job: any = {
       name: titleDraft || '',
       prompt: promptDraft || undefined,
@@ -140,8 +142,8 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
         ? { mode: deliveryModeDraft as 'announce' | 'webhook', target: deliveryTargetDraft || undefined, to: deliveryToDraft || undefined }
         : { mode: 'none' as const },
     };
-    try { await createCronJob(job); Toast.success('定时任务已创建'); setAddModalVisible(false); } catch { Toast.error('创建失败'); }
-  }, [createCronJob, titleDraft, promptDraft, scheduleDraft, agentIdDraft, deliveryModeDraft, deliveryToDraft, deliveryTargetDraft]);
+    try { await createCronJob(job); Toast.success(t('tasks.created')); setAddModalVisible(false); } catch { Toast.error(t('tasks.createFailed')); }
+  }, [createCronJob, titleDraft, promptDraft, scheduleDraft, agentIdDraft, deliveryModeDraft, deliveryToDraft, deliveryTargetDraft, t]);
 
   const handleEdit = useCallback(async () => {
     if (!editJob) return;
@@ -155,16 +157,16 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
           ? { mode: deliveryModeDraft as 'announce' | 'webhook', target: deliveryTargetDraft || undefined, to: deliveryToDraft || undefined }
           : { mode: 'none' as const },
       } as any);
-      Toast.success('定时任务已更新');
+      Toast.success(t('tasks.updated'));
       setEditJob(null);
-    } catch { Toast.error('更新失败'); }
-  }, [editJob, updateCronJob, titleDraft, promptDraft, scheduleDraft, agentIdDraft, deliveryModeDraft, deliveryToDraft, deliveryTargetDraft]);
+    } catch { Toast.error(t('tasks.updateFailed')); }
+  }, [editJob, updateCronJob, titleDraft, promptDraft, scheduleDraft, agentIdDraft, deliveryModeDraft, deliveryToDraft, deliveryTargetDraft, t]);
 
   const handleMagicFill = useCallback(async () => {
     const st = useStore.getState();
     const client = st.activeClient?.getStatus() === 'connected' ? st.activeClient : null;
-    if (!promptDraft.trim()) { Toast.warning('请先填写任务内容'); return; }
-    if (!client || !st.currentInstanceId) { Toast.error('未连接到 Gateway'); return; }
+    if (!promptDraft.trim()) { Toast.warning(t('tasks.fillContent')); return; }
+    if (!client || !st.currentInstanceId) { Toast.error(t('tasks.notConnected')); return; }
     const instanceId = st.currentInstanceId;
 
     setMagicLoading(true);
@@ -172,7 +174,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
       const run = createAiActionRun({ type: 'cron-task-parser', sourcePage: 'tasks', instanceId, input: promptDraft });
       await upsertAiActionRun(instanceId, run);
       const executed = await executeAiActionRunWithGateway(client, run, {
-        title: '解析定时任务',
+        title: t('tasks.parseTitle'),
         prompt: 'Extract cron job params from: ' + promptDraft + '\nReturn ONLY inside \x60\x60\x60ai-action\n{"kind":"completed","summary":"...","result":{"cronPrompt":"...","schedule":"cron expr","deliveryMode":"announce|none|webhook","deliverySessionKey":""}}\n\x60\x60\x60',
       });
 
@@ -184,14 +186,14 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
         await new Promise((r) => setTimeout(r, 2000));
       }
 
-      if (synced.status !== 'done') { Toast.error('AI 解析未完成'); return; }
+      if (synced.status !== 'done') { Toast.error(t('tasks.aiParseNotDone')); return; }
 
       // Parse
       const text = synced.lastAssistantResponse ?? '';
       let obj: any = null;
       const blocks = Array.from(text.matchAll(/```(?:json|ai-action)\s*([\s\S]*?)```/gi));
       for (let i = blocks.length - 1; i >= 0 && !obj; i--) { try { const p = JSON.parse(blocks[i][1].trim()); obj = p?.result ?? p; } catch {} }
-      if (!obj) { Toast.error('解析失败'); return; }
+      if (!obj) { Toast.error(t('tasks.parseFailed')); return; }
 
       // Apply to BOTH state and form
       if (typeof obj.title === 'string' && obj.title) setTitleDraft(obj.title);
@@ -208,27 +210,27 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
       if (obj.deliverySessionKey) fields.deliveryTo = obj.deliverySessionKey;
       realApiRef.current?.setValues(fields);
 
-      Toast.success('已填写任务内容');
-    } catch (err) { console.error('[magicFill]', err); Toast.error('解析出错'); }
+      Toast.success(t('tasks.contentFilled'));
+    } catch (err) { console.error('[magicFill]', err); Toast.error(t('tasks.parseError')); }
     finally { setMagicLoading(false); }
-  }, [promptDraft]);
+  }, [promptDraft, t]);
 
   const handleDelete = useCallback(
     (job: CronJob) => {
       Modal.confirm({
-        title: '确认删除',
-        content: `确定要删除定时任务「${job.name || job.title || formatCronSchedule(job.schedule)}」吗？`,
+        title: t('tasks.deleteConfirm'),
+        content: t('tasks.deleteConfirmContent', { name: job.name || job.title || formatCronSchedule(job.schedule) }),
         onOk: async () => {
           try {
             await removeCronJob(job.id);
-            Toast.success('定时任务已删除');
+            Toast.success(t('tasks.deleted'));
           } catch {
-            Toast.error('删除失败');
+            Toast.error(t('tasks.deleteFailed'));
           }
         },
       });
     },
-    [removeCronJob],
+    [removeCronJob, t],
   );
 
   const handleToggle = useCallback(
@@ -236,10 +238,10 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
       try {
         await toggleCronJob(job.id, checked);
       } catch {
-        Toast.error('操作失败');
+        Toast.error(t('tasks.operationFailed'));
       }
     },
-    [toggleCronJob],
+    [toggleCronJob, t],
   );
 
   const handleRunNow = useCallback(
@@ -248,9 +250,9 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
       setRunningJobs((prev) => new Set(prev).add(job.id));
       try {
         const result = await runCronJob(job.id);
-        Toast.success(`任务已触发，运行 ID: ${result.runId}`);
+        Toast.success(t('tasks.triggered', { runId: result.runId }));
       } catch {
-        Toast.error('运行失败');
+        Toast.error(t('tasks.runFailed'));
       } finally {
         setRunningJobs((prev) => {
           const next = new Set(prev);
@@ -259,7 +261,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
         });
       }
     },
-    [runCronJob, runningJobs],
+    [runCronJob, runningJobs, t],
   );
 
   const handleExpand = useCallback(
@@ -277,18 +279,18 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
 
   const columns = useMemo(() => [
     {
-      title: '名称',
+      title: t('tasks.name'),
       dataIndex: 'name',
       key: 'name',
       width: 200,
       render: (_: unknown, record: CronJob) => (
         <Text style={{ fontWeight: (record.name || record.title) ? 500 : 400 }}>
-          {record.name || record.title || '(未命名)'}
+          {record.name || record.title || t('tasks.unnamed')}
         </Text>
       ),
     },
     {
-      title: '调度',
+      title: t('tasks.schedule'),
       dataIndex: 'schedule',
       key: 'schedule',
       width: 160,
@@ -299,23 +301,23 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
       ),
     },
     {
-      title: '状态',
+      title: t('tasks.status'),
       dataIndex: 'enabled',
       key: 'enabled',
       width: 100,
       render: (val: boolean) =>
         val ? (
           <Tag color="green" type="light">
-            已启用
+            {t('tasks.enabled')}
           </Tag>
         ) : (
           <Tag color="grey" type="light">
-            已禁用
+            {t('tasks.disabled')}
           </Tag>
         ),
     },
     {
-      title: 'Agent',
+      title: t('tasks.agent'),
       dataIndex: 'agentId',
       key: 'agentId',
       width: 140,
@@ -326,7 +328,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
       },
     },
     {
-      title: '上次运行',
+      title: t('tasks.lastRun'),
       key: 'lastRun',
       width: 180,
       render: (_: unknown, record: CronJob) => {
@@ -343,7 +345,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
       },
     },
     {
-      title: '下次运行',
+      title: t('tasks.nextRun'),
       key: 'nextRun',
       width: 150,
       render: (_: unknown, record: CronJob) => {
@@ -356,19 +358,19 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
       },
     },
     {
-      title: '操作',
+      title: t('tasks.actions'),
       key: 'actions',
       width: 220,
       render: (_: unknown, record: CronJob) => (
         <Space>
-          <Tooltip content={record.enabled ? '禁用' : '启用'}>
+          <Tooltip content={record.enabled ? t('tasks.disable') : t('tasks.enable')}>
             <Switch
               size="small"
               checked={record.enabled}
               onChange={(v) => handleToggle(record, v)}
             />
           </Tooltip>
-          <Tooltip content="立即运行">
+          <Tooltip content={t('tasks.runNow')}>
             <Button
               icon={<IconPlayCircle />}
               size="small"
@@ -381,7 +383,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
               }}
             />
           </Tooltip>
-          <Tooltip content="编辑">
+          <Tooltip content={t('tasks.edit')}>
             <Button
               icon={<IconEdit />}
               size="small"
@@ -392,7 +394,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
               }}
             />
           </Tooltip>
-          <Tooltip content="删除">
+          <Tooltip content={t('tasks.delete')}>
             <Button
               icon={<IconDelete />}
               size="small"
@@ -407,7 +409,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
         </Space>
       ),
     },
-  ], [agents, handleToggle, handleRunNow, runningJobs, handleDelete]);
+  ], [agents, handleToggle, handleRunNow, runningJobs, handleDelete, t]);
 
   const filteredJobs = useMemo(() => {
     return cronJobs.filter((job) => {
@@ -433,43 +435,43 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
     <>
       <Form.Input
         field="name"
-        label="名称"
-        placeholder="定时任务名称"
+        label={t('tasks.name')}
+        placeholder={t('tasks.namePlaceholder')}
         onChange={(v: string) => setTitleDraft(v)}
         rules={[{ required: false }]}
       />
       <Form.TextArea
         field="prompt"
-        label={<span style={{ fontWeight: 600, fontSize: 15 }}>⭐ 任务内容</span>}
-        placeholder="例如：每天上午9点在团队频道发送晨会摘要…"
-        rules={[{ required: true, message: '请填写任务内容' }]}
+        label={<span style={{ fontWeight: 600, fontSize: 15 }}>⭐ {t('tasks.content')}</span>}
+        placeholder={t('tasks.contentPlaceholder')}
+        rules={[{ required: true, message: t('tasks.contentRequired') }]}
         style={{ minHeight: 120, fontSize: 14 }}
         onChange={(v: string) => setPromptDraft(v)}
         extraText={
           <Space>
-            <Text type="tertiary" size="small">定时触发时发送给 Agent 的指令</Text>
+            <Text type="tertiary" size="small">{t('tasks.contentDesc')}</Text>
             <Button icon={<IconBolt />} size="small" type="primary" theme="light" loading={magicLoading} onClick={handleMagicFill}>
-              {magicLoading ? 'AI 解析中…' : '✨ 魔法填充'}
+              {magicLoading ? t('tasks.aiParsing') : '✨ ' + t('tasks.magicFill')}
             </Button>
           </Space>
         }
       />
       <Form.Input
         field="schedule"
-        label="Cron 表达式"
-        placeholder="例如: 0 */6 * * *"
+        label={t('tasks.cronExpression')}
+        placeholder={t('tasks.cronPlaceholder')}
         onChange={(v: string) => setScheduleDraft(v)}
-        rules={[{ required: true, message: '请输入 Cron 表达式' }]}
+        rules={[{ required: true, message: t('tasks.cronRequired') }]}
         extraText={
           <Text type="tertiary" size="small">
-            格式: 分 时 日 月 周。示例: "0 */6 * * *" (每6小时), "30 9 * * 1-5" (工作日9:30)
+            {t('tasks.cronHint')}
           </Text>
         }
       />
       <Form.Select
         field="agentId"
-        label="Agent"
-        placeholder="选择 Agent（可选）"
+        label={t('tasks.agent')}
+        placeholder={t('tasks.agentPlaceholder')}
         onChange={(v: any) => setAgentIdDraft(v || undefined)}
         style={{ width: '100%' }}
         showClear
@@ -482,30 +484,30 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
       </Form.Select>
       <Form.Select
         field="deliveryMode"
-        label="投递方式"
-        placeholder="选择投递方式"
+        label={t('tasks.deliveryMode')}
+        placeholder={t('tasks.deliveryModePlaceholder')}
         style={{ width: '100%' }}
         onChange={(v: any) => setDeliveryModeDraft(String(v ?? 'none'))}
       >
-        <Form.Select.Option value="none">无</Form.Select.Option>
-        <Form.Select.Option value="announce">Announce（发送到聊天）</Form.Select.Option>
-        <Form.Select.Option value="webhook">Webhook（发送到 URL）</Form.Select.Option>
+        <Form.Select.Option value="none">{t('common.none')}</Form.Select.Option>
+        <Form.Select.Option value="announce">{t('tasks.deliveryAnnounce')}</Form.Select.Option>
+        <Form.Select.Option value="webhook">{t('tasks.deliveryWebhook')}</Form.Select.Option>
       </Form.Select>
 
       <Form.Select
         field="deliveryTo"
-        label="目标会话"
-        placeholder="选择要投递到的会话"
+        label={t('tasks.targetSession')}
+        placeholder={t('tasks.targetSessionPlaceholder')}
         style={{ width: '100%' }}
         onChange={(v: any) => setDeliveryToDraft(String(v ?? ''))}
         showClear
       >
         {sessions.filter((s: any) => s.key || s.sessionKey).map((s: any) => (
           <Form.Select.Option key={s.key || s.sessionKey || ''} value={s.key || s.sessionKey || ''}>
-            <Tooltip content={<div style={{ fontSize: 12, lineHeight: 1.6 }}><div>Key: {s.key || s.sessionKey || '-'}</div><div>Agent: {s.agentId || '-'}</div><div>状态: {s.status || '-'}</div></div>}>
+            <Tooltip content={<div style={{ fontSize: 12, lineHeight: 1.6 }}><div>Key: {s.key || s.sessionKey || '-'}</div><div>Agent: {s.agentId || '-'}</div><div>Status: {s.status || '-'}</div></div>}>
               <Space>
                 <IconComment style={{ color: 'var(--semi-color-primary)' }} />
-                <span>{s.title || s.label || s.sessionKey || s.key || '未命名会话'}</span>
+                <span>{s.title || s.label || s.sessionKey || s.key || t('tasks.unnamedSession')}</span>
                 <Tag size="small" color="blue" type="light">{s.status || 'active'}</Tag>
               </Space>
             </Tooltip>
@@ -515,13 +517,13 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
 
       <Form.Input
         field="deliveryTarget"
-        label="Webhook URL"
-        placeholder="Webhook 模式下的回调 URL"
+        label={t('tasks.webhookUrl')}
+        placeholder={t('tasks.webhookUrlPlaceholder')}
         onChange={(v: string) => setDeliveryTargetDraft(v)}
         rules={[{ required: false }]}
       />
       {!isEdit && (
-        <Form.Switch field="enabled" label="创建后启用" initValue={true} />
+        <Form.Switch field="enabled" label={t('tasks.enableOnCreate')} initValue={true} />
       )}
     </>
   );
@@ -556,9 +558,9 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
             style={{ width: 120 }}
             size="small"
           >
-            <Select.Option value="all">全部状态</Select.Option>
-            <Select.Option value="enabled">已启用</Select.Option>
-            <Select.Option value="disabled">已禁用</Select.Option>
+            <Select.Option value="all">{t('tasks.filterAllStatus')}</Select.Option>
+            <Select.Option value="enabled">{t('tasks.enabled')}</Select.Option>
+            <Select.Option value="disabled">{t('tasks.disabled')}</Select.Option>
           </Select>
           <Select
             value={scheduleKindFilter}
@@ -566,22 +568,22 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
             style={{ width: 120 }}
             size="small"
           >
-            <Select.Option value="all">全部类型</Select.Option>
+            <Select.Option value="all">{t('tasks.filterAllTypes')}</Select.Option>
             <Select.Option value="cron">Cron</Select.Option>
-            <Select.Option value="at">一次性</Select.Option>
-            <Select.Option value="every">间隔</Select.Option>
+            <Select.Option value="at">{t('tasks.typeAt')}</Select.Option>
+            <Select.Option value="every">{t('tasks.typeEvery')}</Select.Option>
           </Select>
           <Input
             value={searchQuery}
             onChange={setSearchQuery}
-            placeholder="搜索名称或调度…"
+            placeholder={t('tasks.searchPlaceholder')}
             prefix={<IconSearch />}
             showClear
             size="small"
             style={{ width: 200 }}
           />
           <Text type="tertiary" size="small" style={{ marginLeft: 'auto' }}>
-            {filteredJobs.length} 个任务
+            {t('tasks.count', { count: filteredJobs.length })}
           </Text>
         </div>
         {connectionStatus !== 'connected' ? (
@@ -593,7 +595,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
               height: '100%',
             }}
           >
-            <Empty description="请先连接到 Gateway" />
+            <Empty description={t('tasks.notConnected')} />
           </div>
         ) : (
           <Table
@@ -602,8 +604,8 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
             rowKey="id"
             loading={loading}
             empty={
-              <Empty description="暂无定时任务" title="⏰">
-                <Text type="tertiary">点击「添加任务」创建你的第一个定时任务</Text>
+              <Empty description={t('tasks.empty')} title="⏰">
+                <Text type="tertiary">{t('tasks.emptyDesc')}</Text>
               </Empty>
             }
             expandedRowRender={(record, _index, _expanded) => {
@@ -611,7 +613,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
               const runs = runHistory ? (runHistory as Record<string, CronRun[]>)[row.id] : undefined;
               const runColumns = [
                 {
-                  title: '运行 ID',
+                  title: t('tasks.runId'),
                   dataIndex: 'runId',
                   key: 'runId',
                   width: 180,
@@ -622,7 +624,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
                   ),
                 },
                 {
-                  title: '开始时间',
+                  title: t('tasks.startTime'),
                   dataIndex: 'startedAt',
                   key: 'startedAt',
                   width: 160,
@@ -633,7 +635,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
                   ),
                 },
                 {
-                  title: '结束时间',
+                  title: t('tasks.endTime'),
                   dataIndex: 'endedAt',
                   key: 'endedAt',
                   width: 160,
@@ -644,7 +646,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
                   ),
                 },
                 {
-                  title: '耗时',
+                  title: t('tasks.duration'),
                   key: 'duration',
                   width: 80,
                   render: (_: unknown, r: CronRun) =>
@@ -653,14 +655,14 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
                       : '-',
                 },
                 {
-                  title: '状态',
+                  title: t('tasks.status'),
                   dataIndex: 'status',
                   key: 'status',
                   width: 120,
                   render: (val: string) => statusTag(val),
                 },
                 {
-                  title: '摘要',
+                  title: t('tasks.summary'),
                   dataIndex: 'summary',
                   key: 'summary',
                   render: (val: string | undefined) => (
@@ -686,7 +688,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
                     size="small"
                     style={{ marginBottom: 8, display: 'block' }}
                   >
-                    运行历史
+                    {t('tasks.runHistory')}
                   </Text>
                   <Table
                     dataSource={runs || []}
@@ -694,7 +696,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
                     rowKey="runId"
                     size="small"
                     pagination={{ pageSize: 5 }}
-                    empty={<Empty description="暂无运行记录" />}
+                    empty={<Empty description={t('tasks.noRunRecords')} />}
                   />
                 </div>
               );
@@ -710,7 +712,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
 
       {/* Add Modal */}
       <Modal
-        title="添加定时任务"
+        title={t('tasks.addTitle')}
         visible={addModalVisible}
         onCancel={() => setAddModalVisible(false)}
         footer={null}
@@ -727,9 +729,9 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
               marginTop: 16,
             }}
           >
-            <Button onClick={() => setAddModalVisible(false)}>取消</Button>
+            <Button onClick={() => setAddModalVisible(false)}>{t('common.cancel')}</Button>
             <Button type="primary" onClick={handleAdd}>
-              保存
+              {t('common.save')}
             </Button>
           </div>
         </Form>
@@ -737,7 +739,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
 
       {/* Edit Modal */}
       <Modal
-        title="编辑定时任务"
+        title={t('tasks.editTitle')}
         visible={!!editJob}
         onCancel={() => setEditJob(null)}
         footer={null}
@@ -766,9 +768,9 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
                 marginTop: 16,
               }}
             >
-              <Button onClick={() => setEditJob(null)}>取消</Button>
+              <Button onClick={() => setEditJob(null)}>{t('common.cancel')}</Button>
               <Button type="primary" onClick={handleEdit}>
-                保存
+                {t('common.save')}
               </Button>
             </div>
           </Form>
@@ -781,4 +783,3 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
 TasksPage.displayName = 'TasksPage';
 
 export default TasksPage;
-

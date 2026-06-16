@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Card,
@@ -61,50 +62,32 @@ function statusColor(status: AiActionRunStatus): 'blue' | 'green' | 'orange' | '
   }
 }
 
-function statusLabel(status: AiActionRunStatus): string {
-  switch (status) {
-    case 'draft':
-      return '草稿';
-    case 'planning':
-      return '规划中';
-    case 'awaiting_approval':
-      return '待审批';
-    case 'running':
-      return '执行中';
-    case 'done':
-      return '完成';
-    case 'failed':
-      return '失败';
-    case 'cancelled':
-      return '已取消';
-    default:
-      return status;
-  }
-}
+const STATUS_LABEL_KEYS: Record<AiActionRunStatus, string> = {
+  draft: 'actions.statusDraft',
+  planning: 'actions.statusPlanning',
+  awaiting_approval: 'actions.statusAwaitingApproval',
+  running: 'actions.statusRunning',
+  done: 'actions.statusDone',
+  failed: 'actions.statusFailed',
+  cancelled: 'actions.statusCancelled',
+};
 
-function modeLabel(mode: AiActionRun['executionMode']): string {
-  switch (mode) {
-    case 'isolated-session':
-      return '隔离执行会话';
-    case 'domain-thread':
-      return '领域线程';
-    case 'subagent-tree':
-      return '子 Agent 树';
-    case 'local-bridge':
-      return '本地能力桥';
-    default:
-      return mode;
-  }
-}
+const MODE_LABEL_KEYS: Record<NonNullable<AiActionRun['executionMode']>, string> = {
+  'isolated-session': 'actions.modeIsolated',
+  'domain-thread': 'actions.modeDomainThread',
+  'subagent-tree': 'actions.modeSubagentTree',
+  'local-bridge': 'actions.modeLocalBridge',
+};
 
-function runTitle(run: AiActionRun): string {
-  if (run.type === 'agent_team_compose') return 'Agent 团队编排';
-  if (run.type === 'gateway_agent_create') return '创建 Gateway Agent';
-  if (run.type === 'desktop_bridge_register') return '注册 Desktop Bridge';
-  return run.type;
-}
+const RUN_TITLE_KEYS: Record<string, string> = {
+  agent_team_compose: 'actions.typeTeamCompose',
+  gateway_agent_create: 'actions.typeGatewayCreate',
+  desktop_bridge_register: 'actions.typeDesktopBridge',
+};
 
 export default function ActionCenterPage() {
+  const { t } = useTranslation();
+
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const activeClient = useStore((s) => s.activeClient);
   const connectionStatus = useStore((s) => s.connectionStatus);
@@ -120,6 +103,22 @@ export default function ActionCenterPage() {
     () => runs.find((run) => run.id === selectedRunId) ?? runs[0] ?? null,
     [runs, selectedRunId],
   );
+
+  const statusLabel = (status: AiActionRunStatus): string => {
+    const key = STATUS_LABEL_KEYS[status];
+    return key ? t(key) : status;
+  };
+
+  const modeLabel = (mode: AiActionRun['executionMode']): string => {
+    if (!mode) return mode;
+    const key = MODE_LABEL_KEYS[mode];
+    return key ? t(key) : mode;
+  };
+
+  const runTitle = (run: AiActionRun): string => {
+    const key = RUN_TITLE_KEYS[run.type];
+    return key ? t(key) : run.type;
+  };
 
   const loadRuns = useCallback(async () => {
     if (!currentInstanceId) {
@@ -147,23 +146,23 @@ export default function ActionCenterPage() {
   const clearRuns = useCallback(() => {
     if (!currentInstanceId || runs.length === 0) return;
     Modal.confirm({
-      title: '清空动作记录',
-      content: '只会清空 Desktop 本地 ActionRun 索引，不会删除 OpenClaw Gateway 会话或文件。',
-      okText: '清空',
-      cancelText: '取消',
+      title: t('actions.clearTitle'),
+      content: t('actions.clearDesc'),
+      okText: t('actions.clear'),
+      cancelText: t('common.cancel'),
       onOk: () => {
         setRuns([]);
         setSelectedRunId(null);
         void saveAiActionRuns(currentInstanceId, []);
       },
     });
-  }, [currentInstanceId, runs.length]);
+  }, [currentInstanceId, runs.length, t]);
 
   const handleApprovalDecision = useCallback(
     async (approval: AiActionApproval, decision: 'approved' | 'rejected') => {
       if (!selectedRun || !currentInstanceId) return;
       if (!activeClient || connectionStatus !== 'connected') {
-        Toast.error('未连接 Gateway，无法提交审批决定');
+        Toast.error(t('actions.notConnected'));
         return;
       }
 
@@ -172,20 +171,20 @@ export default function ActionCenterPage() {
         const updated = await resolveAiActionApprovalWithGateway(activeClient, selectedRun, approval.id, decision);
         await upsertAiActionRun(currentInstanceId, updated);
         setRuns((current) => current.map((run) => (run.id === updated.id ? updated : run)));
-        Toast.success(decision === 'approved' ? '已批准，AI 将继续执行' : '已拒绝，动作已取消');
+        Toast.success(decision === 'approved' ? t('actions.approvedContinue') : t('actions.rejectedCancelled'));
       } catch (err) {
-        Toast.error(err instanceof Error ? err.message : '提交审批决定失败');
+        Toast.error(err instanceof Error ? err.message : t('actions.decisionFailed'));
       } finally {
         setDecisionLoadingId(null);
       }
     },
-    [activeClient, connectionStatus, currentInstanceId, selectedRun],
+    [activeClient, connectionStatus, currentInstanceId, selectedRun, t],
   );
 
   const handleResync = useCallback(
     async (run: AiActionRun) => {
       if (!currentInstanceId || !activeClient || connectionStatus !== 'connected') {
-        Toast.error('未连接 Gateway，无法重新同步');
+        Toast.error(t('actions.notConnectedResync'));
         return;
       }
       setResyncLoadingId(run.id);
@@ -194,36 +193,36 @@ export default function ActionCenterPage() {
         setRuns((current) => current.map((r) => (r.id === synced.id ? synced : r)));
         Toast.success(
           synced.status === 'done' || synced.status === 'failed' || synced.status === 'cancelled'
-            ? '已重新同步'
-            : '已刷新状态',
+            ? t('actions.resynced')
+            : t('actions.statusRefreshed'),
         );
       } catch (err) {
-        Toast.error(err instanceof Error ? err.message : '重新同步失败');
+        Toast.error(err instanceof Error ? err.message : t('actions.resyncFailed'));
       } finally {
         setResyncLoadingId(null);
       }
     },
-    [activeClient, connectionStatus, currentInstanceId],
+    [activeClient, connectionStatus, currentInstanceId, t],
   );
 
   const handleResume = useCallback(
     async (run: AiActionRun) => {
       if (!currentInstanceId || !activeClient || connectionStatus !== 'connected') {
-        Toast.error('未连接 Gateway，无法追问继续');
+        Toast.error(t('actions.notConnectedResume'));
         return;
       }
       setResumeLoadingId(run.id);
       try {
         const resumed = await resumeStalledAiActionRun(currentInstanceId, activeClient, run);
         setRuns((current) => current.map((r) => (r.id === resumed.id ? resumed : r)));
-        Toast.success('已发送追问消息，Gateway 将继续执行');
+        Toast.success(t('actions.resumed'));
       } catch (err) {
-        Toast.error(err instanceof Error ? err.message : '追问继续失败');
+        Toast.error(err instanceof Error ? err.message : t('actions.resumeFailed'));
       } finally {
         setResumeLoadingId(null);
       }
     },
-    [activeClient, connectionStatus, currentInstanceId],
+    [activeClient, connectionStatus, currentInstanceId, t],
   );
 
   return (
@@ -239,29 +238,29 @@ export default function ActionCenterPage() {
       >
         <div>
           <Title heading={3} style={{ margin: 0 }}>
-            AI Action Center
+            {t('actions.title')}
           </Title>
-          <Text type="tertiary">自然语言办事、计划审批与 OpenClaw 执行会话映射</Text>
+          <Text type="tertiary">{t('actions.subtitle')}</Text>
         </div>
         <Space>
           <Button icon={<IconRefresh />} onClick={loadRuns} loading={loading}>
-            刷新
+            {t('common.refresh')}
           </Button>
           <Button icon={<IconDelete />} type="danger" onClick={clearRuns} disabled={runs.length === 0}>
-            清空记录
+            {t('actions.clearRecords')}
           </Button>
         </Space>
       </div>
 
       {loading ? (
         <div style={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Spin size="large" tip="加载动作记录..." />
+          <Spin size="large" tip={t('actions.loading')} />
         </div>
       ) : runs.length === 0 ? (
         <div style={{ height: 320, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Empty description="暂无动作记录">
+          <Empty description={t('actions.empty')}>
             <Text type="tertiary" size="small">
-              从团队页的自然语言编排开始，会在这里看到 ActionRun。
+              {t('actions.emptyDesc')}
             </Text>
           </Empty>
         </div>
@@ -327,7 +326,7 @@ export default function ActionCenterPage() {
                           loading={resyncLoadingId === selectedRun.id}
                           onClick={() => handleResync(selectedRun)}
                         >
-                          {selectedRun.status === 'running' || selectedRun.status === 'awaiting_approval' ? '刷新状态' : '重新同步'}
+                          {selectedRun.status === 'running' || selectedRun.status === 'awaiting_approval' ? t('actions.refreshState') : t('actions.resync')}
                         </Button>
                         {(selectedRun.status === 'running' || selectedRun.status === 'awaiting_approval') && (
                           <Button
@@ -337,7 +336,7 @@ export default function ActionCenterPage() {
                             loading={resumeLoadingId === selectedRun.id}
                             onClick={() => handleResume(selectedRun)}
                           >
-                            追问继续
+                            {t('actions.resume')}
                           </Button>
                         )}
                       </>
@@ -349,22 +348,22 @@ export default function ActionCenterPage() {
                   row
                   size="small"
                   data={[
-                    { key: '动作类型', value: selectedRun.type },
-                    { key: '来源页面', value: selectedRun.sourcePage },
-                    { key: 'Agent', value: selectedRun.agentId },
-                    { key: '目标 Agent', value: selectedRun.targetAgentId || '—' },
-                    { key: '实际 Gateway Agent', value: selectedRun.gatewayAgentId || '—' },
-                    { key: '执行模式', value: modeLabel(selectedRun.executionMode) },
-                    { key: 'Gateway Session', value: selectedRun.gatewaySessionKey || '—' },
-                    { key: 'Gateway Run', value: selectedRun.gatewayRunId || '—' },
-                    { key: '创建时间', value: formatTime(selectedRun.createdAt) },
-                    { key: '更新时间', value: formatTime(selectedRun.updatedAt) },
+                    { key: t('actions.fieldType'), value: selectedRun.type },
+                    { key: t('actions.fieldSourcePage'), value: selectedRun.sourcePage },
+                    { key: t('actions.fieldAgent'), value: selectedRun.agentId },
+                    { key: t('actions.fieldTargetAgent'), value: selectedRun.targetAgentId || '—' },
+                    { key: t('actions.fieldGatewayAgent'), value: selectedRun.gatewayAgentId || '—' },
+                    { key: t('actions.fieldExecutionMode'), value: modeLabel(selectedRun.executionMode) },
+                    { key: t('actions.fieldGatewaySession'), value: selectedRun.gatewaySessionKey || '—' },
+                    { key: t('actions.fieldGatewayRun'), value: selectedRun.gatewayRunId || '—' },
+                    { key: t('actions.fieldCreatedAt'), value: formatTime(selectedRun.createdAt) },
+                    { key: t('actions.fieldUpdatedAt'), value: formatTime(selectedRun.updatedAt) },
                   ]}
                 />
 
                 <div style={PANEL_STYLE}>
                   <div style={{ padding: 14 }}>
-                    <Text strong>用户意图</Text>
+                    <Text strong>{t('actions.userIntent')}</Text>
                     <Text style={{ display: 'block', marginTop: 8, whiteSpace: 'pre-wrap' }}>{selectedRun.input}</Text>
                   </div>
                 </div>
@@ -372,7 +371,7 @@ export default function ActionCenterPage() {
                 {selectedRun.plan && (
                   <div style={PANEL_STYLE}>
                     <div style={{ padding: 14 }}>
-                      <Text strong>执行计划</Text>
+                      <Text strong>{t('actions.plan')}</Text>
                       <MarkdownView content={selectedRun.plan} />
                     </div>
                   </div>
@@ -380,8 +379,8 @@ export default function ActionCenterPage() {
 
                 <div style={PANEL_STYLE}>
                   <div style={{ padding: 14 }}>
-                    <Text strong>执行结果</Text>
-                    <MarkdownView content={selectedRun.resultSummary || '等待 Gateway 执行结果。'} />
+                    <Text strong>{t('actions.result')}</Text>
+                    <MarkdownView content={selectedRun.resultSummary || t('actions.waitingForResult')} />
                     {selectedRun.lastAssistantResponse && (
                       <Collapse
                         className="action-raw-response-collapse"
@@ -389,7 +388,7 @@ export default function ActionCenterPage() {
                         keepDOM={false}
                         lazyRender
                       >
-                        <Collapse.Panel itemKey="raw-response" header="查看原始响应">
+                        <Collapse.Panel itemKey="raw-response" header={t('actions.viewRaw')}>
                           <div className="action-raw-response">
                             <MarkdownView content={selectedRun.lastAssistantResponse} showProtocolBlocks />
                           </div>
@@ -402,7 +401,7 @@ export default function ActionCenterPage() {
                 {selectedRun.error && (
                   <div style={PANEL_STYLE}>
                     <div style={{ padding: 14 }}>
-                      <Text strong>错误</Text>
+                      <Text strong>{t('actions.error')}</Text>
                       <MarkdownView content={selectedRun.error} />
                     </div>
                   </div>
@@ -411,7 +410,7 @@ export default function ActionCenterPage() {
                 {(selectedRun.approvals?.length ?? 0) > 0 && (
                   <div style={PANEL_STYLE}>
                     <div style={{ padding: 14, display: 'grid', gap: 12 }}>
-                      <Text strong>审批</Text>
+                      <Text strong>{t('actions.approval')}</Text>
                       {selectedRun.approvals?.map((approval) => (
                         <div
                           key={approval.id}
@@ -432,7 +431,7 @@ export default function ActionCenterPage() {
                                   approval.risk === 'high' ? 'red' : approval.risk === 'medium' ? 'orange' : 'blue'
                                 }
                               >
-                                {approval.risk === 'high' ? '高风险' : approval.risk === 'medium' ? '中风险' : '低风险'}
+                                {approval.risk === 'high' ? t('auth.highRisk') : approval.risk === 'medium' ? t('auth.medRisk') : t('auth.lowRisk')}
                               </Tag>
                               <Tag
                                 color={
@@ -444,10 +443,10 @@ export default function ActionCenterPage() {
                                 }
                               >
                                 {approval.status === 'pending'
-                                  ? '待审批'
+                                  ? t('actions.approvalPending')
                                   : approval.status === 'approved'
-                                    ? '已批准'
-                                    : '已拒绝'}
+                                    ? t('actions.approvalApproved')
+                                    : t('actions.approvalRejected')}
                               </Tag>
                             </Space>
                           </div>
@@ -463,7 +462,7 @@ export default function ActionCenterPage() {
                                 loading={decisionLoadingId === approval.id}
                                 onClick={() => handleApprovalDecision(approval, 'approved')}
                               >
-                                批准并继续
+                                {t('actions.approveContinue')}
                               </Button>
                               <Button
                                 icon={<IconClose />}
@@ -471,7 +470,7 @@ export default function ActionCenterPage() {
                                 loading={decisionLoadingId === approval.id}
                                 onClick={() => handleApprovalDecision(approval, 'rejected')}
                               >
-                                拒绝
+                                {t('auth.deny')}
                               </Button>
                             </Space>
                           )}
@@ -482,7 +481,7 @@ export default function ActionCenterPage() {
                 )}
               </div>
             ) : (
-              <Empty description="请选择动作记录" />
+              <Empty description={t('actions.selectRecord')} />
             )}
           </Card>
         </div>

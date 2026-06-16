@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Empty, Modal, RadioGroup, Space, Spin, Tag, TextArea, Toast, Typography } from '@douyinfe/semi-ui';
 import { IconFile, IconRefresh, IconSave } from '@douyinfe/semi-icons';
+import { useTranslation } from 'react-i18next';
 import MarkdownView from './MarkdownView';
 import {
   fetchGatewayAgentFileContent,
@@ -85,6 +86,7 @@ export default function AgentFilesPanel({
   client: GatewayAgentsClient | null;
   isConnected: boolean;
 }) {
+  const { t } = useTranslation();
   const [files, setFiles] = useState<WorkspaceFile[]>([]);
   const [selectedFile, setSelectedFile] = useState<WorkspaceFile | null>(null);
   const [fileContent, setFileContent] = useState('');
@@ -101,7 +103,7 @@ export default function AgentFilesPanel({
     async (file: WorkspaceFile) => {
       if (!agentId || !client) return;
       if (!isTextFile(file.name)) {
-        Toast.warning('仅支持查看文本文件');
+        Toast.warning(t('agentFiles.textOnly'));
         return;
       }
       setSelectedFile(file);
@@ -115,12 +117,12 @@ export default function AgentFilesPanel({
         setFileDraft(content);
         setMode(isMarkdownAgentFile(file.name) ? 'preview' : 'edit');
       } catch (err) {
-        Toast.error(err instanceof Error ? err.message : '读取文件失败');
+        Toast.error(err instanceof Error ? err.message : t('agentFiles.readFailed'));
       } finally {
         setContentLoading(false);
       }
     },
-    [agentId, client],
+    [agentId, client, t],
   );
 
   const loadFiles = useCallback(async (preferredName?: string) => {
@@ -141,11 +143,11 @@ export default function AgentFilesPanel({
         setFileDraft('');
       }
     } catch (err) {
-      Toast.error(err instanceof Error ? err.message : '读取 Agent 文件列表失败');
+      Toast.error(err instanceof Error ? err.message : t('agentFiles.listFailed'));
     } finally {
       setFilesLoading(false);
     }
-  }, [agentId, client, isConnected, readFile]);
+  }, [agentId, client, isConnected, readFile, t]);
 
   useEffect(() => {
     if (agentId && client && isConnected) {
@@ -163,14 +165,14 @@ export default function AgentFilesPanel({
         return;
       }
       Modal.confirm({
-        title: '放弃未保存的修改？',
-        content: `切换到 ${file.name} 将丢失当前文件的未保存修改。`,
-        okText: '放弃并切换',
-        cancelText: '继续编辑',
+        title: t('agentFiles.discardTitle'),
+        content: t('agentFiles.discardDesc', { name: file.name }),
+        okText: t('agentFiles.discardAndSwitch'),
+        cancelText: t('agentFiles.continueEditing'),
         onOk: () => readFile(file),
       });
     },
-    [dirty, readFile, selectedFile?.name],
+    [dirty, readFile, selectedFile?.name, t],
   );
 
   const handleRefresh = useCallback(() => {
@@ -179,13 +181,13 @@ export default function AgentFilesPanel({
       return;
     }
     Modal.confirm({
-      title: '放弃未保存的修改？',
-      content: '刷新文件列表将重新读取当前文件内容。',
-      okText: '放弃并刷新',
-      cancelText: '继续编辑',
+      title: t('agentFiles.discardTitle'),
+      content: t('agentFiles.refreshDiscardDesc'),
+      okText: t('agentFiles.discardAndRefresh'),
+      cancelText: t('agentFiles.continueEditing'),
       onOk: () => loadFiles(selectedFile?.name),
     });
-  }, [dirty, loadFiles, selectedFile?.name]);
+  }, [dirty, loadFiles, selectedFile?.name, t]);
 
   const handleSave = useCallback(async () => {
     if (!agentId || !client || !selectedFile || !dirty) return;
@@ -202,38 +204,38 @@ export default function AgentFilesPanel({
       setFileContent(saved.content);
       setFileDraft(saved.content);
       setMode(isMarkdownAgentFile(saved.name) ? 'preview' : 'edit');
-      Toast.success('Agent 文件已保存');
+      Toast.success(t('agentFiles.saved'));
     } catch (err) {
-      Toast.error(err instanceof Error ? err.message : '保存 Agent 文件失败');
+      Toast.error(err instanceof Error ? err.message : t('agentFiles.saveFailed'));
     } finally {
       setSaving(false);
     }
-  }, [agentId, client, dirty, fileDraft, selectedFile]);
+  }, [agentId, client, dirty, fileDraft, selectedFile, t]);
 
   const fileMeta = useMemo(
     () => (selectedFile ? `${formatSize(selectedFile.size)} · ${formatTime(selectedFile.modifiedAt)}` : ''),
     [selectedFile],
   );
 
-  if (!agentId) return <Empty description="请选择 Agent" />;
-  if (!isConnected || !client) return <Empty description="请先连接到 Gateway" />;
+  if (!agentId) return <Empty description={t('agentFiles.selectAgent')} />;
+  if (!isConnected || !client) return <Empty description={t('agentFiles.connectFirst')} />;
 
   return (
     <div className="agent-file-workspace">
       <aside className="agent-file-list-panel">
         <div className="agent-file-list-header">
           <div>
-            <Text strong>Agent 文件</Text>
+            <Text strong>{t('agentFiles.title')}</Text>
             <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 2 }}>
-              {files.length} 个文件
+              {t('agentFiles.fileCount', { count: files.length })}
             </Text>
           </div>
           <Button
             icon={<IconRefresh />}
             size="small"
             loading={filesLoading}
-            title="刷新文件列表"
-            aria-label="刷新文件列表"
+            title={t('agentFiles.refreshFileList')}
+            aria-label={t('agentFiles.refreshFileList')}
             onClick={handleRefresh}
           />
         </div>
@@ -243,7 +245,7 @@ export default function AgentFilesPanel({
               <Spin />
             </div>
           ) : files.length === 0 ? (
-            <Empty description="暂无 Agent 文件" style={{ padding: 20 }} />
+            <Empty description={t('agentFiles.empty')} style={{ padding: 20 }} />
           ) : (
             files.map((file) => (
               <button
@@ -261,7 +263,7 @@ export default function AgentFilesPanel({
                 </span>
                 {BOOTSTRAP_FILES.has(file.name) && (
                   <Tag size="small" color="blue">
-                    启动
+                    {t('agentFiles.startup')}
                   </Tag>
                 )}
               </button>
@@ -274,12 +276,12 @@ export default function AgentFilesPanel({
         <div className="agent-file-content-header">
           <div style={{ minWidth: 0 }}>
             <Text strong ellipsis style={{ display: 'block' }}>
-              {selectedFile?.name || '选择一个文件'}
+              {selectedFile?.name || t('agentFiles.selectFile')}
             </Text>
             {selectedFile && (
               <Text type="tertiary" size="small">
                 {fileMeta}
-                {dirty ? ' · 未保存' : ''}
+                {dirty ? t('agentFiles.unsaved') : ''}
               </Text>
             )}
           </div>
@@ -289,10 +291,10 @@ export default function AgentFilesPanel({
                 type="button"
                 buttonSize="small"
                 value={mode}
-                aria-label="文件查看模式"
+                aria-label={t('agentFiles.viewMode')}
                 options={[
-                  { label: '预览', value: 'preview' },
-                  { label: '编辑', value: 'edit' },
+                  { label: t('agentFiles.preview'), value: 'preview' },
+                  { label: t('agentFiles.edit'), value: 'edit' },
                 ]}
                 onChange={(event) => setMode(event.target.value as 'preview' | 'edit')}
               />
@@ -304,7 +306,7 @@ export default function AgentFilesPanel({
                 loading={saving}
                 onClick={handleSave}
               >
-                保存
+                {t('agentFiles.save')}
               </Button>
             </Space>
           )}
@@ -313,7 +315,7 @@ export default function AgentFilesPanel({
         <div className="agent-file-content-body">
           {!selectedFile ? (
             <div className="agent-file-empty-state">
-              <Empty description="选择一个文件查看内容" />
+              <Empty description={t('agentFiles.selectFileHint')} />
             </div>
           ) : contentLoading ? (
             <div className="agent-file-empty-state">
@@ -325,7 +327,7 @@ export default function AgentFilesPanel({
               value={fileDraft}
               onChange={setFileDraft}
               autosize={false}
-              aria-label={`编辑 ${selectedFile.name}`}
+              aria-label={t('agentFiles.editFile', { name: selectedFile.name })}
             />
           ) : markdown ? (
             <div className="agent-file-markdown-preview">

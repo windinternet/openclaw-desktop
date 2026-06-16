@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Badge,
   Button,
@@ -195,6 +196,7 @@ function themeColorValue(themeColor: string): string {
 }
 
 export default function Office3DPage() {
+  const { t } = useTranslation();
   const agents = useStore((s) => s.agents);
   const sessions = useStore((s) => s.sessions);
   const instances = useStore((s) => s.instances);
@@ -255,7 +257,7 @@ export default function Office3DPage() {
 
   const handleRefresh = async () => {
     await refreshAll();
-    Toast.success('办公室状态已刷新');
+    Toast.success(t('office.refreshed'));
   };
 
   const handleResetCamera = () => {
@@ -263,8 +265,17 @@ export default function Office3DPage() {
   };
 
   const receptionMessage = useMemo(() => {
-    return `前台：${displayOfficeProfile.receptionGreeting}。当前 ${connectionLabel(connectionStatus)}，办公室里有 ${officeAgents.length} 个 Agent，${activeSessions} 个活跃/待命会话。工作区 ${workingCount}，会议区 ${meetingCount}，休闲区 ${loungeCount}。`;
-  }, [displayOfficeProfile.receptionGreeting, connectionStatus, officeAgents, activeSessions, workingCount, meetingCount, loungeCount]);
+    const connLabel = connectionLabel(connectionStatus);
+    return t('office.receptionTemplate', {
+      greeting: displayOfficeProfile.receptionGreeting,
+      connectionLabel: connLabel,
+      agentCount: officeAgents.length,
+      activeSessions,
+      workingCount,
+      meetingCount,
+      loungeCount,
+    });
+  }, [displayOfficeProfile.receptionGreeting, connectionStatus, officeAgents, activeSessions, workingCount, meetingCount, loungeCount, t]);
 
   return (
     <div
@@ -290,7 +301,7 @@ export default function Office3DPage() {
         >
           <Card className="office-panel" style={{ maxWidth: 520 }}>
             <Title heading={4} style={{ color: officeTheme.panel.text, marginTop: 0 }}>
-              3D 办公室暂时无法启动
+              {t('office.notReady')}
             </Title>
             <Text style={{ color: officeTheme.panel.muted }}>
               {sceneError}
@@ -317,26 +328,26 @@ export default function Office3DPage() {
             <Space>
               <IconUserGroup style={{ color: officeTheme.scene.accent }} />
               <Title heading={5} style={{ margin: 0, color: officeTheme.panel.text }}>
-                OpenClaw 3D Office
+                {t('office.title')}
               </Title>
             </Space>
             <Space>
               <Badge dot type={connectionBadgeType(connectionStatus)} />
               <Text style={{ color: officeTheme.panel.muted }}>{connectionLabel(connectionStatus)}</Text>
               <Tag color="blue" size="small">{officeAgents.length} Agents</Tag>
-              <Tag color="green" size="small">{activeSessions} 会话</Tag>
+              <Tag color="green" size="small">{t('office.sessionCount', { count: activeSessions })}</Tag>
             </Space>
           </Space>
         </Card>
 
         <Card className="office-panel" bodyStyle={{ padding: '14px 16px' }}>
           <Space>
-            <Tag color="blue">工作 {workingCount}</Tag>
-            <Tag color="orange">会议 {meetingCount}</Tag>
-            <Tag color="green">休闲 {loungeCount}</Tag>
-            <Tooltip content="还原默认视角">
+            <Tag color="blue">{t('office.zoneWorkCount', { count: workingCount })}</Tag>
+            <Tag color="orange">{t('office.zoneMeetingCount', { count: meetingCount })}</Tag>
+            <Tag color="green">{t('office.zoneLoungeCount', { count: loungeCount })}</Tag>
+            <Tooltip content={t('office.resetView')}>
               <Button
-                aria-label="还原默认视角"
+                aria-label={t('office.resetView')}
                 icon={<IconUndo />}
                 size="small"
                 theme="borderless"
@@ -345,7 +356,7 @@ export default function Office3DPage() {
               />
             </Tooltip>
             <Button icon={<IconRefresh />} size="small" theme="solid" type="primary" onClick={handleRefresh}>
-              刷新
+              {t('common.refresh')}
             </Button>
           </Space>
         </Card>
@@ -370,7 +381,7 @@ export default function Office3DPage() {
               {selectedAgent.currentTask ? ` · ${selectedAgent.currentTask}` : ''}
             </Text>
             <Text type="tertiary" style={{ color: officeTheme.panel.tertiary }}>
-              点击场景中的机器人可以切换关注对象。
+              {t('office.clickHint')}
             </Text>
           </Space>
         </Card>
@@ -378,12 +389,12 @@ export default function Office3DPage() {
 
       <Card className="office-panel office-legend" bodyStyle={{ padding: 16 }}>
         <Space vertical align="start" spacing={8}>
-          <Text strong style={{ color: officeTheme.panel.text }}>行为说明</Text>
-          <Text style={{ color: officeTheme.panel.muted }}>休闲 → 工作/会议：快步前往</Text>
-          <Text style={{ color: officeTheme.panel.muted }}>工作/会议 → 休闲：慢走回去</Text>
-          <Text style={{ color: officeTheme.panel.muted }}>多个活跃 Agent 会话：进入会议区协作</Text>
-          <Text style={{ color: officeTheme.panel.muted }}>未选中：WASD/左键拖动平移 · 选中 Agent：WASD 行走并切第一视角 · V 返回第三人称</Text>
-          <Text style={{ color: officeTheme.panel.muted }}>点击前台：了解当前办公室情况</Text>
+          <Text strong style={{ color: officeTheme.panel.text }}>{t('office.behaviorLegend')}</Text>
+          <Text style={{ color: officeTheme.panel.muted }}>{t('office.behaviorDesc1')}</Text>
+          <Text style={{ color: officeTheme.panel.muted }}>{t('office.behaviorDesc2')}</Text>
+          <Text style={{ color: officeTheme.panel.muted }}>{t('office.behaviorDesc3')}</Text>
+          <Text style={{ color: officeTheme.panel.muted }}>{t('office.behaviorDesc4')}</Text>
+          <Text style={{ color: officeTheme.panel.muted }}>{t('office.behaviorDesc5')}</Text>
         </Space>
       </Card>
     </div>

@@ -10,7 +10,7 @@ interface Props {
 }
 
 export function ArtifactCreateDialog({ onClose }: Props) {
-  void useTranslation();
+  const { t } = useTranslation();
   const generateArtifact = useStore((s) => s.generateArtifact);
   const [title, setTitle] = useState('');
   const [type, setType] = useState<ArtifactType>('other');
@@ -30,7 +30,7 @@ export function ArtifactCreateDialog({ onClose }: Props) {
         html: html || '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + title + '</title></head><body><h1>' + title + '</h1></body></html>',
         source: { type: 'manual' },
       });
-      Toast.success('产物已创建');
+      Toast.success(t('artifact.created'));
       onClose();
     } catch (e) {
       Toast.error(String(e));
@@ -43,41 +43,41 @@ export function ArtifactCreateDialog({ onClose }: Props) {
 
   return (
     <Modal
-      title="新建产物"
+      title={t('artifact.createTitle')}
       visible
       onCancel={onClose}
       footer={
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <Button onClick={onClose}>取消</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button theme="solid" onClick={handleCreate} loading={saving} disabled={!title.trim()}>
-            创建
+            {t('common.create')}
           </Button>
         </div>
       }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div>
-          <div style={labelStyle}>名称</div>
-          <Input placeholder="输入产物名称" value={title} onChange={setTitle} />
+          <div style={labelStyle}>{t('artifact.title')}</div>
+          <Input placeholder={t('artifact.titlePlaceholder')} value={title} onChange={setTitle} />
         </div>
         <div>
-          <div style={labelStyle}>类型</div>
+          <div style={labelStyle}>{t('artifact.type')}</div>
           <Select value={type} onChange={(v) => setType(v as ArtifactType)}
             optionList={[
-              { value: 'report', label: '📊 报告' }, { value: 'dashboard', label: '📈 仪表盘' },
-              { value: 'analysis', label: '🔍 分析' }, { value: 'checklist', label: '📋 清单' },
-              { value: 'code', label: '💻 代码' }, { value: 'document', label: '📄 文档' },
-              { value: 'other', label: '📦 其他' },
+              { value: 'report', label: t('artifact.typeLabelReport') }, { value: 'dashboard', label: t('artifact.typeLabelDashboard') },
+              { value: 'analysis', label: t('artifact.typeLabelAnalysis') }, { value: 'checklist', label: t('artifact.typeLabelChecklist') },
+              { value: 'code', label: t('artifact.typeLabelCode') }, { value: 'document', label: t('artifact.typeLabelDoc') },
+              { value: 'other', label: t('artifact.typeLabelOther') },
             ]}
           />
         </div>
         <div>
-          <div style={labelStyle}>描述</div>
-          <Input placeholder="可选描述" value={description} onChange={setDescription} />
+          <div style={labelStyle}>{t('artifact.desc')}</div>
+          <Input placeholder={t('artifact.descPlaceholder')} value={description} onChange={setDescription} />
         </div>
         <div>
-          <div style={labelStyle}>HTML 内容</div>
-          <TextArea placeholder="<!DOCTYPE html>..." value={html} onChange={setHtml} rows={6} maxCount={100000} />
+          <div style={labelStyle}>{t('artifact.htmlContent')}</div>
+          <TextArea placeholder={t('artifact.htmlPlaceholder')} value={html} onChange={setHtml} rows={6} maxCount={100000} />
         </div>
       </div>
     </Modal>

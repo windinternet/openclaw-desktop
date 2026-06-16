@@ -196,14 +196,14 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
 
   const gatewayUser = currentInstance?.gatewayUser;
   const displayName = connectionStatus === 'connected'
-    ? (gatewayUser?.whatToCall || userDisplayName || currentInstance?.name || 'Operator')
+    ? (gatewayUser?.whatToCall || userDisplayName || currentInstance?.name || t('sidebar.operator'))
     : connectionRetry
-      ? '重试中…'
+      ? t('sidebar.retrying')
       : connectionStatus === 'connecting'
-      ? '连接中…'
+      ? t('instance.statusConnecting')
       : connectionStatus === 'error'
-        ? '连接失败'
-        : (gatewayUser?.whatToCall || userDisplayName || currentInstance?.name || '未连接');
+        ? t('sidebar.connectFailed')
+        : (gatewayUser?.whatToCall || userDisplayName || currentInstance?.name || t('instance.statusDisconnected'));
   const bioLine = gatewayUser?.notes?.split('\n')[0] ?? '';
   const fullNotes = gatewayUser?.notes ?? '';
   const hasPopover = !!(gatewayUser?.name || gatewayUser?.os || gatewayUser?.timezone || fullNotes);
@@ -244,23 +244,23 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
     if (connectionRetry) {
       return {
         color: 'var(--semi-color-warning)',
-        label: '重试中',
+        label: t('instance.retrying'),
       };
     }
     switch (connectionStatus) {
       case 'connected':
-        return { color: 'var(--semi-color-success)', label: '已连接' };
+        return { color: 'var(--semi-color-success)', label: t('instance.statusConnected') };
       case 'connecting':
-        return { color: 'var(--semi-color-info)', label: '连接中' };
+        return { color: 'var(--semi-color-info)', label: t('instance.statusConnecting') };
       case 'error':
-        return { color: 'var(--semi-color-danger)', label: '连接失败' };
+        return { color: 'var(--semi-color-danger)', label: t('sidebar.connectFailed') };
       default:
-        return { color: 'var(--semi-color-text-2)', label: '未连接' };
+        return { color: 'var(--semi-color-text-2)', label: t('instance.statusDisconnected') };
     }
   })();
 
   const retryDelayText = connectionRetry
-    ? `${Math.max(1, Math.ceil(connectionRetry.delayMs / 1000))} 秒`
+    ? `${Math.max(1, Math.ceil(connectionRetry.delayMs / 1000))}${t('common.seconds')}`
     : '';
 
   const connectionPopoverContent = (
@@ -290,7 +290,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
       )}
       {connectionRetry && (
         <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--semi-color-border)', color: 'var(--semi-color-text-1)' }}>
-          第 {connectionRetry.attempt} 次重试约 {retryDelayText} 后开始
+          {t('sidebar.retryAttemptInfo', { attempt: connectionRetry.attempt, delay: retryDelayText })}
         </div>
       )}
       {(connectionError || connectionRetry?.reason) && (
@@ -408,20 +408,20 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
     if (s.title) return s.title;
     const key = s.key || '';
     // 主会话
-    if (key === 'agent:main:main') return '主会话';
+    if (key === 'agent:main:main') return t('session.mainSession');
     // 飞书
-    if (key.includes(':feishu:direct:')) return '飞书私聊';
-    if (key.includes(':feishu:group:')) return '飞书群聊';
+    if (key.includes(':feishu:direct:')) return t('session.feishuDM');
+    if (key.includes(':feishu:group:')) return t('session.feishuGroup');
     // WebChat
     const origin = (s as { origin?: { surface?: string } }).origin;
-    if (key.includes(':webchat:') || origin?.surface === 'webchat') return 'WebChat';
+    if (key.includes(':webchat:') || origin?.surface === 'webchat') return t('session.webchat');
     // 定时任务
-    if (key.includes(':cron:')) return '定时任务';
+    if (key.includes(':cron:')) return t('session.cron');
     // Dashboard 会话 → 取 ID 后 8 位
     if (key.includes(':dashboard:')) {
       const parts = key.split(':');
       const id = parts[parts.length - 1]?.slice(-8);
-      return id ? `Dashboard #${id}` : 'Dashboard 会话';
+      return id ? t('session.dashboardWithId', { id }) : t('session.dashboardSession');
     }
     // 兜底：取最后一段
     const parts = key.split(':');
@@ -432,12 +432,12 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
     if (!ts) return '';
     const diff = relativeNow - ts;
     const mins = Math.floor(diff / 60000);
-    if (mins < 1) return '刚刚';
-    if (mins < 60) return `${mins}分钟前`;
+    if (mins < 1) return t('sidebar.justNow');
+    if (mins < 60) return t('sidebar.nMinutesAgo', { count: mins });
     const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}小时前`;
+    if (hours < 24) return t('sidebar.nHoursAgo', { count: hours });
     const days = Math.floor(hours / 24);
-    if (days < 7) return `${days}天前`;
+    if (days < 7) return t('sidebar.nDaysAgo', { count: days });
     return new Date(ts).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
   };
 
@@ -475,10 +475,10 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
     if (!key) return;
 
     patchSessionLabel(key, value || null).catch((err) => {
-      Toast.error(`标签保存失败: ${err instanceof Error ? err.message : '未知错误'}`);
+      Toast.error(t('sidebar.labelSaveFailed', { error: err instanceof Error ? err.message : t('common.unknownError') }));
       useStore.getState().fetchSessions();
     });
-  }, [editingKey, patchSessionLabel]);
+  }, [editingKey, patchSessionLabel, t]);
 
   const cancelEdit = useCallback(() => {
     setEditingKey(null);
@@ -642,14 +642,14 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
 
         <NavSectionLabel label={t('nav.sectionTools')} />
         <Nav.Item itemKey="extensions" text={t('nav.extensions')} icon={<IconPuzzle />} />
-        <Nav.Item itemKey="taskkanban" text="任务看板" icon={<IconCheckList />} />
+        <Nav.Item itemKey="taskkanban" text={t('nav.kanban')} icon={<IconCheckList />} />
         <Nav.Item itemKey="actions" text={t('nav.actions')} icon={<IconBolt />} />
         <Nav.Item itemKey="artifacts" text={t('nav.artifacts')} icon={<IconAppCenter />} />
 
         <NavSectionLabel label={t('nav.sectionCollaboration')} />
         <Nav.Item itemKey="teams" text={t('nav.teams')} icon={<IconUserGroup />} />
         <Nav.Item itemKey="office" text={t('nav.office')} icon={<IconDesktop />} />
-        <Nav.Item itemKey="memory" text="调教" icon={<IconCustomize />} />
+        <Nav.Item itemKey="memory" text={t('nav.tuning')} icon={<IconCustomize />} />
       </Nav>
     </div>
       {showPopover && createPortal(

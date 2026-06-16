@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button, Card, Typography, Tag } from '@douyinfe/semi-ui';
 import { IconPlay, IconExpand } from '@douyinfe/semi-icons';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
 import type { ArtifactMeta } from '../lib/artifact-types';
 
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export function ArtifactPreview({ artifact }: Props) {
+  const { t } = useTranslation();
   const openArtifactWindow = useStore((s) => s.openArtifactWindow);
   const [expanded, setExpanded] = useState(false);
 
@@ -28,11 +30,11 @@ export function ArtifactPreview({ artifact }: Props) {
       headerExtraContent={
         <div style={{ display: 'flex', gap: 4 }}>
           <Button size="small" theme="borderless" icon={<IconPlay />} onClick={() => openArtifactWindow(artifact.id)}>
-            打开
+            {t('artifact.open')}
           </Button>
           <Button size="small" theme="borderless" icon={<IconExpand />}
             onClick={() => setExpanded(!expanded)}>
-            {expanded ? '收起' : '展开'}
+            {expanded ? t('artifact.collapse') : t('artifact.expand')}
           </Button>
         </div>
       }

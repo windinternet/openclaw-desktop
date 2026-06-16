@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Modal, Button, Typography, Tag, Space } from '@douyinfe/semi-ui';
 import type { TagColor } from '@douyinfe/semi-ui/lib/es/tag';
 import { IconAlertTriangle, IconAlertCircle, IconInfoCircle } from '@douyinfe/semi-icons';
+import { useTranslation } from 'react-i18next';
 import { getCapability } from '../lib/artifact-capabilities';
 
 const { Text } = Typography;
@@ -13,6 +14,7 @@ interface AuthRequest {
 }
 
 export function AuthorizationDialog() {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
   const [request, setRequest] = useState<AuthRequest | null>(null);
 
@@ -41,6 +43,7 @@ export function AuthorizationDialog() {
   if (!request) return null;
 
   const cap = getCapability(request.capability);
+  const riskLabels: Record<string, string> = { low: t('auth.lowRisk'), medium: t('auth.medRisk'), high: t('auth.highRisk') };
   const riskColors: Record<string, TagColor> = { low: 'green', medium: 'orange', high: 'red' };
   const RiskIcon = cap?.risk === 'high' ? IconAlertTriangle : cap?.risk === 'medium' ? IconAlertCircle : IconInfoCircle;
   const riskColor: TagColor = cap ? riskColors[cap.risk] : 'grey';
@@ -53,7 +56,7 @@ export function AuthorizationDialog() {
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <RiskIcon style={{ color: cap?.risk === 'high' ? 'var(--semi-color-danger)' : cap?.risk === 'medium' ? 'var(--semi-color-warning)' : 'var(--semi-color-success)' }} />
-          <span>权限请求</span>
+          <span>{t('auth.title')}</span>
         </div>
       }
       footer={null}
@@ -61,7 +64,7 @@ export function AuthorizationDialog() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div>
           <Text type="secondary">
-            「{request.artifactId}」请求以下能力：
+            {t('auth.artifactRequest', { title: request.artifactId })}
           </Text>
         </div>
 
@@ -70,24 +73,24 @@ export function AuthorizationDialog() {
             <Text strong>{cap?.name ?? request.capability}</Text>
             {cap && (
               <Tag size="small" color={riskColor}>
-                {{ low: '低风险', medium: '中风险', high: '高风险' }[cap.risk]}
+                {riskLabels[cap.risk]}
               </Tag>
             )}
           </div>
           <Text type="secondary" size="small">{cap?.description}</Text>
           {request.detail && (
             <div style={{ marginTop: 8 }}>
-              <Text type="tertiary" size="small">目标: {request.detail}</Text>
+              <Text type="tertiary" size="small">{t('auth.target')}: {request.detail}</Text>
             </div>
           )}
         </div>
 
         <Space spacing="medium" wrap>
-          <Button type="tertiary" onClick={() => handleChoice('once')} size="small">仅本次</Button>
-          <Button type="tertiary" onClick={() => handleChoice('session')} size="small">本次会话</Button>
-          <Button type="secondary" onClick={() => handleChoice('artifact')} size="small">此产物始终</Button>
-          <Button type="primary" onClick={() => handleChoice('global')} size="small">所有产物</Button>
-          <Button type="danger" onClick={() => handleChoice(null)} size="small">拒绝</Button>
+          <Button type="tertiary" onClick={() => handleChoice('once')} size="small">{t('auth.once')}</Button>
+          <Button type="tertiary" onClick={() => handleChoice('session')} size="small">{t('auth.session')}</Button>
+          <Button type="secondary" onClick={() => handleChoice('artifact')} size="small">{t('auth.artifact')}</Button>
+          <Button type="primary" onClick={() => handleChoice('global')} size="small">{t('auth.global')}</Button>
+          <Button type="danger" onClick={() => handleChoice(null)} size="small">{t('auth.deny')}</Button>
         </Space>
       </div>
     </Modal>

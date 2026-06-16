@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, type Ref } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { AIChatDialogue, AIChatInput, Button, Empty, Progress, SideSheet, Tabs, Tag, Toast, Typography } from '@douyinfe/semi-ui';
 import { IconAppCenter, IconClose, IconInfoCircle, IconList, IconPlay, IconWrench } from '@douyinfe/semi-icons';
 import type {
@@ -295,8 +296,10 @@ function groupAdjacentToolCallChats(chats: DisplayChat[]): DisplayChat[] {
   return output;
 }
 
-function safePretty(value: unknown): string {
-  if (value == null || value === '') return '暂无数据';
+type TFunc = (key: string, options?: Record<string, unknown>) => string;
+
+function safePretty(value: unknown, t?: TFunc): string {
+  if (value == null || value === '') return t ? t('common.noData') : '暂无数据';
   if (typeof value === 'string') {
     try {
       return JSON.stringify(JSON.parse(value), null, 2);
@@ -311,13 +314,13 @@ function safePretty(value: unknown): string {
   }
 }
 
-function formatNumber(value?: number): string {
-  if (value === undefined || !Number.isFinite(value)) return '未知';
+function formatNumber(value?: number, t?: TFunc): string {
+  if (value === undefined || !Number.isFinite(value)) return t ? t('common.unknown') : '未知';
   return new Intl.NumberFormat('zh-CN').format(Math.round(value));
 }
 
-function formatPercent(value?: number): string {
-  if (value === undefined || !Number.isFinite(value)) return '未知';
+function formatPercent(value?: number, t?: TFunc): string {
+  if (value === undefined || !Number.isFinite(value)) return t ? t('common.unknown') : '未知';
   return `${Math.round(value * 100)}%`;
 }
 
@@ -327,12 +330,12 @@ function sumOptionalNumbers(...values: (number | undefined)[]): number | undefin
   return present.reduce((sum, value) => sum + value, 0);
 }
 
-function contextSourceLabel(source?: SessionContextSnapshot['source']): string {
+function contextSourceLabel(source?: SessionContextSnapshot['source'], t?: TFunc): string {
   if (source === 'sessions.describe') return 'OpenClaw sessions.describe';
   if (source === 'status') return 'OpenClaw status';
   if (source === 'usage') return 'OpenClaw sessions.usage';
-  if (source === 'message') return '消息 usage';
-  return '本地估算';
+  if (source === 'message') return t ? t('chat.insight.messageUsage') : '消息 usage';
+  return t ? t('chat.insight.localEstimate') : '本地估算';
 }
 
 function toolStatusColor(status?: string): 'green' | 'orange' | 'red' | 'blue' | 'grey' {
@@ -343,7 +346,7 @@ function toolStatusColor(status?: string): 'green' | 'orange' | 'red' | 'blue' |
   return 'blue';
 }
 
-function DetailCodeBlock({ value }: { value: unknown }) {
+function DetailCodeBlock({ value, t }: { value: unknown; t?: TFunc }) {
   return (
     <pre
       style={{
@@ -361,7 +364,7 @@ function DetailCodeBlock({ value }: { value: unknown }) {
         overflow: 'auto',
       }}
     >
-      {safePretty(value)}
+      {safePretty(value, t)}
     </pre>
   );
 }
@@ -403,6 +406,7 @@ function SessionSidePanel({
   onOpenArtifact: (artifact: ArtifactMeta) => void;
   onClose?: () => void;
 }) {
+  const { t } = useTranslation();
   const contextPercent = insight.contextUsageRatio !== undefined
     ? Math.round(insight.contextUsageRatio * 100)
     : 0;
@@ -418,7 +422,7 @@ function SessionSidePanel({
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <IconInfoCircle size="small" />
-          <Text strong>会话详情</Text>
+          <Text strong>{t('chat.sidePanel.title')}</Text>
         </div>
       }
       bodyStyle={{ padding: 0 }}
@@ -431,10 +435,10 @@ function SessionSidePanel({
         tabBarStyle={{ padding: '0 16px' }}
         contentStyle={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '12px 16px 16px' }}
       >
-        <Tabs.TabPane tab="概况" itemKey="overview">
+        <Tabs.TabPane tab={t('chat.sidePanel.overview')} itemKey="overview">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <section>
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>上下文窗口</Text>
+              <Text strong style={{ display: 'block', marginBottom: 8 }}>{t('chat.insight.contextWindow')}</Text>
               <Progress
                 percent={contextPercent}
                 showInfo
@@ -442,49 +446,49 @@ function SessionSidePanel({
                 stroke={insight.contextUsageRatio && insight.contextUsageRatio > 0.8 ? 'var(--semi-color-warning)' : 'var(--semi-color-primary)'}
               />
               <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 6 }}>
-                已用 {formatNumber(insight.usedContextTokens)} / {formatNumber(insight.contextLimit)} tokens（{formatPercent(insight.contextUsageRatio)}）
+                {t('chat.insight.tokensUsed', { used: formatNumber(insight.usedContextTokens, t), limit: formatNumber(insight.contextLimit, t), percent: formatPercent(insight.contextUsageRatio, t) })}
               </Text>
               <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>
-                {contextSourceLabel(insight.contextSource)}
-                {insight.contextFresh === false ? ' · 统计可能延迟' : ''}
+                {contextSourceLabel(insight.contextSource, t)}
+                {insight.contextFresh === false ? t('chat.insight.dataMayBeDelayed') : ''}
               </Text>
             </section>
 
             <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <Metric label="剩余上下文" value={formatNumber(insight.remainingContextTokens)} />
-              <Metric label="输入 tokens" value={formatNumber(insight.inputTokens)} />
-              <Metric label="输出 tokens" value={formatNumber(insight.outputTokens)} />
-              <Metric label="缓存 tokens" value={formatNumber(sumOptionalNumbers(insight.cacheReadTokens, insight.cacheWriteTokens))} />
-              <Metric label="消息" value={formatNumber(insight.messageCount)} />
-              <Metric label="工具调用" value={formatNumber(insight.toolCallCount)} />
-              <Metric label="用户消息" value={formatNumber(insight.userMessageCount)} />
-              <Metric label="Agent 回复" value={formatNumber(insight.assistantMessageCount)} />
+              <Metric label={t('chat.insight.remainingContext')} value={formatNumber(insight.remainingContextTokens, t)} />
+              <Metric label={t('chat.insight.inputTokens')} value={formatNumber(insight.inputTokens, t)} />
+              <Metric label={t('chat.insight.outputTokens')} value={formatNumber(insight.outputTokens, t)} />
+              <Metric label={t('chat.insight.cacheTokens')} value={formatNumber(sumOptionalNumbers(insight.cacheReadTokens, insight.cacheWriteTokens), t)} />
+              <Metric label={t('chat.insight.messages')} value={formatNumber(insight.messageCount, t)} />
+              <Metric label={t('chat.insight.toolCalls')} value={formatNumber(insight.toolCallCount, t)} />
+              <Metric label={t('chat.insight.userMessages')} value={formatNumber(insight.userMessageCount, t)} />
+              <Metric label={t('chat.insight.agentReplies')} value={formatNumber(insight.assistantMessageCount, t)} />
             </section>
 
             {(insight.contextModel || insight.contextStatus) && (
               <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <Metric label="模型" value={insight.contextModel || '未知'} />
-                <Metric label="状态" value={insight.contextStatus || '未知'} />
+                <Metric label={t('chat.insight.model')} value={insight.contextModel || t('common.unknown')} />
+                <Metric label={t('chat.insight.status')} value={insight.contextStatus || t('common.unknown')} />
               </section>
             )}
 
             <section>
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>会话产物</Text>
-              <Metric label="已识别产物" value={formatNumber(artifacts.length)} />
+              <Text strong style={{ display: 'block', marginBottom: 8 }}>{t('chat.insight.sessionArtifacts')}</Text>
+              <Metric label={t('chat.insight.identifiedArtifacts')} value={formatNumber(artifacts.length, t)} />
             </section>
 
             <section>
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>后续洞察能力</Text>
+              <Text strong style={{ display: 'block', marginBottom: 8 }}>{t('chat.insight.futureInsights')}</Text>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <FutureItem label="会话摘要" />
-                <FutureItem label="关键事实" />
-                <FutureItem label="TODO List" />
+                <FutureItem label={t('chat.insight.sessionSummary')} />
+                <FutureItem label={t('chat.insight.keyFacts')} />
+                <FutureItem label={t('chat.insight.todoList')} />
               </div>
             </section>
           </div>
         </Tabs.TabPane>
 
-        <Tabs.TabPane tab="工具" itemKey="tool">
+        <Tabs.TabPane tab={t('chat.sidePanel.tools')} itemKey="tool">
           {selectedTool ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -499,7 +503,7 @@ function SessionSidePanel({
                     {selectedTool.item.status ?? 'unknown'}
                   </Tag>
                   <Button
-                    aria-label="清空工具详情"
+                    aria-label={t('chat.sidePanel.clearToolDetail')}
                     icon={<IconClose size="small" />}
                     size="small"
                     theme="borderless"
@@ -509,31 +513,31 @@ function SessionSidePanel({
               </div>
 
               <section>
-                <Text strong size="small" style={{ display: 'block', marginBottom: 6 }}>参数</Text>
-                <DetailCodeBlock value={selectedTool.item.arguments} />
+                <Text strong size="small" style={{ display: 'block', marginBottom: 6 }}>{t('chat.tool.arguments')}</Text>
+                <DetailCodeBlock value={selectedTool.item.arguments} t={t} />
               </section>
 
               <section>
-                <Text strong size="small" style={{ display: 'block', marginBottom: 6 }}>结果</Text>
-                <DetailCodeBlock value={selectedTool.item.toolResult} />
+                <Text strong size="small" style={{ display: 'block', marginBottom: 6 }}>{t('chat.tool.result')}</Text>
+                <DetailCodeBlock value={selectedTool.item.toolResult} t={t} />
               </section>
 
               <section>
-                <Text strong size="small" style={{ display: 'block', marginBottom: 6 }}>原始结构</Text>
-                <DetailCodeBlock value={selectedTool.item.raw ?? selectedTool.item} />
+                <Text strong size="small" style={{ display: 'block', marginBottom: 6 }}>{t('chat.tool.rawStructure')}</Text>
+                <DetailCodeBlock value={selectedTool.item.raw ?? selectedTool.item} t={t} />
               </section>
             </div>
           ) : (
             <div style={{ paddingTop: 32, textAlign: 'center', color: 'var(--semi-color-text-2)' }}>
               <IconWrench />
               <Text type="tertiary" style={{ display: 'block', marginTop: 8 }}>
-                点击聊天中的工具调用查看详情
+                {t('chat.tool.clickToView')}
               </Text>
             </div>
           )}
         </Tabs.TabPane>
 
-        <Tabs.TabPane tab="产物" itemKey="artifact">
+        <Tabs.TabPane tab={t('chat.sidePanel.artifacts')} itemKey="artifact">
           {artifacts.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {artifacts.map((artifact) => (
@@ -570,15 +574,15 @@ function SessionSidePanel({
               ))}
             </div>
           ) : (
-            <Empty image={<IconAppCenter />} description="当前会话暂无产物" />
+            <Empty image={<IconAppCenter />} description={t('chat.artifact.noArtifacts')} />
           )}
         </Tabs.TabPane>
 
-        <Tabs.TabPane tab="洞察" itemKey="insight">
+        <Tabs.TabPane tab={t('chat.sidePanel.insights')} itemKey="insight">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <InsightPlaceholder title="会话摘要" desc="后续可接入 OpenClaw 或本地摘要生成。" />
-            <InsightPlaceholder title="关键事实" desc="沉淀用户确认过的重要事实与约束。" />
-            <InsightPlaceholder title="TODO List" desc="从会话中抽取未完成事项与负责人。" />
+            <InsightPlaceholder title={t('chat.insight.sessionSummary')} desc={t('chat.insight.sessionSummaryDesc')} />
+            <InsightPlaceholder title={t('chat.insight.keyFacts')} desc={t('chat.insight.keyFactsDesc')} />
+            <InsightPlaceholder title={t('chat.insight.todoList')} desc={t('chat.insight.todoListDesc')} />
           </div>
         </Tabs.TabPane>
       </Tabs>
@@ -596,11 +600,12 @@ function Metric({ label, value }: { label: string; value: string }) {
 }
 
 function FutureItem({ label }: { label: string }) {
+  const { t } = useTranslation();
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <IconList size="small" />
       <Text size="small">{label}</Text>
-      <Tag color="grey" size="small">预留</Tag>
+      <Tag color="grey" size="small">{t('common.reserved')}</Tag>
     </div>
   );
 }
@@ -615,6 +620,7 @@ function InsightPlaceholder({ title, desc }: { title: string; desc: string }) {
 }
 
 export default function SessionChatPage() {
+  const { t } = useTranslation();
   const { sessionKey: urlSessionKey } = useParams<{ sessionKey: string }>();
   const location = useLocation();
   const navigate = useNavigate();
@@ -1330,7 +1336,7 @@ export default function SessionChatPage() {
           }
         }
       } catch (err) {
-        Toast.error(err instanceof Error ? err.message : '发送失败');
+        Toast.error(err instanceof Error ? err.message : t('errors.sendFailed'));
         setGenerating(false);
         sendingRef.current = false;
         setChats((prev) => prev.map((chat) => (
@@ -1338,7 +1344,7 @@ export default function SessionChatPage() {
         )));
       }
     },
-    [activeClient, activeSessionKey, chats.length, currentInstanceId, endGeneration, patchSessionConfig, rootSessionKey],
+    [activeClient, activeSessionKey, chats.length, currentInstanceId, endGeneration, patchSessionConfig, rootSessionKey, t],
   );
 
   useEffect(() => {
@@ -1416,9 +1422,9 @@ export default function SessionChatPage() {
     setPageDragActive(false);
     chatInputRef.current?.uploadRef?.current?.insert?.(files);
     requestAnimationFrame(() => {
-      Toast.success(`已添加 ${files.length} 个附件`);
+      Toast.success(t('chat.attachmentsAdded', { count: files.length }));
     });
-  }, [getPageDropFiles]);
+  }, [getPageDropFiles, t]);
 
   useEffect(() => {
     window.addEventListener('dragenter', handlePageDragEnter);
@@ -1435,10 +1441,10 @@ export default function SessionChatPage() {
 
   const roleConfig = useMemo(() => ({
     user: { name: 'You', avatar: '👤' },
-    assistant: { name: 'AI', avatar: '🤖' },
+    assistant: { name: t('chat.assistantName'), avatar: '🤖' },
     system: { name: 'System', avatar: '🛎️' },
     ...buildAgentRoleConfig(agents),
-  }), [agents]);
+  }), [agents, t]);
 
   const agentOptions = useMemo(
     () => agents.filter((agent) => agent.id).map((agent) => ({
@@ -1452,7 +1458,7 @@ export default function SessionChatPage() {
     if (!activeClient || !activeSessionKey || !rootSessionKey || !currentInstanceId) return;
     if (targetAgentId === getAgentIdFromSessionKey(activeSessionKey)) return;
     if (generating || switchingAgent) {
-      Toast.warning('请等待当前回复完成后再切换 Agent');
+      Toast.warning(t('chat.agentSwitchWait'));
       return;
     }
 
@@ -1480,7 +1486,7 @@ export default function SessionChatPage() {
       try {
         return await requestAgentHandoffSummary(activeClient, activeSessionKey, targetAgentName);
       } catch (error) {
-        Toast.warning(error instanceof Error ? error.message : '上下文摘要生成失败');
+        Toast.warning(error instanceof Error ? error.message : t('chat.contextSummaryFailed'));
         return undefined;
       }
     };
@@ -1492,7 +1498,7 @@ export default function SessionChatPage() {
         const createParams = buildNewSessionCreateParams({
           agentId: targetAgentId,
           model: chatModel || models[0]?.id,
-          content: `与 ${targetAgentName} 继续对话`,
+          content: t('chat.switchContinueWith', { name: targetAgentName }),
         });
         const result = await activeClient.request<{ key?: string; sessionKey?: string }>(
           'sessions.create',
@@ -1554,9 +1560,9 @@ export default function SessionChatPage() {
 
       setRelatedSessionKeys((keys) => [...new Set([...keys, destinationSessionKey])]);
       setActiveSessionKey(destinationSessionKey);
-      Toast.success(`已切换到 ${targetAgentName}`);
+      Toast.success(t('chat.switchSuccess', { name: targetAgentName }));
     } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '切换 Agent 失败');
+      Toast.error(error instanceof Error ? error.message : t('chat.switchFailed'));
     } finally {
       setSwitchingAgent(false);
     }
@@ -1575,6 +1581,7 @@ export default function SessionChatPage() {
     rootSessionKey,
     sessions,
     switchingAgent,
+    t,
   ]);
 
   const renderConfig = useCallback(
@@ -1584,7 +1591,7 @@ export default function SessionChatPage() {
       <>
         <Configure.Select
           field="agent"
-          label="Agent"
+          label={t('chat.agent')}
           optionList={agentOptions}
           initValue={currentAgentId}
         />
@@ -1596,17 +1603,17 @@ export default function SessionChatPage() {
         <Configure.Select
           field="thinking"
           optionList={[
-            { value: 'off', label: '关闭' },
-            { value: 'minimal', label: '最低' },
-            { value: 'low', label: '低' },
-            { value: 'medium', label: '中' },
-            { value: 'high', label: '高' },
+            { value: 'off', label: t('chat.thinkingOff') },
+            { value: 'minimal', label: t('chat.thinkingMinimal') },
+            { value: 'low', label: t('chat.thinkingLow') },
+            { value: 'medium', label: t('chat.thinkingMedium') },
+            { value: 'high', label: t('chat.thinkingHigh') },
           ]}
           initValue={chatThinking}
         />
       </>
     )},
-    [agentOptions, models, chatModel, chatThinking, activeSessionKey],
+    [agentOptions, models, chatModel, chatThinking, activeSessionKey, t],
   );
 
   const handleConfigChange = useCallback((_v: Record<string, unknown> | undefined, changed: Record<string, unknown> | undefined) => {
@@ -1685,7 +1692,7 @@ export default function SessionChatPage() {
   if (!activeSessionKey) {
     return (
       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--semi-color-text-2)' }}>
-        选择一个会话
+        <div>{t('chat.selectSession')}</div>
       </div>
     );
   }
@@ -1751,7 +1758,7 @@ export default function SessionChatPage() {
           <AIChatInput
             key={activeSessionKey}
             ref={chatInputRef as Ref<AIChatInput>}
-            placeholder="输入消息…"
+            placeholder={t('chat.firstMessagePlaceholder')}
             generating={generating || switchingAgent}
             uploadProps={{
               action: '',
@@ -1816,7 +1823,7 @@ export default function SessionChatPage() {
             style={{ border: 'none', borderRadius: 0, boxShadow: 'none' }}
             onClick={() => setSidePanelVisible(!sidePanelVisible)}
           >
-            {sidePanelVisible ? '收起仪表盘' : '展开会话仪表盘'}
+            {sidePanelVisible ? t('chat.collapseDashboard') : t('chat.expandDashboard')}
           </Button>
           <div style={{ height: 4, background: 'var(--semi-color-fill-0)' }}>
             <div
@@ -1849,7 +1856,7 @@ export default function SessionChatPage() {
           }}
           onClick={() => setSidePanelVisible(!sidePanelVisible)}
         >
-          {sidePanelVisible ? '收起仪表盘' : '展开会话仪表盘'}
+          {sidePanelVisible ? t('chat.collapseDashboard') : t('chat.expandDashboard')}
         </Button>
       )}
       {pageDragActive ? (
@@ -1872,7 +1879,7 @@ export default function SessionChatPage() {
           }}
         >
           <span style={{ fontSize: 32 }}>📎</span>
-          <span>松开以添加附件</span>
+          <span>{t('chat.dropToAttach')}</span>
         </div>
       ) : null}
     </div>

@@ -9,7 +9,7 @@ import { ArtifactCreateDialog } from '../components/ArtifactCreateDialog';
 const { Text } = Typography;
 
 export default function ArtifactsPage() {
-  void useTranslation();
+  const { t } = useTranslation();
   const artifacts = useStore((s) => s.artifacts);
   const fetchArtifacts = useStore((s) => s.fetchArtifacts);
   const openArtifactWindow = useStore((s) => s.openArtifactWindow);
@@ -29,14 +29,14 @@ export default function ArtifactsPage() {
   }, []);
 
   const typeOptions = [
-    { value: 'all', label: '全部' },
-    { value: 'report', label: '📊 报告' },
-    { value: 'dashboard', label: '📈 仪表盘' },
-    { value: 'analysis', label: '🔍 分析' },
-    { value: 'checklist', label: '📋 清单' },
-    { value: 'code', label: '💻 代码' },
-    { value: 'document', label: '📄 文档' },
-    { value: 'other', label: '📦 其他' },
+    { value: 'all', label: t('artifact.typeAll') },
+    { value: 'report', label: t('artifact.typeLabelReport') },
+    { value: 'dashboard', label: t('artifact.typeLabelDashboard') },
+    { value: 'analysis', label: t('artifact.typeLabelAnalysis') },
+    { value: 'checklist', label: t('artifact.typeLabelChecklist') },
+    { value: 'code', label: t('artifact.typeLabelCode') },
+    { value: 'document', label: t('artifact.typeLabelDoc') },
+    { value: 'other', label: t('artifact.typeLabelOther') },
   ];
 
   const filteredArtifacts = useMemo(() => {
@@ -50,27 +50,27 @@ export default function ArtifactsPage() {
   }, [artifacts, typeFilter, search]);
 
   const statusText = (status: string) => {
-    if (status === 'draft') return '草稿';
-    if (status === 'published') return '已发布';
-    return '已归档';
+    if (status === 'draft') return t('artifact.statusDraft');
+    if (status === 'published') return t('artifact.statusPublished');
+    return t('artifact.statusArchived');
   };
 
   const formatTime = (ts: number) => {
     // eslint-disable-next-line react-hooks/purity
     const diff = Date.now() - ts;
-    if (diff < 60000) return '刚刚';
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`;
-    return `${Math.floor(diff / 86400000)}天前`;
+    if (diff < 60000) return t('artifact.justNow');
+    if (diff < 3600000) return t('artifact.minAgo', { count: Math.floor(diff / 60000) });
+    if (diff < 86400000) return t('artifact.hourAgo', { count: Math.floor(diff / 3600000) });
+    return t('artifact.dayAgo', { count: Math.floor(diff / 86400000) });
   };
 
   return (
     <div style={{ padding: 24, height: '100%', overflow: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20, gap: 12 }}>
-        <Text strong style={{ fontSize: 20, flex: 1 }}>产物</Text>
+        <Text strong style={{ fontSize: 20, flex: 1 }}>{t('nav.artifacts')}</Text>
         <Input
           prefix={<IconSearch />}
-          placeholder="搜索产物..."
+          placeholder={t('artifact.searchPlaceholder')}
           value={search}
           onChange={(v) => setSearch(v)}
           style={{ width: 240 }}
@@ -85,14 +85,14 @@ export default function ArtifactsPage() {
           <IconAppCenter />
         </Button>
         <Button icon={<IconPlus />} theme="solid" onClick={() => setShowCreate(true)}>
-          新建
+          {t('artifact.create')}
         </Button>
       </div>
 
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}><Spin /></div>
       ) : filteredArtifacts.length === 0 ? (
-        <Empty title="暂无产物" description="在对话中生成的产物将出现在这里" />
+        <Empty title={t('artifact.empty')} description={t('artifact.emptyDesc')} />
       ) : viewMode === 'card' ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
           {filteredArtifacts.map((a: ArtifactMeta) => (

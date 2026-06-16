@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button, Space, Tabs, Typography } from '@douyinfe/semi-ui';
 import { IconCheckList, IconKanban, IconPlus, IconRefresh } from '@douyinfe/semi-icons';
 import TasksPage, { type TasksPageHandle } from './TasksPage';
@@ -7,6 +8,7 @@ import KanbanPage, { type KanbanPageHandle } from './KanbanPage';
 const { Title, Text } = Typography;
 
 export default function TaskKanbanPage() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<string>('tasks');
   const [taskRefreshing, setTaskRefreshing] = useState(false);
   const [kanbanCount, setKanbanCount] = useState(0);
@@ -37,10 +39,10 @@ export default function TaskKanbanPage() {
         }}
       >
         <Title heading={3} style={{ margin: 0 }}>
-          任务看板
+          {t('nav.kanban')}
         </Title>
         <Text type="tertiary" size="small">
-          定时任务与看板管理
+          {t('kanban.pageDesc')}
         </Text>
       </div>
 
@@ -74,7 +76,7 @@ export default function TaskKanbanPage() {
                   loading={taskRefreshing}
                   onClick={handleTasksRefresh}
                 >
-                  刷新
+                  {t('common.refresh')}
                 </Button>
                 <Button
                   icon={<IconPlus />}
@@ -82,12 +84,12 @@ export default function TaskKanbanPage() {
                   size="small"
                   onClick={() => tasksRef.current?.openAdd()}
                 >
-                  添加任务
+                  {t('tasks.add')}
                 </Button>
               </Space>
             ) : (
               <Text type="tertiary" size="small">
-                {kanbanCount} 张卡片
+                {t('kanban.nCards', { count: kanbanCount })}
               </Text>
             )
           }
@@ -99,7 +101,7 @@ export default function TaskKanbanPage() {
             tab={
               <span>
                 <IconCheckList style={{ marginRight: 6 }} />
-                任务
+                {t('nav.tasks')}
               </span>
             }
             itemKey="tasks"
@@ -110,7 +112,7 @@ export default function TaskKanbanPage() {
             tab={
               <span>
                 <IconKanban style={{ marginRight: 6 }} />
-                看板
+                {t('nav.kanban')}
               </span>
             }
             itemKey="kanban"

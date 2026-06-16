@@ -175,39 +175,39 @@ export default function DashboardPage() {
   const statusLabel = isConnected
     ? t('instance.statusConnected')
     : connectionRetry
-      ? `重试中 · 第 ${connectionRetry.attempt} 次`
+      ? t('dashboard.retrying', { n: connectionRetry.attempt })
       : isLoading
       ? t('instance.statusConnecting')
       : t('instance.statusDisconnected');
 
   const handleRefresh = () => {
     useStore.getState().refreshAll();
-    Toast.success('Refreshed');
+    Toast.success(t('dashboard.refreshed'));
   };
 
   // ── Stat cards data ──────────────────────────────────────────────
 
   const statCards: StatCardProps[] = [
     {
-      title: 'Connected Agents',
+      title: t('dashboard.connectedAgents'),
       value: activeAgentCount,
       icon: <IconServer size="large" />,
       accentColor: 'var(--semi-color-primary)',
     },
     {
-      title: 'Active Sessions',
+      title: t('dashboard.activeSessions'),
       value: activeSessionCount,
       icon: <IconComment size="large" />,
       accentColor: 'var(--semi-color-success)',
     },
     {
-      title: 'Gateway Version',
+      title: t('dashboard.gatewayVersion'),
       value: gatewayVersion,
       icon: <IconBox size="large" />,
       accentColor: 'var(--semi-color-warning)',
     },
     {
-      title: 'Uptime',
+      title: t('dashboard.uptime'),
       value: uptimeText,
       icon: <IconClock size="large" />,
       accentColor: 'var(--semi-color-info)',
@@ -243,7 +243,7 @@ export default function DashboardPage() {
           )}
           {connectionRetry && (
             <Tag size="small" color="orange" style={{ marginLeft: 4 }}>
-              {formatRetryDelay(connectionRetry.delayMs)} 后重试
+              {t('dashboard.retryAfter', { delay: formatRetryDelay(connectionRetry.delayMs) })}
             </Tag>
           )}
         </div>
@@ -266,7 +266,7 @@ export default function DashboardPage() {
             height: 300,
           }}
         >
-          <Empty description="Not connected to Gateway" />
+          <Empty description={t('dashboard.notConnected')} />
         </div>
       ) : (
         /* ── Connected — Full Dashboard ─────────────────────── */
@@ -292,14 +292,14 @@ export default function DashboardPage() {
                 boxShadow: '0 2px 8px var(--semi-color-primary-light-default)',
               }}
             >
-              New Session
+              {t('chat.newSession')}
             </Button>
             <Button
               icon={<IconUserGroup />}
               onClick={() => navigate('/teams')}
               style={{ borderRadius: 8, fontWeight: 500 }}
             >
-              Manage Agents
+              {t('dashboard.manageAgents')}
             </Button>
           </div>
 
@@ -307,7 +307,7 @@ export default function DashboardPage() {
           <Card
             title={
               <Text style={{ fontWeight: 600, fontSize: 16 }}>
-                Recent Sessions
+                {t('dashboard.recentSessions')}
               </Text>
             }
             style={{
@@ -318,13 +318,13 @@ export default function DashboardPage() {
             bodyStyle={{ padding: 0 }}
             headerExtraContent={
               <Button size="small" theme="borderless" onClick={() => navigate('/search')}>
-                View All
+                {t('dashboard.viewAll')}
               </Button>
             }
           >
             {recentSessions.length === 0 ? (
               <Empty
-                description="No sessions yet — start a new conversation"
+                description={t('dashboard.noSessions')}
                 style={{ padding: '48px 0' }}
               />
             ) : (
@@ -382,7 +382,7 @@ export default function DashboardPage() {
                             )}
                             {session.messageCount != null && (
                               <Text type="tertiary" size="small">
-                                {session.messageCount} msgs
+                                {t('dashboard.msgs', { count: session.messageCount })}
                               </Text>
                             )}
                             {session.createdAt && (
@@ -411,9 +411,9 @@ export default function DashboardPage() {
           <div style={{ marginTop: 16 }}>
             <Text type="tertiary" size="small">
               {totalSessions > 0
-                ? `Showing ${recentSessions.length} of ${totalSessions} total sessions`
-                : 'No sessions recorded'}
-              {agents.length > 0 && ` · ${agents.length} agent${agents.length !== 1 ? 's' : ''} configured`}
+                ? t('dashboard.showingSessions', { n: recentSessions.length, total: totalSessions })
+                : t('dashboard.noSessionsRecorded')}
+              {agents.length > 0 && ` · ${t('dashboard.agentsConfigured', { count: agents.length })}`}
             </Text>
           </div>
         </>

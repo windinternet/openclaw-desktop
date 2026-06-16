@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef, type Ref } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AIChatInput, Typography, Toast } from '@douyinfe/semi-ui';
 import { IconPlusCircle } from '@douyinfe/semi-icons';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
 import {
   buildNewSessionNavigationTarget,
@@ -13,20 +14,13 @@ import AgentSelectOption from '../components/AgentSelectOption';
 const { Configure } = AIChatInput;
 const { Title, Text } = Typography;
 
-const THINKING_OPTIONS = [
-  { value: 'off', label: '关闭' },
-  { value: 'minimal', label: '最低' },
-  { value: 'low', label: '低' },
-  { value: 'medium', label: '中' },
-  { value: 'high', label: '高' },
-];
-
 interface FileDropEvent {
   dataTransfer: DataTransfer | null;
   preventDefault: () => void;
 }
 
 export default function NewSessionPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const models = useStore((s) => s.models);
   const agents = useStore((s) => s.agents);
@@ -40,6 +34,14 @@ export default function NewSessionPage() {
   const [pageDragActive, setPageDragActive] = useState(false);
   const chatInputRef = useRef<{ uploadRef?: { current?: { insert?: (files: File[]) => void } } } | null>(null);
   const pageDragDepthRef = useRef(0);
+
+  const THINKING_OPTIONS = [
+    { value: 'off', label: t('chat.thinkingOff') },
+    { value: 'minimal', label: t('chat.thinkingMinimal') },
+    { value: 'low', label: t('chat.thinkingLow') },
+    { value: 'medium', label: t('chat.thinkingMedium') },
+    { value: 'high', label: t('chat.thinkingHigh') },
+  ];
 
   const modelOptions = models.map((m) => ({ value: m.id, label: m.alias || m.name || m.id }));
   const agentOptions = agents.filter((agent) => agent.id).map((agent) => ({
@@ -57,8 +59,8 @@ export default function NewSessionPage() {
   }, [agents, selectedAgentId]);
 
   const handleSend = useCallback(async (content: unknown) => {
-    if (!activeClient || connectionStatus !== 'connected') { Toast.error('未连接'); return; }
-    if (!selectedModel && models.length > 0) { Toast.warning('请选择模型'); return; }
+    if (!activeClient || connectionStatus !== 'connected') { Toast.error(t('errors.notConnected')); return; }
+    if (!selectedModel && models.length > 0) { Toast.warning(t('chat.selectModel')); return; }
     const agent = agents.find((a) => a.default) ?? agents[0];
     const createParams = buildNewSessionCreateParams({
       agentId: selectedAgentId || agent?.id || 'main',
@@ -81,27 +83,27 @@ export default function NewSessionPage() {
         thinking: thinkingLevel,
       });
       useStore.getState().fetchSessions();
-      Toast.success('会话已创建');
+      Toast.success(t('chat.sessionCreated'));
       navigate(target.to, target.state ? { state: target.state } : undefined);
     } catch (err) {
-      Toast.error(err instanceof Error ? err.message : '创建失败');
+      Toast.error(err instanceof Error ? err.message : t('chat.createFailed'));
     } finally {
       setCreating(false);
     }
-  }, [activeClient, connectionStatus, models, agents, selectedAgentId, selectedModel, thinkingLevel, navigate]);
+  }, [activeClient, connectionStatus, models, agents, selectedAgentId, selectedModel, thinkingLevel, navigate, t]);
 
   const renderConfig = useCallback(() => (
     <>
       <Configure.Select
         field="agent"
-        label="Agent"
+        label={t('chat.agent')}
         optionList={agentOptions}
         initValue={selectedAgentId || agentOptions[0]?.value}
       />
       <Configure.Select field="model" optionList={modelOptions} initValue={modelOptions[0]?.value} />
       <Configure.Select field="thinking" optionList={THINKING_OPTIONS} initValue={thinkingLevel} />
     </>
-  ), [agentOptions, modelOptions, selectedAgentId, thinkingLevel]);
+  ), [agentOptions, modelOptions, selectedAgentId, thinkingLevel, THINKING_OPTIONS, t]);
 
   const handleConfigChange = useCallback((_value: Record<string, unknown> | undefined, changed: Record<string, unknown> | undefined) => {
     if (!changed) return;
@@ -149,9 +151,9 @@ export default function NewSessionPage() {
     setPageDragActive(false);
     chatInputRef.current?.uploadRef?.current?.insert?.(files);
     requestAnimationFrame(() => {
-      Toast.success(`已添加 ${files.length} 个附件`);
+      Toast.success(t('chat.attachmentsAdded', { count: files.length }));
     });
-  }, [getPageDropFiles]);
+  }, [getPageDropFiles, t]);
 
   useEffect(() => {
     window.addEventListener('dragenter', handlePageDragEnter);
@@ -174,13 +176,13 @@ export default function NewSessionPage() {
         <div style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: 'var(--semi-color-primary-light-default)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
           <IconPlusCircle size="extra-large" style={{ color: 'var(--semi-color-primary)' }} />
         </div>
-        <Title heading={3} style={{ marginBottom: 8 }}>新会话</Title>
-        <Text type="tertiary">选择 Agent 和模型，开启新的对话</Text>
+        <Title heading={3} style={{ marginBottom: 8 }}>{t('chat.newSession')}</Title>
+        <Text type="tertiary">{t('chat.newSessionSubtitle')}</Text>
       </div>
 
       {connectionStatus !== 'connected' && (
         <div style={{ margin: '16px 40px 0', padding: '10px 16px', borderRadius: 8, backgroundColor: 'var(--semi-color-warning-light-default)', border: '1px solid var(--semi-color-warning-light-hover)', fontSize: 13, color: 'var(--semi-color-text-1)' }}>
-          {connectionStatus === 'connecting' ? '连接中…' : '未连接'}
+          {connectionStatus === 'connecting' ? t('connection.connecting') : t('connection.notConnected')}
         </div>
       )}
 
@@ -202,7 +204,7 @@ export default function NewSessionPage() {
           <AIChatInput
             ref={chatInputRef as Ref<AIChatInput>}
             key={`${agentOptions.length}:${modelOptions.length}`}
-            placeholder="输入第一条消息"
+            placeholder={t('chat.firstMessagePlaceholder')}
             generating={creating}
             uploadProps={{ action: '', beforeUpload: () => ({ shouldUpload: false }) }}
             renderConfigureArea={renderConfig}
@@ -236,7 +238,7 @@ export default function NewSessionPage() {
           }}
         >
           <span style={{ fontSize: 32 }}>📎</span>
-          <span>松开以添加附件</span>
+          <span>{t('chat.dropToAttach')}</span>
         </div>
       ) : null}
     </div>

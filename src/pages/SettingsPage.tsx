@@ -28,8 +28,8 @@ const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
 
 /* ── Language options ── */
 const LOCALE_OPTIONS: { value: SupportedLocale; label: string }[] = [
-  { value: 'zh-CN', label: '中文' },
-  { value: 'en-US', label: 'English' },
+  { value: 'zh-CN', label: 'settings.chinese' },
+  { value: 'en-US', label: 'settings.english' },
 ];
 
 const AGENT_SWITCH_OPTIONS: AgentSwitchStrategy[] = ['new-session', 'subagent-session'];
@@ -261,7 +261,7 @@ export default function SettingsPage() {
           >
             {LOCALE_OPTIONS.map((opt) => (
               <Select.Option key={opt.value} value={opt.value}>
-                {opt.label}
+                {t(opt.label)}
               </Select.Option>
             ))}
           </Select>
@@ -297,10 +297,10 @@ export default function SettingsPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24 }}>
             <div style={{ minWidth: 0 }}>
               <Text style={{ display: 'block', color: 'var(--semi-color-text-0)' }}>
-                外部链接打开方式
+                {t('settings.externalLinkMode')}
               </Text>
               <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>
-                选择在系统默认浏览器或内部窗口中打开外部链接
+                {t('settings.externalLinkModeDesc')}
               </Text>
             </div>
             <Select
@@ -311,8 +311,8 @@ export default function SettingsPage() {
               }}
               style={{ width: 140 }}
             >
-              <Select.Option value="system">默认浏览器</Select.Option>
-              <Select.Option value="internal">内部窗口</Select.Option>
+              <Select.Option value="system">{t('settings.systemBrowser')}</Select.Option>
+              <Select.Option value="internal">{t('settings.internalWindow')}</Select.Option>
             </Select>
           </div>
         </SectionCard>
