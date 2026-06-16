@@ -1,5 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
-import {Button, Layout, Modal, Space, Tag, Toast, Typography} from '@douyinfe/semi-ui';
+import {Button, Checkbox, Layout, Modal, Space, Tag, Toast, Typography} from '@douyinfe/semi-ui';
 import {Outlet} from 'react-router-dom';
 import {useTranslation} from 'react-i18next';
 import {useStore} from '../lib';
@@ -37,6 +37,9 @@ export default function MainPage() {
     const prevRetryAttemptRef = useRef(0);
     const lastErrorToastRef = useRef(0);
     const companionCheckedRef = useRef(new Set<string>());
+    const companionInstallDismissedRef = useRef(
+        localStorage.getItem('openclaw-companion-install-dismissed') === '1'
+    );
 
     useEffect(() => {
         if (!currentId && instances.length > 0) {
@@ -96,6 +99,7 @@ export default function MainPage() {
             return;
         }
         if (companionCheckedRef.current.has(currentId)) return;
+        if (companionInstallDismissedRef.current) return;
 
         companionCheckedRef.current.add(currentId);
         let cancelled = false;
@@ -123,6 +127,16 @@ export default function MainPage() {
                             <Button size="small" theme="solid" type="warning" onClick={handleInstallSession}>
                                 创建安装会话
                             </Button>
+                            <Checkbox
+                                onChange={(e) => {
+                                    if (e.target.checked) {
+                                        localStorage.setItem('openclaw-companion-install-dismissed', '1');
+                                        companionInstallDismissedRef.current = true;
+                                    }
+                                }}
+                            >
+                                不再提醒
+                            </Checkbox>
                         </div>
                     ),
                     duration: 12,
