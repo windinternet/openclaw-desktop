@@ -104,8 +104,8 @@ jobs:
             release/*.exe
             release/*.rpm
             release/*.tar.gz
-            release/*.yml
-            release/*.yaml
+            release/latest*.yml
+            release/latest*.yaml
             release/*.zip
           if-no-files-found: error
 
