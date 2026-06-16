@@ -414,6 +414,7 @@ function SessionSidePanel({
       width={400}
       disableScroll={false}
       maskStyle={{ background: 'rgba(0,0,0,0.15)' }}
+      headerStyle={{ borderBottom: '1px solid var(--semi-color-border)' }}
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <IconInfoCircle size="small" />
@@ -427,6 +428,7 @@ function SessionSidePanel({
         onChange={(key) => onTabChange(String(key))}
         size="small"
         style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+        tabBarStyle={{ padding: '0 16px' }}
         contentStyle={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '12px 16px 16px' }}
       >
         <Tabs.TabPane tab="概况" itemKey="overview">
