@@ -99,8 +99,8 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
   };
 
   const handleTest = async () => {
-    if (!manualUrl.trim() || !manualToken.trim()) {
-      Toast.warning(t('connection.pleaseFillFields'));
+    if (!manualUrl.trim()) {
+      Toast.warning(t('connection.pleaseFillUrl'));
       return;
     }
     setTesting(true);
@@ -208,8 +208,8 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
   };
 
   const handleManualConnect = async () => {
-    if (!manualUrl.trim() || !manualToken.trim()) {
-      Toast.warning(t('connection.pleaseFillFields'));
+    if (!manualUrl.trim()) {
+      Toast.warning(t('connection.pleaseFillUrl'));
       return;
     }
     await doConnect(manualUrl.trim(), manualToken.trim());
@@ -455,7 +455,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
                 theme="light"
                 onClick={handleTest}
                 loading={testing}
-                disabled={!manualUrl.trim() || !manualToken.trim() || connecting}
+                disabled={!manualUrl.trim() || connecting}
                 block
               >
                 {t('connection.testConnection')}
@@ -505,7 +505,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
                 type="primary"
                 size="large"
                 loading={connecting}
-                disabled={!manualUrl.trim() || !manualToken.trim()}
+                disabled={!manualUrl.trim()}
                 onClick={handleManualConnect}
                 block
               >
