@@ -1818,19 +1818,21 @@ export default function SessionChatPage() {
           >
             {sidePanelVisible ? '收起仪表盘' : '展开会话仪表盘'}
           </Button>
-          <div style={{ padding: '0 12px 6px' }}>
-            <Progress
-              percent={Math.round(sessionInsight.contextUsageRatio * 100)}
-              size="small"
-              showInfo
-              style={{ width: '100%' }}
-              stroke={
-                sessionInsight.contextUsageRatio > 0.8
-                  ? 'var(--semi-color-warning)'
-                  : sessionInsight.contextUsageRatio > 0.6
-                    ? 'var(--semi-color-primary)'
-                    : undefined
-              }
+          <div style={{ height: 4, background: 'var(--semi-color-fill-0)' }}>
+            <div
+              style={{
+                height: '100%',
+                width: `${Math.round(sessionInsight.contextUsageRatio * 100)}%`,
+                minWidth: 8,
+                background:
+                  sessionInsight.contextUsageRatio > 0.8
+                    ? 'var(--semi-color-warning)'
+                    : sessionInsight.contextUsageRatio > 0.6
+                      ? 'var(--semi-color-primary)'
+                      : 'var(--semi-color-tertiary)',
+                borderRadius: '0 2px 2px 0',
+                transition: 'width 0.4s ease',
+              }}
             />
           </div>
         </div>
