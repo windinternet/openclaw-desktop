@@ -33,7 +33,7 @@ Release 触发方式：
 - `windows-latest` 构建 Windows x64。
 - `windows-11-arm` 构建 Windows arm64。
 - `ubuntu-latest` 构建 Linux x64。
-- `ubuntu-24.04-arm` 构建 Linux arm64。
+- `ubuntu-latest` 交叉构建 Linux arm64，因为 electron-builder 的 deb/rpm 打包依赖 fpm，而当前下载的 fpm 辅助工具是 Linux x86 二进制，不能在原生 Linux arm64 runner 上执行。
 
 electron-builder 官方文档说明不要期待在单一平台构建所有平台，macOS 签名只能在 macOS 上完成；GitHub Actions 官方文档已提供 Linux arm64、Windows arm64、macOS Intel/arm64 runner 标签。因此采用真实目标平台 runner，而不是在单一 Linux runner 上交叉构建全部平台。
 

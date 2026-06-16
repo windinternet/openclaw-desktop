@@ -1,6 +1,6 @@
 {
   "name": "openclaw-desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "OpenClaw Desktop Client",
   "author": "OpenClaw",
   "main": "dist-electron/main.js",
