@@ -2,10 +2,8 @@ name: Build & Release
 
 on:
   push:
-    branches: [main, develop]
     tags: ['v*']
-  pull_request:
-    branches: [main, develop]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -16,22 +14,44 @@ concurrency:
 
 jobs:
   build:
-    name: ${{ matrix.os }}
+    name: ${{ matrix.name }}
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            target: linux
-            artifact-name: OpenClaw-Desktop-linux-amd64
-          - os: macos-latest
-            target: mac
-            artifact-name: OpenClaw-Desktop-mac
-          - os: windows-latest
-            target: win
+          - name: macOS x64
+            os: macos-15-intel
+            arch: x64
+            builder-args: --mac dmg zip --x64
+            artifact-name: OpenClaw-Desktop-mac-x64
+          - name: macOS arm64
+            os: macos-latest
+            arch: arm64
+            builder-args: --mac dmg zip --arm64
+            artifact-name: OpenClaw-Desktop-mac-arm64
+          - name: Windows x64
+            os: windows-latest
+            arch: x64
+            builder-args: --win nsis portable --x64
             artifact-name: OpenClaw-Desktop-win-x64
+          - name: Windows arm64
+            os: windows-11-arm
+            arch: arm64
+            builder-args: --win nsis portable --arm64
+            artifact-name: OpenClaw-Desktop-win-arm64
+          - name: Linux x64
+            os: ubuntu-latest
+            arch: x64
+            builder-args: --linux AppImage deb rpm tar.gz --x64
+            artifact-name: OpenClaw-Desktop-linux-x64
+          - name: Linux arm64
+            os: ubuntu-24.04-arm
+            arch: arm64
+            builder-args: --linux AppImage deb rpm tar.gz --arm64
+            artifact-name: OpenClaw-Desktop-linux-arm64
 
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
@@ -42,19 +62,51 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Cache Electron downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+          key: ${{ runner.os }}-${{ matrix.arch }}-electron-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.arch }}-electron-
+
       - name: Install dependencies
         run: npm ci
 
-      - name: Build electron app (${{ matrix.target }})
-        run: npm run electron:build -- --${{ matrix.target }}
+      - name: Install Linux package dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libopenjp2-tools rpm
+
+      - name: Build renderer and Electron main process
+        run: npm run build
+
+      - name: Package desktop app
+        run: npx electron-builder ${{ matrix.builder-args }} --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact-name }}
-          path: release/*
+          path: |
+            release/*.AppImage
+            release/*.blockmap
+            release/*.deb
+            release/*.dmg
+            release/*.exe
+            release/*.rpm
+            release/*.tar.gz
+            release/*.yml
+            release/*.yaml
+            release/*.zip
           if-no-files-found: error
 
   release:
@@ -69,8 +121,13 @@ jobs:
         with:
           path: artifacts
 
+      - name: Generate SHA256 checksums
+        run: find artifacts -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*
+          files: |
+            artifacts/**/*
+            SHA256SUMS.txt
           generate_release_notes: true
