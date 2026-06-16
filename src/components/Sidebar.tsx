@@ -628,7 +628,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
         mode="vertical"
         selectedKeys={[activeKey]}
         onSelect={handleSelect}
-        style={{ flex: 1, paddingTop: sidebarTopInset, boxSizing: 'border-box' }}
+        style={{ width: '100%', paddingTop: sidebarTopInset, boxSizing: 'border-box' }}
         header={{
           logo: instanceAvatar,
           text: instanceHeaderText,

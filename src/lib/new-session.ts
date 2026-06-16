@@ -44,13 +44,14 @@ export function buildNewSessionCreateParams(options: {
   const peerKey = generateDashboardPeerKey();
   const sessionKey = buildDashboardSessionKey(options.agentId, peerKey);
   const title = extractSessionMessageText(options.content).trim();
+  const uniqueSuffix = Date.now().toString(36).slice(-4);
 
   return {
     request: {
       agentId: options.agentId,
       key: sessionKey,
       model: options.model,
-      label: title || undefined,
+      label: title ? `${title.slice(0, 36)} · ${uniqueSuffix}` : undefined,
     },
     agentId: options.agentId,
     key: sessionKey,

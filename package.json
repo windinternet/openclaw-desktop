@@ -83,6 +83,7 @@
       }
     ],
     "win": {
+      "icon": "build/icons/icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -111,6 +112,7 @@
     },
     "mac": {
       "category": "public.app-category.developer-tools",
+      "icon": "build/icons/icon.icns",
       "target": [
         {
           "target": "dmg",
@@ -135,6 +137,7 @@
       "maintainer": "OpenClaw",
       "category": "Development",
       "executableName": "openclaw-desktop",
+      "icon": "build/icons",
       "target": [
         {
           "target": "AppImage",

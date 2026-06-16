@@ -659,7 +659,7 @@ export default function SessionChatPage() {
   const [allHistory, setAllHistory] = useState<DisplayChat[]>([]);
   const [selectedToolCall, setSelectedToolCall] = useState<SelectedToolCall | null>(null);
   const [sidePanelTab, setSidePanelTab] = useState('overview');
-  const [sidePanelVisible, setSidePanelVisible] = useState(true);
+  const [sidePanelVisible, setSidePanelVisible] = useState(false);
   const [sessionContextSnapshot, setSessionContextSnapshot] = useState<SessionContextSnapshot | null>(null);
   const [pageDragActive, setPageDragActive] = useState(false);
 
