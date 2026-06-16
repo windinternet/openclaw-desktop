@@ -665,11 +665,14 @@ export default function SessionChatPage() {
   const sendingRef = useRef(false);
   const genTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const chatInputRef = useRef<{ uploadRef?: { current?: { insert?: (files: File[]) => void } } } | null>(null);
+  const chatInputRef = useRef<{ setContent?: (content: string) => void; uploadRef?: { current?: { insert?: (files: File[]) => void } } } | null>(null);
+  const inputDefaultContentRef = useRef('');
   const initialMessageSentRef = useRef<string | null>(null);
   const prevRootSessionKeyRef = useRef<string | undefined>();
   const pageDragDepthRef = useRef(0);
   const savedArtifactKeysRef = useRef(new Set<string>());
+  const draftKeyRef = useRef<string | null>(null);
+  const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!urlSessionKey) return;
@@ -722,6 +725,55 @@ export default function SessionChatPage() {
   useEffect(() => {
     if (!chatModel && models.length > 0) queueMicrotask(() => setChatModel(models[0].id));
   }, [models, chatModel]);
+
+  /* ── 草稿保存 ── */
+  const DRAFT_PREFIX = 'chat-draft:';
+
+  const getDraftKey = useCallback((sessionKey: string) => `${DRAFT_PREFIX}${sessionKey}`, []);
+
+  const saveDraft = useCallback((sessionKey: string, text: string) => {
+    if (text.trim()) {
+      localStorage.setItem(getDraftKey(sessionKey), text);
+    } else {
+      localStorage.removeItem(getDraftKey(sessionKey));
+    }
+  }, [getDraftKey]);
+
+  const loadDraft = useCallback((sessionKey: string): string => {
+    return localStorage.getItem(getDraftKey(sessionKey)) || '';
+  }, [getDraftKey]);
+
+  // 切换会话时加载草稿
+  useEffect(() => {
+    if (!activeSessionKey) return;
+    const draft = loadDraft(activeSessionKey);
+    draftKeyRef.current = activeSessionKey;
+    // 延迟确保 AIChatInput ref 就绪
+    const timer = setTimeout(() => {
+      if (draftKeyRef.current === activeSessionKey) {
+        chatInputRef.current?.setContent?.(draft);
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [activeSessionKey, loadDraft]);
+
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      if (draftSaveTimerRef.current) {
+        clearTimeout(draftSaveTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleContentChange = useCallback((_content: unknown) => {
+    if (!activeSessionKey) return;
+    const text = extractMessageText(_content);
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    draftSaveTimerRef.current = setTimeout(() => {
+      saveDraft(activeSessionKey, text);
+    }, 500);
+  }, [activeSessionKey, saveDraft]);
 
     /**
    * Auto-scroll to bottom when new chats arrive, but only if the user
@@ -1175,6 +1227,8 @@ export default function SessionChatPage() {
       const message = extractMessageText(_content);
       const attachments = await normalizeChatInputAttachments(extractChatInputAttachments(_content));
       if (!message.trim() && attachments.length === 0) return;
+      // 清除草稿
+      saveDraft(activeSessionKey, '');
       const pendingSummary = currentInstanceId
         ? getPendingSummary(currentInstanceId, activeSessionKey)
         : undefined;
@@ -1686,6 +1740,8 @@ export default function SessionChatPage() {
             showUploadButton
             showReference={false}
             round={false}
+            defaultContent={inputDefaultContentRef.current}
+            onContentChange={handleContentChange}
             onMessageSend={handleSend}
             onStopGenerate={handleStop}
             renderConfigureArea={renderConfig}
@@ -1726,6 +1782,37 @@ export default function SessionChatPage() {
       >
         {sidePanelVisible ? '收起仪表盘' : '展开会话仪表盘'}
       </Button>
+      {sessionInsight.contextUsageRatio !== undefined && (
+        <div
+          style={{
+            position: 'absolute',
+            right: 12,
+            top: 80,
+            zIndex: 10,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-end',
+            gap: 4,
+          }}
+        >
+          <Progress
+            percent={Math.round(sessionInsight.contextUsageRatio * 100)}
+            size="small"
+            showInfo={false}
+            style={{ width: 140 }}
+            stroke={
+              sessionInsight.contextUsageRatio > 0.8
+                ? 'var(--semi-color-warning)'
+                : sessionInsight.contextUsageRatio > 0.6
+                  ? 'var(--semi-color-primary)'
+                  : undefined
+            }
+          />
+          <Text size="small" type="tertiary">
+            {Math.round(sessionInsight.contextUsageRatio * 100)}%
+          </Text>
+        </div>
+      )}
       {pageDragActive ? (
         <div
           style={{
