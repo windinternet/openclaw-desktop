@@ -285,6 +285,7 @@ export default function MainPage() {
                 maskClosable
                 footer={null}
                 width={560}
+                bodyStyle={{ paddingBottom: 24 }}
             >
                 <ConnectionWizard
                     onConnected={(instanceId) => {

@@ -9,6 +9,7 @@ import { fetchSkillMarketplaceSkills } from '../src/lib/skill-marketplace'
 import type { SkillMarketplaceSearchParams } from '../src/lib/types'
 import { registerLocalFileStorageHandlers } from './local-storage'
 import { registerArtifactProtocol, registerArtifactIpcHandlers } from './artifact-handlers'
+import { setupMainLogger, writeRenderer } from './logger'
 
 const execFileAsync = promisify(execFile)
 
@@ -317,6 +318,10 @@ ipcMain.handle('notification:show', (_event, params: { title?: string; body?: st
   return true
 })
 
+ipcMain.handle('log:renderer', (_event, level: string, ...args: unknown[]) => {
+  writeRenderer(level, ...args)
+})
+
 ipcMain.handle('marketplace:search', async (_event, params: SkillMarketplaceSearchParams) => {
   return fetchSkillMarketplaceSkills(params)
 })
@@ -427,6 +432,7 @@ ipcMain.on('set-external-link-mode', (_event, mode: string) => {
 });
 
 app.whenReady().then(() => {
+  setupMainLogger()
   registerArtifactProtocol()
   createWindow()
 })
