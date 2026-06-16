@@ -61,7 +61,7 @@ export type {
   GatewayClientOptions,
 } from './types';
 export { useStore } from './store';
-export { createGatewayClient } from './gateway';
+export { createGatewayClient, GatewayConnectError } from './gateway';
 export type { GatewayClient } from './gateway';
 export {
   fetchGatewayAgentFileContent,

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Card,
   Button,
@@ -10,10 +10,11 @@ import {
   Divider,
   Toast,
   Input,
+  Modal,
 } from '@douyinfe/semi-ui';
 import { IconSearch, IconLink, IconPlay, IconTickCircle, IconClose, IconDownload } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
-import { useStore, createGatewayClient } from '../lib';
+import { useStore, createGatewayClient, GatewayConnectError } from '../lib';
 import type { DiscoveredInstance } from '../lib';
 
 const { Text } = Typography;
@@ -51,6 +52,9 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
   const [connecting, setConnecting] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [scannedOnce, setScannedOnce] = useState(false);
+  const [remoteHelpVisible, setRemoteHelpVisible] = useState(false);
+  const [remoteHelpUrl, setRemoteHelpUrl] = useState('');
+  const autoApproveRetriedRef = useRef(false);
 
   const isElectron = typeof window !== 'undefined' && 'electronAPI' in window;
 
@@ -188,6 +192,51 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
 
       client.disconnect();
     } catch (err) {
+      const isGatewayError =
+        err instanceof GatewayConnectError ||
+        (err instanceof Error && err.message.includes('CONTROL_UI_ORIGIN_NOT_ALLOWED'))
+
+      if (isGatewayError) {
+        console.log('[ConnectionWizard] control-ui origin not allowed:', {
+          isGatewayConnectError: err instanceof GatewayConnectError,
+          message: err instanceof Error ? err.message : String(err),
+        })
+
+        const api = (window as any).electronAPI
+        if (api?.connect?.isLocal && api?.connect?.autoApprove) {
+          console.log('[ConnectionWizard] checking if url is local:', url)
+          const isLocal = await api.connect.isLocal(url)
+          console.log('[ConnectionWizard] isLocal result:', isLocal)
+          if (isLocal) {
+            if (autoApproveRetriedRef.current) {
+              Toast.error('自动批准后仍被拒绝，请检查 Gateway 配置')
+            } else {
+              autoApproveRetriedRef.current = true
+              Toast.info('检测到本机连接，正在自动批准…')
+              console.log('[ConnectionWizard] calling autoApprove')
+              const result = await api.connect.autoApprove()
+              console.log('[ConnectionWizard] autoApprove result:', result)
+              if (result.success) {
+                Toast.success('已自动批准 origin，重启 Gateway 后重试连接…')
+                setTimeout(() => {
+                  void doConnect(url, token, name)
+                }, 5000)
+              } else {
+                Toast.error(result.error || '自动批准失败')
+              }
+            }
+          } else {
+            setRemoteHelpUrl(url)
+            setRemoteHelpVisible(true)
+          }
+        } else {
+          console.log('[ConnectionWizard] electronAPI.connect not available')
+          setRemoteHelpUrl(url)
+          setRemoteHelpVisible(true)
+        }
+        setConnecting(false)
+        return
+      }
       const message = err instanceof Error ? err.message : t('connection.connectFailed');
       Toast.error(message);
     } finally {
@@ -204,6 +253,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
       version: instance.version,
     });
     const token = instance.token || '';
+    autoApproveRetriedRef.current = false;
     await doConnect(instance.url, token, instance.name || instance.version);
   };
 
@@ -212,6 +262,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
       Toast.warning(t('connection.pleaseFillUrl'));
       return;
     }
+    autoApproveRetriedRef.current = false;
     await doConnect(manualUrl.trim(), manualToken.trim());
   };
 
@@ -515,6 +566,45 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
           </div>
         </Card>
       )}
+      <Modal
+        title="远程 Gateway 连接被拒绝"
+        visible={remoteHelpVisible}
+        onCancel={() => setRemoteHelpVisible(false)}
+        centered
+        closable
+        maskClosable
+        width={520}
+        footer={
+          <Button theme="solid" type="primary" onClick={() => setRemoteHelpVisible(false)}>
+            知道了
+          </Button>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <Text>
+            目标 Gateway（{remoteHelpUrl}）拒绝了来自当前应用的连接，
+            因为该 origin 不在 Gateway 的允许列表中。
+          </Text>
+          <Text>
+            请在 Gateway 主机上执行以下操作来批准此连接：
+          </Text>
+          <div
+            style={{
+              padding: 12,
+              borderRadius: 6,
+              backgroundColor: 'var(--semi-color-fill-0)',
+              fontFamily: 'monospace',
+              fontSize: 13,
+              lineHeight: 1.8,
+            }}
+          >
+            <div># 方法 1：修改配置文件</div>
+            <div>openclaw config set gateway.controlUi.allowedOrigins --json '[&quot;file://&quot;]'</div>
+            <div style={{ marginTop: 8 }}># 方法 2：如果是在 Gateway 本机使用浏览器访问</div>
+            <div>直接从 Gateway 主机打开浏览器访问 Gateway 地址即可</div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

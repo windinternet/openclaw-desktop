@@ -7,6 +7,18 @@ import type {
   GatewayRetryInfo,
 } from './types';
 
+export class GatewayConnectError extends Error {
+  code?: string
+  details?: unknown
+
+  constructor(message: string, code?: string, details?: unknown) {
+    super(message)
+    this.name = 'GatewayConnectError'
+    this.code = code
+    this.details = details
+  }
+}
+
 interface PendingEntry {
   resolve: (value: unknown) => void;
   reject: (reason: Error) => void;
@@ -253,8 +265,14 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
       } else {
         const errInfo = f.error as GatewayError | undefined;
         const message = errInfo?.message ?? 'Connection rejected';
+        const code = errInfo?.code;
+        const details = errInfo?.details;
         if (connectReject !== null) {
-          connectReject(new Error(message));
+          intentionalClose = true;
+          connectReject(new GatewayConnectError(message, code, details));
+          if (ws !== null && ws.readyState === WebSocket.OPEN) {
+            ws.close();
+          }
         } else {
           lastCloseReason = message;
           setStatus('error');

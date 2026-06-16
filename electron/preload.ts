@@ -59,5 +59,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   log: {
     send: (level: string, ...args: unknown[]) => ipcRenderer.invoke('log:renderer', level, ...args),
   },
+  connect: {
+    isLocal: (url: string) => ipcRenderer.invoke('connect:isLocal', url),
+    autoApprove: () => ipcRenderer.invoke('connect:autoApprove'),
+  },
   setExternalLinkMode: (mode: string) => ipcRenderer.send('set-external-link-mode', mode),
 })

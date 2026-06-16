@@ -2,9 +2,10 @@ import { app, BrowserWindow, ipcMain, Notification, shell } from 'electron'
 import path from 'node:path'
 import { execFile, execFileSync, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import crypto from 'node:crypto'
+import { lookup } from 'node:dns/promises'
 import { fetchSkillMarketplaceSkills } from '../src/lib/skill-marketplace'
 import type { SkillMarketplaceSearchParams } from '../src/lib/types'
 import { registerLocalFileStorageHandlers } from './local-storage'
@@ -116,7 +117,14 @@ interface DiscoveredResult {
 
 async function resolveAuthMode(): Promise<string | undefined> {
   try {
-    const { stdout } = await execFileAsync('sh', ['-lc', 'openclaw config get gateway.auth --json'], { timeout: 5000 })
+    let stdout: string
+    try {
+      const result = await execFileAsync('openclaw', ['config', 'get', 'gateway.auth', '--json'], { timeout: 5000 })
+      stdout = result.stdout
+    } catch {
+      const result = await execFileAsync('bash', ['-lc', 'openclaw config get gateway.auth --json'], { timeout: 5000 })
+      stdout = result.stdout
+    }
     const raw = stdout.trim()
     console.log('[main] resolveAuthMode: raw =', raw.slice(0, 80))
     const auth = JSON.parse(raw)
@@ -131,10 +139,17 @@ async function resolveAuthMode(): Promise<string | undefined> {
 async function readGatewayToken(): Promise<string | undefined> {
   const configPaths: string[] = []
   try {
-    const { stdout } = await execFileAsync('sh', ['-lc', 'openclaw config file'], { timeout: 3000 })
-    const path = lastLineOf(stdout)
-    console.log('[main] readGatewayToken: CLI config path =', path)
-    configPaths.push(path)
+    let stdout: string
+    try {
+      const result = await execFileAsync('openclaw', ['config', 'file'], { timeout: 3000 })
+      stdout = result.stdout
+    } catch {
+      const result = await execFileAsync('bash', ['-lc', 'openclaw config file'], { timeout: 3000 })
+      stdout = result.stdout
+    }
+    const resolvedPath = lastLineOf(stdout)
+    console.log('[main] readGatewayToken: CLI config path =', resolvedPath)
+    configPaths.push(resolvedPath.startsWith('~') ? path.join(os.homedir(), resolvedPath.slice(1)) : resolvedPath)
   } catch (err) {
     console.log('[main] readGatewayToken: CLI config file failed:', err)
   }
@@ -242,8 +257,13 @@ function lastLineOf(stdout: string): string {
 ipcMain.handle('discover:scan', async () => {
   let probeOutput: string
   try {
-    const { stdout } = await execFileAsync('sh', ['-lc', 'openclaw gateway probe --json --timeout 5000'], { timeout: 8000 })
-    probeOutput = stdout.trim()
+    try {
+      const result = await execFileAsync('openclaw', ['gateway', 'probe', '--json', '--timeout', '5000'], { timeout: 8000 })
+      probeOutput = result.stdout.trim()
+    } catch {
+      const result = await execFileAsync('bash', ['-lc', 'openclaw gateway probe --json --timeout 5000'], { timeout: 8000 })
+      probeOutput = result.stdout.trim()
+    }
   } catch {
     return []
   }
@@ -302,6 +322,127 @@ ipcMain.handle('discover:scan', async () => {
   }
 
   return results
+})
+
+function getLocalAddresses(): Set<string> {
+  const addrs = new Set<string>()
+  addrs.add('localhost')
+  addrs.add('127.0.0.1')
+  addrs.add('::1')
+  addrs.add('0.0.0.0')
+
+  const host = os.hostname()
+  addrs.add(host)
+  addrs.add(`${host}.local`)
+
+  const nets = os.networkInterfaces()
+  for (const [, interfaces] of Object.entries(nets)) {
+    if (!interfaces) continue
+    for (const iface of interfaces) {
+      if (iface.address) addrs.add(iface.address)
+    }
+  }
+
+  return addrs
+}
+
+async function isLocalUrl(url: string): Promise<boolean> {
+  try {
+    const parsed = new URL(url)
+    const host = parsed.hostname
+
+    const localAddrs = getLocalAddresses()
+    if (localAddrs.has(host)) return true
+
+    if (/^127\.\d+\.\d+\.\d+$/.test(host)) return true
+
+    try {
+      const { address } = await lookup(host)
+      if (localAddrs.has(address)) return true
+    } catch {
+      // DNS failed, can't determine
+    }
+
+    return false
+  } catch {
+    return false
+  }
+}
+
+ipcMain.handle('connect:isLocal', async (_event, url: string) => {
+  return isLocalUrl(url)
+})
+
+ipcMain.handle('connect:autoApprove', async () => {
+    let configPath: string
+    try {
+      try {
+        const result = await execFileAsync('openclaw', ['config', 'file'], { timeout: 3000 })
+        configPath = result.stdout.trim().split('\n').pop()!.trim()
+      } catch {
+        const result = await execFileAsync('bash', ['-lc', 'openclaw config file'], { timeout: 3000 })
+        configPath = result.stdout.trim().split('\n').pop()!.trim()
+      }
+    } catch {
+      return { success: false, error: '无法读取 OpenClaw 配置文件路径' }
+    }
+
+    if (configPath.startsWith('~')) {
+      configPath = path.join(os.homedir(), configPath.slice(1))
+    }
+
+  let config: Record<string, unknown>
+  try {
+    config = JSON.parse(readFileSync(configPath, 'utf-8'))
+  } catch {
+    config = {}
+  }
+
+  const gateway = (config.gateway as Record<string, unknown> | undefined) ?? {}
+  const controlUi = (gateway.controlUi as Record<string, unknown> | undefined) ?? {}
+  const allowedOrigins: string[] = Array.isArray(controlUi.allowedOrigins)
+    ? (controlUi.allowedOrigins as string[])
+    : []
+
+  const neededOrigins = ['file://', 'null']
+  let changed = false
+
+  for (const origin of neededOrigins) {
+    if (!allowedOrigins.includes(origin)) {
+      allowedOrigins.push(origin)
+      changed = true
+    }
+  }
+
+  if (changed) {
+    const updatedControlUi = { ...controlUi, allowedOrigins }
+    const updatedGateway = { ...gateway, controlUi: updatedControlUi }
+    const updatedConfig = { ...config, gateway: updatedGateway }
+
+    try {
+      writeFileSync(configPath, JSON.stringify(updatedConfig, null, 2), 'utf-8')
+      console.log('[main] autoApprove: wrote config with origins:', allowedOrigins)
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : '写入配置失败' }
+    }
+  } else {
+    console.log('[main] autoApprove: origins already configured:', allowedOrigins)
+  }
+
+  try {
+    const result = await execFileAsync('openclaw', ['gateway', 'restart'], { timeout: 10000 })
+    console.log('[main] autoApprove: gateway restart stdout:', result.stdout.trim().slice(0, 200))
+  } catch {
+    try {
+      const result = await execFileAsync('bash', ['-lc', 'openclaw gateway restart'], { timeout: 10000 })
+      console.log('[main] autoApprove: gateway restart (bash) stdout:', result.stdout.trim().slice(0, 200))
+    } catch (restartErr) {
+      console.log('[main] autoApprove: gateway restart failed:', String(restartErr).slice(0, 200))
+      return { success: true, origins: allowedOrigins, restartFailed: true }
+    }
+  }
+
+  return { success: true, origins: allowedOrigins }
 })
 
 ipcMain.handle('config:getPath', () => {
