@@ -1716,7 +1716,7 @@ export default function SessionChatPage() {
         style={{
           position: 'absolute',
           right: 12,
-          top: 12,
+          top: 42,
           zIndex: 10,
           borderRadius: 8,
         }}
