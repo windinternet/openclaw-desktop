@@ -665,8 +665,7 @@ export default function SessionChatPage() {
   const sendingRef = useRef(false);
   const genTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const chatInputRef = useRef<{ setContent?: (content: string) => void; uploadRef?: { current?: { insert?: (files: File[]) => void } } } | null>(null);
-  const inputDefaultContentRef = useRef('');
+  const chatInputRef = useRef<{ uploadRef?: { current?: { insert?: (files: File[]) => void } } } | null>(null);
   const initialMessageSentRef = useRef<string | null>(null);
   const prevRootSessionKeyRef = useRef<string | undefined>();
   const pageDragDepthRef = useRef(0);
@@ -731,30 +730,33 @@ export default function SessionChatPage() {
 
   const getDraftKey = useCallback((sessionKey: string) => `${DRAFT_PREFIX}${sessionKey}`, []);
 
-  const saveDraft = useCallback((sessionKey: string, text: string) => {
-    if (text.trim()) {
-      localStorage.setItem(getDraftKey(sessionKey), text);
+  const saveDraft = useCallback((sessionKey: string, text: string, attachments: Array<{ uid: string; name: string; size: string }> = []) => {
+    const hasContent = text.trim() || attachments.length > 0;
+    if (hasContent) {
+      localStorage.setItem(getDraftKey(sessionKey), JSON.stringify({ text, attachments }));
     } else {
       localStorage.removeItem(getDraftKey(sessionKey));
     }
   }, [getDraftKey]);
 
-  const loadDraft = useCallback((sessionKey: string): string => {
-    return localStorage.getItem(getDraftKey(sessionKey)) || '';
+  const loadDraft = useCallback((sessionKey: string): { text: string; attachments: Array<{ uid: string; name: string; size: string }> } => {
+    try {
+      const raw = localStorage.getItem(getDraftKey(sessionKey));
+      if (!raw) return { text: '', attachments: [] };
+      return JSON.parse(raw);
+    } catch {
+      return { text: '', attachments: [] };
+    }
   }, [getDraftKey]);
+
+  const [draftState, setDraftState] = useState<{ text: string; attachments: Array<{ uid: string; name: string; size: string }> }>({ text: '', attachments: [] });
 
   // 切换会话时加载草稿
   useEffect(() => {
     if (!activeSessionKey) return;
     const draft = loadDraft(activeSessionKey);
     draftKeyRef.current = activeSessionKey;
-    // 延迟确保 AIChatInput ref 就绪
-    const timer = setTimeout(() => {
-      if (draftKeyRef.current === activeSessionKey) {
-        chatInputRef.current?.setContent?.(draft);
-      }
-    }, 50);
-    return () => clearTimeout(timer);
+    setDraftState(draft);
   }, [activeSessionKey, loadDraft]);
 
   // 组件卸载时清理定时器
@@ -766,12 +768,26 @@ export default function SessionChatPage() {
     };
   }, []);
 
+  const draftAttachmentsRef = useRef<Array<{ uid: string; name: string; size: string }>>([]);
+
   const handleContentChange = useCallback((_content: unknown) => {
     if (!activeSessionKey) return;
     const text = extractMessageText(_content);
     if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
     draftSaveTimerRef.current = setTimeout(() => {
-      saveDraft(activeSessionKey, text);
+      saveDraft(activeSessionKey, text, draftAttachmentsRef.current);
+    }, 500);
+  }, [activeSessionKey, saveDraft]);
+
+  const handleUploadChange = useCallback((props: { fileList?: Array<{ uid: string; name: string; size: string }> }) => {
+    if (!activeSessionKey) return;
+    const attachments = (props.fileList || []).map((f) => ({ uid: f.uid, name: f.name, size: f.size }));
+    draftAttachmentsRef.current = attachments;
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    draftSaveTimerRef.current = setTimeout(() => {
+      const editor = document.querySelector('.semi-ai-chat-input .ProseMirror') as HTMLElement | null;
+      const currentText = editor?.textContent || '';
+      saveDraft(activeSessionKey, currentText, attachments);
     }, 500);
   }, [activeSessionKey, saveDraft]);
 
@@ -1228,7 +1244,8 @@ export default function SessionChatPage() {
       const attachments = await normalizeChatInputAttachments(extractChatInputAttachments(_content));
       if (!message.trim() && attachments.length === 0) return;
       // 清除草稿
-      saveDraft(activeSessionKey, '');
+      saveDraft(activeSessionKey, '', []);
+      draftAttachmentsRef.current = [];
       const pendingSummary = currentInstanceId
         ? getPendingSummary(currentInstanceId, activeSessionKey)
         : undefined;
@@ -1732,16 +1749,27 @@ export default function SessionChatPage() {
           }}
         >
           <AIChatInput
+            key={activeSessionKey}
             ref={chatInputRef as Ref<AIChatInput>}
             placeholder="输入消息…"
             generating={generating || switchingAgent}
-            uploadProps={{ action: '', beforeUpload: () => ({ shouldUpload: false }) }}
+            uploadProps={{
+              action: '',
+              beforeUpload: () => ({ shouldUpload: false }),
+              defaultFileList: draftState.attachments.map((a) => ({
+                uid: a.uid,
+                name: a.name,
+                size: a.size || '',
+                status: 'success' as const,
+              })),
+            }}
             showUploadFile
             showUploadButton
             showReference={false}
             round={false}
-            defaultContent={inputDefaultContentRef.current}
+            defaultContent={draftState.text}
             onContentChange={handleContentChange}
+            onUploadChange={handleUploadChange}
             onMessageSend={handleSend}
             onStopGenerate={handleStop}
             renderConfigureArea={renderConfig}
@@ -1768,50 +1796,59 @@ export default function SessionChatPage() {
           void openArtifactWindow(artifact.id, artifact.currentVersion);
         }}
       />
-      <Button
-        size="small"
-        theme="light"
-        style={{
-          position: 'absolute',
-          right: 12,
-          top: 42,
-          zIndex: 10,
-          borderRadius: 8,
-        }}
-        onClick={() => setSidePanelVisible(!sidePanelVisible)}
-      >
-        {sidePanelVisible ? '收起仪表盘' : '展开会话仪表盘'}
-      </Button>
-      {sessionInsight.contextUsageRatio !== undefined && (
+      {sessionInsight.contextUsageRatio !== undefined ? (
         <div
           style={{
             position: 'absolute',
             right: 12,
-            top: 80,
+            top: 42,
             zIndex: 10,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'flex-end',
-            gap: 4,
+            borderRadius: 8,
+            overflow: 'hidden',
+            border: '1px solid var(--semi-color-border)',
+            background: 'var(--semi-color-bg-1)',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
           }}
         >
-          <Progress
-            percent={Math.round(sessionInsight.contextUsageRatio * 100)}
+          <Button
             size="small"
-            showInfo={false}
-            style={{ width: 140 }}
-            stroke={
-              sessionInsight.contextUsageRatio > 0.8
-                ? 'var(--semi-color-warning)'
-                : sessionInsight.contextUsageRatio > 0.6
-                  ? 'var(--semi-color-primary)'
-                  : undefined
-            }
-          />
-          <Text size="small" type="tertiary">
-            {Math.round(sessionInsight.contextUsageRatio * 100)}%
-          </Text>
+            theme="light"
+            style={{ border: 'none', borderRadius: 0, boxShadow: 'none' }}
+            onClick={() => setSidePanelVisible(!sidePanelVisible)}
+          >
+            {sidePanelVisible ? '收起仪表盘' : '展开会话仪表盘'}
+          </Button>
+          <div style={{ padding: '0 12px 6px' }}>
+            <Progress
+              percent={Math.round(sessionInsight.contextUsageRatio * 100)}
+              size="small"
+              showInfo
+              style={{ width: '100%' }}
+              stroke={
+                sessionInsight.contextUsageRatio > 0.8
+                  ? 'var(--semi-color-warning)'
+                  : sessionInsight.contextUsageRatio > 0.6
+                    ? 'var(--semi-color-primary)'
+                    : undefined
+              }
+            />
+          </div>
         </div>
+      ) : (
+        <Button
+          size="small"
+          theme="light"
+          style={{
+            position: 'absolute',
+            right: 12,
+            top: 42,
+            zIndex: 10,
+            borderRadius: 8,
+          }}
+          onClick={() => setSidePanelVisible(!sidePanelVisible)}
+        >
+          {sidePanelVisible ? '收起仪表盘' : '展开会话仪表盘'}
+        </Button>
       )}
       {pageDragActive ? (
         <div
