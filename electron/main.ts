@@ -115,7 +115,7 @@ interface DiscoveredResult {
 
 async function resolveAuthMode(): Promise<string | undefined> {
   try {
-    const { stdout } = await execFileAsync('openclaw', ['config', 'get', 'gateway.auth', '--json'], { timeout: 5000 })
+    const { stdout } = await execFileAsync('sh', ['-lc', 'openclaw config get gateway.auth --json'], { timeout: 5000 })
     const raw = stdout.trim()
     console.log('[main] resolveAuthMode: raw =', raw.slice(0, 80))
     const auth = JSON.parse(raw)
@@ -130,7 +130,7 @@ async function resolveAuthMode(): Promise<string | undefined> {
 async function readGatewayToken(): Promise<string | undefined> {
   const configPaths: string[] = []
   try {
-    const { stdout } = await execFileAsync('openclaw', ['config', 'file'], { timeout: 3000 })
+    const { stdout } = await execFileAsync('sh', ['-lc', 'openclaw config file'], { timeout: 3000 })
     const path = lastLineOf(stdout)
     console.log('[main] readGatewayToken: CLI config path =', path)
     configPaths.push(path)
@@ -241,7 +241,7 @@ function lastLineOf(stdout: string): string {
 ipcMain.handle('discover:scan', async () => {
   let probeOutput: string
   try {
-    const { stdout } = await execFileAsync('openclaw', ['gateway', 'probe', '--json', '--timeout', '5000'], { timeout: 8000 })
+    const { stdout } = await execFileAsync('sh', ['-lc', 'openclaw gateway probe --json --timeout 5000'], { timeout: 8000 })
     probeOutput = stdout.trim()
   } catch {
     return []
