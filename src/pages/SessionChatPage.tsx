@@ -413,6 +413,7 @@ function SessionSidePanel({
       onCancel={onClose}
       width={400}
       disableScroll={false}
+      maskStyle={{ background: 'rgba(0,0,0,0.15)' }}
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <IconInfoCircle size="small" />
@@ -1710,17 +1711,19 @@ export default function SessionChatPage() {
         }}
       />
       <Button
-        icon={<IconList />}
         size="small"
-        theme="borderless"
+        theme="light"
         style={{
           position: 'absolute',
-          right: 8,
-          top: 42,
+          right: 12,
+          top: 12,
           zIndex: 10,
+          borderRadius: 8,
         }}
         onClick={() => setSidePanelVisible(!sidePanelVisible)}
-      />
+      >
+        {sidePanelVisible ? '收起仪表盘' : '展开会话仪表盘'}
+      </Button>
       {pageDragActive ? (
         <div
           style={{
