@@ -151,3 +151,4 @@ vite.config.ts.timestamp-*
 yarn.lock
 scripts/*.mjs
 plugins/openclaw-desktop-companion/
+.superpowers/
