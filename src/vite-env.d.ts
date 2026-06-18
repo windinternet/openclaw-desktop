@@ -51,6 +51,15 @@ interface Window {
     install: {
       run: () => Promise<void>;
     };
+    pet?: {
+      emitEvent: (event: import('./lib/pet-types').PetEvent) => Promise<void>;
+      getState: () => Promise<import('./lib/pet-types').PetPersistedState>;
+      setSize: (scale: number) => Promise<void>;
+      setAiLink: (enabled: boolean) => Promise<void>;
+      toggle: () => Promise<boolean>;
+      onEvent: (cb: (event: import('./lib/pet-types').PetEvent) => void) => void;
+      onAiLinkChanged: (cb: (enabled: boolean) => void) => void;
+    };
     artifact?: {
       open: (artifactId: string, version: number) => Promise<number>;
       getMeta: (artifactId: string) => Promise<unknown>;

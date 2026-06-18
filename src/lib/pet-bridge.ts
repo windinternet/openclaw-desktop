@@ -1,21 +1,5 @@
 import type { PetEvent, PetPersistedState } from './pet-types'
 
-declare global {
-  interface Window {
-    electronAPI?: {
-      pet: {
-        emitEvent: (event: PetEvent) => Promise<void>
-        getState: () => Promise<PetPersistedState>
-        setSize: (scale: number) => Promise<void>
-        setAiLink: (enabled: boolean) => Promise<void>
-        toggle: () => Promise<boolean>
-        onEvent: (cb: (event: PetEvent) => void) => void
-        onAiLinkChanged: (cb: (enabled: boolean) => void) => void
-      }
-    }
-  }
-}
-
 const pet = window.electronAPI?.pet
 
 /** 向宠物窗口发送 Gateway 事件 */
