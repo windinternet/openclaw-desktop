@@ -25,6 +25,7 @@ import {
   IconAppCenter,
 } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
+import { PetControl } from './PetControl'
 import { useStore } from '../lib';
 import { useSettingsStore } from '../lib/settings-store';
 import { decodeSessionKeyParam } from '../lib/session-content';
@@ -582,6 +583,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
               <Button icon={themeMode === 'dark' ? <IconSun size="small" /> : <IconMoon size="small" />} size="small" theme="borderless" onClick={toggleTheme} />
               <Button icon={<IconSetting size="small" />} size="small" theme="borderless" onClick={() => navigate('/settings')} />
               <Button icon={<IconGithubLogo size="small" />} size="small" theme="borderless" onClick={openGitHub} />
+              <PetControl />
             </div>
             {bioLine && (
               <div style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', fontSize: 11, lineHeight: '16px', marginTop: 2, color: 'var(--semi-color-text-2)', wordBreak: 'break-all' }}>
