@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import type { ComponentClass, CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Nav, Avatar, Button, Typography, Input, Toast } from '@douyinfe/semi-ui';
+import { Nav, Avatar, Button, Typography, Input, Toast, Tooltip } from '@douyinfe/semi-ui';
 import { InfiniteLoader, AutoSizer } from 'react-virtualized';
 import VList from 'react-virtualized/dist/commonjs/List';
 import {
@@ -525,9 +525,11 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
                               maxLength={512}
                             />
                           ) : (
-                            <span style={{ flex: 1, fontSize: 12, fontWeight: isCurrent ? 700 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isCurrent ? 'var(--semi-color-primary)' : 'var(--semi-color-text-0)' }}>
-                              {formatSessionName(s)}
-                            </span>
+                            <Tooltip content={formatSessionName(s)} mouseEnterDelay={0.6}>
+                              <span style={{ flex: 1, fontSize: 12, fontWeight: isCurrent ? 700 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isCurrent ? 'var(--semi-color-primary)' : 'var(--semi-color-text-0)' }}>
+                                {formatSessionName(s)}
+                              </span>
+                            </Tooltip>
                           )}
                           {!isEditing && (() => {
                             const actState = runtimeSessionActivityStates[s.key] || sessionActivityStatesRead[s.key];
