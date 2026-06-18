@@ -29,6 +29,7 @@ import { artifactService, type GenerateParams } from './artifact-service';
 import { artifactPersistence } from './artifact-persistence';
 import { createGatewayClient, type GatewayClient } from './gateway';
 import { connectDesktopBridgeToGateway, disconnectDesktopBridge } from './desktop-bridge';
+import { emitPetEvent } from './pet-bridge';
 import { fetchSkillMarketplaceSkills } from './skill-marketplace';
 import { fetchGatewayUser, fetchUserProfile } from './user';
 import { fetchGatewayAgents } from './gateway-agents';
@@ -573,13 +574,21 @@ export const useStore = create<StoreState>((set, get) => ({
               const stream = (p.stream ?? p.state ?? '') as string;
               if (stream === 'assistant' || stream === 'tool') {
                 get().patchSessionActivityState(evtSessionKey, 'generating');
+                if (stream === 'assistant') {
+                  emitPetEvent({ type: 'agent:streaming', timestamp: Date.now() })
+                } else if (stream === 'tool') {
+                  const data = (typeof p.data === 'object' && p.data !== null) ? p.data as Record<string, unknown> : null
+                  emitPetEvent({ type: 'agent:tool-call', payload: { toolName: (data?.toolName as string) || (data?.name as string) }, timestamp: Date.now() })
+                }
               } else if (stream === 'lifecycle') {
                 const data = (typeof p.data === 'object' && p.data !== null) ? p.data as Record<string, unknown> : null;
                 const phase = (p.phase ?? data?.phase ?? '') as string;
                 if (phase === 'error') {
                   get().patchSessionActivityState(evtSessionKey, 'error');
+                  emitPetEvent({ type: 'agent:error', payload: { errorMessage: (data?.error as string) || '未知错误' }, timestamp: Date.now() })
                 } else if (phase === 'end' || phase === 'done' || phase === 'complete') {
                   get().patchSessionActivityState(evtSessionKey, 'completed');
+                  emitPetEvent({ type: 'agent:completed', payload: { summary: summary ?? undefined }, timestamp: Date.now() })
                 }
               }
             }
@@ -604,8 +613,9 @@ export const useStore = create<StoreState>((set, get) => ({
       },
       onStatusChange: (status: ConnectionStatus) => {
         const s = get();
-        if (s.instanceRuntimes[instance.id]?.client !== client) return; // 旧 client 的回调忽略
-        if (status === 'connected') {
+          if (s.instanceRuntimes[instance.id]?.client !== client) return; // 旧 client 的回调忽略
+          if (status === 'connected') {
+            emitPetEvent({ type: 'connection:connected', timestamp: Date.now() })
           set((current) =>
             withInstanceRuntime(current, instance.id, {
               connectionStatus: 'connected',
@@ -651,6 +661,7 @@ export const useStore = create<StoreState>((set, get) => ({
                 });
             });
         } else if (status === 'error') {
+          emitPetEvent({ type: 'connection:error', payload: { errorMessage: '网关连接错误' }, timestamp: Date.now() })
           set((current) =>
             withInstanceRuntime(current, instance.id, {
               connectionStatus: 'error',
@@ -658,9 +669,11 @@ export const useStore = create<StoreState>((set, get) => ({
             }),
           );
         } else if (status === 'disconnected') {
+          emitPetEvent({ type: 'connection:disconnected', timestamp: Date.now() })
           set((current) => withInstanceRuntime(current, instance.id, { connectionStatus: 'disconnected' }));
           disconnectDesktopBridge(instance.id);
         } else if (status === 'connecting') {
+          emitPetEvent({ type: 'connection:connecting', timestamp: Date.now() })
           set((current) => withInstanceRuntime(current, instance.id, { connectionStatus: 'connecting' }));
         }
       },
