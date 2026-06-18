@@ -1,0 +1,55 @@
+import type { PetEvent, PetPersistedState } from './pet-types'
+
+declare global {
+  interface Window {
+    electronAPI?: {
+      pet: {
+        emitEvent: (event: PetEvent) => Promise<void>
+        getState: () => Promise<PetPersistedState>
+        setSize: (scale: number) => Promise<void>
+        setAiLink: (enabled: boolean) => Promise<void>
+        toggle: () => Promise<boolean>
+        onEvent: (cb: (event: PetEvent) => void) => void
+        onAiLinkChanged: (cb: (enabled: boolean) => void) => void
+      }
+    }
+  }
+}
+
+const pet = window.electronAPI?.pet
+
+/** 向宠物窗口发送 Gateway 事件 */
+export function emitPetEvent(event: PetEvent): void {
+  if (!pet) return
+  pet.emitEvent(event).catch(() => {
+    /* 宠物窗口不存在时忽略 */
+  })
+}
+
+/** 获取宠物持久化状态 */
+export async function getPetState(): Promise<PetPersistedState | null> {
+  if (!pet) return null
+  try {
+    return await pet.getState()
+  } catch {
+    return null
+  }
+}
+
+/** 设置宠物大小 */
+export async function setPetSize(scale: number): Promise<void> {
+  if (!pet) return
+  await pet.setSize(scale)
+}
+
+/** 设置 AI 联动开关 */
+export async function setPetAiLink(enabled: boolean): Promise<void> {
+  if (!pet) return
+  await pet.setAiLink(enabled)
+}
+
+/** 切换宠物显示 */
+export async function togglePet(): Promise<boolean> {
+  if (!pet) return false
+  return await pet.toggle()
+}
