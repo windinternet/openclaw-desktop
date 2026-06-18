@@ -14,6 +14,22 @@ import { setupMainLogger, writeRenderer } from './logger'
 
 const execFileAsync = promisify(execFile)
 
+const isWin = process.platform === 'win32'
+
+function execOpenclaw(
+  args: string[],
+  options?: { timeout?: number; maxBuffer?: number },
+): Promise<{ stdout: string; stderr: string }> {
+  const timeout = options?.timeout ?? 5000
+  const maxBuffer = options?.maxBuffer ?? 1024 * 1024
+  if (isWin) {
+    return execFileAsync('openclaw', args, { shell: true, timeout, maxBuffer })
+  }
+  return execFileAsync('openclaw', args, { timeout, maxBuffer }).catch(() =>
+    execFileAsync('bash', ['-lc', `openclaw ${args.join(' ')}`], { timeout, maxBuffer }),
+  )
+}
+
 // === 开发调试：开启 CDP 远程调试端口，供 Playwright 等工具连接运行时 Chromium ===
 if (!app.isPackaged) {
   app.commandLine.appendSwitch('remote-debugging-port', '9222')
@@ -117,14 +133,7 @@ interface DiscoveredResult {
 
 async function resolveAuthMode(): Promise<string | undefined> {
   try {
-    let stdout: string
-    try {
-      const result = await execFileAsync('openclaw', ['config', 'get', 'gateway.auth', '--json'], { timeout: 5000 })
-      stdout = result.stdout
-    } catch {
-      const result = await execFileAsync('bash', ['-lc', 'openclaw config get gateway.auth --json'], { timeout: 5000 })
-      stdout = result.stdout
-    }
+    const { stdout } = await execOpenclaw(['config', 'get', 'gateway.auth', '--json'], { timeout: 5000 })
     const raw = stdout.trim()
     console.log('[main] resolveAuthMode: raw =', raw.slice(0, 80))
     const auth = JSON.parse(raw)
@@ -139,14 +148,7 @@ async function resolveAuthMode(): Promise<string | undefined> {
 async function readGatewayToken(): Promise<string | undefined> {
   const configPaths: string[] = []
   try {
-    let stdout: string
-    try {
-      const result = await execFileAsync('openclaw', ['config', 'file'], { timeout: 3000 })
-      stdout = result.stdout
-    } catch {
-      const result = await execFileAsync('bash', ['-lc', 'openclaw config file'], { timeout: 3000 })
-      stdout = result.stdout
-    }
+    const { stdout } = await execOpenclaw(['config', 'file'], { timeout: 3000 })
     const resolvedPath = lastLineOf(stdout)
     console.log('[main] readGatewayToken: CLI config path =', resolvedPath)
     configPaths.push(resolvedPath.startsWith('~') ? path.join(os.homedir(), resolvedPath.slice(1)) : resolvedPath)
@@ -257,13 +259,8 @@ function lastLineOf(stdout: string): string {
 ipcMain.handle('discover:scan', async () => {
   let probeOutput: string
   try {
-    try {
-      const result = await execFileAsync('openclaw', ['gateway', 'probe', '--json', '--timeout', '5000'], { timeout: 8000 })
-      probeOutput = result.stdout.trim()
-    } catch {
-      const result = await execFileAsync('bash', ['-lc', 'openclaw gateway probe --json --timeout 5000'], { timeout: 8000 })
-      probeOutput = result.stdout.trim()
-    }
+    const result = await execOpenclaw(['gateway', 'probe', '--json', '--timeout', '5000'], { timeout: 8000 })
+    probeOutput = result.stdout.trim()
   } catch {
     return []
   }
@@ -376,13 +373,8 @@ ipcMain.handle('connect:isLocal', async (_event, url: string) => {
 ipcMain.handle('connect:autoApprove', async () => {
     let configPath: string
     try {
-      try {
-        const result = await execFileAsync('openclaw', ['config', 'file'], { timeout: 3000 })
-        configPath = result.stdout.trim().split('\n').pop()!.trim()
-      } catch {
-        const result = await execFileAsync('bash', ['-lc', 'openclaw config file'], { timeout: 3000 })
-        configPath = result.stdout.trim().split('\n').pop()!.trim()
-      }
+      const result = await execOpenclaw(['config', 'file'], { timeout: 3000 })
+      configPath = result.stdout.trim().split('\n').pop()!.trim()
     } catch {
       return { success: false, error: '无法读取 OpenClaw 配置文件路径' }
     }
@@ -430,16 +422,11 @@ ipcMain.handle('connect:autoApprove', async () => {
   }
 
   try {
-    const result = await execFileAsync('openclaw', ['gateway', 'restart'], { timeout: 10000 })
+    const result = await execOpenclaw(['gateway', 'restart'], { timeout: 10000 })
     console.log('[main] autoApprove: gateway restart stdout:', result.stdout.trim().slice(0, 200))
-  } catch {
-    try {
-      const result = await execFileAsync('bash', ['-lc', 'openclaw gateway restart'], { timeout: 10000 })
-      console.log('[main] autoApprove: gateway restart (bash) stdout:', result.stdout.trim().slice(0, 200))
-    } catch (restartErr) {
-      console.log('[main] autoApprove: gateway restart failed:', String(restartErr).slice(0, 200))
-      return { success: true, origins: allowedOrigins, restartFailed: true }
-    }
+  } catch (restartErr) {
+    console.log('[main] autoApprove: gateway restart failed:', String(restartErr).slice(0, 200))
+    return { success: true, origins: allowedOrigins, restartFailed: true }
   }
 
   return { success: true, origins: allowedOrigins }
@@ -508,7 +495,7 @@ ipcMain.handle('device:signChallenge', async (_event, params: {
   }
 })
 
-function findTerminal(): string | null {
+function findUnixTerminal(): string | null {
   const candidates = [
     'x-terminal-emulator',
     'gnome-terminal',
@@ -530,8 +517,8 @@ function findTerminal(): string | null {
   return null
 }
 
-function openTerminal(command: string): void {
-  const terminal = findTerminal()
+function openUnixTerminal(command: string): void {
+  const terminal = findUnixTerminal()
   if (!terminal) {
     spawn('xterm', ['-e', command], { detached: true, stdio: 'ignore' }).unref()
     return
@@ -561,7 +548,53 @@ function openTerminal(command: string): void {
   spawn(terminal, args, { detached: true, stdio: 'ignore' }).unref()
 }
 
+function findWindowsTerminal(): 'wt.exe' | 'powershell.exe' | 'cmd.exe' {
+  try {
+    const stdout = execFileSync('cmd.exe', ['/c', 'where wt 2>nul'], { encoding: 'utf8' })
+    if (stdout.trim()) return 'wt.exe'
+  } catch {
+    // Windows Terminal not found, try PowerShell
+  }
+  try {
+    const stdout = execFileSync('cmd.exe', ['/c', 'where powershell 2>nul'], { encoding: 'utf8' })
+    if (stdout.trim()) return 'powershell.exe'
+  } catch {
+    // PowerShell not found, fallback to cmd
+  }
+  return 'cmd.exe'
+}
+
+function openWindowsTerminal(command: string): void {
+  const terminal = findWindowsTerminal()
+
+  if (terminal === 'wt.exe') {
+    spawn('wt', ['powershell', '-NoExit', '-Command', command], { detached: true, stdio: 'ignore' }).unref()
+  } else if (terminal === 'powershell.exe') {
+    spawn('powershell', ['-NoExit', '-Command', command], { detached: true, stdio: 'ignore' }).unref()
+  } else {
+    spawn('cmd.exe', ['/c', 'start', 'OpenClaw Install', 'cmd.exe', '/k', command], { detached: true, stdio: 'ignore' }).unref()
+  }
+}
+
+function findTerminal(): string | null {
+  if (isWin) return findWindowsTerminal()
+  return findUnixTerminal()
+}
+
+function openTerminal(command: string): void {
+  if (isWin) {
+    openWindowsTerminal(command)
+    return
+  }
+  openUnixTerminal(command)
+}
+
 ipcMain.handle('install:openclaw', async () => {
+  if (isWin) {
+    // Windows 上没有 curl|bash 安装方式，引导用户到文档页
+    shell.openExternal('https://openclaw.ai/docs/install')
+    return
+  }
   const script = 'curl -fsSL https://openclaw.ai/install.sh | bash'
   openTerminal(script)
 })
