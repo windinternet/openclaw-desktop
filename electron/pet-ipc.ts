@@ -1,0 +1,41 @@
+import { ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { getPetWindow, togglePetWindow } from './pet-window-manager';
+import { loadPetState, savePetState } from './pet-store';
+import type { PetEvent } from '../src/lib/pet-types';
+import { PET_BASE_SIZE } from '../src/lib/pet-types';
+
+export function registerPetIpcHandlers(): void {
+  ipcMain.handle('pet:emit-event', (_event: IpcMainInvokeEvent, petEvent: PetEvent) => {
+    const win = getPetWindow();
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('pet:event', petEvent);
+    }
+  });
+
+  ipcMain.handle('pet:get-state', () => {
+    return loadPetState();
+  });
+
+  ipcMain.handle('pet:set-size', (_event: IpcMainInvokeEvent, scale: number) => {
+    savePetState({ size: scale });
+    const win = getPetWindow();
+    if (win && !win.isDestroyed()) {
+      const newSize = Math.round(PET_BASE_SIZE.width * scale);
+      win.setSize(newSize, newSize);
+    }
+  });
+
+  ipcMain.handle('pet:set-ai-link', (_event: IpcMainInvokeEvent, enabled: boolean) => {
+    savePetState({ aiLinkEnabled: enabled });
+    const win = getPetWindow();
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('pet:ai-link-changed', enabled);
+    }
+  });
+
+  ipcMain.handle('pet:toggle', () => {
+    togglePetWindow();
+    const win = getPetWindow();
+    return win !== null;
+  });
+}
