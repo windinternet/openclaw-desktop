@@ -13,9 +13,6 @@ export function PetApp(): React.ReactElement {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animFrameRef = useRef<number>(0)
   const loadedRef = useRef(false)
-  const draggingRef = useRef(false)
-  const dragStartRef = useRef({ x: 0, y: 0 })
-  const mouseMovedRef = useRef(false)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -83,35 +80,17 @@ export function PetApp(): React.ReactElement {
     }
   }, [])
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    draggingRef.current = true
-    mouseMovedRef.current = false
-    dragStartRef.current = { x: e.screenX, y: e.screenY }
-    fsm.changeStateDirect('drag')
-  }, [])
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!draggingRef.current) return
-    const dx = e.screenX - dragStartRef.current.x
-    const dy = e.screenY - dragStartRef.current.y
-    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
-      mouseMovedRef.current = true
+  const handleCanvasClick = useCallback(() => {
+    const quote = getRandomQuote()
+    renderer.addBubble(quote.text, 0, -10)
+    if (quote.emoji) {
+      renderer.addEmojiBubble(quote.emoji, 20, -30)
     }
-    if (mouseMovedRef.current && window.electronAPI?.pet?.move) {
-      window.electronAPI.pet.move(dx, dy)
-      dragStartRef.current = { x: e.screenX, y: e.screenY }
-    }
-  }, [])
-
-  const handleMouseUp = useCallback((_e: React.MouseEvent) => {
-    draggingRef.current = false
-    fsm.changeStateDirect('idle')
-
-    if (!mouseMovedRef.current) {
-      // 是点击，不是拖拽
-      fsm.handleEvent({ type: 'agent:completed', payload: { summary: getRandomQuote().text }, timestamp: Date.now() })
-    }
+    fsm.handleEvent({
+      type: 'agent:completed',
+      payload: { summary: quote.text },
+      timestamp: Date.now(),
+    })
   }, [])
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -119,13 +98,13 @@ export function PetApp(): React.ReactElement {
   }, [])
 
   return (
-    <canvas
-      ref={canvasRef}
-      style={{ width: '100%', height: '100%', display: 'block', cursor: 'grab' }}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onContextMenu={handleContextMenu}
-    />
+    <div style={{ width: '100%', height: '100%', WebkitAppRegion: 'drag' } as React.CSSProperties}>
+      <canvas
+        ref={canvasRef}
+        style={{ width: '100%', height: '100%', display: 'block', cursor: 'pointer', WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        onClick={handleCanvasClick}
+        onContextMenu={handleContextMenu}
+      />
+    </div>
   )
 }
