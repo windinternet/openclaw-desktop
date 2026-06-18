@@ -64,4 +64,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     autoApprove: () => ipcRenderer.invoke('connect:autoApprove'),
   },
   setExternalLinkMode: (mode: string) => ipcRenderer.send('set-external-link-mode', mode),
+  pet: {
+    emitEvent: (event: unknown) => ipcRenderer.invoke('pet:emit-event', event),
+    getState: () => ipcRenderer.invoke('pet:get-state'),
+    setSize: (scale: number) => ipcRenderer.invoke('pet:set-size', scale),
+    setAiLink: (enabled: boolean) => ipcRenderer.invoke('pet:set-ai-link', enabled),
+    toggle: () => ipcRenderer.invoke('pet:toggle'),
+    onEvent: (cb: (event: unknown) => void) => {
+      ipcRenderer.on('pet:event', (_event, petEvent) => cb(petEvent))
+    },
+    onAiLinkChanged: (cb: (enabled: boolean) => void) => {
+      ipcRenderer.on('pet:ai-link-changed', (_event, enabled) => cb(enabled))
+    },
+  },
 })

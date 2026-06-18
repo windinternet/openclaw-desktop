@@ -11,6 +11,8 @@ import type { SkillMarketplaceSearchParams } from '../src/lib/types'
 import { registerLocalFileStorageHandlers } from './local-storage'
 import { registerArtifactProtocol, registerArtifactIpcHandlers } from './artifact-handlers'
 import { setupMainLogger, writeRenderer } from './logger'
+import { createPetWindow, destroyPetWindow, togglePetWindow, getPetWindow } from './pet-window-manager'
+import { registerPetIpcHandlers } from './pet-ipc'
 
 const execFileAsync = promisify(execFile)
 
@@ -456,6 +458,7 @@ ipcMain.handle('marketplace:search', async (_event, params: SkillMarketplaceSear
 
 registerLocalFileStorageHandlers()
 registerArtifactIpcHandlers()
+registerPetIpcHandlers()
 
 ipcMain.handle('device:signChallenge', async (_event, params: {
   nonce: string;
@@ -612,6 +615,11 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
+  const petWin = getPetWindow()
+  if (petWin && !petWin.isDestroyed()) {
+    // 宠物窗口存活，不退出应用
+    return
+  }
   if (process.platform !== 'darwin') app.quit()
 })
 
