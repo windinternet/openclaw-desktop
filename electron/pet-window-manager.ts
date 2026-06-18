@@ -1,40 +1,40 @@
-import { BrowserWindow, screen, app } from 'electron';
-import path from 'node:path';
-import { PET_BASE_SIZE } from '../src/lib/pet-types';
-import { loadPetState, savePetState } from './pet-store';
+import { BrowserWindow, screen, app } from 'electron'
+import path from 'node:path'
+import { PET_BASE_SIZE } from '../src/lib/pet-types'
+import { loadPetState, savePetState } from './pet-store'
 
-let petWindow: BrowserWindow | null = null;
+let petWindow: BrowserWindow | null = null
 
-const isDev = !app.isPackaged;
+const isDev = !app.isPackaged
 
 export function getPetWindow(): BrowserWindow | null {
-  return petWindow;
+  return petWindow
 }
 
 function computeDefaultPosition(): { x: number; y: number } {
-  const primary = screen.getPrimaryDisplay();
-  const { width, height } = primary.workAreaSize;
+  const primary = screen.getPrimaryDisplay()
+  const { width, height } = primary.workAreaSize
   return {
     x: width - PET_BASE_SIZE.width - 20,
     y: height - PET_BASE_SIZE.height - 40,
-  };
+  }
 }
 
 export function createPetWindow(): BrowserWindow {
   if (petWindow && !petWindow.isDestroyed()) {
-    petWindow.show();
-    petWindow.focus();
-    return petWindow;
+    petWindow.show()
+    petWindow.focus()
+    return petWindow
   }
 
-  const state = loadPetState();
-  const size = Math.round(PET_BASE_SIZE.width * state.size);
-  let x = state.x;
-  let y = state.y;
+  const state = loadPetState()
+  const size = Math.round(PET_BASE_SIZE.width * state.size)
+  let x = state.x
+  let y = state.y
   if (x < 0 || y < 0) {
-    const def = computeDefaultPosition();
-    x = def.x;
-    y = def.y;
+    const def = computeDefaultPosition()
+    x = def.x
+    y = def.y
   }
 
   petWindow = new BrowserWindow({
@@ -54,52 +54,50 @@ export function createPetWindow(): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
     },
-  });
+  })
 
-  petWindow.setIgnoreMouseEvents(false);
+  petWindow.setIgnoreMouseEvents(false)
 
   petWindow.on('moved', () => {
-    if (!petWindow) return;
-    const [wx, wy] = petWindow.getPosition();
-    savePetState({ x: wx, y: wy });
-  });
+    if (!petWindow) return
+    const [wx, wy] = petWindow.getPosition()
+    savePetState({ x: wx, y: wy })
+  })
 
   petWindow.on('closed', () => {
-    petWindow = null;
-  });
+    petWindow = null
+  })
 
   if (isDev) {
-    petWindow.loadURL('http://localhost:5173/pet.html');
+    petWindow.loadURL('http://localhost:5173/pet.html')
   } else {
-    petWindow.loadFile(path.join(__dirname, '../dist/pet.html'));
+    petWindow.loadFile(path.join(__dirname, '../dist/pet.html'))
   }
 
-  return petWindow;
+  return petWindow
 }
 
 export function destroyPetWindow(): void {
   if (petWindow && !petWindow.isDestroyed()) {
-    petWindow.close();
-    petWindow = null;
+    petWindow.close()
   }
-  savePetState({ enabled: false });
 }
 
 export function togglePetWindow(): void {
   if (petWindow && !petWindow.isDestroyed()) {
-    destroyPetWindow();
+    petWindow.close()
   } else {
-    createPetWindow();
+    createPetWindow()
   }
 }
 
 export function setPetSize(scale: number): void {
-  const state = loadPetState();
-  state.size = scale;
-  savePetState({ size: scale });
+  const state = loadPetState()
+  state.size = scale
+  savePetState({ size: scale })
 
   if (petWindow && !petWindow.isDestroyed()) {
-    const newSize = Math.round(PET_BASE_SIZE.width * scale);
-    petWindow.setSize(newSize, newSize);
+    const newSize = Math.round(PET_BASE_SIZE.width * scale)
+    petWindow.setSize(newSize, newSize)
   }
 }
