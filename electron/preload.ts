@@ -71,10 +71,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setAiLink: (enabled: boolean) => ipcRenderer.invoke('pet:set-ai-link', enabled),
     toggle: () => ipcRenderer.invoke('pet:toggle'),
     onEvent: (cb: (event: unknown) => void) => {
-      ipcRenderer.on('pet:event', (_event, petEvent) => cb(petEvent))
+      const handler = (_event: Electron.IpcRendererEvent, petEvent: unknown) => cb(petEvent)
+      ipcRenderer.on('pet:event', handler)
+      return () => { ipcRenderer.removeListener('pet:event', handler) }
     },
     onAiLinkChanged: (cb: (enabled: boolean) => void) => {
-      ipcRenderer.on('pet:ai-link-changed', (_event, enabled) => cb(enabled))
+      const handler = (_event: Electron.IpcRendererEvent, enabled: boolean) => cb(enabled)
+      ipcRenderer.on('pet:ai-link-changed', handler)
+      return () => { ipcRenderer.removeListener('pet:ai-link-changed', handler) }
     },
     move: (dx: number, dy: number) => ipcRenderer.invoke('pet:move', { dx, dy }),
   },

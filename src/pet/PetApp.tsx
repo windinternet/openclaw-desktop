@@ -70,13 +70,17 @@ export function PetApp(): React.ReactElement {
       petEventBus.dispatch(event)
     }
 
+    let unsubIpcEvent: (() => void) | undefined
+
     if (window.electronAPI?.pet) {
-      window.electronAPI.pet.onEvent(onIpcEvent)
+      unsubIpcEvent = window.electronAPI.pet.onEvent(onIpcEvent)
     }
 
     return () => {
       cancelAnimationFrame(animFrameRef.current)
       unsubEvent()
+      unsubIpcEvent?.()
+      loadedRef.current = false
     }
   }, [])
 

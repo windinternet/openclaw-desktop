@@ -57,8 +57,8 @@ interface Window {
       setSize: (scale: number) => Promise<void>;
       setAiLink: (enabled: boolean) => Promise<void>;
       toggle: () => Promise<boolean>;
-      onEvent: (cb: (event: import('./lib/pet-types').PetEvent) => void) => void;
-      onAiLinkChanged: (cb: (enabled: boolean) => void) => void;
+      onEvent: (cb: (event: import('./lib/pet-types').PetEvent) => void) => () => void;
+      onAiLinkChanged: (cb: (enabled: boolean) => void) => () => void;
       move: (dx: number, dy: number) => Promise<void>;
     };
     artifact?: {

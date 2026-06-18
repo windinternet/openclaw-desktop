@@ -5,6 +5,8 @@ import type { PetEvent } from '../src/lib/pet-types'
 
 export function registerPetIpcHandlers(): void {
   ipcMain.handle('pet:emit-event', (_event: IpcMainInvokeEvent, petEvent: PetEvent) => {
+    const state = loadPetState()
+    if (!state.aiLinkEnabled) return
     const win = getPetWindow()
     if (win && !win.isDestroyed()) {
       win.webContents.send('pet:event', petEvent)
@@ -30,10 +32,12 @@ export function registerPetIpcHandlers(): void {
   ipcMain.handle('pet:toggle', () => {
     togglePetWindow()
     const win = getPetWindow()
-    return win !== null
+    const visible = win !== null
+    savePetState({ enabled: visible })
+    return visible
   })
 
-  ipcMain.handle('pet:move', (_event: IpcMainInvokeEvent, delta: { dx: number dy: number }) => {
+  ipcMain.handle('pet:move', (_event: IpcMainInvokeEvent, delta: { dx: number; dy: number }) => {
     const win = getPetWindow()
     if (win && !win.isDestroyed()) {
       const [x, y] = win.getPosition()

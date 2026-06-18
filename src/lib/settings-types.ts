@@ -33,7 +33,6 @@ export interface AppSettings {
   sessionToolCallDisplay: SessionToolCallDisplay;
   assistantReplyGrouping: AssistantReplyGrouping;
   openTuningOnStartup: boolean;
-  desktopPetEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -49,5 +48,4 @@ export const DEFAULT_SETTINGS: AppSettings = {
   sessionToolCallDisplay: 'hidden',
   assistantReplyGrouping: 'merged',
   openTuningOnStartup: false,
-  desktopPetEnabled: false,
 };

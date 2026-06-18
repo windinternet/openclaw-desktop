@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Card,
@@ -16,7 +16,7 @@ import type { ThemeMode, SupportedLocale } from '../lib/settings-types';
 import type { AgentSwitchStrategy, InstanceAgentSwitchStrategy } from '../lib/agent-switch-settings';
 import type { AssistantReplyGrouping, SessionToolCallDisplay } from '../lib/session-content';
 import { useStore } from '../lib';
-import { togglePet } from '../lib/pet-bridge';
+import { togglePet, getPetState } from '../lib/pet-bridge';
 
 const { Title, Text } = Typography;
 
@@ -101,6 +101,11 @@ export default function SettingsPage() {
   const settings = useSettingsStore((s) => s.settings);
   const updateSettings = useSettingsStore((s) => s.updateSettings);
   const resetSettings = useSettingsStore((s) => s.resetSettings);
+
+  const [petEnabled, setPetEnabled] = useState(false)
+  useEffect(() => {
+    getPetState().then((s) => { if (s) setPetEnabled(s.enabled) }).catch(() => {})
+  }, [])
 
   const health = useStore((s) => s.health);
   const connectionStatus = useStore((s) => s.connectionStatus);
@@ -271,9 +276,9 @@ export default function SettingsPage() {
         {/* ═══ Desktop Pet ═══ */}
         <SectionCard icon="🐱" title={t('settings.desktopPet')} desc={t('settings.desktopPetDesc')}>
           <Switch
-            checked={settings.desktopPetEnabled}
+            checked={petEnabled}
             onChange={async (checked: boolean) => {
-              updateSettings({ desktopPetEnabled: checked })
+              setPetEnabled(checked)
               await togglePet()
             }}
             checkedText="开启"
