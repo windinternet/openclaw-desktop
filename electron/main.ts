@@ -11,7 +11,7 @@ import type { SkillMarketplaceSearchParams } from '../src/lib/types'
 import { registerLocalFileStorageHandlers } from './local-storage'
 import { registerArtifactProtocol, registerArtifactIpcHandlers } from './artifact-handlers'
 import { setupMainLogger, writeRenderer } from './logger'
-import { createPetWindow, destroyPetWindow, togglePetWindow, getPetWindow } from './pet-window-manager'
+import { getPetWindow } from './pet-window-manager'
 import { registerPetIpcHandlers } from './pet-ipc'
 
 const execFileAsync = promisify(execFile)
