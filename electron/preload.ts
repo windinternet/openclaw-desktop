@@ -76,5 +76,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onAiLinkChanged: (cb: (enabled: boolean) => void) => {
       ipcRenderer.on('pet:ai-link-changed', (_event, enabled) => cb(enabled))
     },
+    move: (dx: number, dy: number) => ipcRenderer.invoke('pet:move', { dx, dy }),
   },
 })

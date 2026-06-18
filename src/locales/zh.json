@@ -334,7 +334,9 @@
       "interfaceBack": "返回音效",
       "interfaceRemove": "移除音效",
       "interfaceStart": "开始音效"
-    }
+    },
+    "desktopPet": "桌面宠物",
+    "desktopPetDesc": "在桌面上显示 OpenClaw 品牌吉祥物宠物，与 AI 状态联动"
   },
   "extensions": {
     "skills": "技能",

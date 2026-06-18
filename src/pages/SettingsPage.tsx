@@ -16,6 +16,7 @@ import type { ThemeMode, SupportedLocale } from '../lib/settings-types';
 import type { AgentSwitchStrategy, InstanceAgentSwitchStrategy } from '../lib/agent-switch-settings';
 import type { AssistantReplyGrouping, SessionToolCallDisplay } from '../lib/session-content';
 import { useStore } from '../lib';
+import { togglePet } from '../lib/pet-bridge';
 
 const { Title, Text } = Typography;
 
@@ -265,6 +266,19 @@ export default function SettingsPage() {
               </Select.Option>
             ))}
           </Select>
+        </SectionCard>
+
+        {/* ═══ Desktop Pet ═══ */}
+        <SectionCard icon="🐱" title={t('settings.desktopPet')} desc={t('settings.desktopPetDesc')}>
+          <Switch
+            checked={settings.desktopPetEnabled}
+            onChange={async (checked: boolean) => {
+              updateSettings({ desktopPetEnabled: checked })
+              await togglePet()
+            }}
+            checkedText="开启"
+            uncheckedText="关闭"
+          />
         </SectionCard>
 
         {/* ═══ User ═══ */}

@@ -143,6 +143,13 @@ export class AnimationFSM {
     }
   }
 
+  changeStateDirect(newState: PetAnimationState): void {
+    if (this.currentState === newState) return
+    this.currentState = newState
+    this.stateEnterTime = Date.now()
+    petEventBus.emitState(newState)
+  }
+
   private changeState(newState: PetAnimationState): void {
     if (this.currentState === newState) return
     if (this.currentState !== 'react' && this.currentState !== 'hop') {

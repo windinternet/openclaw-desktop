@@ -334,7 +334,9 @@
       "interfaceBack": "Interface Back",
       "interfaceRemove": "Interface Remove",
       "interfaceStart": "Interface Start"
-    }
+    },
+    "desktopPet": "Desktop Pet",
+    "desktopPetDesc": "Show OpenClaw mascot pet on desktop, linked to AI status"
   },
   "extensions": {
     "skills": "Skills",

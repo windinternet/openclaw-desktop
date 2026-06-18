@@ -59,6 +59,7 @@ interface Window {
       toggle: () => Promise<boolean>;
       onEvent: (cb: (event: import('./lib/pet-types').PetEvent) => void) => void;
       onAiLinkChanged: (cb: (enabled: boolean) => void) => void;
+      move: (dx: number, dy: number) => Promise<void>;
     };
     artifact?: {
       open: (artifactId: string, version: number) => Promise<number>;

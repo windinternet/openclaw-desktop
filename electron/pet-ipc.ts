@@ -32,4 +32,12 @@ export function registerPetIpcHandlers(): void {
     const win = getPetWindow()
     return win !== null
   })
+
+  ipcMain.handle('pet:move', (_event: IpcMainInvokeEvent, delta: { dx: number dy: number }) => {
+    const win = getPetWindow()
+    if (win && !win.isDestroyed()) {
+      const [x, y] = win.getPosition()
+      win.setPosition(x + delta.dx, y + delta.dy)
+    }
+  })
 }
