@@ -18,7 +18,13 @@ export function parseArtifactFromText(text: string): ParsedArtifact | null {
     const header = JSON.parse(match[1].trim());
     const html = match[2].trim();
 
-    if (!header.title || !html) return null;
+    if (!header.title) return null;
+    const htmlTypes = ['report', 'dashboard', 'analysis', 'checklist', 'code', 'document', 'slide', 'form', 'other'];
+    if (header.type && !htmlTypes.includes(header.type)) {
+      // Non-HTML types don't require html
+    } else if (!html) {
+      return null;
+    }
 
     return {
       title: String(header.title),
@@ -51,6 +57,6 @@ export async function saveArtifactFromChat(
 }
 
 function isValidArtifactType(type: unknown): type is ArtifactType {
-  const validTypes = ['report', 'dashboard', 'analysis', 'checklist', 'code', 'document', 'slide', 'form', 'other'];
+  const validTypes = ['report', 'dashboard', 'analysis', 'checklist', 'code', 'document', 'slide', 'form', 'other', 'link', 'app', 'file', 'audio', 'image', 'video'];
   return typeof type === 'string' && validTypes.includes(type);
 }

@@ -12,6 +12,12 @@ const ARTIFACT_TYPES = new Set<ArtifactType>([
   'slide',
   'form',
   'other',
+  'link',
+  'app',
+  'file',
+  'audio',
+  'image',
+  'video',
 ]);
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -45,13 +51,15 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
   if (command === 'desktop.artifacts.create') {
     const title = stringValue(params.title);
     const html = stringValue(params.html);
+    const type = artifactTypeValue(params.type);
     if (!title) return invalidParams('title is required');
-    if (!html) return invalidParams('html is required');
+    const htmlTypes = ['report', 'dashboard', 'analysis', 'checklist', 'code', 'document', 'slide', 'form', 'other'];
+    if (htmlTypes.includes(type) && !html) return invalidParams('html is required');
 
     const artifact = await artifactService.generate({
       title,
       html,
-      type: artifactTypeValue(params.type),
+      type,
       icon: stringValue(params.icon),
       description: stringValue(params.description),
       tags: tagsValue(params.tags),
