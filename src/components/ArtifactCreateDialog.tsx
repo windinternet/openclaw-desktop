@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Modal, Button, Input, Select, TextArea, TagInput, Toast } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
@@ -6,6 +6,7 @@ import type { ArtifactType } from '../lib/artifact-types';
 import { getDefaultIcon } from '../lib/artifact-service';
 
 interface Props {
+  visible: boolean;
   onClose: () => void;
 }
 
@@ -31,7 +32,7 @@ const HTML_TYPES: ArtifactType[] = ['report', 'dashboard', 'analysis', 'checklis
 const FILE_TYPES: ArtifactType[] = ['file', 'audio', 'image', 'video'];
 const MEDIA_TYPES: ArtifactType[] = ['audio', 'image', 'video'];
 
-export function ArtifactCreateDialog({ onClose }: Props) {
+export function ArtifactCreateDialog({ visible, onClose }: Props) {
   const { t } = useTranslation();
   const generateArtifact = useStore((s) => s.generateArtifact);
   const [title, setTitle] = useState('');
@@ -44,6 +45,22 @@ export function ArtifactCreateDialog({ onClose }: Props) {
   const [fileName, setFileName] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const prevVisible = useRef(visible);
+
+  useEffect(() => {
+    if (visible && !prevVisible.current) {
+      setTitle('');
+      setType('other');
+      setDescription('');
+      setHtml('');
+      setUrl('');
+      setCommand('');
+      setFilePath('');
+      setFileName('');
+      setTags([]);
+    }
+    prevVisible.current = visible;
+  }, [visible]);
 
   const isHtmlType = HTML_TYPES.includes(type);
   const isLinkType = type === 'link';
@@ -86,7 +103,7 @@ export function ArtifactCreateDialog({ onClose }: Props) {
   return (
     <Modal
       title={t('artifact.createTitle')}
-      visible
+      visible={visible}
       onCancel={onClose}
       footer={
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
