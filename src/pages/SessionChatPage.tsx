@@ -1720,9 +1720,19 @@ export default function SessionChatPage() {
               },
               renderDialogueTitle: ({ role: _role, message, defaultTitle }) => {
                 const ts = (message as Record<string, unknown> | undefined)?.createAt;
-                const timeStr = typeof ts === 'number'
-                  ? new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-                  : '';
+                const timeStr = (() => {
+                  if (typeof ts !== 'number') return '';
+                  const d = new Date(ts);
+                  const now = new Date();
+                  const isToday = d.getFullYear() === now.getFullYear()
+                    && d.getMonth() === now.getMonth()
+                    && d.getDate() === now.getDate();
+                  if (isToday) {
+                    return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+                  }
+                  const pad = (n: number) => String(n).padStart(2, '0');
+                  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+                })();
                 return (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                     {defaultTitle}

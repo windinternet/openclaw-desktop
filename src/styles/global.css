@@ -108,6 +108,10 @@ body,
   fill: url('#ig-actions') !important;
 }
 
+.semi-icon-app_center svg path {
+  fill: url('#ig-artifacts') !important;
+}
+
 /* ── Layout: Remove Sider default border ────────────────────────── */
 .semi-layout-sider {
   border-right: none;
