@@ -6,6 +6,7 @@ import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGa
 import { buildArtifactCreatePrompt } from '../lib/ai-action-prompts';
 import { upsertAiActionRun } from '../lib/ai-action-run-store';
 import type { AiActionRun } from '../lib/types';
+import type { ArtifactType } from '../lib/artifact-types';
 
 const { Text, Paragraph } = Typography;
 
@@ -127,10 +128,10 @@ export function ArtifactAICreateDrawer({ visible, onClose }: Props) {
       const { getDefaultIcon } = await import('../lib/artifact-service');
       await generateArtifact({
         title: preview.title,
-        type: preview.type as any,
+        type: preview.type as ArtifactType,
         description: preview.description,
         tags: preview.tags,
-        icon: getDefaultIcon(preview.type as any),
+        icon: getDefaultIcon(preview.type as ArtifactType),
         url: preview.url,
         command: preview.command,
         fileName: preview.fileName,

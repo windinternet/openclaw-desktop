@@ -117,13 +117,13 @@ export default function ArtifactDetailPage() {
               />
               <Input addonBefore={t('artifact.desc')} value={metaForm.description ?? ''} onChange={(v) => setMetaForm((p) => ({ ...p, description: v }))} />
               {['link', 'audio', 'image', 'video'].includes(metaForm.type ?? '') && (
-                <Input addonBefore="URL" value={(metaForm as any).url ?? ''} onChange={(v) => setMetaForm((p: any) => ({ ...p, url: v }))} />
+                <Input addonBefore="URL" value={metaForm.url ?? ''} onChange={(v) => setMetaForm((p) => ({ ...p, url: v }))} />
               )}
               {metaForm.type === 'app' && (
-                <Input addonBefore="命令" value={(metaForm as any).command ?? ''} onChange={(v) => setMetaForm((p: any) => ({ ...p, command: v }))} />
+                <Input addonBefore="命令" value={metaForm.command ?? ''} onChange={(v) => setMetaForm((p) => ({ ...p, command: v }))} />
               )}
               {['file', 'audio', 'image', 'video'].includes(metaForm.type ?? '') && (
-                <Input addonBefore="文件名" value={(metaForm as any).fileName ?? ''} onChange={(v) => setMetaForm((p: any) => ({ ...p, fileName: v }))} />
+                <Input addonBefore="文件名" value={metaForm.fileName ?? ''} onChange={(v) => setMetaForm((p) => ({ ...p, fileName: v }))} />
               )}
             </div>
           ) : (
