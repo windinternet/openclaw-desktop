@@ -19,6 +19,12 @@ export function getDefaultIcon(type: ArtifactType): string {
     slide: '\uD83D\uDDBD\uFE0F',
     form: '\uD83D\uDCDD',
     other: '\uD83D\uDCE6',
+    link: '\uD83D\uDD17',
+    app: '\uD83D\uDE80',
+    file: '\uD83D\uDCCE',
+    audio: '\uD83C\uDFB5',
+    image: '\uD83D\uDDBC\uFE0F',
+    video: '\uD83C\uDFAC',
   };
   return icons[type] ?? icons.other;
 }
@@ -42,20 +48,30 @@ export interface GenerateParams {
   data?: Record<string, unknown>;
   html?: string;
   source?: ArtifactSource;
+  url?: string;
+  command?: string;
+  filePath?: string;
+  fileName?: string;
+  fileSize?: number;
+  mimeType?: string;
 }
 
 export const artifactService = {
   async generate(params: GenerateParams): Promise<ArtifactMeta> {
     const id = generateArtifactId();
 
-    let html: string;
-    if (params.templateId) {
-      const template = await loadTemplateContent(params.templateId);
-      html = renderTemplate(template, params.data ?? {});
-    } else if (params.html) {
-      html = params.html;
-    } else {
-      throw new Error('必须提供 templateId+data 或 html');
+    let html: string | null = null;
+    const isHtmlType = !['link', 'app', 'file', 'audio', 'image', 'video'].includes(params.type);
+
+    if (isHtmlType) {
+      if (params.templateId) {
+        const template = await loadTemplateContent(params.templateId);
+        html = renderTemplate(template, params.data ?? {});
+      } else if (params.html) {
+        html = params.html;
+      } else {
+        throw new Error('必须提供 templateId+data 或 html');
+      }
     }
 
     const now = Date.now();
@@ -72,10 +88,18 @@ export const artifactService = {
       status: 'draft',
       createdAt: now,
       updatedAt: now,
+      url: params.url,
+      command: params.command,
+      filePath: params.filePath,
+      fileName: params.fileName,
+      fileSize: params.fileSize,
+      mimeType: params.mimeType,
     };
 
     await artifactPersistence.saveMeta(id, meta);
-    await artifactPersistence.saveHtml(id, 1, html);
+    if (html !== null) {
+      await artifactPersistence.saveHtml(id, 1, html);
+    }
 
     const index = await artifactPersistence.list();
     index.push(meta);

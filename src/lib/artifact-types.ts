@@ -7,7 +7,13 @@ export type ArtifactType =
   | 'document'
   | 'slide'
   | 'form'
-  | 'other';
+  | 'other'
+  | 'link'
+  | 'app'
+  | 'file'
+  | 'audio'
+  | 'image'
+  | 'video';
 
 export interface ArtifactSource {
   type: 'chat' | 'workflow' | 'agent_team' | 'manual' | 'mcp_tool';
@@ -30,6 +36,12 @@ export interface ArtifactMeta {
   createdBy?: { agent?: string; model?: string };
   createdAt: number;
   updatedAt: number;
+  url?: string;
+  command?: string;
+  filePath?: string;
+  fileName?: string;
+  fileSize?: number;
+  mimeType?: string;
 }
 
 export interface VersionEntry {
