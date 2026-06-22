@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { SideSheet, Button, TextArea, Spin, Tag, Toast, Typography, Space } from '@douyinfe/semi-ui';
+import { Modal, Button, TextArea, Spin, Tag, Toast, Typography, Space } from '@douyinfe/semi-ui';
 import { IconAIFilledLevel1, IconRefresh } from '@douyinfe/semi-icons';
 import { useStore } from '../lib';
 import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway } from '../lib/ai-action-center';
@@ -156,13 +156,14 @@ export function ArtifactAICreateDrawer({ visible, onClose }: Props) {
   };
 
   return (
-    <SideSheet
+    <Modal
       title="AI 魔法创建"
       visible={visible}
       onCancel={handleClose}
-      width={480}
-      bodyStyle={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}
+      footer={null}
+      width={520}
     >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <TextArea
         placeholder="用自然语言描述你想创建的产物，例如：&#10;把 https://openclaw.ai/docs 存为一个链接产物，标签：AI、开发工具"
         value={input}
@@ -226,6 +227,7 @@ export function ArtifactAICreateDrawer({ visible, onClose }: Props) {
           </div>
         </div>
       )}
-    </SideSheet>
+      </div>
+    </Modal>
   );
 }

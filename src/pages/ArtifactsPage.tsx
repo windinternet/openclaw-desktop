@@ -213,7 +213,7 @@ export default function ArtifactsPage() {
       )}
 
       {showCreate && <ArtifactCreateDialog onClose={() => setShowCreate(false)} />}
-      {showAICreate && <ArtifactAICreateDrawer visible={showAICreate} onClose={() => setShowAICreate(false)} />}
+      <ArtifactAICreateDrawer visible={showAICreate} onClose={() => setShowAICreate(false)} />
     </div>
   );
 }
