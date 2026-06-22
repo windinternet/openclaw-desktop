@@ -1,5 +1,6 @@
 import agentTeamComposeTemplate from '../prompts/ai-actions/agent-team-compose.md?raw';
 import approvalDecisionTemplate from '../prompts/ai-actions/approval-decision.md?raw';
+import artifactCreateTemplate from '../prompts/ai-actions/artifact-create.md?raw';
 import gatewayAgentCreateTemplate from '../prompts/ai-actions/gateway-agent-create.md?raw';
 import type { AgentLocalProfile } from './types';
 
@@ -31,6 +32,12 @@ export function buildAgentTeamComposePrompt(options: { input: string; profile?: 
   return renderTemplate(agentTeamComposeTemplate, {
     input: options.input.trim(),
     profile: profileText(options.profile),
+  });
+}
+
+export function buildArtifactCreatePrompt(options: { input: string }): string {
+  return renderTemplate(artifactCreateTemplate, {
+    input: options.input.trim(),
   });
 }
 
