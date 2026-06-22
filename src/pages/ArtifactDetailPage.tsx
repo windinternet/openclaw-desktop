@@ -64,7 +64,28 @@ export default function ArtifactDetailPage() {
         <Tag size="large" color={meta.status === 'published' ? 'green' : meta.status === 'draft' ? 'orange' : 'grey'} type="light">
           {statusText(meta.status)}
         </Tag>
-        <Button icon={<IconPlay />} theme="solid" onClick={() => openArtifactWindow(meta.id)}>{t('artifact.view')}</Button>
+        {meta.type === 'link' && meta.url && (
+          <Button icon={<IconPlay />} theme="solid" onClick={() => window.open(meta.url, '_blank')}>
+            在浏览器打开
+          </Button>
+        )}
+        {meta.type === 'app' && meta.command && (
+          <Button icon={<IconPlay />} theme="solid" onClick={() => {
+            navigator.clipboard.writeText(meta.command!).then(() => Toast.success('命令已复制'));
+          }}>
+            复制命令
+          </Button>
+        )}
+        {(meta.type === 'file' || meta.type === 'audio' || meta.type === 'image' || meta.type === 'video') && (
+          <Button icon={<IconPlay />} theme="solid" onClick={() => openArtifactWindow(meta.id)}>
+            查看
+          </Button>
+        )}
+        {(meta.type === 'report' || meta.type === 'dashboard' || meta.type === 'analysis' || meta.type === 'checklist' || meta.type === 'code' || meta.type === 'document' || meta.type === 'slide' || meta.type === 'form' || meta.type === 'other') && (
+          <Button icon={<IconPlay />} theme="solid" onClick={() => openArtifactWindow(meta.id)}>
+            {t('artifact.view')}
+          </Button>
+        )}
         {meta.status !== 'published' && (
           <Button onClick={() => { updateArtifact(meta.id, { status: 'published' }); }}>{t('artifact.publish')}</Button>
         )}
@@ -84,13 +105,26 @@ export default function ArtifactDetailPage() {
               <Input addonBefore={t('artifact.icon')} value={metaForm.icon ?? ''} onChange={(v) => setMetaForm((p) => ({ ...p, icon: v }))} />
               <Select value={metaForm.type} onChange={(v) => setMetaForm((p) => ({ ...p, type: v as ArtifactMeta['type'] }))}
                 optionList={[
-                  { value: 'report', label: t('artifact.typeReport') }, { value: 'dashboard', label: t('artifact.typeDashboard') },
-                  { value: 'analysis', label: t('artifact.typeAnalysis') }, { value: 'checklist', label: t('artifact.typeChecklist') },
-                  { value: 'code', label: t('artifact.typeCode') }, { value: 'document', label: t('artifact.typeDoc') },
-                  { value: 'other', label: t('artifact.typeOther') },
+                  { value: 'report', label: '报告' }, { value: 'dashboard', label: '仪表盘' },
+                  { value: 'analysis', label: '分析' }, { value: 'checklist', label: '清单' },
+                  { value: 'code', label: '代码' }, { value: 'document', label: '文档' },
+                  { value: 'slide', label: '幻灯片' }, { value: 'form', label: '表单' },
+                  { value: 'other', label: '其他' },
+                  { value: 'link', label: '链接' }, { value: 'app', label: '应用' },
+                  { value: 'file', label: '文件' }, { value: 'audio', label: '音频' },
+                  { value: 'image', label: '图片' }, { value: 'video', label: '视频' },
                 ]}
               />
               <Input addonBefore={t('artifact.desc')} value={metaForm.description ?? ''} onChange={(v) => setMetaForm((p) => ({ ...p, description: v }))} />
+              {['link', 'audio', 'image', 'video'].includes(metaForm.type ?? '') && (
+                <Input addonBefore="URL" value={(metaForm as any).url ?? ''} onChange={(v) => setMetaForm((p: any) => ({ ...p, url: v }))} />
+              )}
+              {metaForm.type === 'app' && (
+                <Input addonBefore="命令" value={(metaForm as any).command ?? ''} onChange={(v) => setMetaForm((p: any) => ({ ...p, command: v }))} />
+              )}
+              {['file', 'audio', 'image', 'video'].includes(metaForm.type ?? '') && (
+                <Input addonBefore="文件名" value={(metaForm as any).fileName ?? ''} onChange={(v) => setMetaForm((p: any) => ({ ...p, fileName: v }))} />
+              )}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -104,6 +138,10 @@ export default function ArtifactDetailPage() {
                   {meta.tags.map((tag) => <Tag key={tag} size="small" type="light">{tag}</Tag>)}
                 </div>
               )}
+              {meta.url && <div><Text type="tertiary">URL: </Text><Text copyable>{meta.url}</Text></div>}
+              {meta.command && <div><Text type="tertiary">命令: </Text><Text copyable code>{meta.command}</Text></div>}
+              {meta.fileName && <div><Text type="tertiary">文件: </Text><Text>{meta.fileName}</Text></div>}
+              {meta.filePath && <div><Text type="tertiary">路径: </Text><Text copyable>{meta.filePath}</Text></div>}
             </div>
           )}
         </Card>
