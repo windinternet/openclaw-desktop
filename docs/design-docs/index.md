@@ -10,6 +10,7 @@
 | `core-beliefs.md` | ✅ 活跃 | 核心理念与设计原则 |
 | `startup-flow.md` | ✅ 活跃 | 启动流程与实例连接 |
 | `local-instance-storage.md` | ✅ 活跃 | 响应式内存层 + Electron 文件后端的实例级本地存储 |
+| `agentic-repository-workbench.md` | 🔄 设计中 | 绑定 Git 仓库的 Agentic Workbench、知识库与事项推进体系 |
 | `ai-action-center.md` | ✅ 活跃 | 自然语言办事、ActionRun、执行会话和端侧能力桥 |
 | `agent-teams.md` | ✅ 活跃 | Agent 团队管理、本地扩展画像和自然语言编排草稿 |
 | `kanban.md` | 🔄 进行中 | 事件驱动 Agent 工作流看板 |
