@@ -1,5 +1,5 @@
 import { Card, Space, Tag, Typography } from '@douyinfe/semi-ui';
-import { IconCustomize, IconPuzzle, IconSetting } from '@douyinfe/semi-icons';
+import { IconCheckList, IconCustomize, IconPuzzle, IconSetting } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
@@ -10,6 +10,7 @@ export default function ControlCenterPage() {
   const navigate = useNavigate();
 
   const items = [
+    { title: t('nav.tasks'), desc: t('controlCenter.tasksDesc'), path: '/taskkanban', icon: <IconCheckList size="extra-large" /> },
     { title: t('nav.extensions'), desc: t('controlCenter.extensionsDesc'), path: '/extensions', icon: <IconPuzzle size="extra-large" /> },
     { title: t('nav.tuning'), desc: t('controlCenter.tuningDesc'), path: '/tuning', icon: <IconCustomize size="extra-large" /> },
     { title: t('nav.settings'), desc: t('controlCenter.settingsDesc'), path: '/settings', icon: <IconSetting size="extra-large" /> },

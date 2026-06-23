@@ -52,7 +52,6 @@
   },
   "workbench": {
     "pageDesc": "Move work through items, plans, execution, outputs, and reviews.",
-    "kanbanDesc": "View scheduled jobs and the local board state.",
     "activityDesc": "Review actions, approvals, and results executed by OpenClaw Agents.",
     "outputs": "Outputs",
     "outputsDesc": "View reports, HTML, documents, and other deliverables.",
@@ -73,6 +72,7 @@
   },
   "controlCenter": {
     "pageDesc": "Manage Agent capabilities, runtime environment, permissions, and instance settings.",
+    "tasksDesc": "Manage scheduled jobs and automation in OpenClaw Gateway.",
     "extensionsDesc": "Manage plugins, skills, MCP, and Companion capabilities.",
     "tuningDesc": "Tune Agent identity, memory, models, and context policies.",
     "settingsDesc": "Configure instance connections, appearance, and Desktop behavior.",

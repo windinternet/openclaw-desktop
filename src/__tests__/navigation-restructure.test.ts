@@ -64,7 +64,6 @@ describe('navigation restructure', () => {
   });
 
   it('highlights workbench for legacy work routes', () => {
-    expect(getActiveNavKey('/taskkanban')).toBe('workbench');
     expect(getActiveNavKey('/actions')).toBe('workbench');
     expect(getActiveNavKey('/artifacts')).toBe('workbench');
     expect(getActiveNavKey('/artifacts/art_123')).toBe('workbench');
@@ -76,6 +75,7 @@ describe('navigation restructure', () => {
   });
 
   it('highlights control center for legacy configuration routes', () => {
+    expect(getActiveNavKey('/taskkanban')).toBe('control-center');
     expect(getActiveNavKey('/extensions')).toBe('control-center');
     expect(getActiveNavKey('/tuning')).toBe('control-center');
     expect(getActiveNavKey('/settings')).toBe('control-center');
@@ -100,7 +100,7 @@ describe('navigation hub pages', () => {
     expect(sessions).toContain('/search');
 
     expect(workbench).toContain("t('nav.workbench')");
-    expect(workbench).toContain('/taskkanban');
+    expect(workbench).not.toContain('/taskkanban');
     expect(workbench).toContain('/actions');
     expect(workbench).toContain('/artifacts');
 
@@ -112,6 +112,7 @@ describe('navigation hub pages', () => {
     expect(collaboration).toContain('/office');
 
     expect(control).toContain("t('nav.controlCenter')");
+    expect(control).toContain('/taskkanban');
     expect(control).toContain('/extensions');
     expect(control).toContain('/tuning');
     expect(control).toContain('/settings');
@@ -156,7 +157,6 @@ describe('navigation locale strings', () => {
       'sessions.newSessionDesc',
       'sessions.searchDesc',
       'workbench.pageDesc',
-      'workbench.kanbanDesc',
       'workbench.activityDesc',
       'workbench.outputs',
       'workbench.outputsDesc',
@@ -171,6 +171,7 @@ describe('navigation locale strings', () => {
       'collaboration.teamsDesc',
       'collaboration.officeDesc',
       'controlCenter.pageDesc',
+      'controlCenter.tasksDesc',
       'controlCenter.extensionsDesc',
       'controlCenter.tuningDesc',
       'controlCenter.settingsDesc',

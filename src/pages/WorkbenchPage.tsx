@@ -1,5 +1,5 @@
 import { Card, Space, Tag, Typography } from '@douyinfe/semi-ui';
-import { IconAppCenter, IconBolt, IconCheckList } from '@douyinfe/semi-icons';
+import { IconAppCenter, IconBolt } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
@@ -10,7 +10,6 @@ export default function WorkbenchPage() {
   const navigate = useNavigate();
 
   const items = [
-    { title: t('nav.kanban'), desc: t('workbench.kanbanDesc'), path: '/taskkanban', icon: <IconCheckList size="extra-large" /> },
     { title: t('nav.actions'), desc: t('workbench.activityDesc'), path: '/actions', icon: <IconBolt size="extra-large" /> },
     { title: t('workbench.outputs'), desc: t('workbench.outputsDesc'), path: '/artifacts', icon: <IconAppCenter size="extra-large" /> },
   ];

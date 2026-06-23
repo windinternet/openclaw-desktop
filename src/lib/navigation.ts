@@ -65,11 +65,11 @@ export const PRIMARY_ROUTE_MAP: Record<PrimaryNavKey, string> = NAV_GROUPS
 const LEGACY_ROUTE_ACTIVE_KEYS: Array<{ prefix: string; key: PrimaryNavKey }> = [
   { prefix: '/chat/', key: 'sessions' },
   { prefix: '/search', key: 'sessions' },
-  { prefix: '/taskkanban', key: 'workbench' },
   { prefix: '/actions', key: 'workbench' },
   { prefix: '/artifacts', key: 'workbench' },
   { prefix: '/teams', key: 'collaboration' },
   { prefix: '/office', key: 'collaboration' },
+  { prefix: '/taskkanban', key: 'control-center' },
   { prefix: '/extensions', key: 'control-center' },
   { prefix: '/tuning', key: 'control-center' },
   { prefix: '/settings', key: 'control-center' },

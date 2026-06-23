@@ -52,7 +52,6 @@
   },
   "workbench": {
     "pageDesc": "围绕事项、计划、执行、成果和复盘推进工作。",
-    "kanbanDesc": "查看定时任务与本地看板的当前状态。",
     "activityDesc": "查看由 OpenClaw Agent 执行的动作、审批和结果。",
     "outputs": "成果",
     "outputsDesc": "查看报告、HTML、文档和其他可交付结果。",
@@ -73,6 +72,7 @@
   },
   "controlCenter": {
     "pageDesc": "管理 Agent 能力、运行环境、权限和实例设置。",
+    "tasksDesc": "管理 OpenClaw Gateway 的定时任务和自动化。",
     "extensionsDesc": "管理插件、技能、MCP 和 Companion 能力。",
     "tuningDesc": "调整 Agent 身份、记忆、模型和上下文策略。",
     "settingsDesc": "配置实例连接、外观和 Desktop 行为。",
