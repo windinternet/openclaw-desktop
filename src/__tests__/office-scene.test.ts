@@ -39,10 +39,14 @@ describe('OfficeScene agent labels', () => {
   });
 
   it('passes only the explicitly selected Agent into the 3D scene control state', () => {
-    const source = readFileSync('src/pages/Office3DPage.tsx', 'utf8');
+    const pageSource = readFileSync('src/pages/Office3DPage.tsx', 'utf8');
+    const sceneSource = readFileSync('src/components/office/OfficeScene.tsx', 'utf8');
 
-    expect(source).toContain('selectedAgentId={selectedAgentId}');
-    expect(source).not.toContain('selectedAgentId={selectedAgent?.agentId ?? null}');
-    expect(source).toContain('V 返回第三人称');
+    expect(pageSource).toContain('selectedAgentId={selectedAgentId}');
+    expect(pageSource).not.toContain('selectedAgentId={selectedAgent?.agentId ?? null}');
+    expect(sceneSource).toContain("if (key === 'v')");
+    expect(sceneSource).toContain('selectedRef.current = null;');
+    expect(sceneSource).toContain('onSelectRef.current(null);');
+    expect(sceneSource).toContain('resetCameraControl(state, container);');
   });
 });

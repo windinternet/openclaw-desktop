@@ -76,7 +76,15 @@
     "repoReadyTitle": "Repository is ready",
     "repoReadyDesc": "You can start reading sources/, wiki/index.md, and wiki/log.md.",
     "sources": "Sources",
-    "wiki": "Wiki"
+    "wiki": "Wiki",
+    "sourceCount": "{{count}} sources",
+    "wikiCount": "{{count}} Wiki pages",
+    "searchPlaceholder": "Search sources/ and wiki/",
+    "searchResults": "Search Results",
+    "emptySources": "No sources yet",
+    "emptyWiki": "No Wiki pages yet",
+    "index": "Index",
+    "log": "Log"
   },
   "repositoryGate": {
     "knowledgeTitle": "Knowledge Repository",

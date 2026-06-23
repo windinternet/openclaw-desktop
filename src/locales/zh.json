@@ -76,7 +76,15 @@
     "repoReadyTitle": "Repository 已就绪",
     "repoReadyDesc": "可以开始读取 sources/、wiki/index.md 和 wiki/log.md。",
     "sources": "资料源",
-    "wiki": "Wiki"
+    "wiki": "Wiki",
+    "sourceCount": "{{count}} 个资料源",
+    "wikiCount": "{{count}} 个 Wiki 页面",
+    "searchPlaceholder": "搜索 sources/ 与 wiki/",
+    "searchResults": "搜索结果",
+    "emptySources": "暂无资料源",
+    "emptyWiki": "暂无 Wiki 页面",
+    "index": "索引",
+    "log": "日志"
   },
   "repositoryGate": {
     "knowledgeTitle": "知识库仓库",
