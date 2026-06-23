@@ -21,13 +21,15 @@ export default function ControlCenterPage() {
       <Text type="tertiary">{t('controlCenter.pageDesc')}</Text>
       <Space align="start" wrap style={{ marginTop: 20 }}>
         {items.map((item) => (
-          <Card key={item.path} hoverable style={{ width: 280, cursor: 'pointer' }} bodyStyle={{ minHeight: 132 }} onClick={() => navigate(item.path)}>
-            <Space vertical align="start">
-              {item.icon}
-              <Text strong>{item.title}</Text>
-              <Text type="tertiary" size="small">{item.desc}</Text>
-            </Space>
-          </Card>
+          <div key={item.path} onClick={() => navigate(item.path)}>
+            <Card style={{ width: 280, cursor: 'pointer' }} bodyStyle={{ minHeight: 132 }}>
+              <Space vertical align="start">
+                {item.icon}
+                <Text strong>{item.title}</Text>
+                <Text type="tertiary" size="small">{item.desc}</Text>
+              </Space>
+            </Card>
+          </div>
         ))}
         <Card style={{ width: 280 }} bodyStyle={{ minHeight: 132 }}>
           <Space vertical align="start">
