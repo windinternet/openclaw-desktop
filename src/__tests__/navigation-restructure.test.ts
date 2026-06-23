@@ -6,6 +6,13 @@ import {
   PRIMARY_ROUTE_MAP,
 } from '../lib/navigation';
 
+function getByPath(source: unknown, path: string): unknown {
+  return path.split('.').reduce<unknown>((value, key) => {
+    if (!value || typeof value !== 'object') return undefined;
+    return (value as Record<string, unknown>)[key];
+  }, source);
+}
+
 describe('navigation restructure', () => {
   it('keeps new session as a first-level work entry', () => {
     const work = NAV_GROUPS.find((group) => group.key === 'work');
@@ -136,18 +143,45 @@ describe('app routes for new primary navigation', () => {
 
 describe('navigation locale strings', () => {
   it('defines locale keys used by new navigation hubs', () => {
-    const zh = readFileSync('src/locales/zh.json', 'utf8');
-    const en = readFileSync('src/locales/en.json', 'utf8');
+    const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
+    const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
+    const keys = [
+      'nav.sectionWork',
+      'nav.sectionAgents',
+      'nav.workbench',
+      'nav.knowledge',
+      'nav.collaboration',
+      'nav.controlCenter',
+      'sessions.pageDesc',
+      'sessions.newSessionDesc',
+      'sessions.searchDesc',
+      'workbench.pageDesc',
+      'workbench.kanbanDesc',
+      'workbench.activityDesc',
+      'workbench.outputs',
+      'workbench.outputsDesc',
+      'workbench.plansReviews',
+      'workbench.plansReviewsDesc',
+      'knowledge.pageDesc',
+      'knowledge.repoGateTitle',
+      'knowledge.repoGateDesc',
+      'knowledge.sources',
+      'knowledge.wiki',
+      'collaboration.pageDesc',
+      'collaboration.teamsDesc',
+      'collaboration.officeDesc',
+      'controlCenter.pageDesc',
+      'controlCenter.extensionsDesc',
+      'controlCenter.tuningDesc',
+      'controlCenter.settingsDesc',
+      'controlCenter.repositoryProtocol',
+      'controlCenter.repositoryProtocolDesc',
+    ];
 
-    for (const source of [zh, en]) {
-      expect(source).toContain('"sectionWork"');
-      expect(source).toContain('"sectionAgents"');
-      expect(source).toContain('"workbench"');
-      expect(source).toContain('"knowledge"');
-      expect(source).toContain('"collaboration"');
-      expect(source).toContain('"controlCenter"');
-      expect(source).toContain('"repoGateTitle"');
-      expect(source).toContain('"repositoryProtocol"');
+    for (const locale of [zh, en]) {
+      for (const key of keys) {
+        expect(getByPath(locale, key), key).toBeTypeOf('string');
+      }
     }
   });
 });
