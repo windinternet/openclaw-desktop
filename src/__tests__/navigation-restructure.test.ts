@@ -100,9 +100,8 @@ describe('navigation hub pages', () => {
     expect(sessions).toContain('/search');
 
     expect(workbench).toContain("t('nav.workbench')");
+    expect(workbench).toContain('WorkbenchRepositoryPanel');
     expect(workbench).not.toContain('/taskkanban');
-    expect(workbench).toContain('/actions');
-    expect(workbench).toContain('/artifacts');
 
     expect(knowledge).toContain("t('nav.knowledge')");
     expect(knowledge).toContain('RepositoryGate');

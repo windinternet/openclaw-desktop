@@ -56,7 +56,18 @@
     "outputs": "Outputs",
     "outputsDesc": "View reports, HTML, documents, and other deliverables.",
     "plansReviews": "Plans and Reviews",
-    "plansReviewsDesc": "Repository plans/ and reviews/ will be connected in a later phase."
+    "plansReviewsDesc": "Repository plans/ and reviews/ will be connected in a later phase.",
+    "inbox": "Inbox",
+    "activeWork": "Active Matters",
+    "activePlans": "Execution Plans",
+    "runs": "Run Records",
+    "reviews": "Reviews",
+    "activeWorkCount": "{{count}} matters",
+    "activePlanCount": "{{count}} plans",
+    "reviewCount": "{{count}} reviews",
+    "emptyActiveWork": "No active matters",
+    "emptyActivePlans": "No active plans",
+    "emptyReviews": "No reviews yet"
   },
   "knowledge": {
     "pageDesc": "Manage sources, Wiki pages, indexes, logs, and references.",

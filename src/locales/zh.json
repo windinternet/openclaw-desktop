@@ -56,7 +56,18 @@
     "outputs": "成果",
     "outputsDesc": "查看报告、HTML、文档和其他可交付结果。",
     "plansReviews": "计划与复盘",
-    "plansReviewsDesc": "后续接入 Repository plans/ 与 reviews/。"
+    "plansReviewsDesc": "后续接入 Repository plans/ 与 reviews/。",
+    "inbox": "收件箱",
+    "activeWork": "进行中的事项",
+    "activePlans": "执行计划",
+    "runs": "执行记录",
+    "reviews": "复盘",
+    "activeWorkCount": "{{count}} 个事项",
+    "activePlanCount": "{{count}} 个计划",
+    "reviewCount": "{{count}} 个复盘",
+    "emptyActiveWork": "暂无进行中的事项",
+    "emptyActivePlans": "暂无执行计划",
+    "emptyReviews": "暂无复盘"
   },
   "knowledge": {
     "pageDesc": "管理资料源、Wiki、索引、日志和引用关系。",
