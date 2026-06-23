@@ -52,6 +52,7 @@ interface Window {
       }>;
       listMarkdown?: (repoPath: string, directory: string) => Promise<import('./lib/repository-knowledge').RepositoryMarkdownFile[]>;
       readText?: (repoPath: string, relativePath: string) => Promise<string>;
+      writeText?: (repoPath: string, relativePath: string, content: string) => Promise<void>;
       search?: (repoPath: string, query: string, directories: string[]) => Promise<import('./lib/repository-knowledge').RepositorySearchResult[]>;
     };
     device: {

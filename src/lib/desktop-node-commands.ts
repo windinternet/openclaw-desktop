@@ -1,6 +1,8 @@
 import type { ArtifactType } from './artifact-types';
 import { artifactService } from './artifact-service';
 import { artifactPersistence } from './artifact-persistence';
+import { createDefaultRepositoryBinding } from './agentic-repository';
+import { createRepositoryOutput } from './repository-outputs';
 
 const ARTIFACT_TYPES = new Set<ArtifactType>([
   'report',
@@ -72,6 +74,48 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
         id: artifact.id,
         title: artifact.title,
         currentVersion: artifact.currentVersion,
+      },
+    };
+  }
+
+  if (command === 'desktop.outputs.create') {
+    const repoPath = stringValue(params.repoPath);
+    const title = stringValue(params.title);
+    const html = stringValue(params.html);
+    const type = artifactTypeValue(params.type);
+    if (!repoPath) return invalidParams('repoPath is required');
+    if (!title) return invalidParams('title is required');
+    const htmlTypes = ['report', 'dashboard', 'analysis', 'checklist', 'code', 'document', 'slide', 'form', 'other'];
+    if (htmlTypes.includes(type) && !html) return invalidParams('html is required');
+
+    const artifact = await artifactService.generate({
+      title,
+      html,
+      type,
+      icon: stringValue(params.icon),
+      description: stringValue(params.description),
+      tags: tagsValue(params.tags),
+      source: { type: 'mcp_tool', name: command },
+    });
+    const output = await createRepositoryOutput({
+      binding: createDefaultRepositoryBinding({
+        gatewayInstanceId: stringValue(params.gatewayInstanceId) ?? 'desktop-node',
+        repoPath,
+      }),
+      artifact,
+      html,
+    });
+
+    return {
+      ok: true,
+      artifact: {
+        id: artifact.id,
+        title: artifact.title,
+        currentVersion: artifact.currentVersion,
+      },
+      output: {
+        path: output.outputPath,
+        previewPath: output.previewPath,
       },
     };
   }

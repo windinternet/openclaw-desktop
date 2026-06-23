@@ -2,7 +2,7 @@ import { app, ipcMain } from 'electron'
 import path from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { access, cp, mkdir, readFile, readdir, stat } from 'node:fs/promises'
+import { access, cp, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 
 const execFileAsync = promisify(execFile)
 
@@ -161,6 +161,12 @@ async function readText(repoPath: string, relativePath: string): Promise<string>
   return readFile(resolveRepoPath(repoPath, relativePath), 'utf-8').catch(() => '')
 }
 
+async function writeText(repoPath: string, relativePath: string, content: string): Promise<void> {
+  const target = resolveRepoPath(repoPath, relativePath)
+  await mkdir(path.dirname(target), { recursive: true })
+  await writeFile(target, content, 'utf-8')
+}
+
 async function searchRepository(repoPath: string, query: string, directories: string[]): Promise<RepositorySearchResult[]> {
   const trimmed = query.trim().toLowerCase()
   if (!trimmed) return []
@@ -191,6 +197,9 @@ export function registerRepositoryIpcHandlers(): void {
   ipcMain.handle('repository:bootstrap', (_event, repoPath: string) => bootstrapRepository(repoPath))
   ipcMain.handle('repository:listMarkdown', (_event, repoPath: string, directory: string) => listMarkdown(repoPath, directory))
   ipcMain.handle('repository:readText', (_event, repoPath: string, relativePath: string) => readText(repoPath, relativePath))
+  ipcMain.handle('repository:writeText', (_event, repoPath: string, relativePath: string, content: string) =>
+    writeText(repoPath, relativePath, content),
+  )
   ipcMain.handle('repository:search', (_event, repoPath: string, query: string, directories: string[]) =>
     searchRepository(repoPath, query, directories),
   )
