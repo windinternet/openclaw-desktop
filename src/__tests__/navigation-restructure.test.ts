@@ -133,3 +133,21 @@ describe('app routes for new primary navigation', () => {
     expect(app).toContain('path="artifacts" element={<ArtifactsPage />}');
   });
 });
+
+describe('navigation locale strings', () => {
+  it('defines locale keys used by new navigation hubs', () => {
+    const zh = readFileSync('src/locales/zh.json', 'utf8');
+    const en = readFileSync('src/locales/en.json', 'utf8');
+
+    for (const source of [zh, en]) {
+      expect(source).toContain('"sectionWork"');
+      expect(source).toContain('"sectionAgents"');
+      expect(source).toContain('"workbench"');
+      expect(source).toContain('"knowledge"');
+      expect(source).toContain('"collaboration"');
+      expect(source).toContain('"controlCenter"');
+      expect(source).toContain('"repoGateTitle"');
+      expect(source).toContain('"repositoryProtocol"');
+    }
+  });
+});

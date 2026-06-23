@@ -5,6 +5,8 @@
   },
   "nav": {
     "sectionOverview": "总览",
+    "sectionWork": "工作",
+    "sectionAgents": "智能体",
     "sectionTools": "工具",
     "sectionCollaboration": "协作",
     "dashboard": "仪表盘",
@@ -19,6 +21,10 @@
     "office": "3D 办公室",
     "memory": "记忆",
     "sessions": "会话",
+    "workbench": "工作台",
+    "knowledge": "知识库",
+    "collaboration": "协作",
+    "controlCenter": "控制中心",
     "settings": "设置",
     "artifacts": "产物",
     "tuning": "调教",
@@ -38,6 +44,40 @@
     "teamsDesc": "管理 Agent 团队",
     "officeDesc": "3D 虚拟办公室",
     "memoryDesc": "浏览和管理记忆"
+  },
+  "sessions": {
+    "pageDesc": "管理会话入口、搜索和最近对话。",
+    "newSessionDesc": "选择 Agent 和模型，发起新的事情。",
+    "searchDesc": "查找历史会话、消息和相关上下文。"
+  },
+  "workbench": {
+    "pageDesc": "围绕事项、计划、执行、成果和复盘推进工作。",
+    "kanbanDesc": "查看定时任务与本地看板的当前状态。",
+    "activityDesc": "查看由 OpenClaw Agent 执行的动作、审批和结果。",
+    "outputs": "成果",
+    "outputsDesc": "查看报告、HTML、文档和其他可交付结果。",
+    "plansReviews": "计划与复盘",
+    "plansReviewsDesc": "后续接入 Repository plans/ 与 reviews/。"
+  },
+  "knowledge": {
+    "pageDesc": "管理资料源、Wiki、索引、日志和引用关系。",
+    "repoGateTitle": "需要绑定 Agentic Repository",
+    "repoGateDesc": "知识库会基于 Git 仓库中的 sources/、wiki/ 和 schemas/ 工作。下一阶段将加入仓库检测与初始化引导。",
+    "sources": "资料源",
+    "wiki": "Wiki"
+  },
+  "collaboration": {
+    "pageDesc": "管理 OpenClaw Agent 团队、办公室和多 Agent 协作。",
+    "teamsDesc": "查看和编排 Gateway 中的 Agent 团队。",
+    "officeDesc": "用空间视图观察 Agent 状态和协作关系。"
+  },
+  "controlCenter": {
+    "pageDesc": "管理 Agent 能力、运行环境、权限和实例设置。",
+    "extensionsDesc": "管理插件、技能、MCP 和 Companion 能力。",
+    "tuningDesc": "调整 Agent 身份、记忆、模型和上下文策略。",
+    "settingsDesc": "配置实例连接、外观和 Desktop 行为。",
+    "repositoryProtocol": "仓库协议",
+    "repositoryProtocolDesc": "后续管理 AGENTS.md、schemas/、BOOTSTRAP.md 和目录映射。"
   },
   "common": {
     "loading": "加载中…",

@@ -5,6 +5,8 @@
   },
   "nav": {
     "sectionOverview": "Overview",
+    "sectionWork": "Work",
+    "sectionAgents": "Agents",
     "sectionTools": "Tools",
     "sectionCollaboration": "Collaboration",
     "dashboard": "Dashboard",
@@ -19,6 +21,10 @@
     "office": "Office 3D",
     "memory": "Memory",
     "sessions": "Sessions",
+    "workbench": "Workbench",
+    "knowledge": "Knowledge",
+    "collaboration": "Collaboration",
+    "controlCenter": "Control Center",
     "settings": "Settings",
     "artifacts": "Artifacts",
     "tuning": "Tuning",
@@ -38,6 +44,40 @@
     "teamsDesc": "Manage Agent teams",
     "officeDesc": "3D virtual office",
     "memoryDesc": "Browse and manage memory"
+  },
+  "sessions": {
+    "pageDesc": "Manage session entry points, search, and recent conversations.",
+    "newSessionDesc": "Pick an Agent and model to start something new.",
+    "searchDesc": "Find historical sessions, messages, and related context."
+  },
+  "workbench": {
+    "pageDesc": "Move work through items, plans, execution, outputs, and reviews.",
+    "kanbanDesc": "View scheduled jobs and the local board state.",
+    "activityDesc": "Review actions, approvals, and results executed by OpenClaw Agents.",
+    "outputs": "Outputs",
+    "outputsDesc": "View reports, HTML, documents, and other deliverables.",
+    "plansReviews": "Plans and Reviews",
+    "plansReviewsDesc": "Repository plans/ and reviews/ will be connected in a later phase."
+  },
+  "knowledge": {
+    "pageDesc": "Manage sources, Wiki pages, indexes, logs, and references.",
+    "repoGateTitle": "Agentic Repository binding required",
+    "repoGateDesc": "Knowledge will work from sources/, wiki/, and schemas/ in a Git repository. Repository checks and bootstrap guidance come in the next phase.",
+    "sources": "Sources",
+    "wiki": "Wiki"
+  },
+  "collaboration": {
+    "pageDesc": "Manage OpenClaw Agent teams, office space, and multi-Agent collaboration.",
+    "teamsDesc": "View and orchestrate Agents from the Gateway.",
+    "officeDesc": "Observe Agent status and collaboration relationships in a spatial view."
+  },
+  "controlCenter": {
+    "pageDesc": "Manage Agent capabilities, runtime environment, permissions, and instance settings.",
+    "extensionsDesc": "Manage plugins, skills, MCP, and Companion capabilities.",
+    "tuningDesc": "Tune Agent identity, memory, models, and context policies.",
+    "settingsDesc": "Configure instance connections, appearance, and Desktop behavior.",
+    "repositoryProtocol": "Repository Protocol",
+    "repositoryProtocolDesc": "AGENTS.md, schemas/, BOOTSTRAP.md, and path mappings will be managed here later."
   },
   "common": {
     "loading": "Loading...",
