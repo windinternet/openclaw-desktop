@@ -75,15 +75,20 @@ const LEGACY_ROUTE_ACTIVE_KEYS: Array<{ prefix: string; key: PrimaryNavKey }> = 
   { prefix: '/settings', key: 'control-center' },
 ];
 
+function matchesPathSegment(pathname: string, prefix: string): boolean {
+  if (prefix.endsWith('/')) return pathname.startsWith(prefix);
+  return pathname === prefix || pathname.startsWith(prefix + '/');
+}
+
 export function getActiveNavKey(pathname: string): PrimaryNavKey {
   if (pathname === '/') return 'dashboard';
 
   const direct = NAV_GROUPS
     .flatMap((group) => group.items)
-    .find((item) => item.route !== '/' && (pathname === item.route || pathname.startsWith(item.route + '/')));
+    .find((item) => item.route !== '/' && matchesPathSegment(pathname, item.route));
 
   if (direct) return direct.key;
 
-  const legacy = LEGACY_ROUTE_ACTIVE_KEYS.find((item) => pathname === item.prefix || pathname.startsWith(item.prefix));
+  const legacy = LEGACY_ROUTE_ACTIVE_KEYS.find((item) => matchesPathSegment(pathname, item.prefix));
   return legacy?.key ?? 'dashboard';
 }

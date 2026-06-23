@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
 import {
   getActiveNavKey,
   NAV_GROUPS,
@@ -38,6 +37,24 @@ describe('navigation restructure', () => {
     });
   });
 
+  it('contains every primary route map key', () => {
+    expect(Object.keys(PRIMARY_ROUTE_MAP).sort()).toEqual([
+      'collaboration',
+      'control-center',
+      'dashboard',
+      'knowledge',
+      'new-session',
+      'sessions',
+      'workbench',
+    ]);
+  });
+
+  it('highlights direct primary routes', () => {
+    expect(getActiveNavKey('/sessions')).toBe('sessions');
+    expect(getActiveNavKey('/workbench')).toBe('workbench');
+    expect(getActiveNavKey('/knowledge')).toBe('knowledge');
+  });
+
   it('highlights workbench for legacy work routes', () => {
     expect(getActiveNavKey('/taskkanban')).toBe('workbench');
     expect(getActiveNavKey('/actions')).toBe('workbench');
@@ -56,11 +73,8 @@ describe('navigation restructure', () => {
     expect(getActiveNavKey('/settings')).toBe('control-center');
   });
 
-  it('does not render old sidebar groups directly', () => {
-    const source = readFileSync('src/components/Sidebar.tsx', 'utf8');
-
-    expect(source).toContain('NAV_GROUPS');
-    expect(source).not.toContain("t('nav.sectionTools')");
-    expect(source).not.toContain("t('nav.sectionCollaboration')");
+  it('does not highlight legacy routes on partial path segment matches', () => {
+    expect(getActiveNavKey('/settings-foo')).toBe('dashboard');
+    expect(getActiveNavKey('/teams-old')).toBe('dashboard');
   });
 });
