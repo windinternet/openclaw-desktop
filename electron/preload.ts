@@ -39,6 +39,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('repository:writeText', repoPath, relativePath, content),
     search: (repoPath: string, query: string, directories: string[]) =>
       ipcRenderer.invoke('repository:search', repoPath, query, directories),
+    gitStatus: (repoPath: string) => ipcRenderer.invoke('repository:gitStatus', repoPath),
+    gitDiff: (repoPath: string) => ipcRenderer.invoke('repository:gitDiff', repoPath),
   },
   artifact: {
     open: (artifactId: string, version: number) => ipcRenderer.invoke('artifact:open', artifactId, version),

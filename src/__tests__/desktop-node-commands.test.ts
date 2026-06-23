@@ -101,6 +101,40 @@ describe('desktop node commands', () => {
     }));
   });
 
+  it('handles structured repository read and search commands', async () => {
+    const readText = vi.fn(async () => '# Index');
+    const search = vi.fn(async () => [{ path: 'wiki/index.md', line: 1, snippet: 'Index' }]);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: {
+          readText,
+          search,
+        },
+      },
+    });
+
+    await expect(handleDesktopNodeCommand('desktop.repository.read', {
+      repoPath: '/repo',
+      path: 'wiki/index.md',
+    })).resolves.toEqual({
+      ok: true,
+      path: 'wiki/index.md',
+      content: '# Index',
+    });
+
+    await expect(handleDesktopNodeCommand('desktop.repository.search', {
+      repoPath: '/repo',
+      query: 'Index',
+      directories: ['wiki'],
+    })).resolves.toEqual({
+      ok: true,
+      results: [{ path: 'wiki/index.md', line: 1, snippet: 'Index' }],
+    });
+
+    expect(readText).toHaveBeenCalledWith('/repo', 'wiki/index.md');
+    expect(search).toHaveBeenCalledWith('/repo', 'Index', ['wiki']);
+  });
+
   it('rejects artifact create without title or html', async () => {
     await expect(handleDesktopNodeCommand('desktop.artifacts.create', {
       title: '',

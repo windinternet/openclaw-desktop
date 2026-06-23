@@ -13,18 +13,27 @@ export const DESKTOP_BRIDGE_CAPABILITIES = [
   'desktop.artifact.update',
 ];
 
-export const DESKTOP_NODE_CAPS = ['desktop', 'desktop.artifacts'];
+export const DESKTOP_NODE_CAPS = ['desktop', 'desktop.artifacts', 'desktop.repository', 'desktop.outputs'];
 
 export const DESKTOP_NODE_COMMANDS = [
   'desktop.artifacts.create',
   'desktop.artifacts.open',
   'desktop.artifacts.update',
   'desktop.artifacts.append',
+  'desktop.repository.status',
+  'desktop.repository.read',
+  'desktop.repository.write',
+  'desktop.repository.search',
+  'desktop.repository.git.status',
+  'desktop.repository.git.diff',
+  'desktop.outputs.create',
   'desktop.notify',
 ];
 
 export const DESKTOP_NODE_PERMISSIONS = {
   'desktop.artifacts': true,
+  'desktop.repository': true,
+  'desktop.outputs': true,
 };
 
 const bridgeClients = new Map<string, GatewayClient>();

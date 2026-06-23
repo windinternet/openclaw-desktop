@@ -1,7 +1,7 @@
 import type { ArtifactType } from './artifact-types';
 import { artifactService } from './artifact-service';
 import { artifactPersistence } from './artifact-persistence';
-import { createDefaultRepositoryBinding } from './agentic-repository';
+import { createDefaultRepositoryBinding, getRepositoryGateStatus } from './agentic-repository';
 import { createRepositoryOutput } from './repository-outputs';
 
 const ARTIFACT_TYPES = new Set<ArtifactType>([
@@ -43,6 +43,10 @@ function artifactTypeValue(value: unknown): ArtifactType {
 
 function invalidParams(message: string): { ok: false; error: 'invalid-params'; message: string } {
   return { ok: false, error: 'invalid-params', message };
+}
+
+function repositoryApi() {
+  return (globalThis as { window?: Window }).window?.electronAPI?.repository;
 }
 
 export async function handleDesktopNodeCommand(command: string, params: unknown): Promise<unknown> {
@@ -118,6 +122,73 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
         previewPath: output.previewPath,
       },
     };
+  }
+
+  if (command === 'desktop.repository.status') {
+    const repoPath = stringValue(params.repoPath);
+    if (!repoPath) return invalidParams('repoPath is required');
+    const repository = repositoryApi();
+    if (!repository?.checkGit || !repository.inspect) return { ok: false, error: 'repository-api-unavailable' };
+    const binding = createDefaultRepositoryBinding({
+      gatewayInstanceId: stringValue(params.gatewayInstanceId) ?? 'desktop-node',
+      repoPath,
+    });
+    const gitAvailable = await repository.checkGit();
+    const details = await repository.inspect(repoPath);
+    const status = getRepositoryGateStatus({ binding, gitAvailable, ...details });
+    return { ok: true, status, details };
+  }
+
+  if (command === 'desktop.repository.read') {
+    const repoPath = stringValue(params.repoPath);
+    const relativePath = stringValue(params.path);
+    if (!repoPath) return invalidParams('repoPath is required');
+    if (!relativePath) return invalidParams('path is required');
+    const repository = repositoryApi();
+    if (!repository?.readText) return { ok: false, error: 'repository-api-unavailable' };
+    return { ok: true, path: relativePath, content: await repository.readText(repoPath, relativePath) };
+  }
+
+  if (command === 'desktop.repository.write') {
+    const repoPath = stringValue(params.repoPath);
+    const relativePath = stringValue(params.path);
+    const content = typeof params.content === 'string' ? params.content : undefined;
+    if (!repoPath) return invalidParams('repoPath is required');
+    if (!relativePath) return invalidParams('path is required');
+    if (content === undefined) return invalidParams('content is required');
+    const repository = repositoryApi();
+    if (!repository?.writeText) return { ok: false, error: 'repository-api-unavailable' };
+    await repository.writeText(repoPath, relativePath, content);
+    return { ok: true, path: relativePath };
+  }
+
+  if (command === 'desktop.repository.search') {
+    const repoPath = stringValue(params.repoPath);
+    const query = stringValue(params.query);
+    const directories = Array.isArray(params.directories)
+      ? params.directories.filter((item): item is string => typeof item === 'string')
+      : ['sources', 'wiki', 'work', 'plans', 'runs', 'outputs', 'reviews'];
+    if (!repoPath) return invalidParams('repoPath is required');
+    if (!query) return invalidParams('query is required');
+    const repository = repositoryApi();
+    if (!repository?.search) return { ok: false, error: 'repository-api-unavailable' };
+    return { ok: true, results: await repository.search(repoPath, query, directories) };
+  }
+
+  if (command === 'desktop.repository.git.status') {
+    const repoPath = stringValue(params.repoPath);
+    if (!repoPath) return invalidParams('repoPath is required');
+    const repository = repositoryApi();
+    if (!repository?.gitStatus) return { ok: false, error: 'repository-api-unavailable' };
+    return { ok: true, status: await repository.gitStatus(repoPath) };
+  }
+
+  if (command === 'desktop.repository.git.diff') {
+    const repoPath = stringValue(params.repoPath);
+    if (!repoPath) return invalidParams('repoPath is required');
+    const repository = repositoryApi();
+    if (!repository?.gitDiff) return { ok: false, error: 'repository-api-unavailable' };
+    return { ok: true, diff: await repository.gitDiff(repoPath) };
   }
 
   if (command === 'desktop.artifacts.append') {

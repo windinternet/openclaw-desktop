@@ -191,6 +191,16 @@ async function searchRepository(repoPath: string, query: string, directories: st
   return results
 }
 
+async function gitStatus(repoPath: string): Promise<string> {
+  const result = await execFileAsync('git', ['status', '--short'], { cwd: path.resolve(repoPath), timeout: 10000 })
+  return result.stdout
+}
+
+async function gitDiff(repoPath: string): Promise<string> {
+  const result = await execFileAsync('git', ['diff'], { cwd: path.resolve(repoPath), timeout: 10000, maxBuffer: 1024 * 1024 })
+  return result.stdout
+}
+
 export function registerRepositoryIpcHandlers(): void {
   ipcMain.handle('repository:checkGit', () => checkGitAvailable())
   ipcMain.handle('repository:inspect', (_event, repoPath: string) => inspectRepository(repoPath))
@@ -203,4 +213,6 @@ export function registerRepositoryIpcHandlers(): void {
   ipcMain.handle('repository:search', (_event, repoPath: string, query: string, directories: string[]) =>
     searchRepository(repoPath, query, directories),
   )
+  ipcMain.handle('repository:gitStatus', (_event, repoPath: string) => gitStatus(repoPath))
+  ipcMain.handle('repository:gitDiff', (_event, repoPath: string) => gitDiff(repoPath))
 }
