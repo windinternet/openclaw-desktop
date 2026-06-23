@@ -13,6 +13,7 @@ const INSTANCE_DATA_KEYS = new Set([
   'agent-team-profile',
   'ai-action-runs',
   'artifacts',
+  'agentic-repository-binding',
 ])
 
 interface StoredAppState {

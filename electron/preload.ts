@@ -29,6 +29,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     saveInstanceData: (instanceId: string, key: string, value: unknown) =>
       ipcRenderer.invoke('storage:saveInstanceData', instanceId, key, value),
   },
+  repository: {
+    checkGit: () => ipcRenderer.invoke('repository:checkGit'),
+    inspect: (repoPath: string) => ipcRenderer.invoke('repository:inspect', repoPath),
+    bootstrap: (repoPath: string) => ipcRenderer.invoke('repository:bootstrap', repoPath),
+  },
   artifact: {
     open: (artifactId: string, version: number) => ipcRenderer.invoke('artifact:open', artifactId, version),
     getMeta: (artifactId: string) => ipcRenderer.invoke('artifact:getMeta', artifactId),

@@ -13,6 +13,7 @@ import { registerArtifactProtocol, registerArtifactIpcHandlers } from './artifac
 import { setupMainLogger, writeRenderer } from './logger'
 import { getPetWindow } from './pet-window-manager'
 import { registerPetIpcHandlers } from './pet-ipc'
+import { registerRepositoryIpcHandlers } from './repository-handlers'
 
 const execFileAsync = promisify(execFile)
 
@@ -459,6 +460,7 @@ ipcMain.handle('marketplace:search', async (_event, params: SkillMarketplaceSear
 registerLocalFileStorageHandlers()
 registerArtifactIpcHandlers()
 registerPetIpcHandlers()
+registerRepositoryIpcHandlers()
 
 ipcMain.handle('device:signChallenge', async (_event, params: {
   nonce: string;

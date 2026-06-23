@@ -62,8 +62,45 @@
     "pageDesc": "Manage sources, Wiki pages, indexes, logs, and references.",
     "repoGateTitle": "Agentic Repository binding required",
     "repoGateDesc": "Knowledge will work from sources/, wiki/, and schemas/ in a Git repository. Repository checks and bootstrap guidance come in the next phase.",
+    "repoReadyTitle": "Repository is ready",
+    "repoReadyDesc": "You can start reading sources/, wiki/index.md, and wiki/log.md.",
     "sources": "Sources",
     "wiki": "Wiki"
+  },
+  "repositoryGate": {
+    "knowledgeTitle": "Knowledge Repository",
+    "knowledgeDesc": "Knowledge uses sources/, wiki/, and schemas/ in a Git repository so Agents can maintain a growing personal Wiki.",
+    "workbenchTitle": "Workbench Repository",
+    "workbenchDesc": "Workbench uses the same Git repository to record matters, plans, runs, outputs, and reviews.",
+    "desktopLocal": "Desktop Local",
+    "gatewayLocal": "Gateway Remote",
+    "pathPlaceholder": "Enter a repository path, for example /Users/me/agentic-repo",
+    "bind": "Bind",
+    "bootstrap": "Initialize Template",
+    "saved": "Repository binding saved",
+    "bootstrapDone": "Repository template initialized",
+    "status": {
+      "repo_ready": "Ready",
+      "repo_unbound": "Unbound",
+      "git_missing": "Git Missing",
+      "repo_path_missing": "Path Missing",
+      "repo_not_git": "Not a Git Repo",
+      "repo_empty": "Empty Repo",
+      "repo_needs_bootstrap": "Needs Bootstrap",
+      "repo_remote_unreachable": "Remote Unreachable",
+      "repo_permission_denied": "Permission Denied"
+    },
+    "hint": {
+      "repo_ready": "Repository is ready.",
+      "repo_unbound": "Bind an Agentic Repository for the current OpenClaw instance first.",
+      "git_missing": "Install Git first. Desktop needs Git to inspect and version the repository.",
+      "repo_path_missing": "Confirm the path exists, or initialize a new desktop-local repository from the template.",
+      "repo_not_git": "This path is not a Git repository yet. Template initialization runs git init first.",
+      "repo_empty": "An empty repository can receive the default template directly.",
+      "repo_needs_bootstrap": "The repository is missing protocol files such as AGENTS.md, wiki/, work/, outputs/, or schemas/.",
+      "repo_remote_unreachable": "gateway-local requires Gateway/Companion repository capabilities before Desktop can access it.",
+      "repo_permission_denied": "Desktop cannot read this path. Check system permissions or choose another location."
+    }
   },
   "collaboration": {
     "pageDesc": "Manage OpenClaw Agent teams, office space, and multi-Agent collaboration.",

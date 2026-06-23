@@ -62,8 +62,45 @@
     "pageDesc": "管理资料源、Wiki、索引、日志和引用关系。",
     "repoGateTitle": "需要绑定 Agentic Repository",
     "repoGateDesc": "知识库会基于 Git 仓库中的 sources/、wiki/ 和 schemas/ 工作。下一阶段将加入仓库检测与初始化引导。",
+    "repoReadyTitle": "Repository 已就绪",
+    "repoReadyDesc": "可以开始读取 sources/、wiki/index.md 和 wiki/log.md。",
     "sources": "资料源",
     "wiki": "Wiki"
+  },
+  "repositoryGate": {
+    "knowledgeTitle": "知识库仓库",
+    "knowledgeDesc": "知识库使用 Git 仓库中的 sources/、wiki/ 和 schemas/，让 Agent 能持续维护个人 Wiki。",
+    "workbenchTitle": "工作台仓库",
+    "workbenchDesc": "工作台使用同一个 Git 仓库记录事项、计划、执行、成果和复盘。",
+    "desktopLocal": "Desktop 本机",
+    "gatewayLocal": "Gateway 远程",
+    "pathPlaceholder": "输入仓库路径，例如 /Users/me/agentic-repo",
+    "bind": "绑定",
+    "bootstrap": "初始化模板",
+    "saved": "仓库绑定已保存",
+    "bootstrapDone": "仓库模板已初始化",
+    "status": {
+      "repo_ready": "已就绪",
+      "repo_unbound": "未绑定",
+      "git_missing": "Git 不可用",
+      "repo_path_missing": "路径不可用",
+      "repo_not_git": "不是 Git 仓库",
+      "repo_empty": "空仓库",
+      "repo_needs_bootstrap": "需要初始化",
+      "repo_remote_unreachable": "远程不可用",
+      "repo_permission_denied": "无权限"
+    },
+    "hint": {
+      "repo_ready": "仓库已可用。",
+      "repo_unbound": "先绑定一个与当前 OpenClaw 实例配套的 Agentic Repository。",
+      "git_missing": "请先安装 Git，Desktop 需要 Git 来检查和版本化仓库。",
+      "repo_path_missing": "请确认路径存在，或点击初始化模板创建一个新的 desktop-local 仓库。",
+      "repo_not_git": "该路径还不是 Git 仓库，初始化模板会先执行 git init。",
+      "repo_empty": "空仓库可以直接写入默认模板。",
+      "repo_needs_bootstrap": "仓库缺少 AGENTS.md、wiki/、work/、outputs/ 或 schemas/ 等协议文件。",
+      "repo_remote_unreachable": "gateway-local 需要 Gateway/Companion 暴露 repository 能力后才能访问。",
+      "repo_permission_denied": "Desktop 没有权限读取该路径，请检查系统权限或换一个位置。"
+    }
   },
   "collaboration": {
     "pageDesc": "管理 OpenClaw Agent 团队、办公室和多 Agent 协作。",

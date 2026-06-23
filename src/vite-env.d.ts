@@ -32,6 +32,25 @@ interface Window {
       loadInstanceData: <T>(instanceId: string, key: string) => Promise<T | null>;
       saveInstanceData: (instanceId: string, key: string, value: unknown) => Promise<void>;
     };
+    repository?: {
+      checkGit: () => Promise<boolean>;
+      inspect: (repoPath: string) => Promise<{
+        pathExists: boolean;
+        isDirectory: boolean;
+        isGitRepo: boolean;
+        isEmpty: boolean;
+        hasRequiredTemplate: boolean;
+        permissionDenied: boolean;
+      }>;
+      bootstrap: (repoPath: string) => Promise<{
+        pathExists: boolean;
+        isDirectory: boolean;
+        isGitRepo: boolean;
+        isEmpty: boolean;
+        hasRequiredTemplate: boolean;
+        permissionDenied: boolean;
+      }>;
+    };
     device: {
       signChallenge: (params: {
         nonce: string;
