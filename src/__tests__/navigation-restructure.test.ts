@@ -110,3 +110,26 @@ describe('navigation hub pages', () => {
     expect(control).toContain('/settings');
   });
 });
+
+describe('app routes for new primary navigation', () => {
+  it('registers primary hub routes while keeping legacy routes', () => {
+    const app = readFileSync('src/App.tsx', 'utf8');
+
+    expect(app).toContain("import SessionsPage from './pages/SessionsPage'");
+    expect(app).toContain("import WorkbenchPage from './pages/WorkbenchPage'");
+    expect(app).toContain("import KnowledgeBasePage from './pages/KnowledgeBasePage'");
+    expect(app).toContain("import CollaborationPage from './pages/CollaborationPage'");
+    expect(app).toContain("import ControlCenterPage from './pages/ControlCenterPage'");
+
+    expect(app).toContain('path="sessions" element={<SessionsPage />}');
+    expect(app).toContain('path="workbench" element={<WorkbenchPage />}');
+    expect(app).toContain('path="knowledge" element={<KnowledgeBasePage />}');
+    expect(app).toContain('path="collaboration" element={<CollaborationPage />}');
+    expect(app).toContain('path="control-center" element={<ControlCenterPage />}');
+
+    expect(app).toContain('path="new-session" element={<NewSessionPage />}');
+    expect(app).toContain('path="teams" element={<TeamsPage />}');
+    expect(app).toContain('path="office" element={<Office3DPage />}');
+    expect(app).toContain('path="artifacts" element={<ArtifactsPage />}');
+  });
+});
