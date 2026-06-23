@@ -1,7 +1,7 @@
-import { Button, Card, Space, Typography } from '@douyinfe/semi-ui';
-import { IconBranch, IconFile, IconSearch } from '@douyinfe/semi-icons';
+import { Typography } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
 import RepositoryGate from '../components/RepositoryGate';
+import KnowledgeRepositoryPanel from '../components/KnowledgeRepositoryPanel';
 
 const { Title, Text } = Typography;
 
@@ -13,21 +13,9 @@ export default function KnowledgeBasePage() {
       <Title heading={3} style={{ marginTop: 0 }}>{t('nav.knowledge')}</Title>
       <Text type="tertiary">{t('knowledge.pageDesc')}</Text>
       <RepositoryGate area="knowledge">
-        <Card style={{ maxWidth: 760 }}>
-          <Space align="start">
-            <IconBranch size="extra-large" />
-            <div>
-              <Text strong>{t('knowledge.repoReadyTitle')}</Text>
-              <Text type="tertiary" style={{ display: 'block', marginTop: 6 }}>
-                {t('knowledge.repoReadyDesc')}
-              </Text>
-              <Space wrap style={{ marginTop: 16 }}>
-                <Button icon={<IconFile />}>{t('knowledge.sources')}</Button>
-                <Button icon={<IconSearch />}>{t('knowledge.wiki')}</Button>
-              </Space>
-            </div>
-          </Space>
-        </Card>
+        {(binding) => (
+          <KnowledgeRepositoryPanel binding={binding} />
+        )}
       </RepositoryGate>
     </div>
   );

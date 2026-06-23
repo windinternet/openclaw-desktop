@@ -106,7 +106,7 @@ describe('navigation hub pages', () => {
 
     expect(knowledge).toContain("t('nav.knowledge')");
     expect(knowledge).toContain('RepositoryGate');
-    expect(knowledge).toContain("t('knowledge.repoReadyTitle')");
+    expect(knowledge).toContain('KnowledgeRepositoryPanel');
 
     expect(collaboration).toContain("t('nav.collaboration')");
     expect(collaboration).toContain('/teams');

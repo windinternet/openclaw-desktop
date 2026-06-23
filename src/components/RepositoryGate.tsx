@@ -32,7 +32,7 @@ export default function RepositoryGate({
   children,
 }: {
   area: 'knowledge' | 'workbench';
-  children: ReactNode;
+  children: ReactNode | ((binding: RepositoryBinding) => ReactNode);
 }) {
   const { t } = useTranslation();
   const currentInstanceId = useStore((s) => s.currentInstanceId);
@@ -164,8 +164,11 @@ export default function RepositoryGate({
           )}
         </Space>
       </Card>
-      {ready && <div style={{ marginTop: 20 }}>{children}</div>}
+      {ready && binding && (
+        <div style={{ marginTop: 20 }}>
+          {typeof children === 'function' ? children(binding) : children}
+        </div>
+      )}
     </div>
   );
 }
-

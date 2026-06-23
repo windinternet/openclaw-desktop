@@ -50,6 +50,9 @@ interface Window {
         hasRequiredTemplate: boolean;
         permissionDenied: boolean;
       }>;
+      listMarkdown?: (repoPath: string, directory: string) => Promise<import('./lib/repository-knowledge').RepositoryMarkdownFile[]>;
+      readText?: (repoPath: string, relativePath: string) => Promise<string>;
+      search?: (repoPath: string, query: string, directories: string[]) => Promise<import('./lib/repository-knowledge').RepositorySearchResult[]>;
     };
     device: {
       signChallenge: (params: {

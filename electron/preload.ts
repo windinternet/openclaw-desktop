@@ -33,6 +33,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     checkGit: () => ipcRenderer.invoke('repository:checkGit'),
     inspect: (repoPath: string) => ipcRenderer.invoke('repository:inspect', repoPath),
     bootstrap: (repoPath: string) => ipcRenderer.invoke('repository:bootstrap', repoPath),
+    listMarkdown: (repoPath: string, directory: string) => ipcRenderer.invoke('repository:listMarkdown', repoPath, directory),
+    readText: (repoPath: string, relativePath: string) => ipcRenderer.invoke('repository:readText', repoPath, relativePath),
+    search: (repoPath: string, query: string, directories: string[]) =>
+      ipcRenderer.invoke('repository:search', repoPath, query, directories),
   },
   artifact: {
     open: (artifactId: string, version: number) => ipcRenderer.invoke('artifact:open', artifactId, version),
