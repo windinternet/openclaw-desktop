@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   getActiveNavKey,
   NAV_GROUPS,
@@ -76,5 +77,36 @@ describe('navigation restructure', () => {
   it('does not highlight legacy routes on partial path segment matches', () => {
     expect(getActiveNavKey('/settings-foo')).toBe('dashboard');
     expect(getActiveNavKey('/teams-old')).toBe('dashboard');
+  });
+});
+
+describe('navigation hub pages', () => {
+  it('defines hub pages for the new primary entries', () => {
+    const sessions = readFileSync('src/pages/SessionsPage.tsx', 'utf8');
+    const workbench = readFileSync('src/pages/WorkbenchPage.tsx', 'utf8');
+    const knowledge = readFileSync('src/pages/KnowledgeBasePage.tsx', 'utf8');
+    const collaboration = readFileSync('src/pages/CollaborationPage.tsx', 'utf8');
+    const control = readFileSync('src/pages/ControlCenterPage.tsx', 'utf8');
+
+    expect(sessions).toContain("t('nav.sessions')");
+    expect(sessions).toContain('/new-session');
+    expect(sessions).toContain('/search');
+
+    expect(workbench).toContain("t('nav.workbench')");
+    expect(workbench).toContain('/taskkanban');
+    expect(workbench).toContain('/actions');
+    expect(workbench).toContain('/artifacts');
+
+    expect(knowledge).toContain("t('nav.knowledge')");
+    expect(knowledge).toContain("t('knowledge.repoGateTitle')");
+
+    expect(collaboration).toContain("t('nav.collaboration')");
+    expect(collaboration).toContain('/teams');
+    expect(collaboration).toContain('/office');
+
+    expect(control).toContain("t('nav.controlCenter')");
+    expect(control).toContain('/extensions');
+    expect(control).toContain('/tuning');
+    expect(control).toContain('/settings');
   });
 });
