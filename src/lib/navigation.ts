@@ -73,6 +73,7 @@ const LEGACY_ROUTE_ACTIVE_KEYS: Array<{ prefix: string; key: PrimaryNavKey }> = 
   { prefix: '/extensions', key: 'control-center' },
   { prefix: '/tuning', key: 'control-center' },
   { prefix: '/settings', key: 'control-center' },
+  { prefix: '/repository-protocol', key: 'control-center' },
 ];
 
 function matchesPathSegment(pathname: string, prefix: string): boolean {

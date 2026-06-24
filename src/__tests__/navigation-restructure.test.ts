@@ -128,12 +128,14 @@ describe('app routes for new primary navigation', () => {
     expect(app).toContain("import KnowledgeBasePage from './pages/KnowledgeBasePage'");
     expect(app).toContain("import CollaborationPage from './pages/CollaborationPage'");
     expect(app).toContain("import ControlCenterPage from './pages/ControlCenterPage'");
+    expect(app).toContain("import RepositoryProtocolPage from './pages/RepositoryProtocolPage'");
 
     expect(app).toContain('path="sessions" element={<SessionsPage />}');
     expect(app).toContain('path="workbench" element={<WorkbenchPage />}');
     expect(app).toContain('path="knowledge" element={<KnowledgeBasePage />}');
     expect(app).toContain('path="collaboration" element={<CollaborationPage />}');
     expect(app).toContain('path="control-center" element={<ControlCenterPage />}');
+    expect(app).toContain('path="repository-protocol" element={<RepositoryProtocolPage />}');
 
     expect(app).toContain('path="new-session" element={<NewSessionPage />}');
     expect(app).toContain('path="teams" element={<TeamsPage />}');
@@ -200,6 +202,17 @@ describe('navigation locale strings', () => {
       'controlCenter.settingsDesc',
       'controlCenter.repositoryProtocol',
       'controlCenter.repositoryProtocolDesc',
+      'controlCenter.runtimeLayer',
+      'controlCenter.repositoryLayer',
+      'controlCenter.pathMappings',
+      'controlCenter.protocolDocuments',
+      'controlCenter.permissionOverview',
+      'controlCenter.localFiles',
+      'controlCenter.repositoryReadWrite',
+      'controlCenter.gatewayTools',
+      'controlCenter.companionCommands',
+      'controlCenter.network',
+      'controlCenter.execution',
     ];
 
     for (const locale of [zh, en]) {

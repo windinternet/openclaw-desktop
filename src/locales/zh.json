@@ -148,7 +148,20 @@
     "tuningDesc": "调整 Agent 身份、记忆、模型和上下文策略。",
     "settingsDesc": "配置实例连接、外观和 Desktop 行为。",
     "repositoryProtocol": "仓库协议",
-    "repositoryProtocolDesc": "后续管理 AGENTS.md、schemas/、BOOTSTRAP.md 和目录映射。"
+    "repositoryProtocolDesc": "管理 AGENTS.md、schemas/、BOOTSTRAP.md 和目录映射。",
+    "runtimeLayer": "OpenClaw 运行层",
+    "runtimeLayerDesc": "管理 Gateway、Agent 调教、扩展、定时任务、记忆和实例设置。",
+    "repositoryLayer": "Repository 工作层",
+    "repositoryLayerDesc": "管理知识、事项、计划、执行记录、成果、复盘和 Agent 可读协议。",
+    "pathMappings": "目录映射",
+    "protocolDocuments": "协议文档",
+    "permissionOverview": "权限概览",
+    "localFiles": "本地文件",
+    "repositoryReadWrite": "仓库读写",
+    "gatewayTools": "Gateway 工具",
+    "companionCommands": "Companion 命令",
+    "network": "网络",
+    "execution": "执行能力"
   },
   "common": {
     "loading": "加载中…",

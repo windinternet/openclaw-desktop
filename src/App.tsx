@@ -10,6 +10,7 @@ import WorkbenchPage from './pages/WorkbenchPage';
 import KnowledgeBasePage from './pages/KnowledgeBasePage';
 import CollaborationPage from './pages/CollaborationPage';
 import ControlCenterPage from './pages/ControlCenterPage';
+import RepositoryProtocolPage from './pages/RepositoryProtocolPage';
 import ExtensionsPage from './pages/ExtensionsPage';
 import SettingsPage from './pages/SettingsPage';
 import TaskKanbanPage from './pages/TaskKanbanPage';
@@ -44,6 +45,7 @@ function App() {
           <Route path="knowledge" element={<KnowledgeBasePage />} />
           <Route path="collaboration" element={<CollaborationPage />} />
           <Route path="control-center" element={<ControlCenterPage />} />
+          <Route path="repository-protocol" element={<RepositoryProtocolPage />} />
           <Route path="extensions" element={<ExtensionsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="taskkanban" element={<TaskKanbanPage />} />

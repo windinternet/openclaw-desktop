@@ -148,7 +148,20 @@
     "tuningDesc": "Tune Agent identity, memory, models, and context policies.",
     "settingsDesc": "Configure instance connections, appearance, and Desktop behavior.",
     "repositoryProtocol": "Repository Protocol",
-    "repositoryProtocolDesc": "AGENTS.md, schemas/, BOOTSTRAP.md, and path mappings will be managed here later."
+    "repositoryProtocolDesc": "Manage AGENTS.md, schemas/, BOOTSTRAP.md, and path mappings.",
+    "runtimeLayer": "OpenClaw Runtime Layer",
+    "runtimeLayerDesc": "Manage Gateway, Agent tuning, extensions, scheduled jobs, memory, and instance settings.",
+    "repositoryLayer": "Repository Work Layer",
+    "repositoryLayerDesc": "Manage knowledge, matters, plans, runs, outputs, reviews, and agent-readable protocols.",
+    "pathMappings": "Path Mappings",
+    "protocolDocuments": "Protocol Documents",
+    "permissionOverview": "Permission Overview",
+    "localFiles": "Local files",
+    "repositoryReadWrite": "Repository read/write",
+    "gatewayTools": "Gateway tools",
+    "companionCommands": "Companion commands",
+    "network": "Network",
+    "execution": "Execution capabilities"
   },
   "common": {
     "loading": "Loading...",

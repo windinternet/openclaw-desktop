@@ -93,10 +93,10 @@
 
 ### G. Control Center
 
-- [ ] Repository Protocol card becomes an actual view.
-- [ ] It can show `AGENTS.md`, `BOOTSTRAP.md`, schemas, and path mappings.
-- [ ] It distinguishes OpenClaw runtime settings from Repository work-layer protocols.
-- [ ] Permission overview shows local files, repository read/write, Gateway tools, Companion node commands, network, and execution class capabilities.
+- [x] Repository Protocol card becomes an actual view.
+- [x] It can show `AGENTS.md`, `BOOTSTRAP.md`, schemas, and path mappings.
+- [x] It distinguishes OpenClaw runtime settings from Repository work-layer protocols.
+- [x] Permission overview shows local files, repository read/write, Gateway tools, Companion node commands, network, and execution class capabilities.
 
 ### H. Collaboration
 
@@ -146,11 +146,11 @@
 
 ### Batch 5: Control Center Repository Protocol
 
-- [ ] Write failing tests for route registration and locale coverage.
-- [ ] Add Repository Protocol view under Control Center.
-- [ ] Read and preview `AGENTS.md`, `BOOTSTRAP.md`, and schemas from the bound repository.
-- [ ] Add path mapping overview.
-- [ ] Commit.
+- [x] Write failing tests for route registration and locale coverage.
+- [x] Add Repository Protocol view under Control Center.
+- [x] Read and preview `AGENTS.md`, `BOOTSTRAP.md`, and schemas from the bound repository.
+- [x] Add path mapping overview.
+- [x] Commit.
 
 ### Batch 6: Gateway-Local Advanced Mode
 

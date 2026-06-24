@@ -1,5 +1,5 @@
-import { Card, Space, Tag, Typography } from '@douyinfe/semi-ui';
-import { IconCheckList, IconCustomize, IconPuzzle, IconSetting } from '@douyinfe/semi-icons';
+import { Card, Space, Typography } from '@douyinfe/semi-ui';
+import { IconCheckList, IconCustomize, IconFile, IconPuzzle, IconSetting } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
@@ -14,6 +14,7 @@ export default function ControlCenterPage() {
     { title: t('nav.extensions'), desc: t('controlCenter.extensionsDesc'), path: '/extensions', icon: <IconPuzzle size="extra-large" /> },
     { title: t('nav.tuning'), desc: t('controlCenter.tuningDesc'), path: '/tuning', icon: <IconCustomize size="extra-large" /> },
     { title: t('nav.settings'), desc: t('controlCenter.settingsDesc'), path: '/settings', icon: <IconSetting size="extra-large" /> },
+    { title: t('controlCenter.repositoryProtocol'), desc: t('controlCenter.repositoryProtocolDesc'), path: '/repository-protocol', icon: <IconFile size="extra-large" /> },
   ];
 
   return (
@@ -32,13 +33,6 @@ export default function ControlCenterPage() {
             </Card>
           </div>
         ))}
-        <Card style={{ width: 280 }} bodyStyle={{ minHeight: 132 }}>
-          <Space vertical align="start">
-            <Tag color="blue">{t('common.reserved')}</Tag>
-            <Text strong>{t('controlCenter.repositoryProtocol')}</Text>
-            <Text type="tertiary" size="small">{t('controlCenter.repositoryProtocolDesc')}</Text>
-          </Space>
-        </Card>
       </Space>
     </div>
   );
