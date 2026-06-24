@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 describe('chat configuration selects', () => {
   it('opens session detail and new-session configure selects upward near the viewport bottom', () => {
     const chat = readFileSync('src/pages/SessionChatPage.tsx', 'utf8');
-    const newSession = readFileSync('src/pages/NewSessionPage.tsx', 'utf8');
+    const newSession = readFileSync('src/components/NewSessionComposer.tsx', 'utf8');
 
     for (const source of [chat, newSession]) {
       expect(source).toContain('configureSelectProps');

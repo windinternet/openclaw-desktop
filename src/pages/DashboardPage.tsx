@@ -1,29 +1,27 @@
-import { useMemo } from 'react';
-import type { ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Badge, Button, Tag, Toast, Typography } from '@douyinfe/semi-ui';
 import {
-  Card,
-  Row,
-  Col,
-  Tag,
-  Button,
-  Empty,
-  List,
-  Badge,
-  Typography,
-  Toast,
-} from '@douyinfe/semi-ui';
-import {
-  IconRefresh,
-  IconPlus,
-  IconServer,
-  IconComment,
+  IconAppCenter,
+  IconBolt,
   IconBox,
+  IconBranch,
   IconClock,
+  IconComment,
+  IconFile,
+  IconRefresh,
+  IconSearch,
+  IconServer,
   IconUserGroup,
 } from '@douyinfe/semi-icons';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useStore } from '../lib';
+import { useStore, type AiActionRun, type SessionInfo } from '../lib';
+import NewSessionComposer from '../components/NewSessionComposer';
+import type { ArtifactMeta } from '../lib/artifact-types';
+import { loadAiActionRuns } from '../lib/ai-action-run-store';
+import { loadRepositoryBinding } from '../lib/agentic-repository-store';
+import { loadKnowledgeSnapshot, type KnowledgeSnapshot, type RepositoryMarkdownFile } from '../lib/repository-knowledge';
+import { loadWorkbenchSnapshot, type WorkbenchSnapshot } from '../lib/repository-workbench';
 
 const { Title, Text } = Typography;
 
@@ -39,107 +37,170 @@ function formatUptime(seconds: number): string {
   return parts.join(' ');
 }
 
-function getStatusLabel(status: string): string {
-  switch (status) {
-    case 'active':
-      return 'active';
-    case 'idle':
-      return 'idle';
-    case 'completed':
-      return 'completed';
-    case 'archived':
-      return 'archived';
-    default:
-      return status;
-  }
-}
-
-function getStatusTagColor(status: string): 'green' | 'orange' | 'blue' | 'grey' {
-  switch (status) {
-    case 'active':
-      return 'green';
-    case 'idle':
-      return 'orange';
-    case 'completed':
-      return 'blue';
-    default:
-      return 'grey';
-  }
-}
-
 function formatRetryDelay(delayMs: number): string {
   const seconds = Math.max(1, Math.ceil(delayMs / 1000));
   return seconds >= 60 ? `${Math.ceil(seconds / 60)}m` : `${seconds}s`;
 }
 
-// ── Stat Card ──────────────────────────────────────────────────────
-
-interface StatCardProps {
-  title: string;
-  value: string | number;
-  icon: ReactNode;
-  accentColor: string;
+function formatDate(value?: number): string {
+  if (!value) return '-';
+  return new Date(value).toLocaleDateString();
 }
 
-function StatCard({ title, value, icon, accentColor }: StatCardProps) {
+function getSessionTime(session: SessionInfo): number {
+  return session.lastInteractionAt || session.updatedAt || session.createdAt || 0;
+}
+
+function getStatusTagColor(status: string): 'green' | 'orange' | 'blue' | 'grey' | 'red' {
+  switch (status) {
+    case 'active':
+    case 'running':
+    case 'done':
+      return 'green';
+    case 'idle':
+    case 'planning':
+    case 'awaiting_approval':
+      return 'orange';
+    case 'completed':
+    case 'draft':
+      return 'blue';
+    case 'failed':
+    case 'cancelled':
+      return 'red';
+    default:
+      return 'grey';
+  }
+}
+
+function fileTitle(file: RepositoryMarkdownFile): string {
+  return file.name || file.path.split('/').pop() || file.path;
+}
+
+interface SectionProps {
+  title: string;
+  description?: string;
+  action?: ReactNode;
+  children: ReactNode;
+}
+
+function DashboardSection({ title, description, action, children }: SectionProps) {
   return (
-    <Card
-      style={{
-        borderRadius: 12,
-        backgroundColor: 'var(--semi-color-bg-1)',
-        border: '1px solid var(--semi-color-border)',
-      }}
-      bodyStyle={{ padding: 20 }}
-    >
-      <div
-        style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}
-      >
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <Text
-            type="tertiary"
-            size="small"
-            style={{ marginBottom: 8, display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}
-          >
-            {title}
-          </Text>
-          <Title heading={3} style={{ margin: 0, color: 'var(--semi-color-text-0)' }}>
-            {value}
-          </Title>
+    <section className="dashboard-section">
+      <div className="dashboard-section-header">
+        <div>
+          <Title heading={5} style={{ margin: 0 }}>{title}</Title>
+          {description ? <Text type="tertiary" size="small">{description}</Text> : null}
         </div>
-        <div
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: 12,
-            backgroundColor: accentColor + '18',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: accentColor,
-            flexShrink: 0,
-          }}
-        >
-          {icon}
-        </div>
+        {action}
       </div>
-    </Card>
+      {children}
+    </section>
   );
 }
 
-// ── Dashboard Page ─────────────────────────────────────────────────
+function MetricPill({ icon, label, value, note }: { icon: ReactNode; label: string; value: ReactNode; note?: string }) {
+  return (
+    <div className="dashboard-metric-pill">
+      <div className="dashboard-metric-icon">{icon}</div>
+      <div>
+        <Text type="tertiary" size="small">{label}</Text>
+        <div className="dashboard-metric-value">{value}</div>
+        {note ? <Text type="tertiary" size="small">{note}</Text> : null}
+      </div>
+    </div>
+  );
+}
+
+function AssetRow({
+  icon,
+  title,
+  meta,
+  tag,
+  onClick,
+}: {
+  icon: ReactNode;
+  title: string;
+  meta?: string;
+  tag?: ReactNode;
+  onClick?: () => void;
+}) {
+  return (
+    <button type="button" className="dashboard-asset-row" onClick={onClick}>
+      <span className="dashboard-asset-icon">{icon}</span>
+      <span className="dashboard-asset-main">
+        <Text ellipsis={{ showTooltip: true }} style={{ fontWeight: 600 }}>{title}</Text>
+        {meta ? <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }}>{meta}</Text> : null}
+      </span>
+      {tag}
+    </button>
+  );
+}
 
 export default function DashboardPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
+  const currentInstanceId = useStore((s) => s.currentInstanceId);
   const agents = useStore((s) => s.agents);
   const sessions = useStore((s) => s.sessions);
+  const models = useStore((s) => s.models);
   const health = useStore((s) => s.health);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const connectionRetry = useStore((s) => s.connectionRetry);
+  const actionRunsVersion = useStore((s) => s.actionRunsVersion);
+  const artifacts = useStore((s) => s.artifacts);
+  const fetchArtifacts = useStore((s) => s.fetchArtifacts);
+
+  const [workbenchSnapshot, setWorkbenchSnapshot] = useState<WorkbenchSnapshot | null>(null);
+  const [knowledgeSnapshot, setKnowledgeSnapshot] = useState<KnowledgeSnapshot | null>(null);
+  const [actionRuns, setActionRuns] = useState<AiActionRun[]>([]);
+  const [repositoryUnavailable, setRepositoryUnavailable] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   const isLoading = connectionStatus === 'connecting';
   const isConnected = connectionStatus === 'connected';
+
+  useEffect(() => {
+    void fetchArtifacts().catch(() => undefined);
+  }, [currentInstanceId, fetchArtifacts]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setWorkbenchSnapshot(null);
+    setKnowledgeSnapshot(null);
+    setActionRuns([]);
+    setRepositoryUnavailable(false);
+
+    if (!currentInstanceId) {
+      setRepositoryUnavailable(true);
+      return;
+    }
+
+    void (async () => {
+      const runsResult = await loadAiActionRuns(currentInstanceId).catch(() => []);
+      if (!cancelled) setActionRuns(runsResult);
+
+      const binding = await loadRepositoryBinding(currentInstanceId).catch(() => null);
+      if (!binding) {
+        if (!cancelled) setRepositoryUnavailable(true);
+        return;
+      }
+
+      const [workbenchResult, knowledgeResult] = await Promise.allSettled([
+        loadWorkbenchSnapshot(binding),
+        loadKnowledgeSnapshot(binding),
+      ]);
+
+      if (cancelled) return;
+      if (workbenchResult.status === 'fulfilled') setWorkbenchSnapshot(workbenchResult.value);
+      if (knowledgeResult.status === 'fulfilled') setKnowledgeSnapshot(knowledgeResult.value);
+      setRepositoryUnavailable(workbenchResult.status === 'rejected' || knowledgeResult.status === 'rejected');
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentInstanceId, actionRunsVersion, refreshTick]);
 
   const activeAgentCount = useMemo(
     () => agents.filter((a) => a.status === 'running' || a.status === 'idle').length,
@@ -151,25 +212,37 @@ export default function DashboardPage() {
     [sessions],
   );
 
-  const totalSessions = sessions.length;
-
   const recentSessions = useMemo(
-    () =>
-      [...sessions]
-        .sort(
-          (a, b) =>
-            (b.lastInteractionAt || b.createdAt || 0) -
-            (a.lastInteractionAt || a.createdAt || 0),
-        )
-        .slice(0, 5),
+    () => [...sessions].sort((a, b) => getSessionTime(b) - getSessionTime(a)).slice(0, 5),
     [sessions],
   );
 
-  const uptimeText =
-    health?.uptime != null ? formatUptime(health.uptime) : '—';
-  const gatewayVersion = health?.version || '—';
+  const recentArtifacts = useMemo(
+    () => [...artifacts].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 8),
+    [artifacts],
+  );
 
-  // Connection status indicator
+  const recentRuns = useMemo(
+    () => [...actionRuns].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 5),
+    [actionRuns],
+  );
+
+  const recentWork = useMemo(() => [
+    ...(workbenchSnapshot?.activeWork ?? []),
+    ...(workbenchSnapshot?.activePlans ?? []),
+    ...(workbenchSnapshot?.reviews ?? []),
+  ].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 5), [workbenchSnapshot]);
+
+  const recentKnowledge = useMemo(
+    () => (knowledgeSnapshot?.recentFiles ?? []).slice(0, 5),
+    [knowledgeSnapshot],
+  );
+
+  const totalMessages = useMemo(
+    () => sessions.reduce((sum, session) => sum + (session.messageCount ?? 0), 0),
+    [sessions],
+  );
+
   const statusBadgeType: 'success' | 'warning' | 'danger' | 'default' =
     isConnected ? 'success' : isLoading ? 'warning' : 'danger';
   const statusLabel = isConnected
@@ -179,245 +252,205 @@ export default function DashboardPage() {
       : isLoading
       ? t('instance.statusConnecting')
       : t('instance.statusDisconnected');
+  const uptimeText = health?.uptime != null ? formatUptime(health.uptime) : '-';
+  const gatewayVersion = health?.version || '-';
 
-  const handleRefresh = () => {
-    useStore.getState().refreshAll();
+  const handleRefresh = async () => {
+    await useStore.getState().refreshAll();
+    await fetchArtifacts().catch(() => undefined);
+    setRefreshTick((value) => value + 1);
     Toast.success(t('dashboard.refreshed'));
   };
 
-  // ── Stat cards data ──────────────────────────────────────────────
+  const renderGatewayStatusSection = () => (
+    <DashboardSection
+      title={t('dashboard.gatewayStatus')}
+      description={t('dashboard.gatewayStatusDesc')}
+      action={
+        <Button icon={<IconRefresh />} size="small" theme="borderless" onClick={handleRefresh} loading={isLoading} />
+      }
+    >
+      <div className="dashboard-gateway-grid">
+        <div className="dashboard-status-panel">
+          <div className="dashboard-status-line">
+            <Badge dot type={statusBadgeType} />
+            <Text style={{ fontWeight: 700 }}>{statusLabel}</Text>
+            {health?.status ? (
+              <Tag size="small" color={health.status === 'ok' ? 'green' : health.status === 'degraded' ? 'orange' : 'red'}>
+                {health.status}
+              </Tag>
+            ) : null}
+            {connectionRetry ? (
+              <Tag size="small" color="orange">{t('dashboard.retryAfter', { delay: formatRetryDelay(connectionRetry.delayMs) })}</Tag>
+            ) : null}
+          </div>
+          <div className="dashboard-status-copy">
+            <Text type="tertiary">{isConnected ? t('dashboard.gatewayReady') : t('dashboard.gatewayLimited')}</Text>
+          </div>
+        </div>
+        <MetricPill icon={<IconServer />} label={t('dashboard.connectedAgents')} value={activeAgentCount} />
+        <MetricPill icon={<IconBox />} label={t('dashboard.gatewayVersion')} value={gatewayVersion} />
+        <MetricPill icon={<IconClock />} label={t('dashboard.uptime')} value={uptimeText} />
+      </div>
+    </DashboardSection>
+  );
 
-  const statCards: StatCardProps[] = [
-    {
-      title: t('dashboard.connectedAgents'),
-      value: activeAgentCount,
-      icon: <IconServer size="large" />,
-      accentColor: 'var(--semi-color-primary)',
-    },
-    {
-      title: t('dashboard.activeSessions'),
-      value: activeSessionCount,
-      icon: <IconComment size="large" />,
-      accentColor: 'var(--semi-color-success)',
-    },
-    {
-      title: t('dashboard.gatewayVersion'),
-      value: gatewayVersion,
-      icon: <IconBox size="large" />,
-      accentColor: 'var(--semi-color-warning)',
-    },
-    {
-      title: t('dashboard.uptime'),
-      value: uptimeText,
-      icon: <IconClock size="large" />,
-      accentColor: 'var(--semi-color-info)',
-    },
-  ];
+  const renderUsageSection = () => (
+    <DashboardSection title={t('dashboard.gatewayUsage')} description={t('dashboard.gatewayUsageDesc')}>
+      <div className="dashboard-metric-grid">
+        <MetricPill icon={<IconComment />} label={t('dashboard.activeSessions')} value={activeSessionCount} note={t('dashboard.totalSessions', { count: sessions.length })} />
+        <MetricPill icon={<IconUserGroup />} label={t('dashboard.connectedAgents')} value={agents.length} note={t('dashboard.modelCount', { count: models.length })} />
+        <MetricPill icon={<IconBolt />} label={t('dashboard.actionRuns')} value={actionRuns.length} note={t('dashboard.recentRunsCount', { count: recentRuns.length })} />
+        <MetricPill icon={<IconAppCenter />} label={t('dashboard.outputsArtifacts')} value={artifacts.length} note={t('dashboard.usageUnavailable')} />
+        <MetricPill icon={<IconFile />} label={t('dashboard.messageCount')} value={totalMessages} note={t('dashboard.estimatedFromSessions')} />
+      </div>
+    </DashboardSection>
+  );
 
-  // ── Render ───────────────────────────────────────────────────────
+  const renderRecentAssetsSection = () => (
+    <DashboardSection
+      title={t('dashboard.recentWorkKnowledge')}
+      description={t('dashboard.recentWorkKnowledgeDesc')}
+      action={
+        <div className="dashboard-section-actions">
+          <Button size="small" theme="borderless" onClick={() => navigate('/workbench')}>{t('dashboard.viewWorkbench')}</Button>
+          <Button size="small" theme="borderless" onClick={() => navigate('/knowledge')}>{t('dashboard.viewKnowledge')}</Button>
+        </div>
+      }
+    >
+      <div className="dashboard-column-grid">
+        <div className="dashboard-asset-column">
+          <Text style={{ fontWeight: 700 }}>{t('dashboard.recentSessions')}</Text>
+          {recentSessions.length > 0 ? recentSessions.map((session) => (
+            <AssetRow
+              key={session.key}
+              icon={<IconComment />}
+              title={session.title || session.label || session.key}
+              meta={`${session.agentId ?? 'agent'} · ${formatDate(getSessionTime(session))}`}
+              tag={<Tag size="small" color={getStatusTagColor(session.status ?? 'idle')}>{session.status ?? 'idle'}</Tag>}
+              onClick={() => navigate(`/chat/${encodeURIComponent(session.key)}`)}
+            />
+          )) : <Text type="tertiary" size="small">{t('dashboard.noSessions')}</Text>}
+        </div>
+        <div className="dashboard-asset-column">
+          <Text style={{ fontWeight: 700 }}>{t('dashboard.repositoryWork')}</Text>
+          {repositoryUnavailable ? <Text type="tertiary" size="small">{t('dashboard.repositoryUnavailable')}</Text> : null}
+          {recentWork.map((file) => (
+            <AssetRow
+              key={file.path}
+              icon={<IconBranch />}
+              title={fileTitle(file)}
+              meta={`${file.path} · ${formatDate(file.updatedAt)}`}
+              onClick={() => navigate('/workbench')}
+            />
+          ))}
+          {!repositoryUnavailable && recentWork.length === 0 ? <Text type="tertiary" size="small">{t('dashboard.noRepositoryWork')}</Text> : null}
+        </div>
+        <div className="dashboard-asset-column">
+          <Text style={{ fontWeight: 700 }}>{t('nav.knowledge')}</Text>
+          {repositoryUnavailable ? <Text type="tertiary" size="small">{t('dashboard.repositoryUnavailable')}</Text> : null}
+          {recentKnowledge.map((file) => (
+            <AssetRow
+              key={file.path}
+              icon={<IconSearch />}
+              title={fileTitle(file)}
+              meta={`${file.path} · ${formatDate(file.updatedAt)}`}
+              onClick={() => navigate('/knowledge')}
+            />
+          ))}
+          {!repositoryUnavailable && recentKnowledge.length === 0 ? <Text type="tertiary" size="small">{t('dashboard.noKnowledge')}</Text> : null}
+        </div>
+      </div>
+    </DashboardSection>
+  );
+
+  const renderOutputsArtifactsSection = () => (
+    <DashboardSection
+      title={t('dashboard.outputsArtifacts')}
+      description={t('dashboard.outputsArtifactsDesc')}
+      action={<Button size="small" theme="borderless" onClick={() => navigate('/artifacts')}>{t('dashboard.viewArtifacts')}</Button>}
+    >
+      <div className="dashboard-output-layout">
+        <div className="dashboard-output-list">
+          {recentArtifacts.length > 0 ? recentArtifacts.map((artifact: ArtifactMeta) => (
+            <AssetRow
+              key={artifact.id}
+              icon={<span aria-hidden="true">{artifact.icon}</span>}
+              title={artifact.title}
+              meta={`${artifact.type} · ${formatDate(artifact.updatedAt)}`}
+              tag={<Tag size="small" color={artifact.status === 'published' ? 'green' : artifact.status === 'draft' ? 'blue' : 'grey'}>{artifact.status}</Tag>}
+              onClick={() => navigate(`/artifacts/${encodeURIComponent(artifact.id)}`)}
+            />
+          )) : <Text type="tertiary" size="small">{t('dashboard.noArtifacts')}</Text>}
+        </div>
+        <div className="dashboard-run-list">
+          <Text style={{ fontWeight: 700 }}>{t('dashboard.recentActionRuns')}</Text>
+          {recentRuns.length > 0 ? recentRuns.map((run) => (
+            <AssetRow
+              key={run.id}
+              icon={<IconBolt />}
+              title={run.input || run.type}
+              meta={`${run.agentId} · ${formatDate(run.updatedAt)}`}
+              tag={<Tag size="small" color={getStatusTagColor(run.status)}>{run.status}</Tag>}
+              onClick={() => navigate('/workbench')}
+            />
+          )) : <Text type="tertiary" size="small">{t('dashboard.noActionRuns')}</Text>}
+        </div>
+      </div>
+    </DashboardSection>
+  );
+
+  const attentionItems = [
+    !isConnected ? t('dashboard.attentionGateway') : null,
+    repositoryUnavailable ? t('dashboard.attentionRepository') : null,
+    agents.length === 0 ? t('dashboard.attentionAgents') : null,
+    artifacts.length === 0 ? t('dashboard.attentionArtifacts') : null,
+  ].filter(Boolean);
 
   return (
-    <div style={{ height: '100%', overflow: 'auto', padding: 24 }}>
-      {/* ── Connection Status Bar ────────────────────────────── */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 24,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Badge dot type={statusBadgeType} />
-          <Text size="small" type="tertiary" style={{ fontWeight: 500 }}>
-            {statusLabel}
-          </Text>
-          {isConnected && health?.status && (
-            <Tag
-              size="small"
-              color={health.status === 'ok' ? 'green' : health.status === 'degraded' ? 'orange' : 'red'}
-              style={{ marginLeft: 4 }}
-            >
-              {health.status}
-            </Tag>
-          )}
-          {connectionRetry && (
-            <Tag size="small" color="orange" style={{ marginLeft: 4 }}>
-              {t('dashboard.retryAfter', { delay: formatRetryDelay(connectionRetry.delayMs) })}
-            </Tag>
-          )}
-        </div>
-        <Button
-          icon={<IconRefresh />}
-          size="small"
-          theme="borderless"
-          onClick={handleRefresh}
-          loading={isLoading}
-        />
-      </div>
-
-      {!isConnected ? (
-        /* ── Disconnected State ─────────────────────────────── */
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            height: 300,
-          }}
-        >
-          <Empty description={t('dashboard.notConnected')} />
-        </div>
-      ) : (
-        /* ── Connected — Full Dashboard ─────────────────────── */
-        <>
-          {/* Stat Cards */}
-          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-            {statCards.map((card, idx) => (
-              <Col xs={24} sm={12} lg={6} key={idx}>
-                <StatCard {...card} />
-              </Col>
-            ))}
-          </Row>
-
-          {/* Quick Actions */}
-          <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-            <Button
-              type="primary"
-              icon={<IconPlus />}
-              onClick={() => navigate('/new-session')}
-              style={{
-                borderRadius: 8,
-                fontWeight: 600,
-                boxShadow: '0 2px 8px var(--semi-color-primary-light-default)',
-              }}
-            >
-              {t('chat.newSession')}
-            </Button>
-            <Button
-              icon={<IconUserGroup />}
-              onClick={() => navigate('/teams')}
-              style={{ borderRadius: 8, fontWeight: 500 }}
-            >
-              {t('dashboard.manageAgents')}
-            </Button>
+    <div className="dashboard-page">
+      <div className="dashboard-main">
+        <div className="dashboard-title-row">
+          <div>
+            <Title heading={3} style={{ margin: 0 }}>{t('nav.dashboard')}</Title>
+            <Text type="tertiary">{t('dashboard.pageDesc')}</Text>
           </div>
+          <Button icon={<IconRefresh />} theme="borderless" onClick={handleRefresh} loading={isLoading} />
+        </div>
 
-          {/* Recent Sessions */}
-          <Card
-            title={
-              <Text style={{ fontWeight: 600, fontSize: 16 }}>
-                {t('dashboard.recentSessions')}
-              </Text>
-            }
-            style={{
-              borderRadius: 12,
-              backgroundColor: 'var(--semi-color-bg-1)',
-              border: '1px solid var(--semi-color-border)',
-            }}
-            bodyStyle={{ padding: 0 }}
-            headerExtraContent={
-              <Button size="small" theme="borderless" onClick={() => navigate('/search')}>
-                {t('dashboard.viewAll')}
-              </Button>
-            }
-          >
-            {recentSessions.length === 0 ? (
-              <Empty
-                description={t('dashboard.noSessions')}
-                style={{ padding: '48px 0' }}
-              />
-            ) : (
-              <List
-                dataSource={recentSessions}
-                renderItem={(session) => (
-                  <List.Item
-                    style={{
-                      cursor: 'pointer',
-                      padding: '14px 24px',
-                      transition: 'background-color 0.15s',
-                      borderBottom: '1px solid var(--semi-color-border)',
-                    }}
-                    onClick={() => navigate(`/chat/${session.key}`)}
-                    main={
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          width: '100%',
-                          gap: 16,
-                        }}
-                      >
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <Text
-                            style={{
-                              fontWeight: 500,
-                              fontSize: 14,
-                              color: 'var(--semi-color-text-0)',
-                              display: 'block',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {session.title || session.key}
-                          </Text>
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 8,
-                              marginTop: 4,
-                            }}
-                          >
-                            {session.agentId && (
-                              <Text
-                                type="tertiary"
-                                size="small"
-                                icon={<IconServer size="extra-small" />}
-                              >
-                                {session.agentId}
-                              </Text>
-                            )}
-                            {session.messageCount != null && (
-                              <Text type="tertiary" size="small">
-                                {t('dashboard.msgs', { count: session.messageCount })}
-                              </Text>
-                            )}
-                            {session.createdAt && (
-                              <Text type="tertiary" size="small">
-                                {new Date(session.createdAt).toLocaleDateString()}
-                              </Text>
-                            )}
-                          </div>
-                        </div>
-                        <Tag
-                          color={getStatusTagColor(session.status ?? 'idle')}
-                          size="small"
-                          style={{ flexShrink: 0, textTransform: 'capitalize' }}
-                        >
-                          {getStatusLabel(session.status ?? 'idle')}
-                        </Tag>
-                      </div>
-                    }
-                  />
-                )}
-              />
+        {renderGatewayStatusSection()}
+        {renderUsageSection()}
+        {renderRecentAssetsSection()}
+        {renderOutputsArtifactsSection()}
+
+        <DashboardSection title={t('dashboard.attention')} description={t('dashboard.attentionDesc')}>
+          <div className="dashboard-attention-list">
+            {attentionItems.length > 0 ? attentionItems.map((item) => (
+              <div key={item} className="dashboard-attention-item">
+                <IconBolt />
+                <Text>{item}</Text>
+              </div>
+            )) : (
+              <div className="dashboard-attention-item">
+                <IconBolt />
+                <Text>{t('dashboard.attentionClear')}</Text>
+              </div>
             )}
-          </Card>
-
-          {/* Summary footer */}
-          <div style={{ marginTop: 16 }}>
-            <Text type="tertiary" size="small">
-              {totalSessions > 0
-                ? t('dashboard.showingSessions', { n: recentSessions.length, total: totalSessions })
-                : t('dashboard.noSessionsRecorded')}
-              {agents.length > 0 && ` · ${t('dashboard.agentsConfigured', { count: agents.length })}`}
-            </Text>
           </div>
-        </>
-      )}
+        </DashboardSection>
+
+        <div className="dashboard-floating-composer-shell">
+          <div className="dashboard-floating-composer-title">
+            <Text strong>{t('dashboard.quickStart')}</Text>
+            <Text type="tertiary" size="small">{t('dashboard.quickStartDesc')}</Text>
+          </div>
+          <NewSessionComposer
+            className="dashboard-floating-composer"
+            inputKeyPrefix="dashboard-quick-start"
+            style={{ width: '100%' }}
+          />
+        </div>
+      </div>
     </div>
   );
 }

@@ -45,6 +45,16 @@ describe('Sidebar session list', () => {
     expect(mainPageSource).not.toContain("WebkitAppRegion: 'drag'");
   });
 
+  it('keeps nav items direct children while spacing the primary navigation from CSS', () => {
+    const source = readFileSync('src/components/Sidebar.tsx', 'utf8');
+    const css = readFileSync('src/styles/global.css', 'utf8');
+
+    expect(source).toContain('NAV_GROUPS.flatMap((group) => group.items).map');
+    expect(source).not.toContain('paddingTop: PRIMARY_NAV_TOP_GAP');
+    expect(css).toContain('.semi-navigation-list {\n  padding: 0;\n}');
+    expect(css).toContain('padding-top: 10px !important;');
+  });
+
   it('renders per-instance runtime status and recent activity in the instance drawer', () => {
     const source = readFileSync('src/components/InstanceDrawer.tsx', 'utf8');
 

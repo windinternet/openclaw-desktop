@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import type { ComponentClass, CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -70,26 +70,6 @@ interface SidebarProps {
 const SIDEBAR_MACOS_TOP_INSET = 30;
 const SIDEBAR_LINUX_TOP_INSET = 12;
 const SIDEBAR_DRAG_HEIGHT = 36;
-
-function NavSectionLabel({ label }: { label: string }) {
-  return (
-    <li
-      style={{
-        padding: '14px 24px 4px',
-        fontSize: 12,
-        fontWeight: 600,
-        textTransform: 'uppercase',
-        letterSpacing: '0.05em',
-        color: 'var(--semi-color-text-2)',
-        listStyle: 'none',
-        cursor: 'default',
-        userSelect: 'none',
-      }}
-    >
-      {label}
-    </li>
-  );
-}
 
 function getNavIcon(item: PrimaryNavItem) {
   switch (item.icon) {
@@ -637,13 +617,8 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
         }}
         footer={footer}
       >
-        {NAV_GROUPS.map((group) => (
-          <Fragment key={group.key}>
-            <NavSectionLabel label={t(group.labelKey)} />
-            {group.items.map((item) => (
-              <Nav.Item key={item.key} itemKey={item.key} text={t(item.labelKey)} icon={getNavIcon(item)} />
-            ))}
-          </Fragment>
+        {NAV_GROUPS.flatMap((group) => group.items).map((item) => (
+          <Nav.Item key={item.key} itemKey={item.key} text={t(item.labelKey)} icon={getNavIcon(item)} />
         ))}
       </Nav>
     </div>

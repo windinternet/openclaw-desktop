@@ -32,12 +32,11 @@ describe('navigation restructure', () => {
     ]);
   });
 
-  it('uses user-facing primary groups instead of the old technical groups', () => {
-    expect(NAV_GROUPS.map((group) => group.labelKey)).toEqual([
-      'nav.sectionOverview',
-      'nav.sectionWork',
-      'nav.sectionAgents',
-    ]);
+  it('renders primary navigation without visible group headings', () => {
+    const sidebar = readFileSync('src/components/Sidebar.tsx', 'utf8');
+
+    expect(sidebar).not.toContain('NavSectionLabel');
+    expect(sidebar).not.toContain('group.labelKey');
   });
 
   it('maps primary entries to their routes', () => {
@@ -271,5 +270,8 @@ describe('navigation locale strings', () => {
         expect(getByPath(locale, key), key).toBeTypeOf('string');
       }
     }
+
+    expect(getByPath(zh, 'nav.collaboration')).toBe('专家团队 / 3D办公室');
+    expect(getByPath(en, 'nav.collaboration')).toBe('Expert Team / 3D Office');
   });
 });

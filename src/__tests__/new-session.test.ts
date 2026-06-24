@@ -126,19 +126,27 @@ describe('new session creation params', () => {
   });
 
   it('documents that the new session page uses the selected agent', () => {
-    const source = readFileSync('src/pages/NewSessionPage.tsx', 'utf8');
+    const page = readFileSync('src/pages/NewSessionPage.tsx', 'utf8');
+    const composer = readFileSync('src/components/NewSessionComposer.tsx', 'utf8');
 
-    expect(source).toContain("const [selectedAgentId, setSelectedAgentId] = useState<string>('')");
-    expect(source).toContain('field="agent"');
-    expect(source).toContain('<AgentSelectOption agent={agent} />');
-    expect(source).toContain("agentId: selectedAgentId || agent?.id || 'main'");
+    expect(page).toContain("import NewSessionComposer from '../components/NewSessionComposer'");
+    expect(page).toContain('<NewSessionComposer');
+    expect(page).not.toContain('<AIChatInput');
+    expect(page).not.toContain("activeClient.request<{ key?: string; sessionKey?: string }>");
+    expect(composer).toContain("const [selectedAgentId, setSelectedAgentId] = useState<string>('')");
+    expect(composer).toContain('field="agent"');
+    expect(composer).toContain('<AgentSelectOption agent={agent} />');
+    expect(composer).toContain("agentId: selectedAgentId || agent?.id || 'main'");
+    expect(composer).toContain("activeClient.request<{ key?: string; sessionKey?: string }>");
   });
 
   it('documents that the new session page accepts file drops across the page', () => {
-    const source = readFileSync('src/pages/NewSessionPage.tsx', 'utf8');
+    const source = readFileSync('src/components/NewSessionComposer.tsx', 'utf8');
 
     expect(source).toContain('handlePageDrop');
     expect(source).toContain('chatInputRef.current?.uploadRef?.current?.insert?.(files)');
     expect(source).toContain("window.addEventListener('drop', handlePageDrop)");
+    expect(source).toContain('showUploadFile');
+    expect(source).toContain('showUploadButton');
   });
 });
