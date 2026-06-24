@@ -12,6 +12,7 @@ import {
   loadRepositoryBinding,
   saveRepositoryBinding,
 } from '../lib/agentic-repository-store';
+import { createUnavailableGatewayRepositoryCapabilities } from '../lib/repository-remote-capabilities';
 
 describe('agentic repository model', () => {
   it('defines the default repository path contract from the design doc', () => {
@@ -80,6 +81,28 @@ describe('agentic repository model', () => {
 
     expect(getRepositoryGateStatus({ binding, gitAvailable: true, remoteReachable: false })).toBe('repo_remote_unreachable');
     expect(getRepositoryGateStatus({ binding, gitAvailable: true, remoteReachable: true, hasRequiredTemplate: true })).toBe('repo_ready');
+  });
+
+  it('uses an isolated remote capability checker for gateway-local repositories', async () => {
+    const checkGit = vi.fn(async () => {
+      throw new Error('desktop local filesystem should not be touched');
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: {
+          checkGit,
+        },
+      },
+    });
+
+    const result = await inspectRepositoryBinding(createBinding({ location: 'gateway-local' }));
+
+    expect(result.status).toBe('repo_remote_unreachable');
+    expect(checkGit).not.toHaveBeenCalled();
+    await expect(createUnavailableGatewayRepositoryCapabilities().inspect(createBinding({ location: 'gateway-local' }))).resolves.toEqual({
+      remoteReachable: false,
+      hasRequiredTemplate: false,
+    });
   });
 });
 
@@ -171,6 +194,46 @@ describe('agentic repository storage and templates', () => {
 
     await saveRepositoryBinding(binding!);
     expect(saveInstanceData).toHaveBeenCalledWith('inst-1', AGENTIC_REPOSITORY_STORAGE_KEY, binding);
+    expect(saveInstanceData).toHaveBeenCalledWith('inst-1', 'agentic-repository-binding:desktop-local', binding);
+  });
+
+  it('stores desktop-local and gateway-local bindings in separate instance slots', async () => {
+    const stored: Record<string, unknown> = {};
+    const loadInstanceData = vi.fn(async (_instanceId: string, key: string) => stored[key] ?? null);
+    const saveInstanceData = vi.fn(async (_instanceId: string, key: string, value: unknown) => {
+      stored[key] = value;
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        storage: {
+          loadInstanceData,
+          saveInstanceData,
+        },
+      },
+    });
+
+    const desktop = createDefaultRepositoryBinding({
+      gatewayInstanceId: 'inst-1',
+      repoPath: '/desktop-repo',
+      location: 'desktop-local',
+    });
+    const gateway = createDefaultRepositoryBinding({
+      gatewayInstanceId: 'inst-1',
+      repoPath: '/gateway-repo',
+      location: 'gateway-local',
+    });
+
+    await saveRepositoryBinding(desktop);
+    await saveRepositoryBinding(gateway);
+
+    await expect(loadRepositoryBinding('inst-1', 'desktop-local')).resolves.toMatchObject({
+      repoPath: '/desktop-repo',
+      location: 'desktop-local',
+    });
+    await expect(loadRepositoryBinding('inst-1', 'gateway-local')).resolves.toMatchObject({
+      repoPath: '/gateway-repo',
+      location: 'gateway-local',
+    });
   });
 
   it('inspects a desktop-local binding through Electron repository APIs', async () => {
@@ -205,6 +268,14 @@ describe('agentic repository storage and templates', () => {
 
     expect(knowledge).toContain('RepositoryGate');
     expect(workbench).toContain('RepositoryGate');
+  });
+
+  it('labels gateway-local repository binding as advanced mode', () => {
+    const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
+    const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
+
+    expect(zh.repositoryGate.gatewayLocal).toContain('高级');
+    expect(en.repositoryGate.gatewayLocal.toLowerCase()).toContain('advanced');
   });
 });
 

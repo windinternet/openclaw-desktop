@@ -86,10 +86,10 @@
 
 ### F. Gateway-Local Advanced Mode
 
-- [ ] `gateway-local` binding is stored separately from `desktop-local` and clearly labeled as advanced.
-- [ ] `gateway-local` never calls Desktop local filesystem APIs.
-- [ ] UI shows `repo_remote_unreachable` when Gateway/Companion repository capabilities are unavailable.
-- [ ] Future Gateway/Companion repository capability checks are isolated behind a small interface.
+- [x] `gateway-local` binding is stored separately from `desktop-local` and clearly labeled as advanced.
+- [x] `gateway-local` never calls Desktop local filesystem APIs.
+- [x] UI shows `repo_remote_unreachable` when Gateway/Companion repository capabilities are unavailable.
+- [x] Future Gateway/Companion repository capability checks are isolated behind a small interface.
 
 ### G. Control Center
 
@@ -154,10 +154,10 @@
 
 ### Batch 6: Gateway-Local Advanced Mode
 
-- [ ] Write failing tests proving `gateway-local` does not use local filesystem IPC.
-- [ ] Add capability-check abstraction.
-- [ ] Render remote unreachable/setup states.
-- [ ] Commit.
+- [x] Write failing tests proving `gateway-local` does not use local filesystem IPC.
+- [x] Add capability-check abstraction.
+- [x] Render remote unreachable/setup states.
+- [x] Commit.
 
 ### Batch 7: Final Design Compliance Verification
 

@@ -103,6 +103,22 @@ export default function RepositoryGate({
     }
   };
 
+  const handleLocationChange = async (value: RepositoryLocation) => {
+    setLocation(value);
+    if (!currentInstanceId) return;
+    const stored = await loadRepositoryBinding(currentInstanceId, value);
+    if (!stored) {
+      setBinding(null);
+      setStatus('repo_unbound');
+      setRepoPath('');
+      return;
+    }
+    setBinding(stored);
+    setRepoPath(stored.repoPath);
+    setStatus(stored.status);
+    await inspect(stored);
+  };
+
   const handleBootstrap = async () => {
     if (!binding) return;
     setLoading(true);
@@ -134,7 +150,7 @@ export default function RepositoryGate({
           <Space wrap style={{ width: '100%' }}>
             <Select
               value={location}
-              onChange={(value) => setLocation(value as RepositoryLocation)}
+              onChange={(value) => void handleLocationChange(value as RepositoryLocation)}
               style={{ width: 180 }}
               optionList={[
                 { label: t('repositoryGate.desktopLocal'), value: 'desktop-local' },

@@ -107,7 +107,7 @@
     "workbenchTitle": "Workbench Repository",
     "workbenchDesc": "Workbench uses the same Git repository to record matters, plans, runs, outputs, and reviews.",
     "desktopLocal": "Desktop Local",
-    "gatewayLocal": "Gateway Remote",
+    "gatewayLocal": "Gateway Remote (Advanced)",
     "pathPlaceholder": "Enter a repository path, for example /Users/me/agentic-repo",
     "bind": "Bind",
     "bootstrap": "Initialize Template",

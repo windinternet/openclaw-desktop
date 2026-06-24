@@ -107,7 +107,7 @@
     "workbenchTitle": "工作台仓库",
     "workbenchDesc": "工作台使用同一个 Git 仓库记录事项、计划、执行、成果和复盘。",
     "desktopLocal": "Desktop 本机",
-    "gatewayLocal": "Gateway 远程",
+    "gatewayLocal": "Gateway 远程（高级）",
     "pathPlaceholder": "输入仓库路径，例如 /Users/me/agentic-repo",
     "bind": "绑定",
     "bootstrap": "初始化模板",

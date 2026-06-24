@@ -8,6 +8,7 @@ import {
   type RepositoryStatus,
 } from './agentic-repository';
 import { loadInstanceData, saveInstanceDataAwaited } from './local-persistence';
+import { createUnavailableGatewayRepositoryCapabilities, type GatewayRepositoryCapabilities } from './repository-remote-capabilities';
 
 export interface RepositoryInspectDetails {
   pathExists?: boolean;
@@ -24,12 +25,33 @@ export interface RepositoryInspectResult {
   details: RepositoryInspectDetails;
 }
 
-export async function loadRepositoryBinding(instanceId: string): Promise<RepositoryBinding | null> {
+function repositoryBindingStorageKey(location: RepositoryLocation): string {
+  return `${AGENTIC_REPOSITORY_STORAGE_KEY}:${location}`;
+}
+
+export async function loadRepositoryBinding(
+  instanceId: string,
+  location?: RepositoryLocation,
+): Promise<RepositoryBinding | null> {
+  if (location) {
+    const stored = await loadInstanceData<unknown>(instanceId, repositoryBindingStorageKey(location));
+    const binding = normalizeRepositoryBinding(stored);
+    if (binding) return binding;
+
+    const legacy = normalizeRepositoryBinding(await loadInstanceData<unknown>(instanceId, AGENTIC_REPOSITORY_STORAGE_KEY));
+    return legacy?.location === location ? legacy : null;
+  }
+
   const stored = await loadInstanceData<unknown>(instanceId, AGENTIC_REPOSITORY_STORAGE_KEY);
   return normalizeRepositoryBinding(stored);
 }
 
 export async function saveRepositoryBinding(binding: RepositoryBinding): Promise<void> {
+  await saveInstanceDataAwaited(
+    binding.gatewayInstanceId,
+    repositoryBindingStorageKey(binding.location),
+    binding,
+  );
   await saveInstanceDataAwaited(binding.gatewayInstanceId, AGENTIC_REPOSITORY_STORAGE_KEY, binding);
 }
 
@@ -44,12 +66,19 @@ export async function createAndSaveRepositoryBinding(options: {
   return binding;
 }
 
-export async function inspectRepositoryBinding(binding: RepositoryBinding): Promise<RepositoryInspectResult> {
+const defaultGatewayRepositoryCapabilities = createUnavailableGatewayRepositoryCapabilities();
+
+export async function inspectRepositoryBinding(
+  binding: RepositoryBinding,
+  gatewayCapabilities: GatewayRepositoryCapabilities = defaultGatewayRepositoryCapabilities,
+): Promise<RepositoryInspectResult> {
   if (binding.location === 'gateway-local') {
+    const remote = await gatewayCapabilities.inspect(binding);
     const status = getRepositoryGateStatus({
       binding,
       gitAvailable: true,
-      remoteReachable: false,
+      remoteReachable: remote.remoteReachable,
+      hasRequiredTemplate: remote.hasRequiredTemplate,
     });
     return {
       binding: { ...binding, status },
@@ -98,4 +127,3 @@ export async function bootstrapRepositoryBinding(binding: RepositoryBinding): Pr
     details,
   };
 }
-
