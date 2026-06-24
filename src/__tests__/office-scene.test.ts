@@ -49,4 +49,39 @@ describe('OfficeScene agent labels', () => {
     expect(sceneSource).toContain('onSelectRef.current(null);');
     expect(sceneSource).toContain('resetCameraControl(state, container);');
   });
+
+  it('defines a local toy blaster mode without changing Gateway-backed state', () => {
+    const source = readFileSync('src/components/office/OfficeScene.tsx', 'utf8');
+
+    expect(source).toContain('OfficeWeaponMode');
+    expect(source).toContain("weaponMode: 'hands'");
+    expect(source).toContain("weaponMode === 'toy-blaster'");
+    expect(source).toContain("if (key === 'q')");
+    expect(source).toContain('toggleOfficeWeaponMode(state)');
+    expect(source).toContain('createBlasterGroup(theme)');
+    expect(source).toContain('createCrosshair(theme)');
+    expect(source).not.toContain('useStore.setState');
+    expect(source).not.toContain('saveInstanceData');
+  });
+
+  it('routes first-person left-clicks through the shooting raycast only while armed', () => {
+    const source = readFileSync('src/components/office/OfficeScene.tsx', 'utf8');
+
+    expect(source).toContain('handleOfficeShot(state, container)');
+    expect(source).toContain("state.cameraMode === 'first-person'");
+    expect(source).toContain("state.weaponMode === 'toy-blaster'");
+    expect(source).toContain('state.raycaster.setFromCamera(new THREE.Vector2(0, 0), state.firstPersonCamera)');
+    expect(source).toContain("typeof item.object.userData.agentId === 'string'");
+    expect(source).toContain('applyOfficeShot(actor.combat, performance.now())');
+  });
+
+  it('initializes combat state for both Gateway Agents and scene NPCs', () => {
+    const source = readFileSync('src/components/office/OfficeScene.tsx', 'utf8');
+
+    expect(source).toContain('combat: createOfficeCombatState()');
+    expect(source).toContain('shieldBar: createShieldBar(theme)');
+    expect(source).toContain("state.actors.set('office-receptionist', receptionActor)");
+    expect(source).toContain("state.actors.set('office-cleaner', cleanerActor)");
+    expect(source).toContain('updateCombatState(actor, now, delta, themeRef.current)');
+  });
 });

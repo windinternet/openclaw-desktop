@@ -18,6 +18,14 @@ import {
   type OfficeCameraDirection,
   type OfficeCameraState,
 } from '../../lib/office-camera';
+import {
+  applyOfficeShot,
+  createOfficeCombatState,
+  officeShieldRatio,
+  reviveOfficeCombatIfReady,
+  type OfficeCombatState,
+  type OfficeWeaponMode,
+} from '../../lib/office-gameplay';
 
 const MANUAL_AGENT_WALK_SPEED = 5.8;
 
@@ -53,6 +61,8 @@ interface ActorState {
   lastMoveDirection: THREE.Vector3;
   jumpVelocity: number;
   isNpc: boolean;
+  combat: OfficeCombatState;
+  shieldBar: THREE.Group;
 }
 
 interface SceneState {
@@ -72,6 +82,13 @@ interface SceneState {
   interactPrompt: THREE.Sprite | null;
   interactRing: THREE.Mesh | null;
   bodyGlow: THREE.Mesh | null;
+  weaponMode: OfficeWeaponMode;
+  blasterGroup: THREE.Group | null;
+  crosshair: THREE.Sprite | null;
+  shotBeam: THREE.Line | null;
+  hitHint: THREE.Sprite | null;
+  shotBeamUntil: number;
+  hitPoint: THREE.Vector3 | null;
   actors: Map<string, ActorState>;
   raycaster: THREE.Raycaster;
   pointer: THREE.Vector2;
@@ -283,6 +300,92 @@ function createActivityBadge(text: string, color: string, theme: OfficeTheme): T
   sprite.scale.set(0.54, 0.3, 1);
   sprite.position.set(0.28, 1.48, 0);
   return sprite;
+}
+
+function createShieldBar(theme: OfficeTheme): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'office-shield-bar';
+  const background = createBox(0.74, 0.055, 0.035, theme.mode === 'light' ? '#e2e8f0' : '#1e293b', [0, 1.6, 0], {
+    roughness: 0.5,
+  });
+  background.name = 'office-shield-background';
+  const fill = createBox(0.7, 0.07, 0.04, '#22d3ee', [0, 1.6, 0.01], { roughness: 0.32 });
+  fill.name = 'office-shield-fill';
+  group.add(background, fill);
+  group.visible = false;
+  return group;
+}
+
+function createCrosshair(theme: OfficeTheme): THREE.Sprite {
+  const canvas = document.createElement('canvas');
+  canvas.width = 96;
+  canvas.height = 96;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.clearRect(0, 0, 96, 96);
+    ctx.strokeStyle = theme.scene.accent;
+    ctx.lineWidth = 4;
+    ctx.globalAlpha = 0.92;
+    ctx.beginPath();
+    ctx.moveTo(48, 18);
+    ctx.lineTo(48, 34);
+    ctx.moveTo(48, 62);
+    ctx.lineTo(48, 78);
+    ctx.moveTo(18, 48);
+    ctx.lineTo(34, 48);
+    ctx.moveTo(62, 48);
+    ctx.lineTo(78, 48);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(48, 48, 7, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false }));
+  sprite.scale.set(44, 44, 1);
+  sprite.visible = false;
+  sprite.renderOrder = 1000;
+  return sprite;
+}
+
+function createHitHint(theme: OfficeTheme): THREE.Sprite {
+  const canvas = document.createElement('canvas');
+  canvas.width = 260;
+  canvas.height = 54;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.fillStyle = theme.mode === 'light' ? 'rgba(255,255,255,0.94)' : 'rgba(15,23,42,0.94)';
+    ctx.strokeStyle = theme.scene.accent;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(4, 4, 252, 46, 12);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = theme.scene.accent;
+    ctx.font = '700 17px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('玩具光束枪', 130, 27);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false }));
+  sprite.scale.set(260, 54, 1);
+  sprite.visible = false;
+  sprite.renderOrder = 1000;
+  return sprite;
+}
+
+function createBlasterGroup(theme: OfficeTheme): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'office-toy-blaster';
+  group.add(createBox(0.34, 0.18, 0.62, theme.scene.trim, [0, 0, 0], { roughness: 0.36 }));
+  group.add(createBox(0.18, 0.13, 0.42, theme.scene.accent, [0, 0.02, -0.38], { roughness: 0.22 }));
+  group.add(createCylinder(0.08, 0.11, 0.16, theme.scene.screen, [0, 0.02, -0.66], { radialSegments: 18, roughness: 0.2 }));
+  group.add(createBox(0.12, 0.26, 0.12, theme.scene.desk, [0.05, -0.24, 0.18], { roughness: 0.48 }));
+  group.visible = false;
+  return group;
 }
 
 function createWallText(text: string, theme: OfficeTheme): THREE.Mesh {
@@ -613,7 +716,11 @@ function createRobot(agent: OfficeAgent, theme: OfficeTheme): ActorState {
     lastMoveDirection: new THREE.Vector3(-0.7, 0, -0.7).normalize(),
     jumpVelocity: 0,
     isNpc: false,
+    combat: createOfficeCombatState(),
+    shieldBar: createShieldBar(theme),
   };
+  group.add(actor.shieldBar);
+  markAgentObject(actor.shieldBar, agent.agentId);
   updateLoungeActivityProp(actor, theme);
   return actor;
 }
@@ -858,6 +965,13 @@ function createScene(container: HTMLDivElement, theme: OfficeTheme, companyName:
     interactPrompt: null as unknown as THREE.Sprite | null,
     interactRing: null as unknown as THREE.Mesh | null,
     bodyGlow: null as unknown as THREE.Mesh | null,
+    weaponMode: 'hands' as OfficeWeaponMode,
+    blasterGroup: null as THREE.Group | null,
+    crosshair: null as THREE.Sprite | null,
+    shotBeam: null as THREE.Line | null,
+    hitHint: null as THREE.Sprite | null,
+    shotBeamUntil: 0,
+    hitPoint: null as THREE.Vector3 | null,
     actors: new Map(),
     raycaster: new THREE.Raycaster(),
     pointer: new THREE.Vector2(),
@@ -915,7 +1029,133 @@ function createScene(container: HTMLDivElement, theme: OfficeTheme, companyName:
   overlayScene.add(interactSprite);
   state.interactPrompt = interactSprite;
 
+  const crosshair = createCrosshair(theme);
+  overlayScene.add(crosshair);
+  state.crosshair = crosshair;
+
+  const hitHint = createHitHint(theme);
+  overlayScene.add(hitHint);
+  state.hitHint = hitHint;
+
+  const blaster = createBlasterGroup(theme);
+  firstPersonCamera.add(blaster);
+  blaster.position.set(0.42, -0.34, -0.78);
+  blaster.rotation.set(-0.08, -0.18, 0.04);
+  scene.add(firstPersonCamera);
+  state.blasterGroup = blaster;
+
   return state;
+}
+
+function updateShieldBar(actor: ActorState, now: number): void {
+  const visible = now <= actor.combat.shieldVisibleUntil || actor.combat.downedUntil !== null;
+  actor.shieldBar.visible = visible;
+  if (!visible) return;
+
+  const ratio = officeShieldRatio(actor.combat);
+  const fill = actor.shieldBar.getObjectByName('office-shield-fill') as THREE.Mesh | undefined;
+  if (!fill) return;
+
+  fill.scale.x = Math.max(0.02, ratio);
+  fill.position.x = -0.35 * (1 - ratio);
+  const material = fill.material as THREE.MeshStandardMaterial;
+  material.color.set(ratio > 0.55 ? '#22d3ee' : ratio > 0.25 ? '#f59e0b' : '#ef4444');
+  material.emissive.copy(material.color);
+  material.emissiveIntensity = actor.combat.downedUntil !== null ? 0.45 : 0.18;
+}
+
+function updateWeaponHud(state: SceneState): void {
+  const armed = state.cameraMode === 'first-person' && state.weaponMode === 'toy-blaster';
+  if (state.crosshair) {
+    state.crosshair.visible = armed;
+    state.crosshair.position.set(state.overlayCamera.right / 2, state.overlayCamera.top / 2, 0);
+  }
+  if (state.hitHint) {
+    state.hitHint.visible = armed;
+    state.hitHint.position.set(state.overlayCamera.right - 150, state.overlayCamera.top - 46, 0);
+  }
+  if (state.blasterGroup) {
+    state.blasterGroup.visible = armed;
+  }
+}
+
+function toggleOfficeWeaponMode(state: SceneState): void {
+  if (state.cameraMode !== 'first-person') return;
+  state.weaponMode = state.weaponMode === 'toy-blaster' ? 'hands' : 'toy-blaster';
+  updateWeaponHud(state);
+}
+
+function showShotBeam(state: SceneState, start: THREE.Vector3, end: THREE.Vector3, theme: OfficeTheme, now: number): void {
+  if (state.shotBeam) {
+    state.scene.remove(state.shotBeam);
+    state.shotBeam.geometry.dispose();
+    (state.shotBeam.material as THREE.Material).dispose();
+  }
+
+  const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+  const material = new THREE.LineBasicMaterial({
+    color: theme.scene.accent,
+    transparent: true,
+    opacity: 0.9,
+  });
+  const beam = new THREE.Line(geometry, material);
+  beam.name = 'office-shot-beam';
+  beam.renderOrder = 20;
+  state.scene.add(beam);
+  state.shotBeam = beam;
+  state.shotBeamUntil = now + 160;
+  state.hitPoint = end.clone();
+}
+
+function handleOfficeShot(state: SceneState, container: HTMLDivElement): boolean {
+  if (state.cameraMode !== 'first-person' || state.weaponMode !== 'toy-blaster') return false;
+
+  const now = performance.now();
+  state.raycaster.setFromCamera(new THREE.Vector2(0, 0), state.firstPersonCamera);
+  const origin = state.firstPersonCamera.position.clone();
+  const fallbackEnd = origin.clone().add(state.raycaster.ray.direction.clone().multiplyScalar(8));
+  const hits = state.raycaster.intersectObjects(state.scene.children, true);
+  const hit = hits.find((item) => (
+    typeof item.object.userData.agentId === 'string' && item.object.userData.agentId !== state.controlledAgentId
+  ));
+  const theme = state.currentTheme;
+  const end = hit?.point ?? fallbackEnd;
+
+  if (theme) showShotBeam(state, origin, end, theme, now);
+  if (state.blasterGroup) {
+    state.blasterGroup.position.z = -0.84;
+    setTimeout(() => {
+      if (state.blasterGroup) state.blasterGroup.position.z = -0.78;
+    }, 90);
+  }
+
+  if (!hit) {
+    updateWeaponHud(state);
+    return true;
+  }
+
+  const agentId = String(hit.object.userData.agentId);
+  const actor = state.actors.get(agentId);
+  if (!actor) return true;
+
+  const result = applyOfficeShot(actor.combat, performance.now());
+  actor.combat = result.combat;
+  actor.collisionReaction = Math.min(1, actor.collisionReaction + 0.75);
+  actor.combat.shieldVisibleUntil = now + 2400;
+  updateShieldBar(actor, now);
+
+  if (theme && result.message) {
+    showSpeechBubble(
+      state.scene,
+      result.message,
+      theme,
+      new THREE.Vector3(actor.group.position.x, actor.group.position.y + 1.85, actor.group.position.z),
+    );
+  }
+
+  container.dataset.officeLastShotTarget = agentId;
+  container.dataset.officeLastShotEvent = result.event;
+  return true;
 }
 
 function resizeScene(state: SceneState, container: HTMLDivElement): void {
@@ -941,6 +1181,8 @@ function resizeScene(state: SceneState, container: HTMLDivElement): void {
 function applyCameraControl(state: SceneState, container: HTMLDivElement): void {
   state.camera = state.thirdPersonCamera;
   state.cameraMode = 'third-person';
+  state.weaponMode = 'hands';
+  updateWeaponHud(state);
   const { target, distance, azimuth, elevation } = state.cameraControl;
   const horizontal = Math.cos(elevation) * distance;
   state.thirdPersonCamera.position.set(
@@ -1041,6 +1283,11 @@ function moveSelectedActorFromKeys(state: SceneState, selectedAgentId: string | 
 
   const actor = state.actors.get(selectedAgentId);
   if (!actor) return;
+  if (actor.combat.downedUntil !== null) {
+    actor.manualWalking = false;
+    state.pressedKeys.clear();
+    return;
+  }
   actor.manualWalking = true;
   actor.nextLeisureDecisionAt = Number.POSITIVE_INFINITY;
   actor.isPlayerControlled = true;
@@ -1085,6 +1332,7 @@ function applyFirstPersonCamera(state: SceneState, container: HTMLDivElement, ac
 
   state.firstPersonCamera.position.copy(eye);
   state.firstPersonCamera.lookAt(lookAt);
+  updateWeaponHud(state);
   resizeScene(state, container);
   container.dataset.officeCameraMode = state.cameraMode;
   container.dataset.officeFirstPersonAgentId = actor.agent.agentId;
@@ -1127,7 +1375,7 @@ function isLeisureActor(actor: ActorState): boolean {
 }
 
 function needsRuntimeCollision(actor: ActorState): boolean {
-  return isLeisureActor(actor) || actor.manualWalking;
+  return actor.combat.downedUntil === null && (isLeisureActor(actor) || actor.manualWalking);
 }
 
 function clampFreeRoamVector(vector: THREE.Vector3): void {
@@ -1163,6 +1411,7 @@ function enforceActorGrounding(actor: ActorState): void {
   if (actor.group.position.y < surfaceY) {
     actor.group.position.y = surfaceY;
   }
+  if (actor.combat.downedUntil !== null) return;
   if (!actor.isPlayerControlled) {
     actor.group.rotation.x = 0;
     actor.group.rotation.z = Math.min(0.22, Math.max(-0.22, actor.group.rotation.z));
@@ -1255,6 +1504,46 @@ function resolveActorCollisions(actors: Map<string, ActorState>): void {
   }
 }
 
+function restoreFaceMaterial(actor: ActorState): void {
+  const material = actor.face.material as THREE.MeshStandardMaterial;
+  material.emissive.set(actor.agent.behavior === 'stuck' ? '#ef4444' : '#22d3ee');
+  material.emissiveIntensity = actor.agent.behavior === 'offline' ? 0.15 : 0.75;
+}
+
+function updateCombatState(actor: ActorState, now: number, delta: number, theme: OfficeTheme): void {
+  const revived = reviveOfficeCombatIfReady(actor.combat, now);
+  if (revived.revived) {
+    actor.combat = revived.combat;
+    actor.group.rotation.x = 0;
+    actor.group.rotation.z = 0;
+    actor.manualWalking = false;
+    actor.target.copy(actor.group.position);
+    restoreFaceMaterial(actor);
+    if (revived.message) {
+      showSpeechBubble(
+        actor.group.parent as THREE.Scene,
+        revived.message,
+        theme,
+        new THREE.Vector3(actor.group.position.x, actor.group.position.y + 1.85, actor.group.position.z),
+      );
+    }
+  }
+
+  actor.combat.hitReaction = Math.max(0, actor.combat.hitReaction - delta * 2.8);
+  updateShieldBar(actor, now);
+  actor.shieldBar.quaternion.copy(actor.group.quaternion).invert();
+
+  if (actor.combat.downedUntil !== null) {
+    actor.manualWalking = false;
+    actor.target.copy(actor.group.position);
+    actor.group.rotation.x = THREE.MathUtils.lerp(actor.group.rotation.x, -0.82, 0.08);
+    actor.group.rotation.z = THREE.MathUtils.lerp(actor.group.rotation.z, 0.48, 0.08);
+    const faceMaterial = actor.face.material as THREE.MeshStandardMaterial;
+    faceMaterial.emissive.set('#ef4444');
+    faceMaterial.emissiveIntensity = 0.35 + Math.abs(Math.sin(now * 0.008)) * 0.45;
+  }
+}
+
 function animateActor(actor: ActorState, time: number, delta: number, selected: boolean): void {
   // Jump physics
   if (actor.jumpVelocity !== 0 || actor.group.position.y > OFFICE_AGENT_GROUND_Y) {
@@ -1265,6 +1554,11 @@ function animateActor(actor: ActorState, time: number, delta: number, selected: 
       actor.group.position.y = landY;
       actor.jumpVelocity = 0;
     }
+  }
+  if (actor.combat.downedUntil !== null) {
+    actor.label.visible = true;
+    actor.group.scale.lerp(new THREE.Vector3(actor.baseScale, actor.baseScale * 0.82, actor.baseScale), 0.08);
+    return;
   }
   if (!actor.isPlayerControlled && isLeisureActor(actor) && time >= actor.nextLeisureDecisionAt && actor.group.position.distanceTo(actor.target) < 0.08) {
     actor.target.copy(chooseNextLeisureTarget(actor, time));
@@ -1445,9 +1739,13 @@ export default function OfficeScene({
       resizeObserver.observe(container);
 
       const showBubble = () => { const r = state.actors.get('office-receptionist'); if (r) showSpeechBubble(state.scene, receptionInfoRef.current || '\u6b22\u8fce\uff01', themeRef.current, new THREE.Vector3(r.group.position.x, r.group.position.y + 1.8, r.group.position.z)); else showReceptionBubble(state, receptionInfoRef.current || '\u6b22\u8fce\uff01', themeRef.current); };
-      const onPointerDown = (event: PointerEvent) => (
-        handleSceneClick(event, state, container, onSelectRef.current, showBubble)
-      );
+      const onPointerDown = (event: PointerEvent) => {
+        if (event.button === 0 && handleOfficeShot(state, container)) {
+          event.preventDefault();
+          return;
+        }
+        handleSceneClick(event, state, container, onSelectRef.current, showBubble);
+      };
       const onMouseDown = (event: MouseEvent) => {
         event.preventDefault();
         container.focus();
@@ -1504,6 +1802,11 @@ export default function OfficeScene({
       };
       const onKeyDown = (event: KeyboardEvent) => {
         const key = event.key.toLowerCase();
+        if (key === 'q') {
+          event.preventDefault();
+          toggleOfficeWeaponMode(state);
+          return;
+        }
         if (event.key === ' ' && state.cameraMode === 'first-person') {
           event.preventDefault();
           // Jump: apply upward velocity if on ground
@@ -1553,6 +1856,11 @@ export default function OfficeScene({
           resetCameraControl(state, container);
           return;
         }
+        if (event.key.toLowerCase() === 'q') {
+          event.preventDefault();
+          toggleOfficeWeaponMode(state);
+          return;
+        }
         if (event.key === ' ' && state.cameraMode === 'first-person') {
           event.preventDefault();
           const actor = state.controlledAgentId ? state.actors.get(state.controlledAgentId) : null;
@@ -1598,19 +1906,28 @@ export default function OfficeScene({
         if (disposed) return;
         const delta = Math.min(0.05, (now - state.lastTime) / 1000);
         state.lastTime = now;
+        if (state.shotBeam && now >= state.shotBeamUntil) {
+          state.scene.remove(state.shotBeam);
+          state.shotBeam.geometry.dispose();
+          (state.shotBeam.material as THREE.Material).dispose();
+          state.shotBeam = null;
+          state.hitPoint = null;
+        }
+        updateWeaponHud(state);
         state.fpsExitAgentId = state.controlledAgentId;
         moveSelectedActorFromKeys(state, selectedRef.current, delta);
         if (!selectedRef.current) {
           updateCameraFromKeys(state, container, delta);
         }
         state.actors.forEach((actor) => {
+          updateCombatState(actor, now, delta, themeRef.current);
           animateActor(actor, now, delta, actor.agent.agentId === selectedRef.current);
           enforceActorGrounding(actor);
         });
         try {
         // Cleaner NPC waypoint movement
         const cl = state.actors.get('office-cleaner');
-        if (cl && cl.isNpc) {
+        if (cl && cl.isNpc && cl.combat.downedUntil === null) {
           const cwp = CLEANER_WAYPOINTS;
           const ct = cwp[state.cleanerWaypointIndex];
           const cdx = ct.x - cl.group.position.x;
@@ -1714,6 +2031,12 @@ export default function OfficeScene({
         window.removeEventListener('keydown', onWindowKeyDown);
         window.removeEventListener('mouseup', stopDrag);
         window.cancelAnimationFrame(state.frame);
+        if (state.shotBeam) {
+          state.scene.remove(state.shotBeam);
+          state.shotBeam.geometry.dispose();
+          (state.shotBeam.material as THREE.Material).dispose();
+          state.shotBeam = null;
+        }
         state.renderer.dispose();
         state.renderer.domElement.remove();
         stateRef.current = null;
