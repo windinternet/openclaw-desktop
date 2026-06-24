@@ -120,6 +120,10 @@ async function bootstrapRepository(repoPath: string): Promise<RepositoryInspectR
   return inspectRepository(repoPath)
 }
 
+async function initRepository(repoPath: string): Promise<RepositoryInspectResult> {
+  return bootstrapRepository(repoPath)
+}
+
 function resolveRepoPath(repoPath: string, relativePath: string): string {
   const root = path.resolve(repoPath)
   const target = path.resolve(root, relativePath)
@@ -201,10 +205,23 @@ async function gitDiff(repoPath: string): Promise<string> {
   return result.stdout
 }
 
+async function gitCommit(repoPath: string, message: string): Promise<string> {
+  const trimmed = message.trim()
+  if (!trimmed) throw new Error('commit-message-required')
+  await execFileAsync('git', ['add', '.'], { cwd: path.resolve(repoPath), timeout: 10000 })
+  const result = await execFileAsync('git', ['commit', '-m', trimmed], {
+    cwd: path.resolve(repoPath),
+    timeout: 10000,
+    maxBuffer: 1024 * 1024,
+  })
+  return result.stdout
+}
+
 export function registerRepositoryIpcHandlers(): void {
   ipcMain.handle('repository:checkGit', () => checkGitAvailable())
   ipcMain.handle('repository:inspect', (_event, repoPath: string) => inspectRepository(repoPath))
   ipcMain.handle('repository:bootstrap', (_event, repoPath: string) => bootstrapRepository(repoPath))
+  ipcMain.handle('repository:init', (_event, repoPath: string) => initRepository(repoPath))
   ipcMain.handle('repository:listMarkdown', (_event, repoPath: string, directory: string) => listMarkdown(repoPath, directory))
   ipcMain.handle('repository:readText', (_event, repoPath: string, relativePath: string) => readText(repoPath, relativePath))
   ipcMain.handle('repository:writeText', (_event, repoPath: string, relativePath: string, content: string) =>
@@ -215,4 +232,5 @@ export function registerRepositoryIpcHandlers(): void {
   )
   ipcMain.handle('repository:gitStatus', (_event, repoPath: string) => gitStatus(repoPath))
   ipcMain.handle('repository:gitDiff', (_event, repoPath: string) => gitDiff(repoPath))
+  ipcMain.handle('repository:gitCommit', (_event, repoPath: string, message: string) => gitCommit(repoPath, message))
 }

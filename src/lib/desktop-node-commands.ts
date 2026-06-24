@@ -219,6 +219,14 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
     return { ok: true, status, details };
   }
 
+  if (command === 'desktop.repository.init') {
+    const repoPath = stringValue(params.repoPath);
+    if (!repoPath) return invalidParams('repoPath is required');
+    const repository = repositoryApi();
+    if (!repository?.init) return { ok: false, error: 'repository-api-unavailable' };
+    return { ok: true, details: await repository.init(repoPath) };
+  }
+
   if (command === 'desktop.repository.read') {
     const repoPath = stringValue(params.repoPath);
     const relativePath = stringValue(params.path);
@@ -269,6 +277,16 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
     const repository = repositoryApi();
     if (!repository?.gitDiff) return { ok: false, error: 'repository-api-unavailable' };
     return { ok: true, diff: await repository.gitDiff(repoPath) };
+  }
+
+  if (command === 'desktop.repository.git.commit') {
+    const repoPath = stringValue(params.repoPath);
+    const message = stringValue(params.message);
+    if (!repoPath) return invalidParams('repoPath is required');
+    if (!message) return invalidParams('message is required');
+    const repository = repositoryApi();
+    if (!repository?.gitCommit) return { ok: false, error: 'repository-api-unavailable' };
+    return { ok: true, commit: await repository.gitCommit(repoPath, message) };
   }
 
   if (command === 'desktop.artifacts.append') {

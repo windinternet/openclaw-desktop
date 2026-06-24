@@ -256,6 +256,51 @@ describe('desktop node commands', () => {
     expect(search).toHaveBeenCalledWith('/repo', 'Index', ['wiki']);
   });
 
+  it('initializes and commits repository changes through structured repository commands', async () => {
+    const init = vi.fn(async () => ({
+      pathExists: true,
+      isDirectory: true,
+      isGitRepo: true,
+      isEmpty: false,
+      hasRequiredTemplate: true,
+      permissionDenied: false,
+    }));
+    const gitCommit = vi.fn(async () => 'abc123 Initial repository state');
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: {
+          init,
+          gitCommit,
+        },
+      },
+    });
+
+    await expect(handleDesktopNodeCommand('desktop.repository.init', {
+      repoPath: '/repo',
+    })).resolves.toEqual({
+      ok: true,
+      details: {
+        pathExists: true,
+        isDirectory: true,
+        isGitRepo: true,
+        isEmpty: false,
+        hasRequiredTemplate: true,
+        permissionDenied: false,
+      },
+    });
+
+    await expect(handleDesktopNodeCommand('desktop.repository.git.commit', {
+      repoPath: '/repo',
+      message: 'Initial repository state',
+    })).resolves.toEqual({
+      ok: true,
+      commit: 'abc123 Initial repository state',
+    });
+
+    expect(init).toHaveBeenCalledWith('/repo');
+    expect(gitCommit).toHaveBeenCalledWith('/repo', 'Initial repository state');
+  });
+
   it('rejects artifact create without title or html', async () => {
     await expect(handleDesktopNodeCommand('desktop.artifacts.create', {
       title: '',

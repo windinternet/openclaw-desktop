@@ -112,6 +112,25 @@ describe('agentic repository storage and templates', () => {
     }
   });
 
+  it('ships the full default repository tree from the design doc', () => {
+    const directories = [
+      'resources/agentic-repo/sources/articles',
+      'resources/agentic-repo/sources/files',
+      'resources/agentic-repo/sources/clips',
+      'resources/agentic-repo/sources/notes',
+      'resources/agentic-repo/wiki/topics',
+      'resources/agentic-repo/wiki/people',
+      'resources/agentic-repo/wiki/projects',
+      'resources/agentic-repo/wiki/decisions',
+      'resources/agentic-repo/templates',
+    ];
+
+    for (const directory of directories) {
+      expect(existsSync(directory), directory).toBe(true);
+      expect(existsSync(`${directory}/.gitkeep`), `${directory}/.gitkeep`).toBe(true);
+    }
+  });
+
   it('exposes structured Electron repository APIs and packages templates', () => {
     const preload = readFileSync('electron/preload.ts', 'utf8');
     const main = readFileSync('electron/main.ts', 'utf8');
@@ -121,6 +140,8 @@ describe('agentic repository storage and templates', () => {
     expect(preload).toContain('repository:checkGit');
     expect(preload).toContain('repository:inspect');
     expect(preload).toContain('repository:bootstrap');
+    expect(preload).toContain('repository:init');
+    expect(preload).toContain('repository:gitCommit');
     expect(main).toContain('registerRepositoryIpcHandlers');
     expect(packageJson).toContain('resources/agentic-repo/**/*');
   });
