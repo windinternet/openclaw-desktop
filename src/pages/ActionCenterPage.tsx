@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -85,7 +85,12 @@ const RUN_TITLE_KEYS: Record<string, string> = {
   desktop_bridge_register: 'actions.typeDesktopBridge',
 };
 
-export default function ActionCenterPage() {
+interface EmbeddedPageProps {
+  embedded?: boolean;
+  onHeaderActionsChange?: (actions: ReactNode | null) => void;
+}
+
+export default function ActionCenterPage({ embedded = false, onHeaderActionsChange }: EmbeddedPageProps = {}) {
   const { t } = useTranslation();
 
   const currentInstanceId = useStore((s) => s.currentInstanceId);
@@ -225,32 +230,44 @@ export default function ActionCenterPage() {
     [activeClient, connectionStatus, currentInstanceId, t],
   );
 
+  const headerActions = useMemo(() => (
+    <Space>
+      <Button icon={<IconRefresh />} onClick={loadRuns} loading={loading}>
+        {t('common.refresh')}
+      </Button>
+      <Button icon={<IconDelete />} type="danger" onClick={clearRuns} disabled={runs.length === 0}>
+        {t('actions.clearRecords')}
+      </Button>
+    </Space>
+  ), [clearRuns, loadRuns, loading, runs.length, t]);
+
+  useEffect(() => {
+    if (!embedded) return undefined;
+    onHeaderActionsChange?.(headerActions);
+    return () => onHeaderActionsChange?.(null);
+  }, [embedded, headerActions, onHeaderActionsChange]);
+
   return (
-    <div style={{ height: '100%', overflow: 'auto', padding: 24 }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: 16,
-          marginBottom: 18,
-        }}
-      >
-        <div>
-          <Title heading={3} style={{ margin: 0 }}>
-            {t('actions.title')}
-          </Title>
-          <Text type="tertiary">{t('actions.subtitle')}</Text>
+    <div style={{ height: '100%', overflow: 'auto', padding: embedded ? '12px 0 0' : 24 }}>
+      {!embedded && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 16,
+            marginBottom: 18,
+          }}
+        >
+          <div>
+            <Title heading={3} style={{ margin: 0 }}>
+              {t('actions.title')}
+            </Title>
+            <Text type="tertiary">{t('actions.subtitle')}</Text>
+          </div>
+          {headerActions}
         </div>
-        <Space>
-          <Button icon={<IconRefresh />} onClick={loadRuns} loading={loading}>
-            {t('common.refresh')}
-          </Button>
-          <Button icon={<IconDelete />} type="danger" onClick={clearRuns} disabled={runs.length === 0}>
-            {t('actions.clearRecords')}
-          </Button>
-        </Space>
-      </div>
+      )}
 
       {loading ? (
         <div style={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

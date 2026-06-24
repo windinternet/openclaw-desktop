@@ -11,6 +11,8 @@ import {
   Typography,
 } from '@douyinfe/semi-ui';
 import {
+  IconMaximize,
+  IconMinimize,
   IconRefresh,
   IconServer,
   IconUndo,
@@ -40,6 +42,18 @@ const officeStyles = `
   min-height: 620px;
   overflow: hidden;
   background: var(--office-page-background);
+}
+
+.office-page--fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  height: 100vh;
+  min-height: 0;
+}
+
+.office-page--embedded {
+  min-height: 0;
 }
 
 .office-scene {
@@ -195,7 +209,11 @@ function themeColorValue(themeColor: string): string {
   return PRESET_THEME_COLORS.find((color) => color.name === themeColor)?.value ?? PRESET_THEME_COLORS[0].value;
 }
 
-export default function Office3DPage() {
+interface Office3DPageProps {
+  embedded?: boolean;
+}
+
+export default function Office3DPage({ embedded = false }: Office3DPageProps = {}) {
   const { t } = useTranslation();
   const agents = useStore((s) => s.agents);
   const sessions = useStore((s) => s.sessions);
@@ -207,6 +225,7 @@ export default function Office3DPage() {
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [sceneError, setSceneError] = useState<string | null>(null);
   const [cameraResetSignal, setCameraResetSignal] = useState(0);
+  const [fullscreen, setFullscreen] = useState(false);
   const currentInstance = instances.find((instance) => instance.id === currentInstanceId) ?? null;
   const fallbackOfficeProfile = useMemo(
     () => createDefaultOfficeProfile(currentInstance?.name),
@@ -264,6 +283,19 @@ export default function Office3DPage() {
     setCameraResetSignal((value) => value + 1);
   };
 
+  const handleToggleFullscreen = () => {
+    setFullscreen((value) => !value);
+  };
+
+  useEffect(() => {
+    if (!fullscreen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setFullscreen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [fullscreen]);
+
   const receptionMessage = useMemo(() => {
     const connLabel = connectionLabel(connectionStatus);
     return t('office.receptionTemplate', {
@@ -279,7 +311,7 @@ export default function Office3DPage() {
 
   return (
     <div
-      className="office-page"
+      className={`office-page${embedded ? ' office-page--embedded' : ''}${fullscreen ? ' office-page--fullscreen' : ''}`}
       style={{
         '--office-page-background': officeTheme.pageBackground,
         '--office-panel-background': officeTheme.panel.background,
@@ -327,9 +359,11 @@ export default function Office3DPage() {
           <Space vertical align="start" spacing={8}>
             <Space>
               <IconUserGroup style={{ color: officeTheme.scene.accent }} />
-              <Title heading={5} style={{ margin: 0, color: officeTheme.panel.text }}>
-                {t('office.title')}
-              </Title>
+              {!embedded && (
+                <Title heading={5} style={{ margin: 0, color: officeTheme.panel.text }}>
+                  {t('office.title')}
+                </Title>
+              )}
             </Space>
             <Space>
               <Badge dot type={connectionBadgeType(connectionStatus)} />
@@ -353,6 +387,16 @@ export default function Office3DPage() {
                 theme="borderless"
                 type="tertiary"
                 onClick={handleResetCamera}
+              />
+            </Tooltip>
+            <Tooltip content={fullscreen ? t('office.exitFullscreen') : t('office.fullscreen')}>
+              <Button
+                aria-label={fullscreen ? t('office.exitFullscreen') : t('office.fullscreen')}
+                icon={fullscreen ? <IconMinimize /> : <IconMaximize />}
+                size="small"
+                theme="borderless"
+                type="tertiary"
+                onClick={handleToggleFullscreen}
               />
             </Tooltip>
             <Button icon={<IconRefresh />} size="small" theme="solid" type="primary" onClick={handleRefresh}>

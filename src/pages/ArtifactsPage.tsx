@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, type ReactNode } from 'react';
 import { Typography, Button, Input, Tag, Select, Empty, Card, Spin, Toast } from '@douyinfe/semi-ui';
 import { IconPlus, IconSearch, IconAppCenter, IconAIFilledLevel1 } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
@@ -10,7 +10,12 @@ import { ArtifactAICreateDrawer } from '../components/ArtifactAICreateDrawer';
 
 const { Text } = Typography;
 
-export default function ArtifactsPage() {
+interface EmbeddedPageProps {
+  embedded?: boolean;
+  onHeaderActionsChange?: (actions: ReactNode | null) => void;
+}
+
+export default function ArtifactsPage({ embedded = false, onHeaderActionsChange }: EmbeddedPageProps = {}) {
   const { t } = useTranslation();
   const artifacts = useStore((s) => s.artifacts);
   const fetchArtifacts = useStore((s) => s.fetchArtifacts);
@@ -32,7 +37,7 @@ export default function ArtifactsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const typeOptions = [
+  const typeOptions = useMemo(() => [
     { value: 'all', label: t('artifact.typeAll') },
     { value: 'report', label: t('artifact.typeLabelReport') },
     { value: 'dashboard', label: t('artifact.typeLabelDashboard') },
@@ -49,7 +54,7 @@ export default function ArtifactsPage() {
     { value: 'audio', label: t('artifact.typeLabelAudio') },
     { value: 'image', label: t('artifact.typeLabelImage') },
     { value: 'video', label: t('artifact.typeLabelVideo') },
-  ];
+  ], [t]);
 
   const filteredArtifacts = useMemo(() => {
     let list = artifacts;
@@ -110,39 +115,53 @@ export default function ArtifactsPage() {
     return t('artifact.dayAgo', { count: Math.floor(diff / 86400000) });
   };
 
+  const headerActions = useMemo(() => (
+    <>
+      <Input
+        prefix={<IconSearch />}
+        placeholder={t('artifact.searchPlaceholder')}
+        value={search}
+        onChange={(v) => setSearch(v)}
+        style={{ width: 240 }}
+      />
+      <Select
+        value={typeFilter}
+        onChange={(v) => setTypeFilter(v as string)}
+        optionList={typeOptions}
+        style={{ width: 140 }}
+      />
+      <Button onClick={() => setViewMode(viewMode === 'card' ? 'list' : 'card')} theme="borderless">
+        <IconAppCenter />
+      </Button>
+      <Button icon={<IconPlus />} theme="solid" onClick={() => setShowCreate(true)}>
+        {t('artifact.create')}
+      </Button>
+      <Button
+        colorful
+        theme="solid"
+        type="primary"
+        icon={<IconAIFilledLevel1 />}
+        onClick={() => setShowAICreate(true)}
+      >
+        魔法创建
+      </Button>
+    </>
+  ), [search, t, typeFilter, typeOptions, viewMode]);
+
+  useEffect(() => {
+    if (!embedded) return undefined;
+    onHeaderActionsChange?.(headerActions);
+    return () => onHeaderActionsChange?.(null);
+  }, [embedded, headerActions, onHeaderActionsChange]);
+
   return (
-    <div style={{ padding: 24, height: '100%', overflow: 'auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20, gap: 12 }}>
-        <Text strong style={{ fontSize: 20, flex: 1 }}>{t('nav.artifacts')}</Text>
-        <Input
-          prefix={<IconSearch />}
-          placeholder={t('artifact.searchPlaceholder')}
-          value={search}
-          onChange={(v) => setSearch(v)}
-          style={{ width: 240 }}
-        />
-        <Select
-          value={typeFilter}
-          onChange={(v) => setTypeFilter(v as string)}
-          optionList={typeOptions}
-          style={{ width: 140 }}
-        />
-        <Button onClick={() => setViewMode(viewMode === 'card' ? 'list' : 'card')} theme="borderless">
-          <IconAppCenter />
-        </Button>
-        <Button icon={<IconPlus />} theme="solid" onClick={() => setShowCreate(true)}>
-          {t('artifact.create')}
-        </Button>
-        <Button
-          colorful
-          theme="solid"
-          type="primary"
-          icon={<IconAIFilledLevel1 />}
-          onClick={() => setShowAICreate(true)}
-        >
-          魔法创建
-        </Button>
-      </div>
+    <div style={{ padding: embedded ? '12px 0 0' : 24, height: '100%', overflow: 'auto' }}>
+      {!embedded && (
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20, gap: 12 }}>
+          <Text strong style={{ fontSize: 20, flex: 1 }}>{t('nav.artifacts')}</Text>
+          {headerActions}
+        </div>
+      )}
 
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}><Spin /></div>

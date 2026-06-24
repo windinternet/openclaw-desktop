@@ -66,6 +66,7 @@ import {
   getChatRoute,
   resolveCreatedSessionKey,
 } from '../lib/new-session';
+import { buildModelOptions, fetchGatewayDefaultModel, resolvePreferredModel } from '../lib/model-selection';
 import {
   buildGatewayChatSendPayload,
   buildSemiMessageContent,
@@ -75,6 +76,10 @@ import {
 
 const { Configure } = AIChatInput;
 const { Text } = Typography;
+const configureSelectProps = {
+  position: 'top' as const,
+  clickToHide: true,
+};
 
 interface FileDropEvent {
   dataTransfer: DataTransfer | null;
@@ -105,6 +110,21 @@ function extractMessageText(content: unknown): string {
     return (c.text as string) || (c.content as string) || (c.value as string) || extractMessageText(c.children) || '';
   }
   return String(content);
+}
+
+function extractMessageSetup(content: unknown): { model?: string; thinking?: string } {
+  if (typeof content !== 'object' || content === null) return {};
+  const setup = (content as Record<string, unknown>).setup;
+  if (typeof setup !== 'object' || setup === null) return {};
+  const record = setup as Record<string, unknown>;
+  return {
+    model: typeof record.model === 'string' && record.model ? record.model : undefined,
+    thinking: typeof record.thinking === 'string' && record.thinking ? record.thinking : undefined,
+  };
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error || '');
 }
 
 /**
@@ -652,6 +672,7 @@ export default function SessionChatPage() {
   const [generating, setGenerating] = useState(false);
   const [switchingAgent, setSwitchingAgent] = useState(false);
   const [chatModel, setChatModel] = useState('');
+  const [gatewayDefaultModel, setGatewayDefaultModel] = useState<string | undefined>();
   const [chatThinking, setChatThinking] = useState('medium');
 
   const PAGE_SIZE = 30;
@@ -667,8 +688,9 @@ export default function SessionChatPage() {
   const streamingIdRef = useRef<string | null>(null);
   const patchAppliedRef = useRef(false);
   const patchModelRef = useRef('');
-  const patchThinkingRef = useRef('');
+  const chatModelTouchedRef = useRef(false);
   const sendingRef = useRef(false);
+  const pendingSessionPatchRef = useRef<Promise<void> | null>(null);
   const genTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<{ uploadRef?: { current?: { insert?: (files: File[]) => void } } } | null>(null);
@@ -727,9 +749,38 @@ export default function SessionChatPage() {
     };
   }, [currentInstanceId, rootSessionKey]);
 
+  const activeAgentId = useMemo(
+    () => getAgentIdFromSessionKey(activeSessionKey || '') || 'main',
+    [activeSessionKey],
+  );
+  const sessionModel = sessionContextSnapshot?.model ?? sessionContextSnapshot?.configuredModel ?? sessionContextSnapshot?.selectedModel;
+  const defaultChatModel = useMemo(() => resolvePreferredModel({
+    models,
+    agents,
+    selectedAgentId: activeAgentId,
+    gatewayDefaultModel,
+    sessionModel,
+  }), [activeAgentId, agents, gatewayDefaultModel, models, sessionModel]);
+
   useEffect(() => {
-    if (!chatModel && models.length > 0) queueMicrotask(() => setChatModel(models[0].id));
-  }, [models, chatModel]);
+    if (!activeClient || connectionStatus !== 'connected') {
+      setGatewayDefaultModel(undefined);
+      return;
+    }
+    let cancelled = false;
+    fetchGatewayDefaultModel(activeClient).then((model) => {
+      if (!cancelled) setGatewayDefaultModel(model);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeClient, connectionStatus]);
+
+  useEffect(() => {
+    if (!chatModelTouchedRef.current && defaultChatModel && chatModel !== defaultChatModel) {
+      queueMicrotask(() => setChatModel(defaultChatModel));
+    }
+  }, [defaultChatModel, chatModel]);
 
   /* ── 草稿保存 ── */
   const DRAFT_PREFIX = 'chat-draft:';
@@ -1220,28 +1271,49 @@ export default function SessionChatPage() {
     return activeClient.subscribeEvent(handleEvent);
   }, [activeClient, activeSessionKey, rootSessionKey, relatedSessionKeys, endGeneration, sessionMessageDisplaySettings]);
 
-  const patchSessionConfig = useCallback(async (options?: { model?: string; thinking?: string }) => {
+  const patchSessionConfig = useCallback((options?: { model?: string }): Promise<void> => {
     const model = options?.model || chatModel;
-    const thinking = options?.thinking ?? chatThinking;
-    if (!activeClient || !activeSessionKey || !model) return;
-    if (patchAppliedRef.current && patchModelRef.current === model && patchThinkingRef.current === thinking) return;
-    try {
-      await activeClient.request('sessions.patch', {
-        key: activeSessionKey,
-        model,
-        thinking: thinking !== 'off' ? thinking : undefined,
-      });
+    if (!activeClient || !activeSessionKey || !model) return Promise.resolve();
+    if (patchAppliedRef.current && patchModelRef.current === model) {
+      return pendingSessionPatchRef.current ?? Promise.resolve();
+    }
+
+    const request = activeClient.request('sessions.patch', {
+      key: activeSessionKey,
+      model,
+    }).then(() => {
       patchAppliedRef.current = true;
       patchModelRef.current = model;
-      patchThinkingRef.current = thinking;
-    } catch {
-      // The session may not support model or thinking overrides.
-    }
-  }, [activeClient, activeSessionKey, chatModel, chatThinking]);
+    });
+
+    const trackedRequest = request.finally(() => {
+      if (pendingSessionPatchRef.current === trackedRequest) {
+        pendingSessionPatchRef.current = null;
+      }
+    });
+    pendingSessionPatchRef.current = trackedRequest;
+    return trackedRequest;
+  }, [activeClient, activeSessionKey, chatModel]);
+
+  const patchSessionConfigSafely = useCallback((options?: { model?: string }) => {
+    void patchSessionConfig(options).catch((error) => {
+      Toast.error(getErrorMessage(error) || t('errors.sendFailed'));
+    });
+  }, [patchSessionConfig, t]);
+
+  const resetPendingSessionPatch = useCallback(() => {
+    pendingSessionPatchRef.current = null;
+  }, []);
 
   useEffect(() => {
     patchAppliedRef.current = false;
-  }, [activeSessionKey]);
+    chatModelTouchedRef.current = false;
+    resetPendingSessionPatch();
+  }, [activeSessionKey, resetPendingSessionPatch]);
+
+  useEffect(() => {
+    return () => resetPendingSessionPatch();
+  }, [resetPendingSessionPatch]);
 
   const handleSend = useCallback(
     async (_content: unknown, options?: { model?: string; thinking?: string }) => {
@@ -1249,6 +1321,8 @@ export default function SessionChatPage() {
       const message = extractMessageText(_content);
       const attachments = await normalizeChatInputAttachments(extractChatInputAttachments(_content));
       if (!message.trim() && attachments.length === 0) return;
+      const setup = extractMessageSetup(_content);
+      const selectedModel = options?.model || setup.model || chatModel || defaultChatModel;
       // 清除草稿
       saveDraft(activeSessionKey, '', []);
       draftAttachmentsRef.current = [];
@@ -1295,7 +1369,7 @@ export default function SessionChatPage() {
       ]);
 
       try {
-        await patchSessionConfig(options);
+        await patchSessionConfig({ model: selectedModel });
         const sendPayload = await buildGatewayChatSendPayload({
           inputContent: _content,
           messageOverride: gatewayMessage,
@@ -1344,7 +1418,19 @@ export default function SessionChatPage() {
         )));
       }
     },
-    [activeClient, activeSessionKey, chats.length, currentInstanceId, endGeneration, patchSessionConfig, rootSessionKey, t],
+    [
+      activeClient,
+      activeSessionKey,
+      chatModel,
+      chatThinking,
+      chats.length,
+      currentInstanceId,
+      defaultChatModel,
+      endGeneration,
+      patchSessionConfig,
+      rootSessionKey,
+      t,
+    ],
   );
 
   useEffect(() => {
@@ -1362,7 +1448,10 @@ export default function SessionChatPage() {
     initialMessageSentRef.current = sentKey;
 
     queueMicrotask(() => {
-      if (initialMessage.model) setChatModel(initialMessage.model);
+      if (initialMessage.model) {
+        chatModelTouchedRef.current = true;
+        setChatModel(initialMessage.model);
+      }
       if (initialMessage.thinking) setChatThinking(initialMessage.thinking);
     });
     void handleSend(initialMessage.content, {
@@ -1497,7 +1586,7 @@ export default function SessionChatPage() {
         const summary = await requestVisibleSummary();
         const createParams = buildNewSessionCreateParams({
           agentId: targetAgentId,
-          model: chatModel || models[0]?.id,
+          model: chatModel || defaultChatModel,
           content: t('chat.switchContinueWith', { name: targetAgentName }),
         });
         const result = await activeClient.request<{ key?: string; sessionKey?: string }>(
@@ -1577,6 +1666,7 @@ export default function SessionChatPage() {
     generating,
     globalAgentSwitchStrategy,
     models,
+    defaultChatModel,
     navigate,
     rootSessionKey,
     sessions,
@@ -1590,17 +1680,20 @@ export default function SessionChatPage() {
       return (
       <>
         <Configure.Select
+          {...configureSelectProps}
           field="agent"
           label={t('chat.agent')}
           optionList={agentOptions}
           initValue={currentAgentId}
         />
         <Configure.Select
+          {...configureSelectProps}
           field="model"
-          optionList={models.map((m) => ({ value: m.id, label: m.alias || m.name || m.id }))}
-          initValue={chatModel || models[0]?.id}
+          optionList={buildModelOptions(models)}
+          initValue={chatModel || defaultChatModel}
         />
         <Configure.Select
+          {...configureSelectProps}
           field="thinking"
           optionList={[
             { value: 'off', label: t('chat.thinkingOff') },
@@ -1613,15 +1706,23 @@ export default function SessionChatPage() {
         />
       </>
     )},
-    [agentOptions, models, chatModel, chatThinking, activeSessionKey, t],
+    [agentOptions, models, chatModel, defaultChatModel, chatThinking, activeSessionKey, t],
   );
 
   const handleConfigChange = useCallback((_v: Record<string, unknown> | undefined, changed: Record<string, unknown> | undefined) => {
     if (!changed) return;
     if ('agent' in changed) void handleAgentSwitch(changed.agent as string);
-    if ('model' in changed) setChatModel(changed.model as string);
-    if ('thinking' in changed) setChatThinking(changed.thinking as string);
-  }, [handleAgentSwitch]);
+    const nextModel = typeof changed.model === 'string' ? changed.model : chatModel || defaultChatModel;
+    const nextThinking = typeof changed.thinking === 'string' ? changed.thinking : chatThinking;
+    if ('model' in changed) {
+      chatModelTouchedRef.current = true;
+      setChatModel(nextModel);
+    }
+    if ('thinking' in changed) setChatThinking(nextThinking);
+    if ('model' in changed) {
+      patchSessionConfigSafely({ model: nextModel });
+    }
+  }, [chatModel, chatThinking, defaultChatModel, handleAgentSwitch, patchSessionConfigSafely]);
 
   const currentModel = useMemo(
     () => models.find((model) => model.id === chatModel) ?? models[0],

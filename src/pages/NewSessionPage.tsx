@@ -9,10 +9,15 @@ import {
   buildNewSessionCreateParams,
   resolveCreatedSessionKey,
 } from '../lib/new-session';
+import { buildModelOptions, fetchGatewayDefaultModel, resolvePreferredModel } from '../lib/model-selection';
 import AgentSelectOption from '../components/AgentSelectOption';
 
 const { Configure } = AIChatInput;
 const { Title, Text } = Typography;
+const configureSelectProps = {
+  position: 'top' as const,
+  clickToHide: true,
+};
 
 interface FileDropEvent {
   dataTransfer: DataTransfer | null;
@@ -29,6 +34,7 @@ export default function NewSessionPage() {
 
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
+  const [gatewayDefaultModel, setGatewayDefaultModel] = useState<string | undefined>();
   const [thinkingLevel, setThinkingLevel] = useState('medium');
   const [creating, setCreating] = useState(false);
   const [pageDragActive, setPageDragActive] = useState(false);
@@ -43,15 +49,37 @@ export default function NewSessionPage() {
     { value: 'high', label: t('chat.thinkingHigh') },
   ];
 
-  const modelOptions = models.map((m) => ({ value: m.id, label: m.alias || m.name || m.id }));
+  const modelOptions = buildModelOptions(models);
   const agentOptions = agents.filter((agent) => agent.id).map((agent) => ({
     value: agent.id,
     label: <AgentSelectOption agent={agent} />,
   }));
 
+  const resolvedDefaultModel = resolvePreferredModel({
+    models,
+    agents,
+    selectedAgentId,
+    gatewayDefaultModel,
+  });
+  const modelTouchedRef = useRef(false);
+
   useEffect(() => {
-    if (!selectedModel && models.length > 0) setSelectedModel(models[0].id);
-  }, [models, selectedModel]);
+    if (!activeClient || connectionStatus !== 'connected') {
+      setGatewayDefaultModel(undefined);
+      return;
+    }
+    let cancelled = false;
+    fetchGatewayDefaultModel(activeClient).then((model) => {
+      if (!cancelled) setGatewayDefaultModel(model);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeClient, connectionStatus]);
+
+  useEffect(() => {
+    if (!modelTouchedRef.current && resolvedDefaultModel) setSelectedModel(resolvedDefaultModel);
+  }, [resolvedDefaultModel]);
 
   useEffect(() => {
     if (selectedAgentId || agents.length === 0) return;
@@ -64,7 +92,7 @@ export default function NewSessionPage() {
     const agent = agents.find((a) => a.default) ?? agents[0];
     const createParams = buildNewSessionCreateParams({
       agentId: selectedAgentId || agent?.id || 'main',
-      model: selectedModel || models[0]?.id,
+      model: selectedModel || resolvedDefaultModel,
       thinking: thinkingLevel,
       content,
     });
@@ -79,7 +107,7 @@ export default function NewSessionPage() {
       const target = buildNewSessionNavigationTarget({
         sessionKey,
         content,
-        model: selectedModel || models[0]?.id,
+        model: selectedModel || resolvedDefaultModel,
         thinking: thinkingLevel,
       });
       useStore.getState().fetchSessions();
@@ -90,25 +118,42 @@ export default function NewSessionPage() {
     } finally {
       setCreating(false);
     }
-  }, [activeClient, connectionStatus, models, agents, selectedAgentId, selectedModel, thinkingLevel, navigate, t]);
+  }, [activeClient, connectionStatus, models, agents, selectedAgentId, selectedModel, resolvedDefaultModel, thinkingLevel, navigate, t]);
 
   const renderConfig = useCallback(() => (
     <>
       <Configure.Select
+        {...configureSelectProps}
         field="agent"
         label={t('chat.agent')}
         optionList={agentOptions}
         initValue={selectedAgentId || agentOptions[0]?.value}
       />
-      <Configure.Select field="model" optionList={modelOptions} initValue={modelOptions[0]?.value} />
-      <Configure.Select field="thinking" optionList={THINKING_OPTIONS} initValue={thinkingLevel} />
+      <Configure.Select
+        {...configureSelectProps}
+        field="model"
+        optionList={modelOptions}
+        initValue={selectedModel || resolvedDefaultModel}
+      />
+      <Configure.Select
+        {...configureSelectProps}
+        field="thinking"
+        optionList={THINKING_OPTIONS}
+        initValue={thinkingLevel}
+      />
     </>
-  ), [agentOptions, modelOptions, selectedAgentId, thinkingLevel, THINKING_OPTIONS, t]);
+  ), [agentOptions, modelOptions, selectedAgentId, selectedModel, resolvedDefaultModel, thinkingLevel, THINKING_OPTIONS, t]);
 
   const handleConfigChange = useCallback((_value: Record<string, unknown> | undefined, changed: Record<string, unknown> | undefined) => {
     if (!changed) return;
-    if ('agent' in changed) setSelectedAgentId(changed.agent as string);
-    if ('model' in changed) setSelectedModel(changed.model as string);
+    if ('agent' in changed) {
+      modelTouchedRef.current = false;
+      setSelectedAgentId(changed.agent as string);
+    }
+    if ('model' in changed) {
+      modelTouchedRef.current = true;
+      setSelectedModel(changed.model as string);
+    }
     if ('thinking' in changed) setThinkingLevel(changed.thinking as string);
   }, []);
 
@@ -203,7 +248,7 @@ export default function NewSessionPage() {
         >
           <AIChatInput
             ref={chatInputRef as Ref<AIChatInput>}
-            key={`${agentOptions.length}:${modelOptions.length}`}
+            key={`${agentOptions.length}:${modelOptions.length}:${selectedAgentId}:${selectedModel || resolvedDefaultModel}`}
             placeholder={t('chat.firstMessagePlaceholder')}
             generating={creating}
             uploadProps={{ action: '', beforeUpload: () => ({ shouldUpload: false }) }}

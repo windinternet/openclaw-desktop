@@ -32,6 +32,42 @@ interface Window {
       loadInstanceData: <T>(instanceId: string, key: string) => Promise<T | null>;
       saveInstanceData: (instanceId: string, key: string, value: unknown) => Promise<void>;
     };
+    repository?: {
+      checkGit: () => Promise<boolean>;
+      chooseDirectory?: () => Promise<string | null>;
+      getDefaultPath?: () => Promise<string>;
+      inspect: (repoPath: string) => Promise<{
+        pathExists: boolean;
+        isDirectory: boolean;
+        isGitRepo: boolean;
+        isEmpty: boolean;
+        hasRequiredTemplate: boolean;
+        permissionDenied: boolean;
+      }>;
+      bootstrap: (repoPath: string) => Promise<{
+        pathExists: boolean;
+        isDirectory: boolean;
+        isGitRepo: boolean;
+        isEmpty: boolean;
+        hasRequiredTemplate: boolean;
+        permissionDenied: boolean;
+      }>;
+      init?: (repoPath: string) => Promise<{
+        pathExists: boolean;
+        isDirectory: boolean;
+        isGitRepo: boolean;
+        isEmpty: boolean;
+        hasRequiredTemplate: boolean;
+        permissionDenied: boolean;
+      }>;
+      listMarkdown?: (repoPath: string, directory: string) => Promise<import('./lib/repository-knowledge').RepositoryMarkdownFile[]>;
+      readText?: (repoPath: string, relativePath: string) => Promise<string>;
+      writeText?: (repoPath: string, relativePath: string, content: string) => Promise<void>;
+      search?: (repoPath: string, query: string, directories: string[]) => Promise<import('./lib/repository-knowledge').RepositorySearchResult[]>;
+      gitStatus?: (repoPath: string) => Promise<string>;
+      gitDiff?: (repoPath: string) => Promise<string>;
+      gitCommit?: (repoPath: string, message: string) => Promise<string>;
+    };
     device: {
       signChallenge: (params: {
         nonce: string;

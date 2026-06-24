@@ -400,6 +400,69 @@ function visibleToolCallContent(toolCall: ChatToolCallContent): ChatToolCallCont
   };
 }
 
+function unwrapHistoryMessage(raw: unknown): unknown {
+  if (!isRecord(raw) || !isRecord(raw.message)) return raw;
+  const message = raw.message;
+  if (!('role' in message) && !('content' in message) && !('toolCalls' in message)) return raw;
+  return {
+    ...message,
+    id: message.id ?? raw.id,
+    timestamp: message.timestamp ?? raw.timestamp,
+    status: message.status ?? raw.status,
+  };
+}
+
+function normalizeReasoningParts(value: unknown): { text: string; type: string }[] {
+  if (Array.isArray(value)) {
+    return value
+      .map(normalizeReasoningParts)
+      .flat()
+      .filter((item) => item.text.trim() !== '');
+  }
+  const text = extractSessionMessageText(value);
+  return text ? [{ type: 'reasoning', text }] : [];
+}
+
+function normalizeReasoningContent(value: unknown, fallbackStatus?: unknown): ChatReasoningContent | null {
+  if (!isRecord(value)) return null;
+  const type = String(value.type ?? '');
+  const isReasoningType = ['thinking', 'reasoning', 'reasoning_text', 'reasoning_summary'].includes(type);
+  const directValue = value.thinking ?? value.reasoning ?? value.reasoning_content;
+  if (!isReasoningType && directValue == null) return null;
+
+  const content = [
+    ...normalizeReasoningParts(directValue),
+    ...normalizeReasoningParts(value.content),
+  ];
+  const summary = normalizeReasoningParts(value.summary);
+  const effectiveContent = content.length > 0 ? content : summary;
+  const effectiveSummary = summary.length > 0 ? summary : effectiveContent;
+  if (effectiveContent.length === 0 && effectiveSummary.length === 0) return null;
+
+  return {
+    type: 'reasoning',
+    content: effectiveContent,
+    summary: effectiveSummary,
+    status: String(value.status ?? fallbackStatus ?? 'completed'),
+  };
+}
+
+function extractReasoningFromMessage(raw: unknown): ChatReasoningContent[] {
+  if (!isRecord(raw)) return [];
+  const items: ChatReasoningContent[] = [];
+  const messageLevel = normalizeReasoningContent(raw);
+  if (messageLevel) items.push(messageLevel);
+
+  if (Array.isArray(raw.content)) {
+    for (const contentItem of raw.content) {
+      const reasoning = normalizeReasoningContent(contentItem, raw.status);
+      if (reasoning) items.push(reasoning);
+    }
+  }
+
+  return items;
+}
+
 /**
  * 将历史消息转为 ContentItem[]。
  * - 纯文本消息 → [{ type: 'message', content: [{ type: 'output_text', text }] }]
@@ -410,15 +473,17 @@ export function parseHistoryMessageToContentItems(
   displaySettings?: Partial<SessionMessageDisplaySettings>,
 ): ChatContentItem[] {
   const settings = normalizeSessionMessageDisplaySettings(displaySettings);
+  const message = unwrapHistoryMessage(raw);
   const items: ChatContentItem[] = [];
 
-  if (isToolResultMessage(raw)) {
+  if (isToolResultMessage(message)) {
     if (settings.toolCallDisplay === 'hidden') return [];
-    const toolResult = normalizeToolResult(raw);
+    const toolResult = normalizeToolResult(message);
     return toolResult ? [visibleToolCallContent(toolResult)] : [];
   }
 
-  const toolCalls = extractToolCallsFromMessage(raw);
+  const toolCalls = extractToolCallsFromMessage(message);
+  const reasoningItems = extractReasoningFromMessage(message);
 
   if (toolCalls && settings.toolCallDisplay === 'compact') {
     for (const tc of toolCalls) {
@@ -427,8 +492,10 @@ export function parseHistoryMessageToContentItems(
     }
   }
 
-  const text = extractSessionMessageText(raw);
-  const attachments = extractHistoryAttachments(raw);
+  items.push(...reasoningItems);
+
+  const text = extractSessionMessageText(message);
+  const attachments = extractHistoryAttachments(message);
   if (attachments.length > 0) {
     items.push(...buildSemiMessageContent(text, attachments));
   } else if (text) {

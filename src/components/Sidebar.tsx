@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { Fragment, useEffect, useRef, useState, useCallback } from 'react';
 import type { ComponentClass, CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -11,14 +11,9 @@ import {
   IconServer,
   IconBranch,
   IconPieChart2Stroked,
-  IconSearch,
   IconPlusCircle,
-  IconPuzzle,
   IconCheckList,
   IconUserGroup,
-  IconDesktop,
-  IconCustomize,
-  IconBolt,
   IconSun,
   IconMoon,
   IconSetting,
@@ -30,22 +25,14 @@ import { useStore } from '../lib';
 import { useSettingsStore } from '../lib/settings-store';
 import { decodeSessionKeyParam } from '../lib/session-content';
 import { filterUserVisibleSessions } from '../lib/ai-action-center';
+import {
+  getActiveNavKey,
+  NAV_GROUPS,
+  PRIMARY_ROUTE_MAP,
+  type PrimaryNavItem,
+} from '../lib/navigation';
 
 const { Text } = Typography;
-
-const ROUTE_MAP: Record<string, string> = {
-  dashboard: '/',
-  search: '/search',
-  'new-session': '/new-session',
-  extensions: '/extensions',
-  taskkanban: '/taskkanban',
-  actions: '/actions',
-  teams: '/teams',
-  office: '/office',
-  memory: '/tuning',
-  settings: '/settings',
-  artifacts: '/artifacts',
-};
 
 interface InfiniteLoaderViewProps {
   isRowLoaded: (params: { index: number }) => boolean;
@@ -104,6 +91,25 @@ function NavSectionLabel({ label }: { label: string }) {
   );
 }
 
+function getNavIcon(item: PrimaryNavItem) {
+  switch (item.icon) {
+    case 'dashboard':
+      return <IconPieChart2Stroked />;
+    case 'new-session':
+      return <IconPlusCircle />;
+    case 'workbench':
+      return <IconCheckList />;
+    case 'knowledge':
+      return <IconBranch />;
+    case 'collaboration':
+      return <IconUserGroup />;
+    case 'control-center':
+      return <IconSetting />;
+    default:
+      return <IconAppCenter />;
+  }
+}
+
 export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -128,19 +134,11 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
     useStore.getState().fetchGatewayUserForCurrent();
   }, [currentId]);
 
-  const activeKey: string = (() => {
-    const path = location.pathname;
-    for (const [key, route] of Object.entries(ROUTE_MAP)) {
-      if (path === route || (route !== '/' && path.startsWith(route))) {
-        return key;
-      }
-    }
-    return 'dashboard';
-  })();
+  const activeKey = getActiveNavKey(location.pathname);
 
   const handleSelect = (data: { itemKey?: string | number }) => {
-    const key = String(data.itemKey ?? '');
-    const route = ROUTE_MAP[key];
+    const key = String(data.itemKey ?? '') as PrimaryNavItem['key'];
+    const route = PRIMARY_ROUTE_MAP[key];
     if (route) navigate(route);
   };
 
@@ -632,28 +630,21 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
         mode="vertical"
         selectedKeys={[activeKey]}
         onSelect={handleSelect}
-        style={{ width: '100%', paddingTop: sidebarTopInset, boxSizing: 'border-box' }}
+        style={{ flex: 1, paddingTop: sidebarTopInset, boxSizing: 'border-box' }}
         header={{
           logo: instanceAvatar,
           text: instanceHeaderText,
         }}
         footer={footer}
       >
-        <NavSectionLabel label={t('nav.sectionOverview')} />
-        <Nav.Item itemKey="dashboard" text={t('nav.dashboard')} icon={<IconPieChart2Stroked />} />
-        <Nav.Item itemKey="search" text={t('nav.search')} icon={<IconSearch />} />
-        <Nav.Item itemKey="new-session" text={t('nav.newSession')} icon={<IconPlusCircle />} />
-
-        <NavSectionLabel label={t('nav.sectionTools')} />
-        <Nav.Item itemKey="extensions" text={t('nav.extensions')} icon={<IconPuzzle />} />
-        <Nav.Item itemKey="taskkanban" text={t('nav.kanban')} icon={<IconCheckList />} />
-        <Nav.Item itemKey="actions" text={t('nav.actions')} icon={<IconBolt />} />
-        <Nav.Item itemKey="artifacts" text={t('nav.artifacts')} icon={<IconAppCenter />} />
-
-        <NavSectionLabel label={t('nav.sectionCollaboration')} />
-        <Nav.Item itemKey="teams" text={t('nav.teams')} icon={<IconUserGroup />} />
-        <Nav.Item itemKey="office" text={t('nav.office')} icon={<IconDesktop />} />
-        <Nav.Item itemKey="memory" text={t('nav.tuning')} icon={<IconCustomize />} />
+        {NAV_GROUPS.map((group) => (
+          <Fragment key={group.key}>
+            <NavSectionLabel label={t(group.labelKey)} />
+            {group.items.map((item) => (
+              <Nav.Item key={item.key} itemKey={item.key} text={t(item.labelKey)} icon={getNavIcon(item)} />
+            ))}
+          </Fragment>
+        ))}
       </Nav>
     </div>
       {showPopover && createPortal(

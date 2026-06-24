@@ -1068,17 +1068,23 @@ function GeneralTab() {
 
 /* ── Main Page ─────────────────────────────────────────────────── */
 
-export default function TuningPage() {
+interface TuningPageProps {
+  embedded?: boolean;
+}
+
+export default function TuningPage({ embedded = false }: TuningPageProps = {}) {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('persona');
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div style={{ padding: '24px 28px 8px', flexShrink: 0 }}>
-        <Title heading={3} style={{ marginBottom: 4 }}>{t('tuning.title')}</Title>
-        <Text type="tertiary">{t('tuning.pageDesc')}</Text>
-      </div>
-      <div style={{ flex: 1, overflow: 'auto', padding: '0 28px 28px', minHeight: 0 }}>
+      {!embedded && (
+        <div style={{ padding: '24px 28px 8px', flexShrink: 0 }}>
+          <Title heading={3} style={{ marginBottom: 4 }}>{t('tuning.title')}</Title>
+          <Text type="tertiary">{t('tuning.pageDesc')}</Text>
+        </div>
+      )}
+      <div style={{ flex: 1, overflow: 'auto', padding: embedded ? '12px 0 0' : '0 28px 28px', minHeight: 0 }}>
         <Tabs type="line" activeKey={activeTab} onChange={setActiveTab}>
           <TabPane tab={t('tuning.memory')} itemKey="memory"><MemoryTab /></TabPane>
           <TabPane tab={t('tuning.persona')} itemKey="persona"><PersonaTab /></TabPane>

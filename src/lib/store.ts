@@ -27,6 +27,7 @@ import type {
 import type { ArtifactMeta } from './artifact-types';
 import { artifactService, type GenerateParams } from './artifact-service';
 import { artifactPersistence } from './artifact-persistence';
+import { mirrorArtifactToReadyRepositoryOutput } from './repository-outputs';
 import { createGatewayClient, type GatewayClient } from './gateway';
 import { connectDesktopBridgeToGateway, disconnectDesktopBridge } from './desktop-bridge';
 import { emitPetEvent } from './pet-bridge';
@@ -1330,6 +1331,15 @@ export const useStore = create<StoreState>((set, get) => ({
 
   generateArtifact: async (params: GenerateParams) => {
     const meta = await artifactService.generate(params);
+    const instanceId = get().currentInstanceId;
+    if (instanceId) {
+      try {
+        const html = await artifactPersistence.loadHtml(meta.id, meta.currentVersion);
+        await mirrorArtifactToReadyRepositoryOutput(instanceId, meta, html ?? undefined);
+      } catch (error) {
+        console.warn('[artifact] repository mirror failed', error);
+      }
+    }
     const { fetchArtifacts } = get();
     await fetchArtifacts();
     return meta;

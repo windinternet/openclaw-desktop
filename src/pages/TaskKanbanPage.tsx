@@ -7,7 +7,11 @@ import KanbanPage, { type KanbanPageHandle } from './KanbanPage';
 
 const { Title, Text } = Typography;
 
-export default function TaskKanbanPage() {
+interface TaskKanbanPageProps {
+  embedded?: boolean;
+}
+
+export default function TaskKanbanPage({ embedded = false }: TaskKanbanPageProps = {}) {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<string>('tasks');
   const [taskRefreshing, setTaskRefreshing] = useState(false);
@@ -32,19 +36,21 @@ export default function TaskKanbanPage() {
         overflow: 'hidden',
       }}
     >
-      <div
-        style={{
-          padding: '20px 24px 0',
-          flexShrink: 0,
-        }}
-      >
-        <Title heading={3} style={{ margin: 0 }}>
-          {t('nav.kanban')}
-        </Title>
-        <Text type="tertiary" size="small">
-          {t('kanban.pageDesc')}
-        </Text>
-      </div>
+      {!embedded && (
+        <div
+          style={{
+            padding: '20px 24px 0',
+            flexShrink: 0,
+          }}
+        >
+          <Title heading={3} style={{ margin: 0 }}>
+            {t('nav.kanban')}
+          </Title>
+          <Text type="tertiary" size="small">
+            {t('kanban.pageDesc')}
+          </Text>
+        </div>
+      )}
 
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <Tabs
@@ -95,7 +101,7 @@ export default function TaskKanbanPage() {
           }
           style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
           contentStyle={{ flex: 1, overflow: 'hidden', padding: 0 }}
-          tabBarStyle={{ padding: '0 24px' }}
+          tabBarStyle={{ padding: embedded ? 0 : '0 24px' }}
         >
           <Tabs.TabPane
             tab={

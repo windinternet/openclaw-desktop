@@ -5,6 +5,12 @@ import MainPage from './pages/MainPage';
 import DashboardPage from './pages/DashboardPage';
 import SearchPage from './pages/SearchPage';
 import NewSessionPage from './pages/NewSessionPage';
+import SessionsPage from './pages/SessionsPage';
+import WorkbenchPage from './pages/WorkbenchPage';
+import KnowledgeBasePage from './pages/KnowledgeBasePage';
+import CollaborationPage from './pages/CollaborationPage';
+import ControlCenterPage from './pages/ControlCenterPage';
+import RepositoryProtocolPage from './pages/RepositoryProtocolPage';
 import ExtensionsPage from './pages/ExtensionsPage';
 import SettingsPage from './pages/SettingsPage';
 import TaskKanbanPage from './pages/TaskKanbanPage';
@@ -34,6 +40,12 @@ function App() {
           <Route index element={<DashboardPage />} />
           <Route path="search" element={<SearchPage />} />
           <Route path="new-session" element={<NewSessionPage />} />
+          <Route path="sessions" element={<SessionsPage />} />
+          <Route path="workbench" element={<WorkbenchPage />} />
+          <Route path="knowledge" element={<KnowledgeBasePage />} />
+          <Route path="collaboration" element={<CollaborationPage />} />
+          <Route path="control-center" element={<ControlCenterPage />} />
+          <Route path="repository-protocol" element={<RepositoryProtocolPage />} />
           <Route path="extensions" element={<ExtensionsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="taskkanban" element={<TaskKanbanPage />} />

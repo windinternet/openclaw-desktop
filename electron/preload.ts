@@ -29,6 +29,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
     saveInstanceData: (instanceId: string, key: string, value: unknown) =>
       ipcRenderer.invoke('storage:saveInstanceData', instanceId, key, value),
   },
+  repository: {
+    checkGit: () => ipcRenderer.invoke('repository:checkGit'),
+    chooseDirectory: () => ipcRenderer.invoke('repository:chooseDirectory'),
+    getDefaultPath: () => ipcRenderer.invoke('repository:getDefaultPath'),
+    inspect: (repoPath: string) => ipcRenderer.invoke('repository:inspect', repoPath),
+    bootstrap: (repoPath: string) => ipcRenderer.invoke('repository:bootstrap', repoPath),
+    init: (repoPath: string) => ipcRenderer.invoke('repository:init', repoPath),
+    listMarkdown: (repoPath: string, directory: string) => ipcRenderer.invoke('repository:listMarkdown', repoPath, directory),
+    readText: (repoPath: string, relativePath: string) => ipcRenderer.invoke('repository:readText', repoPath, relativePath),
+    writeText: (repoPath: string, relativePath: string, content: string) =>
+      ipcRenderer.invoke('repository:writeText', repoPath, relativePath, content),
+    search: (repoPath: string, query: string, directories: string[]) =>
+      ipcRenderer.invoke('repository:search', repoPath, query, directories),
+    gitStatus: (repoPath: string) => ipcRenderer.invoke('repository:gitStatus', repoPath),
+    gitDiff: (repoPath: string) => ipcRenderer.invoke('repository:gitDiff', repoPath),
+    gitCommit: (repoPath: string, message: string) => ipcRenderer.invoke('repository:gitCommit', repoPath, message),
+  },
   artifact: {
     open: (artifactId: string, version: number) => ipcRenderer.invoke('artifact:open', artifactId, version),
     getMeta: (artifactId: string) => ipcRenderer.invoke('artifact:getMeta', artifactId),

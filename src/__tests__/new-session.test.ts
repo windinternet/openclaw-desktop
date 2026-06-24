@@ -12,7 +12,7 @@ describe('new session creation params', () => {
     vi.restoreAllMocks();
   });
 
-  it('creates an isolated dashboard session key instead of relying on the default main session', () => {
+  it('creates an isolated dashboard session key with a unique label instead of relying on the default main session', () => {
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
     vi.spyOn(Math, 'random').mockReturnValue(0.123456789);
 
@@ -30,7 +30,7 @@ describe('new session creation params', () => {
       agentId: 'main',
       key: params.key,
       model: 'gpt-4.1',
-      label: '整理今天的计划',
+      label: '整理今天的计划 · 3v28',
     });
     expect(params.key).not.toBe('agent:main:main');
     expect(params.title).toBe('整理今天的计划');
@@ -70,7 +70,7 @@ describe('new session creation params', () => {
     });
   });
 
-  it('uses attachment names as the new session label when the first message has no text', () => {
+  it('uses attachment names as the new session title and unique label when the first message has no text', () => {
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
     vi.spyOn(Math, 'random').mockReturnValue(0.123456789);
 
@@ -84,7 +84,7 @@ describe('new session creation params', () => {
     });
 
     expect(params.title).toBe('需求.md');
-    expect(params.request.label).toBe('需求.md');
+    expect(params.request.label).toBe('需求.md · 3v28');
   });
 
   it('carries attachment-only first messages to the destination chat page', () => {

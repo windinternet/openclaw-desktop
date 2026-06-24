@@ -320,7 +320,11 @@ const MARKETPLACE_COLUMNS = (
 
 /* ── Component ── */
 
-export default function ExtensionsPage() {
+interface ExtensionsPageProps {
+  embedded?: boolean;
+}
+
+export default function ExtensionsPage({ embedded = false }: ExtensionsPageProps = {}) {
   const { t } = useTranslation();
 
   const skills = useStore((s) => s.skills);
@@ -762,20 +766,21 @@ export default function ExtensionsPage() {
         overflow: 'hidden',
       }}
     >
-      {/* Header */}
-      <div
-        style={{
-          padding: '24px 28px 8px',
-          flexShrink: 0,
-        }}
-      >
-        <Title heading={3} style={{ margin: 0 }}>
-          {t('nav.extensions')}
-        </Title>
-      </div>
+      {!embedded && (
+        <div
+          style={{
+            padding: '24px 28px 8px',
+            flexShrink: 0,
+          }}
+        >
+          <Title heading={3} style={{ margin: 0 }}>
+            {t('nav.extensions')}
+          </Title>
+        </div>
+      )}
 
       {/* Tabs */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '0 28px 28px' }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: embedded ? '12px 0 0' : '0 28px 28px' }}>
         <Tabs
           type="line"
           activeKey={activeTabKey}
