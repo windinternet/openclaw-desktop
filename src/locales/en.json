@@ -64,6 +64,8 @@
     "somedayWork": "Someday",
     "activePlans": "Execution Plans",
     "completedPlans": "Completed Plans",
+    "preview": "Markdown Preview",
+    "previewEmpty": "Select a matter or plan to preview its Markdown",
     "runs": "Run Records",
     "reviews": "Reviews",
     "activeWorkCount": "{{count}} matters",

@@ -170,6 +170,8 @@ describe('navigation locale strings', () => {
       'workbench.emptyCompletedWork',
       'workbench.emptySomedayWork',
       'workbench.emptyCompletedPlans',
+      'workbench.preview',
+      'workbench.previewEmpty',
       'knowledge.pageDesc',
       'knowledge.repoGateTitle',
       'knowledge.repoGateDesc',

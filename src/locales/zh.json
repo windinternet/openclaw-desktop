@@ -64,6 +64,8 @@
     "somedayWork": "以后再说",
     "activePlans": "执行计划",
     "completedPlans": "已完成计划",
+    "preview": "Markdown 预览",
+    "previewEmpty": "选择一个事项或计划查看 Markdown",
     "runs": "执行记录",
     "reviews": "复盘",
     "activeWorkCount": "{{count}} 个事项",

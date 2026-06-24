@@ -50,6 +50,10 @@ export async function loadWorkbenchSnapshot(binding: RepositoryBinding): Promise
   };
 }
 
+export async function readWorkbenchMarkdown(binding: RepositoryBinding, relativePath: string): Promise<string> {
+  return getWorkbenchTextApi().readText(binding.repoPath, relativePath);
+}
+
 function getWorkbenchReadApi() {
   const repository = (globalThis as { window?: Window }).window?.electronAPI?.repository;
   if (!repository?.listMarkdown || !repository.readText) {
@@ -57,6 +61,16 @@ function getWorkbenchReadApi() {
   }
   return {
     listMarkdown: repository.listMarkdown,
+    readText: repository.readText,
+  };
+}
+
+function getWorkbenchTextApi() {
+  const repository = (globalThis as { window?: Window }).window?.electronAPI?.repository;
+  if (!repository?.readText) {
+    throw new Error('electronAPI.repository workbench text method not available');
+  }
+  return {
     readText: repository.readText,
   };
 }

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
-import { loadWorkbenchSnapshot } from '../lib/repository-workbench';
+import { loadWorkbenchSnapshot, readWorkbenchMarkdown } from '../lib/repository-workbench';
 
 describe('repository workbench', () => {
   afterEach(() => {
@@ -46,6 +46,23 @@ describe('repository workbench', () => {
     expect(snapshot.reviews).toHaveLength(1);
   });
 
+  it('reads selected workbench markdown for inline preview', async () => {
+    const readText = vi.fn(async () => '# Matter Preview');
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText },
+      },
+    });
+
+    const content = await readWorkbenchMarkdown(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      'work/active/project.md',
+    );
+
+    expect(content).toBe('# Matter Preview');
+    expect(readText).toHaveBeenCalledWith('/repo', 'work/active/project.md');
+  });
+
   it('surfaces ActionRun records as workbench activity infrastructure', () => {
     const source = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
 
@@ -55,6 +72,9 @@ describe('repository workbench', () => {
     expect(source).toContain('snapshot?.completedWork');
     expect(source).toContain('snapshot?.somedayWork');
     expect(source).toContain('snapshot?.completedPlans');
+    expect(source).toContain('readWorkbenchMarkdown');
+    expect(source).toContain('selectedPreviewContent');
+    expect(source).toContain("t('workbench.preview')");
     expect(source).toContain("t('workbench.activityRuns')");
     expect(source).toContain("navigate('/actions')");
   });

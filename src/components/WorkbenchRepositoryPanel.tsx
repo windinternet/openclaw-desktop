@@ -7,7 +7,8 @@ import { useStore } from '../lib';
 import type { RepositoryBinding } from '../lib/agentic-repository';
 import { loadAiActionRuns } from '../lib/ai-action-run-store';
 import type { WorkbenchSnapshot } from '../lib/repository-workbench';
-import { loadWorkbenchSnapshot } from '../lib/repository-workbench';
+import { loadWorkbenchSnapshot, readWorkbenchMarkdown } from '../lib/repository-workbench';
+import type { RepositoryMarkdownFile } from '../lib/repository-knowledge';
 import type { AiActionRun, AiActionRunStatus } from '../lib/types';
 import MarkdownView from './MarkdownView';
 
@@ -37,6 +38,8 @@ export default function WorkbenchRepositoryPanel({ binding }: { binding: Reposit
   const actionRunsVersion = useStore((s) => s.actionRunsVersion);
   const [snapshot, setSnapshot] = useState<WorkbenchSnapshot | null>(null);
   const [activityRuns, setActivityRuns] = useState<AiActionRun[]>([]);
+  const [selectedPreviewPath, setSelectedPreviewPath] = useState('');
+  const [selectedPreviewContent, setSelectedPreviewContent] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -66,6 +69,21 @@ export default function WorkbenchRepositoryPanel({ binding }: { binding: Reposit
     { title: t('nav.actions'), desc: t('workbench.activityDesc'), path: '/actions', icon: <IconBolt size="extra-large" /> },
     { title: t('workbench.outputs'), desc: t('workbench.outputsDesc'), path: '/artifacts', icon: <IconAppCenter size="extra-large" /> },
   ];
+
+  const openPreview = async (file: RepositoryMarkdownFile) => {
+    setSelectedPreviewPath(file.path);
+    setSelectedPreviewContent(await readWorkbenchMarkdown(binding, file.path));
+  };
+
+  const renderFileList = (files: RepositoryMarkdownFile[]) => (
+    <Space vertical align="start">
+      {files.map((file) => (
+        <Text key={file.path} link onClick={() => void openPreview(file)}>
+          {file.path}
+        </Text>
+      ))}
+    </Space>
+  );
 
   return (
     <Space vertical align="start" spacing={16} style={{ width: '100%' }}>
@@ -100,7 +118,7 @@ export default function WorkbenchRepositoryPanel({ binding }: { binding: Reposit
         <Card>
           <Title heading={5} style={{ marginTop: 0 }}>{t('workbench.activeWork')}</Title>
           {snapshot && snapshot.activeWork.length > 0 ? (
-            <Space vertical align="start">{snapshot.activeWork.map((file) => <Text key={file.path}>{file.path}</Text>)}</Space>
+            renderFileList(snapshot.activeWork)
           ) : (
             <Empty description={t('workbench.emptyActiveWork')} />
           )}
@@ -108,7 +126,7 @@ export default function WorkbenchRepositoryPanel({ binding }: { binding: Reposit
         <Card>
           <Title heading={5} style={{ marginTop: 0 }}>{t('workbench.completedWork')}</Title>
           {snapshot?.completedWork && snapshot.completedWork.length > 0 ? (
-            <Space vertical align="start">{snapshot.completedWork.map((file) => <Text key={file.path}>{file.path}</Text>)}</Space>
+            renderFileList(snapshot.completedWork)
           ) : (
             <Empty description={t('workbench.emptyCompletedWork')} />
           )}
@@ -116,7 +134,7 @@ export default function WorkbenchRepositoryPanel({ binding }: { binding: Reposit
         <Card>
           <Title heading={5} style={{ marginTop: 0 }}>{t('workbench.somedayWork')}</Title>
           {snapshot?.somedayWork && snapshot.somedayWork.length > 0 ? (
-            <Space vertical align="start">{snapshot.somedayWork.map((file) => <Text key={file.path}>{file.path}</Text>)}</Space>
+            renderFileList(snapshot.somedayWork)
           ) : (
             <Empty description={t('workbench.emptySomedayWork')} />
           )}
@@ -124,7 +142,7 @@ export default function WorkbenchRepositoryPanel({ binding }: { binding: Reposit
         <Card>
           <Title heading={5} style={{ marginTop: 0 }}>{t('workbench.activePlans')}</Title>
           {snapshot && snapshot.activePlans.length > 0 ? (
-            <Space vertical align="start">{snapshot.activePlans.map((file) => <Text key={file.path}>{file.path}</Text>)}</Space>
+            renderFileList(snapshot.activePlans)
           ) : (
             <Empty description={t('workbench.emptyActivePlans')} />
           )}
@@ -132,12 +150,24 @@ export default function WorkbenchRepositoryPanel({ binding }: { binding: Reposit
         <Card>
           <Title heading={5} style={{ marginTop: 0 }}>{t('workbench.completedPlans')}</Title>
           {snapshot?.completedPlans && snapshot.completedPlans.length > 0 ? (
-            <Space vertical align="start">{snapshot.completedPlans.map((file) => <Text key={file.path}>{file.path}</Text>)}</Space>
+            renderFileList(snapshot.completedPlans)
           ) : (
             <Empty description={t('workbench.emptyCompletedPlans')} />
           )}
         </Card>
       </div>
+
+      <Card style={{ width: '100%' }}>
+        <Title heading={5} style={{ marginTop: 0 }}>{t('workbench.preview')}</Title>
+        {selectedPreviewContent ? (
+          <>
+            <Text type="tertiary" size="small">{selectedPreviewPath}</Text>
+            <MarkdownView content={selectedPreviewContent} />
+          </>
+        ) : (
+          <Empty description={t('workbench.previewEmpty')} />
+        )}
+      </Card>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 16, width: '100%' }}>
         <Card>

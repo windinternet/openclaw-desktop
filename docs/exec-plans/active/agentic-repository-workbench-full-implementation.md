@@ -60,7 +60,7 @@
 
 - [x] Workbench shows work status view for `work/active`, `work/completed`, and `work/someday`.
 - [x] Workbench exposes a Kanban/status view based on Repository `work/`, separate from OpenClaw scheduled tasks.
-- [ ] Workbench previews selected matter Markdown.
+- [x] Workbench previews selected matter Markdown.
 - [x] Workbench shows `plans/active` and `plans/completed`.
 - [ ] Workbench shows plan approval/status metadata when present in Markdown.
 - [ ] Workbench shows reviews grouped by weekly/project folders.
@@ -127,7 +127,7 @@
 - [x] Write failing tests for active/completed/someday work and active/completed plans.
 - [x] Extend `repository-workbench.ts` snapshot.
 - [x] Render Repository status view without using OpenClaw Tasks.
-- [ ] Add selected Markdown preview for matters/plans.
+- [x] Add selected Markdown preview for matters/plans.
 - [x] Verify with `npm test -- src/__tests__/repository-workbench.test.ts`.
 - [x] Run Electron CDP on existing app to verify `#/workbench`.
 - [ ] Commit.
