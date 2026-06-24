@@ -26,6 +26,10 @@ import {
   type OfficeCombatState,
   type OfficeWeaponMode,
 } from '../../lib/office-gameplay';
+import {
+  resolveOfficeShotTarget,
+  shouldSkipBlasterMouseDown,
+} from './office-scene-interactions';
 
 const MANUAL_AGENT_WALK_SPEED = 5.8;
 
@@ -1115,15 +1119,10 @@ function handleOfficeShot(state: SceneState, container: HTMLDivElement): boolean
   const origin = state.firstPersonCamera.position.clone();
   const fallbackEnd = origin.clone().add(state.raycaster.ray.direction.clone().multiplyScalar(8));
   const hits = state.raycaster.intersectObjects(state.scene.children, true);
-  const hit = hits.find((item) => {
-    if (typeof item.object.userData.agentId !== 'string') return false;
-    const agentId = item.object.userData.agentId;
-    if (agentId === state.controlledAgentId) return false;
-    const actor = state.actors.get(agentId);
-    if (!actor) return false;
-    if (actor.combat.downedUntil !== null) return false;
-    return true;
-  });
+  const agentId = resolveOfficeShotTarget(hits, state.actors, state.controlledAgentId);
+  const hit = agentId
+    ? hits.find((item) => item.object.userData.agentId === agentId)
+    : undefined;
   const theme = state.currentTheme;
   const end = hit?.point ?? fallbackEnd;
 
@@ -1135,12 +1134,11 @@ function handleOfficeShot(state: SceneState, container: HTMLDivElement): boolean
     }, 90);
   }
 
-  if (!hit) {
+  if (!agentId || !hit) {
     updateWeaponHud(state);
     return true;
   }
 
-  const agentId = String(hit.object.userData.agentId);
   const actor = state.actors.get(agentId);
   if (!actor) return true;
 
@@ -1755,7 +1753,7 @@ export default function OfficeScene({
       const onMouseDown = (event: MouseEvent) => {
         event.preventDefault();
         container.focus();
-        if (event.button === 0 && state.cameraMode === 'first-person' && state.weaponMode === 'toy-blaster') {
+        if (shouldSkipBlasterMouseDown(event.button, state.cameraMode, state.weaponMode)) {
           return;
         }
         if (event.button === 1) {

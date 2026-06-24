@@ -75,13 +75,10 @@ describe('OfficeScene agent labels', () => {
     expect(source).toContain("state.cameraMode === 'first-person'");
     expect(source).toContain("state.weaponMode === 'toy-blaster'");
     expect(source).toContain('state.raycaster.setFromCamera(new THREE.Vector2(0, 0), state.firstPersonCamera)');
-    expect(source).toContain("typeof item.object.userData.agentId === 'string'");
-    expect(source).toContain('const actor = state.actors.get(agentId);');
-    expect(source).toContain('if (agentId === state.controlledAgentId) return false;');
-    expect(source).toContain('if (!actor) return false;');
-    expect(source).toContain('if (actor.combat.downedUntil !== null) return false;');
+    expect(source).toContain('resolveOfficeShotTarget(hits, state.actors, state.controlledAgentId)');
+    expect(source).toContain('const actor = state.actors.get(agentId)');
     expect(source).toContain('applyOfficeShot(actor.combat, performance.now())');
-    expect(source).toContain("event.button === 0 && state.cameraMode === 'first-person' && state.weaponMode === 'toy-blaster'");
+    expect(source).toContain('shouldSkipBlasterMouseDown(event.button, state.cameraMode, state.weaponMode)');
     expect(source).toContain('state.leftDrag.active = true');
   });
 
