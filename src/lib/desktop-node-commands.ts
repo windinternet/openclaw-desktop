@@ -35,6 +35,11 @@ function tagsValue(value: unknown): string[] | undefined {
   return value.filter((item): item is string => typeof item === 'string');
 }
 
+function stringArrayValue(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+}
+
 function artifactTypeValue(value: unknown): ArtifactType {
   return typeof value === 'string' && ARTIFACT_TYPES.has(value as ArtifactType)
     ? value as ArtifactType
@@ -47,6 +52,48 @@ function invalidParams(message: string): { ok: false; error: 'invalid-params'; m
 
 function repositoryApi() {
   return (globalThis as { window?: Window }).window?.electronAPI?.repository;
+}
+
+function slugPathSegment(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'session';
+}
+
+function buildSessionSummaryMarkdown(params: {
+  sessionKey: string;
+  title?: string;
+  summary: string;
+  highlights: string[];
+  artifacts: string[];
+}): string {
+  const lines = [
+    `# ${params.title || params.sessionKey}`,
+    '',
+    `sessionKey: ${params.sessionKey}`,
+    `updatedAt: ${new Date().toISOString()}`,
+    '',
+    '## Summary',
+    '',
+    params.summary,
+    '',
+  ];
+
+  if (params.highlights.length > 0) {
+    lines.push('## Highlights', '');
+    for (const highlight of params.highlights) lines.push(`- ${highlight}`);
+    lines.push('');
+  }
+
+  if (params.artifacts.length > 0) {
+    lines.push('## Outputs', '');
+    for (const artifact of params.artifacts) lines.push(`- ${artifact}`);
+    lines.push('');
+  }
+
+  return lines.join('\n');
 }
 
 async function mirrorRepositoryOutput(params: {
@@ -94,7 +141,7 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
     const result: {
       ok: true;
       artifact: { id: string; title: string; currentVersion: number };
-      output?: { path: string; previewPath?: string };
+      output?: { outputId: string; path: string; previewPath?: string };
     } = {
       ok: true,
       artifact: {
@@ -113,6 +160,7 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
         html,
       });
       result.output = {
+        outputId: output.outputId,
         path: output.outputPath,
         previewPath: output.previewPath,
       };
@@ -156,6 +204,7 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
         currentVersion: artifact.currentVersion,
       },
       output: {
+        outputId: output.outputId,
         path: output.outputPath,
         previewPath: output.previewPath,
       },
@@ -194,6 +243,7 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
       ok: true,
       artifactId,
       output: {
+        outputId: output.outputId,
         path: output.outputPath,
         previewPath: output.previewPath,
       },
@@ -218,6 +268,7 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
       ok: true,
       artifactId,
       output: {
+        outputId: output.outputId,
         path: output.outputPath,
         previewPath: output.previewPath,
       },
@@ -307,6 +358,40 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
     const repository = repositoryApi();
     if (!repository?.gitCommit) return { ok: false, error: 'repository-api-unavailable' };
     return { ok: true, commit: await repository.gitCommit(repoPath, message) };
+  }
+
+  if (command === 'desktop.repository.session-summary.write') {
+    const repoPath = stringValue(params.repoPath);
+    const sessionKey = stringValue(params.sessionKey);
+    const summary = stringValue(params.summary);
+    const title = stringValue(params.title);
+    if (!repoPath) return invalidParams('repoPath is required');
+    if (!sessionKey) return invalidParams('sessionKey is required');
+    if (!summary) return invalidParams('summary is required');
+    const repository = repositoryApi();
+    if (!repository?.writeText || !repository.readText) return { ok: false, error: 'repository-api-unavailable' };
+
+    const relativePath = `runs/session-summaries/${slugPathSegment(sessionKey)}.md`;
+    await repository.writeText(
+      repoPath,
+      relativePath,
+      buildSessionSummaryMarkdown({
+        sessionKey,
+        title,
+        summary,
+        highlights: stringArrayValue(params.highlights),
+        artifacts: stringArrayValue(params.artifacts),
+      }),
+    );
+
+    const indexPath = 'runs/session-summaries/index.md';
+    const existingIndex = await repository.readText(repoPath, indexPath);
+    const indexEntry = `- [${title || sessionKey}](${relativePath})`;
+    const nextIndex = existingIndex.includes(relativePath)
+      ? existingIndex
+      : `${existingIndex.trimEnd()}\n${indexEntry}\n`;
+    await repository.writeText(repoPath, indexPath, nextIndex);
+    return { ok: true, path: relativePath };
   }
 
   if (command === 'desktop.artifacts.append') {

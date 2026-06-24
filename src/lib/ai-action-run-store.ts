@@ -7,6 +7,7 @@ import {
   normalizeAgentTeamProfile,
 } from './agent-team';
 import { fetchGatewayAgents } from './gateway-agents';
+import { loadRepositoryBinding } from './agentic-repository-store';
 import { loadInstanceData, saveInstanceDataAwaited } from './local-persistence';
 import type { AgentTeamProfile, AiActionRun, AiActionRunStatus } from './types';
 
@@ -28,7 +29,68 @@ export async function upsertAiActionRun(instanceId: string, run: AiActionRun): P
   const exists = runs.some((item) => item.id === run.id);
   const nextRuns = exists ? runs.map((item) => (item.id === run.id ? run : item)) : [run, ...runs];
   await saveAiActionRuns(instanceId, nextRuns);
+  await mirrorTerminalAiActionRunToRepository(instanceId, run);
   return nextRuns;
+}
+
+export function buildAiActionRunMarkdown(run: AiActionRun): string {
+  const lines = [
+    `# ${run.type}`,
+    '',
+    `runId: ${run.id}`,
+    `status: ${run.status}`,
+    `sourcePage: ${run.sourcePage}`,
+    `agentId: ${run.agentId}`,
+    `executionMode: ${run.executionMode}`,
+    run.gatewaySessionKey ? `gatewaySessionKey: ${run.gatewaySessionKey}` : undefined,
+    run.gatewayRunId ? `gatewayRunId: ${run.gatewayRunId}` : undefined,
+    `createdAt: ${new Date(run.createdAt).toISOString()}`,
+    `updatedAt: ${new Date(run.updatedAt).toISOString()}`,
+    '',
+    '## Input',
+    '',
+    run.input || '(empty)',
+    '',
+  ];
+
+  if (run.plan) {
+    lines.push('## Plan', '', run.plan, '');
+  }
+  if (run.resultSummary) {
+    lines.push('## Result', '', run.resultSummary, '');
+  }
+  if (run.error) {
+    lines.push('## Error', '', run.error, '');
+  }
+  if (run.approvals && run.approvals.length > 0) {
+    lines.push('## Approvals', '');
+    for (const approval of run.approvals) {
+      lines.push(`- ${approval.status}: ${approval.title} (${approval.risk})`);
+    }
+    lines.push('');
+  }
+
+  return lines.filter((line): line is string => typeof line === 'string').join('\n');
+}
+
+async function mirrorTerminalAiActionRunToRepository(instanceId: string, run: AiActionRun): Promise<void> {
+  if (!['done', 'failed', 'cancelled'].includes(run.status)) return;
+  const binding = await loadRepositoryBinding(instanceId);
+  if (!binding || binding.status !== 'repo_ready' || binding.location !== 'desktop-local') return;
+
+  const repository = typeof window !== 'undefined' ? window.electronAPI?.repository : undefined;
+  if (!repository?.writeText || !repository.readText) return;
+
+  const runPath = `${binding.paths.runs}/action-runs/${run.id}.md`;
+  await repository.writeText(binding.repoPath, runPath, buildAiActionRunMarkdown(run));
+
+  const indexPath = `${binding.paths.runs}/action-runs/index.md`;
+  const existingIndex = await repository.readText(binding.repoPath, indexPath);
+  const indexEntry = `- [${run.type}](${runPath}) - ${run.status}`;
+  const nextIndex = existingIndex.includes(runPath)
+    ? existingIndex
+    : `${existingIndex.trimEnd()}\n${indexEntry}\n`;
+  await repository.writeText(binding.repoPath, indexPath, nextIndex);
 }
 
 export async function reconcileGatewayAgentCreationRun(

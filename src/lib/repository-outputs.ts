@@ -1,5 +1,6 @@
 import type { ArtifactMeta } from './artifact-types';
 import type { RepositoryBinding } from './agentic-repository';
+import { loadRepositoryBinding } from './agentic-repository-store';
 
 export interface CreateRepositoryOutputParams {
   binding: RepositoryBinding;
@@ -8,6 +9,7 @@ export interface CreateRepositoryOutputParams {
 }
 
 export interface RepositoryOutputResult {
+  outputId: string;
   outputPath: string;
   previewPath?: string;
 }
@@ -63,7 +65,22 @@ export async function createRepositoryOutput(params: CreateRepositoryOutputParam
     : `${existingIndex.trimEnd()}\n${indexEntry}\n`;
   await repository.writeText(params.binding.repoPath, indexPath, nextIndex);
 
-  return { outputPath, previewPath };
+  return { outputId: params.artifact.id, outputPath, previewPath };
+}
+
+export async function mirrorArtifactToReadyRepositoryOutput(
+  instanceId: string,
+  artifact: ArtifactMeta,
+  html?: string,
+): Promise<RepositoryOutputResult | null> {
+  const binding = await loadRepositoryBinding(instanceId);
+  if (!binding || binding.status !== 'repo_ready' || binding.location !== 'desktop-local') return null;
+
+  return createRepositoryOutput({
+    binding,
+    artifact,
+    html,
+  });
 }
 
 function getRepositoryWriteApi() {
@@ -76,4 +93,3 @@ function getRepositoryWriteApi() {
     readText: repository.readText,
   };
 }
-

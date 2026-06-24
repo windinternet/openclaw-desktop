@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
-import { buildOutputMarkdown, createRepositoryOutput } from '../lib/repository-outputs';
+import { buildOutputMarkdown, createRepositoryOutput, mirrorArtifactToReadyRepositoryOutput } from '../lib/repository-outputs';
 import type { ArtifactMeta } from '../lib/artifact-types';
 
 describe('repository outputs', () => {
@@ -32,11 +32,82 @@ describe('repository outputs', () => {
       html: '<html>ok</html>',
     });
 
+    expect(result.outputId).toBe('art_1');
     expect(result.outputPath).toBe('outputs/reports/art_1.md');
     expect(result.previewPath).toBe('outputs/html/art_1.html');
     expect(writeText).toHaveBeenCalledWith('/repo', 'outputs/html/art_1.html', '<html>ok</html>');
     expect(writeText).toHaveBeenCalledWith('/repo', 'outputs/reports/art_1.md', expect.stringContaining('# Quarterly Report'));
     expect(writeText).toHaveBeenCalledWith('/repo', 'outputs/index.md', expect.stringContaining('outputs/reports/art_1.md'));
+  });
+
+  it('mirrors artifacts through the current ready repository binding', async () => {
+    const writeText = vi.fn();
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'outputs/index.md') return '# Outputs\n';
+      return '';
+    });
+    const loadInstanceData = vi.fn(async () => ({
+      id: 'repo_inst-1',
+      name: 'Repo',
+      location: 'desktop-local',
+      repoPath: '/repo',
+      gatewayInstanceId: 'inst-1',
+      status: 'repo_ready',
+      paths: {
+        sources: 'sources',
+        wiki: 'wiki',
+        work: 'work',
+        plans: 'plans',
+        runs: 'runs',
+        outputs: 'outputs',
+        reviews: 'reviews',
+        schemas: 'schemas',
+      },
+    }));
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: {
+          writeText,
+          readText,
+        },
+        storage: {
+          loadInstanceData,
+        },
+      },
+    });
+
+    await expect(mirrorArtifactToReadyRepositoryOutput('inst-1', createArtifact(), '<html>ok</html>')).resolves.toEqual({
+      outputId: 'art_1',
+      outputPath: 'outputs/reports/art_1.md',
+      previewPath: 'outputs/html/art_1.html',
+    });
+
+    expect(loadInstanceData).toHaveBeenCalledWith('inst-1', 'agentic-repository-binding');
+    expect(writeText).toHaveBeenCalledWith('/repo', 'outputs/html/art_1.html', '<html>ok</html>');
+  });
+
+  it('does not mirror artifacts when the bound repository is not ready', async () => {
+    const writeText = vi.fn();
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: {
+          writeText,
+          readText: vi.fn(async () => '# Outputs\n'),
+        },
+        storage: {
+          loadInstanceData: vi.fn(async () => ({
+            id: 'repo_inst-1',
+            location: 'desktop-local',
+            repoPath: '/repo',
+            gatewayInstanceId: 'inst-1',
+            status: 'repo_needs_bootstrap',
+          })),
+        },
+      },
+    });
+
+    await expect(mirrorArtifactToReadyRepositoryOutput('inst-1', createArtifact(), '<html>ok</html>')).resolves.toBeNull();
+    expect(writeText).not.toHaveBeenCalled();
   });
 });
 
@@ -54,4 +125,3 @@ function createArtifact(): ArtifactMeta {
     updatedAt: 2,
   };
 }
-

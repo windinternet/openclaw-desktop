@@ -27,6 +27,9 @@
 - [x] ActionRun is visible as Workbench activity.
 - [x] Desktop node repository commands: status/read/write/search/git.status/git.diff.
 - [x] Desktop node output commands: create/open/update/append.
+- [x] Desktop UI artifact creation mirrors into Repository `outputs/` when a ready desktop-local binding exists.
+- [x] Terminal ActionRun summaries mirror into `runs/action-runs/`.
+- [x] Session summaries can be written to `runs/session-summaries/` through a narrow Desktop node command.
 - [x] Active plan reflects all remaining design-doc gaps and stays updated after each batch.
 
 ## Remaining Design Requirements
@@ -64,22 +67,22 @@
 - [x] Workbench shows `plans/active` and `plans/completed`.
 - [ ] Workbench shows plan approval/status metadata when present in Markdown.
 - [ ] Workbench shows reviews grouped by weekly/project folders.
-- [ ] ActionRun activity can write or mirror summaries into `runs/action-runs/`.
-- [ ] Session summaries can be represented under `runs/session-summaries/`.
+- [x] ActionRun activity can write or mirror summaries into `runs/action-runs/`.
+- [x] Session summaries can be represented under `runs/session-summaries/`.
 
 ### D. Outputs And Artifacts
 
-- [ ] New artifact creation from the Desktop UI mirrors into Repository `outputs/` when a ready binding exists.
+- [x] New artifact creation from the Desktop UI mirrors into Repository `outputs/` when a ready binding exists.
 - [x] Legacy `desktop.artifacts.create` internally follows the outputs path when `repoPath` is available.
-- [ ] Outputs list in Workbench reflects newly mirrored outputs without requiring the user to understand legacy artifact storage.
-- [ ] Output metadata returns `outputId/path/previewPath` consistently.
+- [x] Outputs list in Workbench reflects newly mirrored outputs without requiring the user to understand legacy artifact storage.
+- [x] Output metadata returns `outputId/path/previewPath` consistently.
 
 ### E. Companion And Repository Commands
 
 - [ ] `desktop.repository.init` initializes from the packaged template through a structured command.
 - [ ] `desktop.repository.git.commit` commits approved repository changes with a provided message.
 - [ ] Commands remain narrow and auditable; no generic shell command is exposed.
-- [ ] Capability declarations include the full repository/outputs command set.
+- [x] Capability declarations include the full repository/outputs command set.
 
 ### F. Gateway-Local Advanced Mode
 
@@ -111,7 +114,7 @@
 - [x] Implement Electron IPC and Desktop node command support.
 - [x] Verify with `npm test -- src/__tests__/agentic-repository.test.ts src/__tests__/desktop-node-commands.test.ts`.
 - [x] Run `npm run typecheck`.
-- [ ] Commit.
+- [x] Commit.
 
 ### Batch 2: Knowledge Relationships
 
@@ -134,11 +137,11 @@
 
 ### Batch 4: Runs, Outputs, And Artifacts Migration
 
-- [ ] Write failing tests for ActionRun summary Markdown generation.
-- [ ] Mirror completed ActionRun summaries into `runs/action-runs/` when a ready binding exists.
-- [ ] Write failing tests for UI-created artifacts mirroring into `outputs/`.
-- [ ] Route legacy artifact node commands through outputs when repository context is available.
-- [ ] Verify with repository outputs, session artifacts, desktop node command, and AI action tests.
+- [x] Write failing tests for ActionRun summary Markdown generation.
+- [x] Mirror completed ActionRun summaries into `runs/action-runs/` when a ready binding exists.
+- [x] Write failing tests for UI-created artifacts mirroring into `outputs/`.
+- [x] Route legacy artifact node commands through outputs when repository context is available.
+- [x] Verify with repository outputs, session artifacts, desktop node command, and AI action tests.
 - [ ] Commit.
 
 ### Batch 5: Control Center Repository Protocol

@@ -28,6 +28,7 @@ export const DESKTOP_NODE_COMMANDS = [
   'desktop.repository.git.status',
   'desktop.repository.git.diff',
   'desktop.repository.git.commit',
+  'desktop.repository.session-summary.write',
   'desktop.outputs.create',
   'desktop.outputs.open',
   'desktop.outputs.update',

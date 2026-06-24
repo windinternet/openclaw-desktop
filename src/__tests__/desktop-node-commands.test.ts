@@ -82,6 +82,7 @@ describe('desktop node commands', () => {
       updatedAt: 1,
     });
     mockedCreateRepositoryOutput.mockResolvedValue({
+      outputId: 'art_legacy',
       outputPath: 'outputs/reports/art_legacy.md',
       previewPath: 'outputs/html/art_legacy.html',
     });
@@ -100,6 +101,7 @@ describe('desktop node commands', () => {
         currentVersion: 1,
       },
       output: {
+        outputId: 'art_legacy',
         path: 'outputs/reports/art_legacy.md',
         previewPath: 'outputs/html/art_legacy.html',
       },
@@ -126,6 +128,7 @@ describe('desktop node commands', () => {
       updatedAt: 1,
     });
     mockedCreateRepositoryOutput.mockResolvedValue({
+      outputId: 'art_2',
       outputPath: 'outputs/reports/art_2.md',
       previewPath: 'outputs/html/art_2.html',
     });
@@ -143,6 +146,7 @@ describe('desktop node commands', () => {
         currentVersion: 1,
       },
       output: {
+        outputId: 'art_2',
         path: 'outputs/reports/art_2.md',
         previewPath: 'outputs/html/art_2.html',
       },
@@ -196,6 +200,7 @@ describe('desktop node commands', () => {
     mockedArtifactPersistence.loadMeta.mockResolvedValue(artifact);
     mockedArtifactPersistence.loadHtml.mockResolvedValue('<html>v2</html>');
     mockedCreateRepositoryOutput.mockResolvedValue({
+      outputId: 'art_2',
       outputPath: 'outputs/reports/art_2.md',
       previewPath: 'outputs/html/art_2.html',
     });
@@ -209,6 +214,7 @@ describe('desktop node commands', () => {
       ok: true,
       artifactId: 'art_2',
       output: {
+        outputId: 'art_2',
         path: 'outputs/reports/art_2.md',
         previewPath: 'outputs/html/art_2.html',
       },
@@ -241,6 +247,7 @@ describe('desktop node commands', () => {
     mockedArtifactPersistence.loadMeta.mockResolvedValue(artifact);
     mockedArtifactPersistence.loadHtml.mockResolvedValue('<html>v2</html>');
     mockedCreateRepositoryOutput.mockResolvedValue({
+      outputId: 'art_2',
       outputPath: 'outputs/reports/art_2.md',
       previewPath: 'outputs/html/art_2.html',
     });
@@ -253,6 +260,7 @@ describe('desktop node commands', () => {
       ok: true,
       artifactId: 'art_2',
       output: {
+        outputId: 'art_2',
         path: 'outputs/reports/art_2.md',
         previewPath: 'outputs/html/art_2.html',
       },
@@ -343,6 +351,45 @@ describe('desktop node commands', () => {
 
     expect(init).toHaveBeenCalledWith('/repo');
     expect(gitCommit).toHaveBeenCalledWith('/repo', 'Initial repository state');
+  });
+
+  it('writes a structured session summary into repository runs', async () => {
+    const writeText = vi.fn();
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'runs/session-summaries/index.md') return '# Session Summaries\n';
+      return '';
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: {
+          readText,
+          writeText,
+        },
+      },
+    });
+
+    await expect(handleDesktopNodeCommand('desktop.repository.session-summary.write', {
+      repoPath: '/repo',
+      sessionKey: 'agent:main:demo',
+      title: '需求梳理会话',
+      summary: '明确了 Repository Workbench 的推进方向。',
+      highlights: ['保留 OpenClaw 原生定位', '产物迁移到 outputs'],
+      artifacts: ['outputs/reports/art_1.md'],
+    })).resolves.toEqual({
+      ok: true,
+      path: 'runs/session-summaries/agent-main-demo.md',
+    });
+
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'runs/session-summaries/agent-main-demo.md',
+      expect.stringContaining('明确了 Repository Workbench 的推进方向。'),
+    );
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'runs/session-summaries/index.md',
+      expect.stringContaining('runs/session-summaries/agent-main-demo.md'),
+    );
   });
 
   it('rejects artifact create without title or html', async () => {
