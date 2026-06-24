@@ -35,7 +35,7 @@ describe('OfficeScene agent labels', () => {
     expect(source).toContain('createHitBox(0.92, 1.55, 0.92');
     expect(source).toContain('state.controlledAgentId !== agent.agentId');
     expect(source).toContain('intersectPlane(groundPlane, groundPoint)');
-    expect(source).toContain('nearestDistance <= 1.45');
+    expect(source).toContain('resolveNearestOfficeControlTarget');
   });
 
   it('passes only the explicitly selected Agent into the 3D scene control state', () => {

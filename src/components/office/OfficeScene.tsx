@@ -27,6 +27,10 @@ import {
   type OfficeWeaponMode,
 } from '../../lib/office-gameplay';
 import {
+  canOfficeActorJump,
+  canUseOfficeBlaster,
+  resolveNearestOfficeControlTarget,
+  resolveOfficeControlTarget,
   resolveOfficeShotTarget,
   shouldSkipBlasterMouseDown,
 } from './office-scene-interactions';
@@ -1114,6 +1118,12 @@ function showShotBeam(state: SceneState, start: THREE.Vector3, end: THREE.Vector
 function handleOfficeShot(state: SceneState, container: HTMLDivElement): boolean {
   if (state.cameraMode !== 'first-person' || state.weaponMode !== 'toy-blaster') return false;
 
+  const controlledActor = state.controlledAgentId ? state.actors.get(state.controlledAgentId) : null;
+  if (!canUseOfficeBlaster(controlledActor)) {
+    updateWeaponHud(state);
+    return true;
+  }
+
   const now = performance.now();
   state.raycaster.setFromCamera(new THREE.Vector2(0, 0), state.firstPersonCamera);
   const origin = state.firstPersonCamera.position.clone();
@@ -1549,6 +1559,13 @@ function updateCombatState(actor: ActorState, now: number, delta: number, theme:
 }
 
 function animateActor(actor: ActorState, time: number, delta: number, selected: boolean): void {
+  if (actor.combat.downedUntil !== null) {
+    actor.jumpVelocity = 0;
+    actor.label.visible = true;
+    actor.group.scale.lerp(new THREE.Vector3(actor.baseScale, actor.baseScale * 0.82, actor.baseScale), 0.08);
+    return;
+  }
+
   // Jump physics
   if (actor.jumpVelocity !== 0 || actor.group.position.y > OFFICE_AGENT_GROUND_Y) {
     actor.group.position.y += actor.jumpVelocity;
@@ -1558,11 +1575,6 @@ function animateActor(actor: ActorState, time: number, delta: number, selected: 
       actor.group.position.y = landY;
       actor.jumpVelocity = 0;
     }
-  }
-  if (actor.combat.downedUntil !== null) {
-    actor.label.visible = true;
-    actor.group.scale.lerp(new THREE.Vector3(actor.baseScale, actor.baseScale * 0.82, actor.baseScale), 0.08);
-    return;
   }
   if (!actor.isPlayerControlled && isLeisureActor(actor) && time >= actor.nextLeisureDecisionAt && actor.group.position.distanceTo(actor.target) < 0.08) {
     actor.target.copy(chooseNextLeisureTarget(actor, time));
@@ -1657,9 +1669,9 @@ function handleSceneClick(
     showBubble();
     return;
   }
-  const hit = hits.find((item) => typeof item.object.userData.agentId === 'string');
-  if (hit) {
-    onSelectAgent(String(hit.object.userData.agentId));
+  const hitAgentId = resolveOfficeControlTarget(hits, state.actors);
+  if (hitAgentId) {
+    onSelectAgent(hitAgentId);
     state.cameraControl.elevation = 0;
     container.requestPointerLock();
     return;
@@ -1668,16 +1680,11 @@ function handleSceneClick(
   const groundPoint = new THREE.Vector3();
   const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -OFFICE_AGENT_GROUND_Y);
   state.raycaster.ray.intersectPlane(groundPlane, groundPoint);
-  let nearestAgentId: string | null = null;
-  let nearestDistance = Number.POSITIVE_INFINITY;
-  state.actors.forEach((actor) => {
+  const nearestAgentId = resolveNearestOfficeControlTarget(Array.from(state.actors.values()).map((actor) => {
     const distance = Math.hypot(actor.group.position.x - groundPoint.x, actor.group.position.z - groundPoint.z);
-    if (distance < nearestDistance) {
-      nearestAgentId = actor.agent.agentId;
-      nearestDistance = distance;
-    }
-  });
-  onSelectAgent(nearestDistance <= 1.45 ? nearestAgentId : null);
+    return { agentId: actor.agent.agentId, actor, distance };
+  }), 1.45);
+  onSelectAgent(nearestAgentId);
 }
 
 export default function OfficeScene({
@@ -1817,7 +1824,7 @@ export default function OfficeScene({
           event.preventDefault();
           // Jump: apply upward velocity if on ground
           const actor = state.controlledAgentId ? state.actors.get(state.controlledAgentId) : null;
-          if (actor && actor.group.position.y <= OFFICE_AGENT_GROUND_Y + 0.01) {
+          if (canOfficeActorJump(actor, OFFICE_AGENT_GROUND_Y)) {
             actor.jumpVelocity = 0.12;
           }
           return;
@@ -1870,7 +1877,7 @@ export default function OfficeScene({
         if (event.key === ' ' && state.cameraMode === 'first-person') {
           event.preventDefault();
           const actor = state.controlledAgentId ? state.actors.get(state.controlledAgentId) : null;
-          if (actor && actor.group.position.y <= OFFICE_AGENT_GROUND_Y + 0.01) {
+          if (canOfficeActorJump(actor, OFFICE_AGENT_GROUND_Y)) {
             actor.jumpVelocity = 0.12;
           }
           return;
