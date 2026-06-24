@@ -52,6 +52,7 @@
   },
   "workbench": {
     "pageDesc": "Move work through items, plans, execution, outputs, and reviews.",
+    "kanbanDesc": "A Repository-backed board for matters, plans, and completed work.",
     "activityDesc": "Review actions, approvals, and results executed by OpenClaw Agents.",
     "outputs": "Outputs",
     "outputsDesc": "View reports, HTML, documents, and other deliverables.",

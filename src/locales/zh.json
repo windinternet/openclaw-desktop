@@ -52,6 +52,7 @@
   },
   "workbench": {
     "pageDesc": "围绕事项、计划、执行、成果和复盘推进工作。",
+    "kanbanDesc": "基于 Repository 中的事项、计划和完成记录形成工作看板。",
     "activityDesc": "查看由 OpenClaw Agent 执行的动作、审批和结果。",
     "outputs": "成果",
     "outputsDesc": "查看报告、HTML、文档和其他可交付结果。",

@@ -101,8 +101,11 @@ describe('navigation hub pages', () => {
 
     expect(workbench).toContain("t('nav.workbench')");
     expect(workbench).toContain('<Tabs');
+    expect(workbench).toContain('activeMeta');
+    expect(workbench).toContain('<Title heading');
+    expect(workbench).toContain("t('workbench.kanbanDesc')");
     expect(workbench).toContain('tabBarExtraContent');
-    expect(workbench).not.toContain('<Title heading');
+    expect(workbench).toContain('RepositoryWorkbenchKanban');
     expect(workbench).toContain('<ActionCenterPage embedded');
     expect(workbench).toContain('<ArtifactsPage embedded');
     expect(workbench).toContain('WorkbenchRepositoryPanel');
@@ -113,8 +116,9 @@ describe('navigation hub pages', () => {
     expect(knowledge).toContain('KnowledgeRepositoryPanel');
 
     expect(collaboration).toContain('<Tabs');
+    expect(collaboration).toContain('activeMeta');
+    expect(collaboration).toContain('<Title heading');
     expect(collaboration).toContain('tabBarExtraContent');
-    expect(collaboration).not.toContain('<Title heading');
     expect(collaboration).toContain('<TeamsPage embedded');
     expect(collaboration).toContain('<Office3DPage embedded');
     expect(collaboration).toContain('loadAiActionRuns');
@@ -122,9 +126,11 @@ describe('navigation hub pages', () => {
     expect(collaboration).toContain("t('collaboration.relatedRuns')");
 
     expect(control).toContain('<Tabs');
+    expect(control).toContain('activeMeta');
+    expect(control).toContain('<Title heading');
     expect(control).toContain('tabBarExtraContent');
-    expect(control).not.toContain('<Title heading');
-    expect(control).toContain('<TaskKanbanPage embedded');
+    expect(control).toContain('<TasksPage ref={tasksRef} embedded');
+    expect(control).not.toContain('TaskKanbanPage');
     expect(control).toContain('<ExtensionsPage embedded');
     expect(control).toContain('<TuningPage embedded');
     expect(control).toContain('<RepositoryProtocolPage embedded');
@@ -137,7 +143,6 @@ describe('navigation hub pages', () => {
       'src/pages/ArtifactsPage.tsx',
       'src/pages/TeamsPage.tsx',
       'src/pages/Office3DPage.tsx',
-      'src/pages/TaskKanbanPage.tsx',
       'src/pages/ExtensionsPage.tsx',
       'src/pages/TuningPage.tsx',
       'src/pages/RepositoryProtocolPage.tsx',
@@ -193,6 +198,7 @@ describe('navigation locale strings', () => {
       'sessions.newSessionDesc',
       'sessions.searchDesc',
       'workbench.pageDesc',
+      'workbench.kanbanDesc',
       'workbench.activityDesc',
       'workbench.outputs',
       'workbench.outputsDesc',

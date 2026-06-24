@@ -9,7 +9,7 @@ import type { AiActionRun } from '../lib/types';
 import TeamsPage from './TeamsPage';
 import Office3DPage from './Office3DPage';
 
-const { Text } = Typography;
+const { Title, Text } = Typography;
 
 export default function CollaborationPage() {
   const { t } = useTranslation();
@@ -19,6 +19,11 @@ export default function CollaborationPage() {
   const [activeTab, setActiveTab] = useState('teams');
   const [tabActions, setTabActions] = useState<ReactNode | null>(null);
   const [runs, setRuns] = useState<AiActionRun[]>([]);
+  const activeMeta = {
+    teams: { title: t('nav.teams'), desc: t('collaboration.teamsDesc') },
+    office: { title: t('nav.office'), desc: t('collaboration.officeDesc') },
+    runs: { title: t('collaboration.relatedRuns'), desc: t('collaboration.relatedRunsDesc') },
+  }[activeTab] ?? { title: t('nav.collaboration'), desc: t('collaboration.pageDesc') };
 
   const handleTabChange = (key: string) => {
     setActiveTab(key);
@@ -45,6 +50,10 @@ export default function CollaborationPage() {
 
   return (
     <div style={{ height: '100%', overflow: 'auto', padding: '16px 24px 24px' }}>
+      <div style={{ marginBottom: 12 }}>
+        <Title heading={3} style={{ margin: 0 }}>{activeMeta.title}</Title>
+        <Text type="tertiary" size="small">{activeMeta.desc}</Text>
+      </div>
       <Tabs activeKey={activeTab} onChange={handleTabChange} type="line" tabBarExtraContent={tabActions}>
         <Tabs.TabPane tab={<><IconUserGroup /> {t('nav.teams')}</>} itemKey="teams">
           {activeTab === 'teams' && <TeamsPage embedded onHeaderActionsChange={setTabActions} />}
