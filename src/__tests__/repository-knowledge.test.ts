@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
 import {
@@ -42,6 +43,52 @@ describe('repository knowledge', () => {
     expect(listMarkdown).toHaveBeenCalledWith('/repo', 'wiki');
   });
 
+  it('loads recent files, backlinks, and related work/output links', async () => {
+    const listMarkdown = vi.fn(async (_repoPath: string, directory: string) => {
+      if (directory === 'sources') return [{ path: 'sources/notes/raw.md', name: 'raw.md', size: 20, updatedAt: 3 }];
+      if (directory === 'wiki') {
+        return [
+          { path: 'wiki/index.md', name: 'index.md', size: 40, updatedAt: 2 },
+          { path: 'wiki/topics/agentic.md', name: 'agentic.md', size: 50, updatedAt: 5 },
+        ];
+      }
+      return [];
+    });
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'wiki/index.md') return '# Wiki Index\n[Agentic](topics/agentic.md)';
+      if (relativePath === 'wiki/log.md') return '# Wiki Log';
+      if (relativePath === 'wiki/topics/agentic.md') return [
+        '# Agentic',
+        '[Matter](../../work/active/matter.md)',
+        '[Output](../../outputs/reports/report.md)',
+      ].join('\n');
+      return '';
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { listMarkdown, readText },
+      },
+    });
+
+    const snapshot = await loadKnowledgeSnapshot({
+      ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      status: 'repo_ready',
+    });
+
+    expect(snapshot.recentFiles.map((file) => file.path)).toEqual([
+      'wiki/topics/agentic.md',
+      'sources/notes/raw.md',
+      'wiki/index.md',
+    ]);
+    expect(snapshot.backlinks).toEqual([
+      { sourcePath: 'wiki/index.md', targetPath: 'wiki/topics/agentic.md' },
+    ]);
+    expect(snapshot.relatedRepositoryLinks).toEqual([
+      { sourcePath: 'wiki/topics/agentic.md', targetPath: 'work/active/matter.md', type: 'work' },
+      { sourcePath: 'wiki/topics/agentic.md', targetPath: 'outputs/reports/report.md', type: 'output' },
+    ]);
+  });
+
   it('searches only sources and wiki paths for knowledge queries', async () => {
     const search = vi.fn(async () => [
       { path: 'wiki/index.md', line: 1, snippet: 'Agentic Repository' },
@@ -71,5 +118,14 @@ describe('repository knowledge', () => {
       { path: 'wiki/other.md', content: '[Other](other.md)' },
     ], 'topics/topic.md')).toEqual(['wiki/index.md']);
   });
-});
 
+  it('renders recent updates and relationship sections in the knowledge panel', () => {
+    const source = readFileSync('src/components/KnowledgeRepositoryPanel.tsx', 'utf8');
+
+    expect(source).toContain('snapshot?.recentFiles');
+    expect(source).toContain('snapshot?.backlinks');
+    expect(source).toContain('snapshot?.relatedRepositoryLinks');
+    expect(source).toContain("t('knowledge.recentUpdates')");
+    expect(source).toContain("t('knowledge.relationships')");
+  });
+});

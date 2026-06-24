@@ -50,9 +50,9 @@
 
 ### B. Knowledge Base
 
-- [ ] Knowledge UI shows 最近更新 from file metadata.
-- [ ] Knowledge UI shows 关系 / backlinks by scanning Markdown links.
-- [ ] Knowledge UI connects wiki pages to related work and outputs when Markdown links reference those paths.
+- [x] Knowledge UI shows 最近更新 from file metadata.
+- [x] Knowledge UI shows 关系 / backlinks by scanning Markdown links.
+- [x] Knowledge UI connects wiki pages to related work and outputs when Markdown links reference those paths.
 - [ ] Search results distinguish sources and wiki paths.
 - [ ] Empty and error states are localized.
 
@@ -115,11 +115,11 @@
 
 ### Batch 2: Knowledge Relationships
 
-- [ ] Write failing tests for backlink extraction from repository Markdown files.
-- [ ] Extend `repository-knowledge.ts` snapshot with recent files and backlinks.
-- [ ] Render 最近更新 and 关系 cards in `KnowledgeRepositoryPanel`.
-- [ ] Verify with `npm test -- src/__tests__/repository-knowledge.test.ts`.
-- [ ] Run Electron CDP on existing app to verify `#/knowledge`.
+- [x] Write failing tests for backlink extraction from repository Markdown files.
+- [x] Extend `repository-knowledge.ts` snapshot with recent files and backlinks.
+- [x] Render 最近更新 and 关系 cards in `KnowledgeRepositoryPanel`.
+- [x] Verify with `npm test -- src/__tests__/repository-knowledge.test.ts`.
+- [x] Run Electron CDP on existing app to verify `#/knowledge`.
 - [ ] Commit.
 
 ### Batch 3: Workbench Repository Status Views

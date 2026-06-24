@@ -18,6 +18,20 @@ export interface KnowledgeSnapshot {
   wiki: RepositoryMarkdownFile[];
   indexMarkdown: string;
   logMarkdown: string;
+  recentFiles: RepositoryMarkdownFile[];
+  backlinks: RepositoryBacklink[];
+  relatedRepositoryLinks: RepositoryRelatedLink[];
+}
+
+export interface RepositoryBacklink {
+  sourcePath: string;
+  targetPath: string;
+}
+
+export interface RepositoryRelatedLink {
+  sourcePath: string;
+  targetPath: string;
+  type: 'work' | 'output';
 }
 
 interface KnowledgeReadApi {
@@ -37,12 +51,38 @@ export async function loadKnowledgeSnapshot(binding: RepositoryBinding): Promise
     repository.readText(binding.repoPath, `${binding.paths.wiki}/index.md`),
     repository.readText(binding.repoPath, `${binding.paths.wiki}/log.md`),
   ]);
+  const wikiContents = await Promise.all(
+    wiki.map(async (file) => ({
+      path: file.path,
+      content: await repository.readText(binding.repoPath, file.path),
+    })),
+  );
+  const wikiPaths = new Set(wiki.map((file) => file.path));
+  const backlinks: RepositoryBacklink[] = [];
+  const relatedRepositoryLinks: RepositoryRelatedLink[] = [];
+
+  for (const file of wikiContents) {
+    for (const href of extractMarkdownLinks(file.content)) {
+      const targetPath = normalizeRepositoryLink(file.path, href);
+      if (!targetPath) continue;
+      if (targetPath.startsWith(`${binding.paths.wiki}/`) && wikiPaths.has(targetPath)) {
+        backlinks.push({ sourcePath: file.path, targetPath });
+      } else if (targetPath.startsWith(`${binding.paths.work}/`)) {
+        relatedRepositoryLinks.push({ sourcePath: file.path, targetPath, type: 'work' });
+      } else if (targetPath.startsWith(`${binding.paths.outputs}/`)) {
+        relatedRepositoryLinks.push({ sourcePath: file.path, targetPath, type: 'output' });
+      }
+    }
+  }
 
   return {
     sources,
     wiki,
     indexMarkdown,
     logMarkdown,
+    recentFiles: [...sources, ...wiki].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 12),
+    backlinks,
+    relatedRepositoryLinks,
   };
 }
 
@@ -74,6 +114,31 @@ export function findBacklinks(
   return files
     .filter((file) => extractMarkdownLinks(file.content).includes(targetPath))
     .map((file) => file.path);
+}
+
+export function normalizeRepositoryLink(sourcePath: string, href: string): string | null {
+  const withoutAnchor = href.split('#')[0]?.trim();
+  if (!withoutAnchor) return null;
+  if (/^(https?:|mailto:)/i.test(withoutAnchor)) return null;
+  const cleaned = withoutAnchor.replace(/^\/+/, '');
+  if (/^(sources|wiki|work|plans|runs|outputs|reviews)\//.test(cleaned)) {
+    return normalizePathSegments(cleaned);
+  }
+  const sourceDirectory = sourcePath.split('/').slice(0, -1).join('/');
+  return normalizePathSegments(`${sourceDirectory}/${cleaned}`);
+}
+
+function normalizePathSegments(path: string): string {
+  const segments: string[] = [];
+  for (const segment of path.split('/')) {
+    if (!segment || segment === '.') continue;
+    if (segment === '..') {
+      segments.pop();
+      continue;
+    }
+    segments.push(segment);
+  }
+  return segments.join('/');
 }
 
 function getKnowledgeReadApi(): KnowledgeReadApi {

@@ -86,7 +86,12 @@
     "emptySources": "暂无资料源",
     "emptyWiki": "暂无 Wiki 页面",
     "index": "索引",
-    "log": "日志"
+    "log": "日志",
+    "recentUpdates": "最近更新",
+    "relationships": "关系",
+    "backlinks": "Wiki 反链",
+    "relatedLinks": "相关事项与成果",
+    "emptyRelationships": "暂无关系"
   },
   "repositoryGate": {
     "knowledgeTitle": "知识库仓库",

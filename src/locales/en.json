@@ -86,7 +86,12 @@
     "emptySources": "No sources yet",
     "emptyWiki": "No Wiki pages yet",
     "index": "Index",
-    "log": "Log"
+    "log": "Log",
+    "recentUpdates": "Recent Updates",
+    "relationships": "Relationships",
+    "backlinks": "Wiki Backlinks",
+    "relatedLinks": "Related Matters and Outputs",
+    "emptyRelationships": "No relationships yet"
   },
   "repositoryGate": {
     "knowledgeTitle": "Knowledge Repository",

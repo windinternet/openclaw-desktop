@@ -101,6 +101,52 @@ export default function KnowledgeRepositoryPanel({ binding }: { binding: Reposit
         </Card>
       </div>
 
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16, width: '100%' }}>
+        <Card>
+          <Title heading={5} style={{ marginTop: 0 }}>{t('knowledge.recentUpdates')}</Title>
+          {snapshot?.recentFiles && snapshot.recentFiles.length > 0 ? (
+            <Space vertical align="start">
+              {snapshot.recentFiles.map((file) => <Text key={file.path}>{file.path}</Text>)}
+            </Space>
+          ) : (
+            <Empty description={t('common.noData')} />
+          )}
+        </Card>
+        <Card>
+          <Title heading={5} style={{ marginTop: 0 }}>{t('knowledge.relationships')}</Title>
+          {(snapshot?.backlinks.length ?? 0) + (snapshot?.relatedRepositoryLinks.length ?? 0) > 0 ? (
+            <Space vertical align="start" style={{ width: '100%' }}>
+              {snapshot?.backlinks && snapshot.backlinks.length > 0 && (
+                <div>
+                  <Text strong>{t('knowledge.backlinks')}</Text>
+                  <Space vertical align="start" style={{ marginTop: 8 }}>
+                    {snapshot.backlinks.map((link) => (
+                      <Text key={`${link.sourcePath}->${link.targetPath}`} size="small">
+                        {link.sourcePath}{' -> '}{link.targetPath}
+                      </Text>
+                    ))}
+                  </Space>
+                </div>
+              )}
+              {snapshot?.relatedRepositoryLinks && snapshot.relatedRepositoryLinks.length > 0 && (
+                <div>
+                  <Text strong>{t('knowledge.relatedLinks')}</Text>
+                  <Space vertical align="start" style={{ marginTop: 8 }}>
+                    {snapshot.relatedRepositoryLinks.map((link) => (
+                      <Text key={`${link.sourcePath}->${link.targetPath}`} size="small">
+                        {link.sourcePath}{' -> '}{link.targetPath}
+                      </Text>
+                    ))}
+                  </Space>
+                </div>
+              )}
+            </Space>
+          ) : (
+            <Empty description={t('knowledge.emptyRelationships')} />
+          )}
+        </Card>
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 16, width: '100%' }}>
         <Card>
           <Title heading={5} style={{ marginTop: 0 }}>{t('knowledge.index')}</Title>
@@ -114,4 +160,3 @@ export default function KnowledgeRepositoryPanel({ binding }: { binding: Reposit
     </Space>
   );
 }
-
