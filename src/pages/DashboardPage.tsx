@@ -5,7 +5,6 @@ import {
   IconBolt,
   IconBox,
   IconBranch,
-  IconClock,
   IconComment,
   IconFile,
   IconRefresh,
@@ -19,23 +18,12 @@ import NewSessionComposer from '../components/NewSessionComposer';
 import type { ArtifactMeta } from '../lib/artifact-types';
 import { loadAiActionRuns } from '../lib/ai-action-run-store';
 import { loadRepositoryBinding } from '../lib/agentic-repository-store';
+import { normalizeDashboardGatewaySummary } from '../lib/dashboard-gateway-summary';
 import { fetchGatewayUsageDashboard, type GatewayUsageDashboard } from '../lib/gateway-usage';
 import { loadKnowledgeSnapshot, type KnowledgeSnapshot, type RepositoryMarkdownFile } from '../lib/repository-knowledge';
 import { loadWorkbenchSnapshot, type WorkbenchSnapshot } from '../lib/repository-workbench';
 
 const { Title, Text } = Typography;
-
-function formatUptime(seconds: number): string {
-  const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const parts: string[] = [];
-  if (d > 0) parts.push(`${d}d`);
-  if (h > 0) parts.push(`${h}h`);
-  if (m > 0) parts.push(`${m}m`);
-  if (parts.length === 0) parts.push('0m');
-  return parts.join(' ');
-}
 
 function formatRetryDelay(delayMs: number): string {
   const seconds = Math.max(1, Math.ceil(delayMs / 1000));
@@ -161,6 +149,7 @@ export default function DashboardPage() {
   const models = useStore((s) => s.models);
   const activeClient = useStore((s) => s.activeClient);
   const health = useStore((s) => s.health);
+  const gatewayStatus = useStore((s) => s.gatewayStatus);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const connectionRetry = useStore((s) => s.connectionRetry);
   const actionRunsVersion = useStore((s) => s.actionRunsVersion);
@@ -239,11 +228,6 @@ export default function DashboardPage() {
     };
   }, [currentInstanceId, actionRunsVersion, refreshTick]);
 
-  const activeAgentCount = useMemo(
-    () => agents.filter((a) => a.status === 'running' || a.status === 'idle').length,
-    [agents],
-  );
-
   const recentSessions = useMemo(
     () => [...sessions].sort((a, b) => getSessionTime(b) - getSessionTime(a)).slice(0, 5),
     [sessions],
@@ -269,6 +253,10 @@ export default function DashboardPage() {
     () => (knowledgeSnapshot?.recentFiles ?? []).slice(0, 5),
     [knowledgeSnapshot],
   );
+  const gatewaySummary = useMemo(
+    () => normalizeDashboardGatewaySummary({ health, gatewayStatus, agents }),
+    [agents, gatewayStatus, health],
+  );
 
   const statusBadgeType: 'success' | 'warning' | 'danger' | 'default' =
     isConnected ? 'success' : isLoading ? 'warning' : 'danger';
@@ -279,8 +267,7 @@ export default function DashboardPage() {
       : isLoading
       ? t('instance.statusConnecting')
       : t('instance.statusDisconnected');
-  const uptimeText = health?.uptime != null ? formatUptime(health.uptime) : '-';
-  const gatewayVersion = health?.version || '-';
+  const gatewayVersion = gatewaySummary.runtimeVersion || '-';
 
   const handleRefresh = async () => {
     await useStore.getState().refreshAll();
@@ -302,9 +289,9 @@ export default function DashboardPage() {
           <div className="dashboard-status-line">
             <Badge dot type={statusBadgeType} />
             <Text style={{ fontWeight: 700 }}>{statusLabel}</Text>
-            {health?.status ? (
-              <Tag size="small" color={health.status === 'ok' ? 'green' : health.status === 'degraded' ? 'orange' : 'red'}>
-                {health.status}
+            {gatewaySummary.healthStatus ? (
+              <Tag size="small" color={gatewaySummary.healthStatus === 'ok' ? 'green' : gatewaySummary.healthStatus === 'degraded' ? 'orange' : 'red'}>
+                {gatewaySummary.healthStatus}
               </Tag>
             ) : null}
             {connectionRetry ? (
@@ -315,9 +302,9 @@ export default function DashboardPage() {
             <Text type="tertiary">{isConnected ? t('dashboard.gatewayReady') : t('dashboard.gatewayLimited')}</Text>
           </div>
         </div>
-        <MetricPill icon={<IconServer />} label={t('dashboard.connectedAgents')} value={activeAgentCount} />
+        <MetricPill icon={<IconServer />} label={t('dashboard.connectedAgents')} value={formatNumber(gatewaySummary.agentCount)} />
         <MetricPill icon={<IconBox />} label={t('dashboard.gatewayVersion')} value={gatewayVersion} />
-        <MetricPill icon={<IconClock />} label={t('dashboard.uptime')} value={uptimeText} />
+        <MetricPill icon={<IconComment />} label={t('dashboard.gatewaySessions')} value={formatNumber(gatewaySummary.sessionCount)} />
       </div>
     </DashboardSection>
   );
@@ -546,6 +533,7 @@ export default function DashboardPage() {
         </DashboardSection>
 
         <div className="dashboard-floating-composer-shell">
+          <span className="dashboard-floating-composer-accent" aria-hidden="true" />
           <div className="dashboard-floating-composer-title">
             <Text strong>{t('dashboard.quickStart')}</Text>
             <Text type="tertiary" size="small">{t('dashboard.quickStartDesc')}</Text>

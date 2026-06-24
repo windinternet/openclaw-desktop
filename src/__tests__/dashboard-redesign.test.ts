@@ -80,6 +80,17 @@ describe('dashboard redesign', () => {
     expect(css).not.toContain('position: sticky;');
   });
 
+  it('makes the floating quick start composer visually prominent without changing its inherited composer logic', () => {
+    const dashboard = readFileSync('src/pages/DashboardPage.tsx', 'utf8');
+    const css = readFileSync('src/styles/global.css', 'utf8');
+
+    expect(dashboard).toContain('dashboard-floating-composer-accent');
+    expect(css).toContain('.dashboard-floating-composer-accent');
+    expect(css).toContain('box-shadow: 0 22px 70px');
+    expect(css).toContain('backdrop-filter: blur(18px)');
+    expect(css).toContain('outline: 1px solid color-mix');
+  });
+
   it('defines locale strings for the four major dashboard areas and quick start', () => {
     const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
     const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
