@@ -11,7 +11,6 @@ import {
   IconServer,
   IconBranch,
   IconPieChart2Stroked,
-  IconSearch,
   IconPlusCircle,
   IconCheckList,
   IconUserGroup,
@@ -98,8 +97,6 @@ function getNavIcon(item: PrimaryNavItem) {
       return <IconPieChart2Stroked />;
     case 'new-session':
       return <IconPlusCircle />;
-    case 'sessions':
-      return <IconSearch />;
     case 'workbench':
       return <IconCheckList />;
     case 'knowledge':

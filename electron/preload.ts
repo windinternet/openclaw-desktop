@@ -31,6 +31,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   repository: {
     checkGit: () => ipcRenderer.invoke('repository:checkGit'),
+    chooseDirectory: () => ipcRenderer.invoke('repository:chooseDirectory'),
+    getDefaultPath: () => ipcRenderer.invoke('repository:getDefaultPath'),
     inspect: (repoPath: string) => ipcRenderer.invoke('repository:inspect', repoPath),
     bootstrap: (repoPath: string) => ipcRenderer.invoke('repository:bootstrap', repoPath),
     init: (repoPath: string) => ipcRenderer.invoke('repository:init', repoPath),

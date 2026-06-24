@@ -14,12 +14,19 @@ function getByPath(source: unknown, path: string): unknown {
 }
 
 describe('navigation restructure', () => {
-  it('keeps new session as a first-level work entry', () => {
+  it('keeps new session as a first-level overview entry', () => {
+    const overview = NAV_GROUPS.find((group) => group.key === 'overview');
+
+    expect(overview?.items.map((item) => item.key)).toEqual([
+      'dashboard',
+      'new-session',
+    ]);
+  });
+
+  it('keeps repository work entries in the work group without a separate sessions hub', () => {
     const work = NAV_GROUPS.find((group) => group.key === 'work');
 
     expect(work?.items.map((item) => item.key)).toEqual([
-      'new-session',
-      'sessions',
       'workbench',
       'knowledge',
     ]);
@@ -37,7 +44,6 @@ describe('navigation restructure', () => {
     expect(PRIMARY_ROUTE_MAP).toMatchObject({
       dashboard: '/',
       'new-session': '/new-session',
-      sessions: '/sessions',
       workbench: '/workbench',
       knowledge: '/knowledge',
       collaboration: '/collaboration',
@@ -52,15 +58,20 @@ describe('navigation restructure', () => {
       'dashboard',
       'knowledge',
       'new-session',
-      'sessions',
       'workbench',
     ]);
   });
 
   it('highlights direct primary routes', () => {
-    expect(getActiveNavKey('/sessions')).toBe('sessions');
+    expect(getActiveNavKey('/new-session')).toBe('new-session');
     expect(getActiveNavKey('/workbench')).toBe('workbench');
     expect(getActiveNavKey('/knowledge')).toBe('knowledge');
+  });
+
+  it('keeps legacy session routes under overview instead of a separate primary nav item', () => {
+    expect(getActiveNavKey('/sessions')).toBe('dashboard');
+    expect(getActiveNavKey('/chat/agent%3Amain%3Aabc')).toBe('dashboard');
+    expect(getActiveNavKey('/search')).toBe('dashboard');
   });
 
   it('highlights workbench for legacy work routes', () => {
@@ -78,7 +89,8 @@ describe('navigation restructure', () => {
     expect(getActiveNavKey('/taskkanban')).toBe('control-center');
     expect(getActiveNavKey('/extensions')).toBe('control-center');
     expect(getActiveNavKey('/tuning')).toBe('control-center');
-    expect(getActiveNavKey('/settings')).toBe('control-center');
+    expect(getActiveNavKey('/repository-protocol')).toBe('control-center');
+    expect(getActiveNavKey('/settings')).toBe('dashboard');
   });
 
   it('does not highlight legacy routes on partial path segment matches', () => {
@@ -134,7 +146,8 @@ describe('navigation hub pages', () => {
     expect(control).toContain('<ExtensionsPage embedded');
     expect(control).toContain('<TuningPage embedded');
     expect(control).toContain('<RepositoryProtocolPage embedded');
-    expect(control).toContain('<SettingsPage embedded');
+    expect(control).not.toContain('SettingsPage');
+    expect(control).not.toContain("itemKey=\"settings\"");
   });
 
   it('lets embedded child pages hide their own page headers', () => {
@@ -146,7 +159,6 @@ describe('navigation hub pages', () => {
       'src/pages/ExtensionsPage.tsx',
       'src/pages/TuningPage.tsx',
       'src/pages/RepositoryProtocolPage.tsx',
-      'src/pages/SettingsPage.tsx',
     ];
 
     for (const pagePath of pages) {
@@ -239,7 +251,6 @@ describe('navigation locale strings', () => {
       'controlCenter.tasksDesc',
       'controlCenter.extensionsDesc',
       'controlCenter.tuningDesc',
-      'controlCenter.settingsDesc',
       'controlCenter.repositoryProtocol',
       'controlCenter.repositoryProtocolDesc',
       'controlCenter.runtimeLayer',

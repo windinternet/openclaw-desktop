@@ -116,6 +116,7 @@ describe('agentic repository storage and templates', () => {
 
     expect(AGENTIC_REPOSITORY_STORAGE_KEY).toBe('agentic-repository-binding');
     expect(source).toContain("'agentic-repository-binding'");
+    expect(source).toContain('agentic-repository-binding:');
   });
 
   it('ships bootstrap instructions and schemas for empty repositories', () => {
@@ -156,15 +157,20 @@ describe('agentic repository storage and templates', () => {
 
   it('exposes structured Electron repository APIs and packages templates', () => {
     const preload = readFileSync('electron/preload.ts', 'utf8');
+    const handlers = readFileSync('electron/repository-handlers.ts', 'utf8');
     const main = readFileSync('electron/main.ts', 'utf8');
     const packageJson = readFileSync('package.json', 'utf8');
 
     expect(preload).toContain('repository:');
     expect(preload).toContain('repository:checkGit');
+    expect(preload).toContain('repository:chooseDirectory');
+    expect(preload).toContain('repository:getDefaultPath');
     expect(preload).toContain('repository:inspect');
     expect(preload).toContain('repository:bootstrap');
     expect(preload).toContain('repository:init');
     expect(preload).toContain('repository:gitCommit');
+    expect(handlers).toContain('showOpenDialog');
+    expect(handlers).toContain("app.getPath('home')");
     expect(main).toContain('registerRepositoryIpcHandlers');
     expect(packageJson).toContain('resources/agentic-repo/**/*');
   });
@@ -276,6 +282,31 @@ describe('agentic repository storage and templates', () => {
 
     expect(zh.repositoryGate.gatewayLocal).toContain('高级');
     expect(en.repositoryGate.gatewayLocal.toLowerCase()).toContain('advanced');
+  });
+
+  it('presents repository setup as choices and guided actions instead of raw path entry first', () => {
+    const gate = readFileSync('src/components/RepositoryGate.tsx', 'utf8');
+    const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
+    const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
+
+    expect(gate).toContain('handleChooseDirectory');
+    expect(gate).toContain('handleInitializeDefaultDesktopRepository');
+    expect(gate).toContain('handleGatewayClone');
+    expect(gate).toContain('handleGatewayInitializeHome');
+    expect(gate).toContain('chooseDirectory');
+    expect(gate).toContain('getDefaultPath');
+    expect(gate).toContain('repositoryGate.desktopChooseFolder');
+    expect(gate).toContain('repositoryGate.desktopInitializeDefault');
+    expect(gate).toContain('repositoryGate.gatewayClone');
+    expect(gate).toContain('repositoryGate.gatewayInitializeHome');
+    expect(gate).toContain('repositoryGate.advancedManualPath');
+
+    expect(zh.repositoryGate.desktopChooseFolder).toContain('选择');
+    expect(zh.repositoryGate.desktopInitializeDefault).toContain('自动');
+    expect(zh.repositoryGate.gatewayClone).toContain('克隆');
+    expect(zh.repositoryGate.gatewayInitializeHome).toContain('主目录');
+    expect(en.repositoryGate.desktopChooseFolder.toLowerCase()).toContain('choose');
+    expect(en.repositoryGate.gatewayClone.toLowerCase()).toContain('clone');
   });
 });
 

@@ -11,6 +11,46 @@ import Office3DPage from './Office3DPage';
 
 const { Title, Text } = Typography;
 
+const collaborationStyles = `
+.collaboration-page {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 16px 24px 24px;
+  box-sizing: border-box;
+}
+
+.collaboration-tabs {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.collaboration-tabs > .semi-tabs-content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.collaboration-tabs > .semi-tabs-content > .semi-tabs-pane {
+  height: 100%;
+  min-height: 0;
+}
+
+.collaboration-tabs .semi-tabs-pane-motion-overlay {
+  height: 100%;
+  min-height: 0;
+}
+
+.office-tab-body {
+  height: 100%;
+  min-height: 0;
+}
+`;
+
 export default function CollaborationPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -49,16 +89,29 @@ export default function CollaborationPage() {
   }, [currentInstanceId, actionRunsVersion]);
 
   return (
-    <div style={{ height: '100%', overflow: 'auto', padding: '16px 24px 24px' }}>
+    <div className="collaboration-page">
+      <style>{collaborationStyles}</style>
       <div style={{ marginBottom: 12 }}>
         <Title heading={3} style={{ margin: 0 }}>{activeMeta.title}</Title>
         <Text type="tertiary" size="small">{activeMeta.desc}</Text>
       </div>
-      <Tabs activeKey={activeTab} onChange={handleTabChange} type="line" tabBarExtraContent={tabActions}>
+      <Tabs
+        className="collaboration-tabs"
+        activeKey={activeTab}
+        onChange={handleTabChange}
+        type="line"
+        tabBarExtraContent={tabActions}
+      >
         <Tabs.TabPane tab={<><IconUserGroup /> {t('nav.teams')}</>} itemKey="teams">
           {activeTab === 'teams' && <TeamsPage embedded onHeaderActionsChange={setTabActions} />}
         </Tabs.TabPane>
-        <Tabs.TabPane tab={<><IconDesktop /> {t('nav.office')}</>} itemKey="office">{activeTab === 'office' && <Office3DPage embedded />}</Tabs.TabPane>
+        <Tabs.TabPane tab={<><IconDesktop /> {t('nav.office')}</>} itemKey="office">
+          {activeTab === 'office' && (
+            <div className="office-tab-body" style={{ height: '100%' }}>
+              <Office3DPage embedded />
+            </div>
+          )}
+        </Tabs.TabPane>
         <Tabs.TabPane tab={<><IconBolt /> {t('collaboration.relatedRuns')}</>} itemKey="runs">
           {activeTab === 'runs' && <Space align="start" wrap>
             <div onClick={() => navigate('/workbench')}>

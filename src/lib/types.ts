@@ -220,8 +220,6 @@ export interface SessionMessage {
 export interface ChatSendParams {
   message: string;
   sessionKey?: string;
-  model?: string;
-  thinking?: string;
   idempotencyKey?: string;
   attachments?: Array<{
     fileName: string;

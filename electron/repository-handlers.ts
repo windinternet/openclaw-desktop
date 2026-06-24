@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron'
+import { app, dialog, ipcMain } from 'electron'
 import path from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
@@ -55,6 +55,19 @@ async function checkGitAvailable(): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+function getDefaultRepositoryPath(): string {
+  return path.join(app.getPath('home'), 'OpenClaw', 'Agentic Repository')
+}
+
+async function chooseDirectory(): Promise<string | null> {
+  const result = await dialog.showOpenDialog({
+    title: 'Choose Agentic Repository Folder',
+    defaultPath: getDefaultRepositoryPath(),
+    properties: ['openDirectory', 'createDirectory'],
+  })
+  return result.canceled ? null : result.filePaths[0] ?? null
 }
 
 async function inspectRepository(repoPath: string): Promise<RepositoryInspectResult> {
@@ -219,6 +232,8 @@ async function gitCommit(repoPath: string, message: string): Promise<string> {
 
 export function registerRepositoryIpcHandlers(): void {
   ipcMain.handle('repository:checkGit', () => checkGitAvailable())
+  ipcMain.handle('repository:chooseDirectory', () => chooseDirectory())
+  ipcMain.handle('repository:getDefaultPath', () => getDefaultRepositoryPath())
   ipcMain.handle('repository:inspect', (_event, repoPath: string) => inspectRepository(repoPath))
   ipcMain.handle('repository:bootstrap', (_event, repoPath: string) => bootstrapRepository(repoPath))
   ipcMain.handle('repository:init', (_event, repoPath: string) => initRepository(repoPath))

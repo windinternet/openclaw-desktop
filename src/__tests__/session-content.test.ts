@@ -119,6 +119,8 @@ describe('session content helpers', () => {
     expect(payload.message).toBe('请总结');
     expect(payload.sessionKey).toBe('agent:main:dashboard:test');
     expect(payload.idempotencyKey).toBe('idem-1');
+    expect(payload).not.toHaveProperty('model');
+    expect(payload).not.toHaveProperty('thinking');
     expect(payload.attachments).toEqual([
       {
         fileName: 'notes.txt',
@@ -172,6 +174,23 @@ describe('session content helpers', () => {
     expect(source).toContain("window.addEventListener('drop', handlePageDrop)");
   });
 
+  it('documents that model selection is applied through sessions.patch before chat.send', () => {
+    const source = readFileSync('src/pages/SessionChatPage.tsx', 'utf8');
+    const patchStart = source.indexOf("activeClient.request('sessions.patch', {");
+    const patchEnd = source.indexOf('}).then(() => {', patchStart);
+    const patchBlock = source.slice(patchStart, patchEnd);
+    const sendPayloadStart = source.indexOf('const sendPayload = await buildGatewayChatSendPayload({');
+    const sendPayloadEnd = source.indexOf('const sendResult = await activeClient.request', sendPayloadStart);
+    const sendPayloadBlock = source.slice(sendPayloadStart, sendPayloadEnd);
+
+    expect(source).toContain('extractMessageSetup(_content)');
+    expect(source).toContain('await patchSessionConfig({ model: selectedModel })');
+    expect(patchBlock).toContain('model,');
+    expect(patchBlock).not.toContain('thinking');
+    expect(sendPayloadBlock).not.toContain('model:');
+    expect(sendPayloadBlock).not.toContain('thinking:');
+  });
+
   it('parses desktop context summaries without obscuring the user message', () => {
     const raw = buildContextualUserMessage('前序摘要', '继续实现');
 
@@ -221,7 +240,14 @@ describe('session content helpers', () => {
         toolCallDisplay: 'hidden',
         assistantReplyGrouping: 'merged',
       }),
-    ).toEqual([]);
+    ).toEqual([
+      {
+        type: 'reasoning',
+        content: [{ type: 'reasoning', text: '需要查一下' }],
+        summary: [{ type: 'reasoning', text: '需要查一下' }],
+        status: 'completed',
+      },
+    ]);
 
     const compact = parseHistoryMessageToContentItems(raw, {
       toolCallDisplay: 'compact',
@@ -230,6 +256,59 @@ describe('session content helpers', () => {
 
     expect(extractContentText(compact)).toContain('exec');
     expect(compact[0]?.type).toBe('function_call');
+    expect(compact[1]?.type).toBe('reasoning');
+  });
+
+  it('maps OpenClaw thinking content to Semi reasoning content instead of normal text', () => {
+    const content = parseHistoryMessageToContentItems({
+      role: 'assistant',
+      content: [
+        { type: 'thinking', thinking: '先检查仓库状态，再给出结论' },
+        { type: 'text', text: '仓库状态正常。' },
+      ],
+    });
+
+    expect(content).toEqual([
+      {
+        type: 'reasoning',
+        content: [{ type: 'reasoning', text: '先检查仓库状态，再给出结论' }],
+        summary: [{ type: 'reasoning', text: '先检查仓库状态，再给出结论' }],
+        status: 'completed',
+      },
+      {
+        type: 'message',
+        content: [{ type: 'output_text', text: '仓库状态正常。' }],
+      },
+    ]);
+    expect(extractContentText(content)).toContain('先检查仓库状态');
+  });
+
+  it('unwraps OpenClaw JSONL message envelopes before mapping explicit thinking content', () => {
+    const content = parseHistoryMessageToContentItems(
+      {
+        type: 'message',
+        id: 'msg-event-1',
+        timestamp: '2026-06-24T10:50:10.206Z',
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'thinking', thinking: '先识别附件类型。' },
+            { type: 'toolCall', id: 'call-7', name: 'read', arguments: { path: 'media://image.png' } },
+          ],
+          stopReason: 'toolUse',
+        },
+      },
+      { toolCallDisplay: 'hidden', assistantReplyGrouping: 'merged' },
+    );
+
+    expect(content).toEqual([
+      {
+        type: 'reasoning',
+        content: [{ type: 'reasoning', text: '先识别附件类型。' }],
+        summary: [{ type: 'reasoning', text: '先识别附件类型。' }],
+        status: 'completed',
+      },
+    ]);
   });
 
   it('hides OpenClaw toolResult history records instead of rendering raw JSON', () => {

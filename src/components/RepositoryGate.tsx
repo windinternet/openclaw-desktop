@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Button, Card, Input, Select, Space, Tag, Toast, Typography } from '@douyinfe/semi-ui';
-import { IconBranch, IconRefresh, IconTickCircle } from '@douyinfe/semi-icons';
+import { IconBranch, IconCloud, IconFolderOpen, IconRefresh, IconTickCircle } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
 import type { RepositoryBinding, RepositoryLocation, RepositoryStatus } from '../lib/agentic-repository';
@@ -38,9 +38,12 @@ export default function RepositoryGate({
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const [binding, setBinding] = useState<RepositoryBinding | null>(null);
   const [repoPath, setRepoPath] = useState('');
+  const [gatewayRepoUrl, setGatewayRepoUrl] = useState('');
+  const [gatewayTargetPath] = useState('~/OpenClaw/Agentic Repository');
   const [location, setLocation] = useState<RepositoryLocation>('desktop-local');
   const [status, setStatus] = useState<RepositoryStatus>('repo_unbound');
   const [loading, setLoading] = useState(false);
+  const [advancedManualPath, setAdvancedManualPath] = useState(false);
 
   const inspect = useCallback(async (nextBinding: RepositoryBinding) => {
     setLoading(true);
@@ -87,24 +90,30 @@ export default function RepositoryGate({
     };
   }, [currentInstanceId, inspect]);
 
-  const handleBind = async () => {
-    if (!currentInstanceId || !repoPath.trim()) return;
+  const bindAndInspect = async (path: string, nextLocation: RepositoryLocation = location) => {
+    if (!currentInstanceId || !path.trim()) return null;
     setLoading(true);
     try {
       const next = await createAndSaveRepositoryBinding({
         gatewayInstanceId: currentInstanceId,
-        repoPath: repoPath.trim(),
-        location,
+        repoPath: path.trim(),
+        location: nextLocation,
       });
       await inspect(next);
       Toast.success(t('repositoryGate.saved'));
+      return next;
     } finally {
       setLoading(false);
     }
   };
 
+  const handleBind = async () => {
+    await bindAndInspect(repoPath, location);
+  };
+
   const handleLocationChange = async (value: RepositoryLocation) => {
     setLocation(value);
+    setAdvancedManualPath(false);
     if (!currentInstanceId) return;
     const stored = await loadRepositoryBinding(currentInstanceId, value);
     if (!stored) {
@@ -117,6 +126,55 @@ export default function RepositoryGate({
     setRepoPath(stored.repoPath);
     setStatus(stored.status);
     await inspect(stored);
+  };
+
+  const handleChooseDirectory = async () => {
+    const selected = await window.electronAPI?.repository?.chooseDirectory?.();
+    if (!selected) return;
+    setRepoPath(selected);
+    await bindAndInspect(selected, 'desktop-local');
+  };
+
+  const handleInitializeDefaultDesktopRepository = async () => {
+    if (!currentInstanceId) return;
+    const defaultPath = await window.electronAPI?.repository?.getDefaultPath?.();
+    if (!defaultPath) {
+      Toast.error(t('repositoryGate.localRepositoryUnavailable'));
+      return;
+    }
+    setLoading(true);
+    try {
+      const next = await createAndSaveRepositoryBinding({
+        gatewayInstanceId: currentInstanceId,
+        repoPath: defaultPath,
+        location: 'desktop-local',
+      });
+      const result = await bootstrapRepositoryBinding(next);
+      setBinding(result.binding);
+      setStatus(result.status);
+      setRepoPath(result.binding.repoPath);
+      setLocation(result.binding.location);
+      await saveRepositoryBinding(result.binding);
+      Toast.success(t('repositoryGate.bootstrapDone'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGatewayClone = async () => {
+    if (!currentInstanceId) return;
+    if (!gatewayRepoUrl.trim()) {
+      Toast.warning(t('repositoryGate.gatewayRepoUrlRequired'));
+      return;
+    }
+    await bindAndInspect(gatewayTargetPath, 'gateway-local');
+    Toast.warning(t('repositoryGate.gatewayCapabilityPending'));
+  };
+
+  const handleGatewayInitializeHome = async () => {
+    if (!currentInstanceId) return;
+    await bindAndInspect(gatewayTargetPath, 'gateway-local');
+    Toast.warning(t('repositoryGate.gatewayCapabilityPending'));
   };
 
   const handleBootstrap = async () => {
@@ -134,6 +192,8 @@ export default function RepositoryGate({
   };
 
   const ready = status === 'repo_ready';
+  const showDesktopActions = location === 'desktop-local';
+  const canRefresh = Boolean(binding);
 
   return (
     <div style={{ marginTop: 20 }}>
@@ -157,22 +217,87 @@ export default function RepositoryGate({
                 { label: t('repositoryGate.gatewayLocal'), value: 'gateway-local' },
               ]}
             />
-            <Input
-              value={repoPath}
-              onChange={setRepoPath}
-              placeholder={t('repositoryGate.pathPlaceholder')}
-              style={{ minWidth: 320, flex: 1 }}
-            />
-            <Button type="primary" loading={loading} disabled={!currentInstanceId || !repoPath.trim()} onClick={handleBind}>
-              {t('repositoryGate.bind')}
-            </Button>
-            <Button icon={<IconRefresh />} loading={loading} disabled={!binding} onClick={() => binding && inspect(binding)}>
+            <Button icon={<IconRefresh />} loading={loading} disabled={!canRefresh} onClick={() => binding && inspect(binding)}>
               {t('common.refresh')}
             </Button>
-            <Button loading={loading} disabled={!binding || location !== 'desktop-local' || ready} onClick={handleBootstrap}>
-              {t('repositoryGate.bootstrap')}
-            </Button>
           </Space>
+          {showDesktopActions ? (
+            <Card style={{ width: '100%', background: 'var(--semi-color-fill-0)' }} bodyStyle={{ padding: 14 }}>
+              <Space vertical align="start" style={{ width: '100%' }}>
+                <Text strong>{t('repositoryGate.desktopSetupTitle')}</Text>
+                <Text type="tertiary" size="small">{t('repositoryGate.desktopSetupDesc')}</Text>
+                <Space wrap>
+                  <Button
+                    icon={<IconFolderOpen />}
+                    type="primary"
+                    loading={loading}
+                    disabled={!currentInstanceId}
+                    onClick={handleChooseDirectory}
+                  >
+                    {t('repositoryGate.desktopChooseFolder')}
+                  </Button>
+                  <Button
+                    loading={loading}
+                    disabled={!currentInstanceId}
+                    onClick={handleInitializeDefaultDesktopRepository}
+                  >
+                    {t('repositoryGate.desktopInitializeDefault')}
+                  </Button>
+                  <Button loading={loading} disabled={!binding || ready} onClick={handleBootstrap}>
+                    {t('repositoryGate.bootstrap')}
+                  </Button>
+                </Space>
+                {repoPath ? (
+                  <Text type="tertiary" size="small">{t('repositoryGate.currentPath', { path: repoPath })}</Text>
+                ) : (
+                  <Text type="tertiary" size="small">{t('repositoryGate.noFolderSelected')}</Text>
+                )}
+              </Space>
+            </Card>
+          ) : (
+            <Card style={{ width: '100%', background: 'var(--semi-color-fill-0)' }} bodyStyle={{ padding: 14 }}>
+              <Space vertical align="start" style={{ width: '100%' }}>
+                <Text strong>{t('repositoryGate.gatewaySetupTitle')}</Text>
+                <Text type="tertiary" size="small">{t('repositoryGate.gatewaySetupDesc')}</Text>
+                <Input
+                  value={gatewayRepoUrl}
+                  onChange={setGatewayRepoUrl}
+                  prefix={<IconCloud />}
+                  placeholder={t('repositoryGate.gatewayRepoUrlPlaceholder')}
+                  style={{ width: 'min(100%, 560px)' }}
+                />
+                <Space wrap>
+                  <Button type="primary" loading={loading} disabled={!currentInstanceId} onClick={handleGatewayClone}>
+                    {t('repositoryGate.gatewayClone')}
+                  </Button>
+                  <Button loading={loading} disabled={!currentInstanceId} onClick={handleGatewayInitializeHome}>
+                    {t('repositoryGate.gatewayInitializeHome')}
+                  </Button>
+                </Space>
+                <Text type="tertiary" size="small">{t('repositoryGate.gatewayTargetPath', { path: gatewayTargetPath })}</Text>
+              </Space>
+            </Card>
+          )}
+          <Button
+            theme="borderless"
+            type="tertiary"
+            onClick={() => setAdvancedManualPath((value) => !value)}
+          >
+            {t('repositoryGate.advancedManualPath')}
+          </Button>
+          {advancedManualPath && (
+            <Space wrap style={{ width: '100%' }}>
+              <Input
+                value={repoPath}
+                onChange={setRepoPath}
+                placeholder={showDesktopActions ? t('repositoryGate.desktopPathPlaceholder') : t('repositoryGate.gatewayPathPlaceholder')}
+                style={{ minWidth: 320, flex: 1 }}
+              />
+              <Button type="primary" loading={loading} disabled={!currentInstanceId || !repoPath.trim()} onClick={handleBind}>
+                {t('repositoryGate.bind')}
+              </Button>
+            </Space>
+          )}
           {!ready && (
             <Text type="tertiary" size="small">
               {t(`repositoryGate.hint.${status}`)}

@@ -34,6 +34,8 @@ interface Window {
     };
     repository?: {
       checkGit: () => Promise<boolean>;
+      chooseDirectory?: () => Promise<string | null>;
+      getDefaultPath?: () => Promise<string>;
       inspect: (repoPath: string) => Promise<{
         pathExists: boolean;
         isDirectory: boolean;

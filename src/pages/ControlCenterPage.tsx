@@ -6,7 +6,6 @@ import TasksPage, { type TasksPageHandle } from './TasksPage';
 import ExtensionsPage from './ExtensionsPage';
 import TuningPage from './TuningPage';
 import RepositoryProtocolPage from './RepositoryProtocolPage';
-import SettingsPage from './SettingsPage';
 
 const { Title, Text } = Typography;
 
@@ -21,7 +20,6 @@ export default function ControlCenterPage() {
     extensions: { title: t('nav.extensions'), desc: t('controlCenter.extensionsDesc') },
     tuning: { title: t('nav.tuning'), desc: t('controlCenter.tuningDesc') },
     'repository-protocol': { title: t('controlCenter.repositoryProtocol'), desc: t('controlCenter.repositoryProtocolDesc') },
-    settings: { title: t('nav.settings'), desc: t('controlCenter.settingsDesc') },
   }[activeTab] ?? { title: t('nav.controlCenter'), desc: t('controlCenter.pageDesc') };
 
   const taskActions = (
@@ -72,7 +70,6 @@ export default function ControlCenterPage() {
         <Tabs.TabPane tab={t('controlCenter.repositoryProtocol')} itemKey="repository-protocol">
           {activeTab === 'repository-protocol' && <RepositoryProtocolPage embedded onHeaderActionsChange={setTabActions} />}
         </Tabs.TabPane>
-        <Tabs.TabPane tab={t('nav.settings')} itemKey="settings">{activeTab === 'settings' && <SettingsPage embedded />}</Tabs.TabPane>
       </Tabs>
     </div>
   );

@@ -15,6 +15,8 @@ const INSTANCE_DATA_KEYS = new Set([
   'artifacts',
   'agentic-repository-binding',
 ])
+const AGENTIC_REPOSITORY_BINDING_PREFIX = 'agentic-repository-binding:'
+const AGENTIC_REPOSITORY_BINDING_LOCATIONS = new Set(['desktop-local', 'gateway-local'])
 
 interface StoredAppState {
   schemaVersion: number
@@ -85,9 +87,14 @@ function assertSafeInstanceId(instanceId: string): void {
 }
 
 function assertSafeInstanceDataKey(key: string): void {
-  if (!INSTANCE_DATA_KEYS.has(key)) {
-    throw new Error('Unsupported instance data key')
+  if (INSTANCE_DATA_KEYS.has(key)) return
+  if (
+    key.startsWith(AGENTIC_REPOSITORY_BINDING_PREFIX) &&
+    AGENTIC_REPOSITORY_BINDING_LOCATIONS.has(key.slice(AGENTIC_REPOSITORY_BINDING_PREFIX.length))
+  ) {
+    return
   }
+  throw new Error('Unsupported instance data key')
 }
 
 function toIndexRecord(instance: InstanceConfig): StoredInstanceRecord {

@@ -1,7 +1,6 @@
 export type PrimaryNavKey =
   | 'dashboard'
   | 'new-session'
-  | 'sessions'
   | 'workbench'
   | 'knowledge'
   | 'collaboration'
@@ -14,7 +13,6 @@ export interface PrimaryNavItem {
   icon:
     | 'dashboard'
     | 'new-session'
-    | 'sessions'
     | 'workbench'
     | 'knowledge'
     | 'collaboration'
@@ -33,14 +31,13 @@ export const NAV_GROUPS: PrimaryNavGroup[] = [
     labelKey: 'nav.sectionOverview',
     items: [
       { key: 'dashboard', labelKey: 'nav.dashboard', route: '/', icon: 'dashboard' },
+      { key: 'new-session', labelKey: 'nav.newSession', route: '/new-session', icon: 'new-session' },
     ],
   },
   {
     key: 'work',
     labelKey: 'nav.sectionWork',
     items: [
-      { key: 'new-session', labelKey: 'nav.newSession', route: '/new-session', icon: 'new-session' },
-      { key: 'sessions', labelKey: 'nav.sessions', route: '/sessions', icon: 'sessions' },
       { key: 'workbench', labelKey: 'nav.workbench', route: '/workbench', icon: 'workbench' },
       { key: 'knowledge', labelKey: 'nav.knowledge', route: '/knowledge', icon: 'knowledge' },
     ],
@@ -63,8 +60,6 @@ export const PRIMARY_ROUTE_MAP: Record<PrimaryNavKey, string> = NAV_GROUPS
   }, {} as Record<PrimaryNavKey, string>);
 
 const LEGACY_ROUTE_ACTIVE_KEYS: Array<{ prefix: string; key: PrimaryNavKey }> = [
-  { prefix: '/chat/', key: 'sessions' },
-  { prefix: '/search', key: 'sessions' },
   { prefix: '/actions', key: 'workbench' },
   { prefix: '/artifacts', key: 'workbench' },
   { prefix: '/teams', key: 'collaboration' },
@@ -72,7 +67,6 @@ const LEGACY_ROUTE_ACTIVE_KEYS: Array<{ prefix: string; key: PrimaryNavKey }> = 
   { prefix: '/taskkanban', key: 'control-center' },
   { prefix: '/extensions', key: 'control-center' },
   { prefix: '/tuning', key: 'control-center' },
-  { prefix: '/settings', key: 'control-center' },
   { prefix: '/repository-protocol', key: 'control-center' },
 ];
 

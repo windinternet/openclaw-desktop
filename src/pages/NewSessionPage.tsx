@@ -14,6 +14,10 @@ import AgentSelectOption from '../components/AgentSelectOption';
 
 const { Configure } = AIChatInput;
 const { Title, Text } = Typography;
+const configureSelectProps = {
+  position: 'top' as const,
+  clickToHide: true,
+};
 
 interface FileDropEvent {
   dataTransfer: DataTransfer | null;
@@ -119,13 +123,24 @@ export default function NewSessionPage() {
   const renderConfig = useCallback(() => (
     <>
       <Configure.Select
+        {...configureSelectProps}
         field="agent"
         label={t('chat.agent')}
         optionList={agentOptions}
         initValue={selectedAgentId || agentOptions[0]?.value}
       />
-      <Configure.Select field="model" optionList={modelOptions} initValue={selectedModel || resolvedDefaultModel} />
-      <Configure.Select field="thinking" optionList={THINKING_OPTIONS} initValue={thinkingLevel} />
+      <Configure.Select
+        {...configureSelectProps}
+        field="model"
+        optionList={modelOptions}
+        initValue={selectedModel || resolvedDefaultModel}
+      />
+      <Configure.Select
+        {...configureSelectProps}
+        field="thinking"
+        optionList={THINKING_OPTIONS}
+        initValue={thinkingLevel}
+      />
     </>
   ), [agentOptions, modelOptions, selectedAgentId, selectedModel, resolvedDefaultModel, thinkingLevel, THINKING_OPTIONS, t]);
 

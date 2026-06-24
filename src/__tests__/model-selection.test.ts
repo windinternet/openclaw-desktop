@@ -64,12 +64,13 @@ describe('model selection helpers', () => {
     expect(formatModelOptionLabel({ id: 'deepseek-pro', provider: 'DeepSeek', name: 'Pro' })).toBe('DeepSeek / Pro · deepseek-pro');
     expect(formatModelOptionLabel({ id: 'deepseek-flash', provider: 'DeepSeek', name: 'Flash' })).toBe('DeepSeek / Flash · deepseek-flash');
     expect(formatModelOptionLabel({ id: 'gpt-4.1', provider: 'OpenAI', name: 'gpt-4.1' })).toBe('OpenAI / gpt-4.1');
-    expect(formatModelOptionLabel({ id: 'deepseek-v4-flash', provider: 'deepseek', name: 'DeepSeek V4 Flash', alias: 'DeepSeek' })).toBe('deepseek / DeepSeek V4 Flash (DeepSeek) · deepseek-v4-flash');
+    expect(formatModelOptionLabel({ id: 'deepseek-v4-flash', provider: 'deepseek', name: 'DeepSeek V4 Flash', alias: 'DeepSeek' })).toBe('deepseek / DeepSeek V4 Flash');
+    expect(formatModelOptionLabel({ id: 'mimo-v2.5-pro', provider: 'mimo', name: '小米 Mimo V2.5 Pro', alias: '小米 Mimo' })).toBe('mimo / 小米 Mimo V2.5 Pro');
   });
 
   it('uses provider-qualified option values for chat configuration', () => {
     expect(buildModelOptions([{ id: 'deepseek-v4-flash', provider: 'deepseek', name: 'DeepSeek V4 Flash' }])).toEqual([
-      { value: 'deepseek/deepseek-v4-flash', label: 'deepseek / DeepSeek V4 Flash · deepseek-v4-flash' },
+      { value: 'deepseek/deepseek-v4-flash', label: 'deepseek / DeepSeek V4 Flash' },
     ]);
   });
 

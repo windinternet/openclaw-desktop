@@ -57,9 +57,9 @@ export function resolvePreferredModel(options: {
 export function formatModelOptionLabel(model: ModelInfo): string {
   const displayName = model.name || model.alias || model.id;
   const providerPrefix = model.provider ? `${model.provider} / ` : '';
-  const alias = model.alias && model.alias !== displayName ? ` (${model.alias})` : '';
-  const concreteId = displayName === model.id ? '' : ` · ${model.id}`;
-  return `${providerPrefix}${displayName}${alias}${concreteId}`;
+  const needsConcreteId = displayName !== model.id && (!model.name || model.name.length <= 8);
+  const concreteId = needsConcreteId ? ` · ${model.id}` : '';
+  return `${providerPrefix}${displayName}${concreteId}`;
 }
 
 export function getModelOptionValue(model: ModelInfo): string {
