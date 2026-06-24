@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
-import { loadWorkbenchSnapshot, readWorkbenchMarkdown } from '../lib/repository-workbench';
+import { groupReviewsByFolder, loadWorkbenchSnapshot, parsePlanMetadata, readWorkbenchMarkdown } from '../lib/repository-workbench';
 
 describe('repository workbench', () => {
   afterEach(() => {
@@ -22,6 +22,8 @@ describe('repository workbench', () => {
       if (relativePath === 'work/inbox.md') return '# Inbox';
       if (relativePath === 'runs/index.md') return '# Runs';
       if (relativePath === 'outputs/index.md') return '# Outputs';
+      if (relativePath === 'plans/active/plan.md') return 'status: approved\napproval: user-approved\n# Plan';
+      if (relativePath === 'plans/completed/plan-done.md') return 'status: done\n# Plan Done';
       return '';
     });
     vi.stubGlobal('window', {
@@ -41,9 +43,35 @@ describe('repository workbench', () => {
     expect(snapshot.somedayWork).toHaveLength(1);
     expect(snapshot.activePlans).toHaveLength(1);
     expect(snapshot.completedPlans).toHaveLength(1);
+    expect(snapshot.planMetadata).toEqual([
+      { path: 'plans/active/plan.md', status: 'approved', approval: 'user-approved' },
+      { path: 'plans/completed/plan-done.md', status: 'done' },
+    ]);
+    expect(snapshot.reviewGroups).toEqual([
+      {
+        group: 'weekly',
+        files: [{ path: 'reviews/weekly/2026-W26.md', name: '2026-W26.md', size: 30, updatedAt: 3 }],
+      },
+    ]);
     expect(snapshot.runsMarkdown).toBe('# Runs');
     expect(snapshot.outputsMarkdown).toBe('# Outputs');
     expect(snapshot.reviews).toHaveLength(1);
+  });
+
+  it('parses plan metadata and groups reviews by folder', () => {
+    expect(parsePlanMetadata('plans/active/demo.md', 'status: awaiting-review\napproval: required\n# Demo')).toEqual({
+      path: 'plans/active/demo.md',
+      status: 'awaiting-review',
+      approval: 'required',
+    });
+
+    expect(groupReviewsByFolder([
+      { path: 'reviews/weekly/2026-W26.md', name: '2026-W26.md', size: 10, updatedAt: 1 },
+      { path: 'reviews/projects/openclaw.md', name: 'openclaw.md', size: 11, updatedAt: 2 },
+    ])).toEqual([
+      { group: 'projects', files: [{ path: 'reviews/projects/openclaw.md', name: 'openclaw.md', size: 11, updatedAt: 2 }] },
+      { group: 'weekly', files: [{ path: 'reviews/weekly/2026-W26.md', name: '2026-W26.md', size: 10, updatedAt: 1 }] },
+    ]);
   });
 
   it('reads selected workbench markdown for inline preview', async () => {
@@ -76,6 +104,8 @@ describe('repository workbench', () => {
     expect(source).toContain('selectedPreviewContent');
     expect(source).toContain("t('workbench.preview')");
     expect(source).toContain("t('workbench.activityRuns')");
+    expect(source).toContain('snapshot.planMetadata');
+    expect(source).toContain('snapshot.reviewGroups');
     expect(source).toContain("navigate('/actions')");
   });
 });

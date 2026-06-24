@@ -11,6 +11,7 @@ export interface RepositorySearchResult {
   path: string;
   line: number;
   snippet: string;
+  sourceType?: 'sources' | 'wiki';
 }
 
 export interface KnowledgeSnapshot {
@@ -92,7 +93,21 @@ export async function searchKnowledge(
 ): Promise<RepositorySearchResult[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
-  return getKnowledgeSearchApi().search(binding.repoPath, trimmed, [binding.paths.sources, binding.paths.wiki]);
+  const results = await getKnowledgeSearchApi().search(binding.repoPath, trimmed, [binding.paths.sources, binding.paths.wiki]);
+  return results.map((result) => classifyKnowledgeSearchResult(binding, result));
+}
+
+export function classifyKnowledgeSearchResult(
+  binding: RepositoryBinding,
+  result: RepositorySearchResult,
+): RepositorySearchResult {
+  if (result.path.startsWith(`${binding.paths.sources}/`) || result.path === binding.paths.sources) {
+    return { ...result, sourceType: 'sources' };
+  }
+  if (result.path.startsWith(`${binding.paths.wiki}/`) || result.path === binding.paths.wiki) {
+    return { ...result, sourceType: 'wiki' };
+  }
+  return result;
 }
 
 export function extractMarkdownLinks(markdown: string): string[] {

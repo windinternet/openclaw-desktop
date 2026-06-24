@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
 import {
+  classifyKnowledgeSearchResult,
   extractMarkdownLinks,
   findBacklinks,
   loadKnowledgeSnapshot,
@@ -104,8 +105,15 @@ describe('repository knowledge', () => {
       'Agentic',
     );
 
-    expect(results).toEqual([{ path: 'wiki/index.md', line: 1, snippet: 'Agentic Repository' }]);
+    expect(results).toEqual([{ path: 'wiki/index.md', line: 1, snippet: 'Agentic Repository', sourceType: 'wiki' }]);
     expect(search).toHaveBeenCalledWith('/repo', 'Agentic', ['sources', 'wiki']);
+  });
+
+  it('classifies knowledge search results by repository area', () => {
+    const binding = createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' });
+
+    expect(classifyKnowledgeSearchResult(binding, { path: 'sources/notes/raw.md', line: 1, snippet: 'raw' }).sourceType).toBe('sources');
+    expect(classifyKnowledgeSearchResult(binding, { path: 'wiki/topics/agentic.md', line: 1, snippet: 'wiki' }).sourceType).toBe('wiki');
   });
 
   it('extracts markdown links and finds backlinks', () => {
@@ -127,5 +135,6 @@ describe('repository knowledge', () => {
     expect(source).toContain('snapshot?.relatedRepositoryLinks');
     expect(source).toContain("t('knowledge.recentUpdates')");
     expect(source).toContain("t('knowledge.relationships')");
+    expect(source).toContain("t('common.failed')");
   });
 });

@@ -16,13 +16,18 @@ export default function KnowledgeRepositoryPanel({ binding }: { binding: Reposit
   const [results, setResults] = useState<RepositorySearchResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setError(null);
     loadKnowledgeSnapshot(binding)
       .then((next) => {
         if (!cancelled) setSnapshot(next);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -35,14 +40,18 @@ export default function KnowledgeRepositoryPanel({ binding }: { binding: Reposit
 
   const handleSearch = async () => {
     setSearching(true);
+    setError(null);
     try {
       setResults(await searchKnowledge(binding, query));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSearching(false);
     }
   };
 
   if (loading) return <Spin />;
+  if (error) return <Empty title={t('common.failed')} description={error} />;
 
   return (
     <Space vertical align="start" style={{ width: '100%' }} spacing={16}>
@@ -70,7 +79,10 @@ export default function KnowledgeRepositoryPanel({ binding }: { binding: Reposit
           <Space vertical align="start" style={{ width: '100%' }}>
             {results.map((result) => (
               <div key={`${result.path}:${result.line}`}>
-                <Text strong>{result.path}:{result.line}</Text>
+                <Space align="center">
+                  {result.sourceType && <Tag size="small">{result.sourceType === 'sources' ? t('knowledge.sources') : t('knowledge.wiki')}</Tag>}
+                  <Text strong>{result.path}:{result.line}</Text>
+                </Space>
                 <Text type="tertiary" style={{ display: 'block' }}>{result.snippet}</Text>
               </div>
             ))}

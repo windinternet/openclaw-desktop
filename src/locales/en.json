@@ -64,6 +64,7 @@
     "somedayWork": "Someday",
     "activePlans": "Execution Plans",
     "completedPlans": "Completed Plans",
+    "planMetadata": "Plan Status",
     "preview": "Markdown Preview",
     "previewEmpty": "Select a matter or plan to preview its Markdown",
     "runs": "Run Records",
@@ -139,7 +140,9 @@
   "collaboration": {
     "pageDesc": "Manage OpenClaw Agent teams, office space, and multi-Agent collaboration.",
     "teamsDesc": "View and orchestrate Agents from the Gateway.",
-    "officeDesc": "Observe Agent status and collaboration relationships in a spatial view."
+    "officeDesc": "Observe Agent status and collaboration relationships in a spatial view.",
+    "relatedRuns": "Related Runs",
+    "relatedRunsDesc": "Open the Workbench to review team and office run records."
   },
   "controlCenter": {
     "pageDesc": "Manage Agent capabilities, runtime environment, permissions, and instance settings.",

@@ -155,6 +155,24 @@ export default function WorkbenchRepositoryPanel({ binding }: { binding: Reposit
             <Empty description={t('workbench.emptyCompletedPlans')} />
           )}
         </Card>
+        <Card>
+          <Title heading={5} style={{ marginTop: 0 }}>{t('workbench.planMetadata')}</Title>
+          {snapshot?.planMetadata && snapshot.planMetadata.length > 0 ? (
+            <Space vertical align="start">
+              {snapshot.planMetadata.map((item) => (
+                <div key={item.path}>
+                  <Text strong>{item.path}</Text>
+                  <Space wrap style={{ marginTop: 4 }}>
+                    {item.status && <Tag color="blue">{item.status}</Tag>}
+                    {item.approval && <Tag color="orange">{item.approval}</Tag>}
+                  </Space>
+                </div>
+              ))}
+            </Space>
+          ) : (
+            <Empty description={t('common.noData')} />
+          )}
+        </Card>
       </div>
 
       <Card style={{ width: '100%' }}>
@@ -203,8 +221,17 @@ export default function WorkbenchRepositoryPanel({ binding }: { binding: Reposit
         </Card>
         <Card>
           <Title heading={5} style={{ marginTop: 0 }}>{t('workbench.reviews')}</Title>
-          {snapshot && snapshot.reviews.length > 0 ? (
-            <Space vertical align="start">{snapshot.reviews.map((file) => <Text key={file.path}>{file.path}</Text>)}</Space>
+          {snapshot?.reviewGroups && snapshot.reviewGroups.length > 0 ? (
+            <Space vertical align="start">
+              {snapshot.reviewGroups.map((group) => (
+                <div key={group.group}>
+                  <Text strong>{group.group}</Text>
+                  <Space vertical align="start" style={{ marginTop: 6 }}>
+                    {group.files.map((file) => <Text key={file.path}>{file.path}</Text>)}
+                  </Space>
+                </div>
+              ))}
+            </Space>
           ) : (
             <Empty description={t('workbench.emptyReviews')} />
           )}

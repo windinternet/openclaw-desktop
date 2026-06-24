@@ -36,7 +36,7 @@
 
 ### A. Repository Template And Bootstrap
 
-- [ ] Template matches the default tree in the design doc:
+- [x] Template matches the default tree in the design doc:
   - `sources/articles`
   - `sources/files`
   - `sources/clips`
@@ -46,18 +46,18 @@
   - `wiki/projects`
   - `wiki/decisions`
   - `resources/agentic-repo/templates`
-- [ ] `BOOTSTRAP.md` explains adaptation for existing non-empty repositories.
-- [ ] Desktop exposes structured `desktop.repository.init`.
-- [ ] Desktop exposes structured `desktop.repository.git.commit`.
-- [ ] Existing non-empty repositories are not silently overwritten.
+- [x] `BOOTSTRAP.md` explains adaptation for existing non-empty repositories.
+- [x] Desktop exposes structured `desktop.repository.init`.
+- [x] Desktop exposes structured `desktop.repository.git.commit`.
+- [x] Existing non-empty repositories are not silently overwritten.
 
 ### B. Knowledge Base
 
 - [x] Knowledge UI shows 最近更新 from file metadata.
 - [x] Knowledge UI shows 关系 / backlinks by scanning Markdown links.
 - [x] Knowledge UI connects wiki pages to related work and outputs when Markdown links reference those paths.
-- [ ] Search results distinguish sources and wiki paths.
-- [ ] Empty and error states are localized.
+- [x] Search results distinguish sources and wiki paths.
+- [x] Empty and error states are localized.
 
 ### C. Workbench
 
@@ -65,8 +65,8 @@
 - [x] Workbench exposes a Kanban/status view based on Repository `work/`, separate from OpenClaw scheduled tasks.
 - [x] Workbench previews selected matter Markdown.
 - [x] Workbench shows `plans/active` and `plans/completed`.
-- [ ] Workbench shows plan approval/status metadata when present in Markdown.
-- [ ] Workbench shows reviews grouped by weekly/project folders.
+- [x] Workbench shows plan approval/status metadata when present in Markdown.
+- [x] Workbench shows reviews grouped by weekly/project folders.
 - [x] ActionRun activity can write or mirror summaries into `runs/action-runs/`.
 - [x] Session summaries can be represented under `runs/session-summaries/`.
 
@@ -79,9 +79,9 @@
 
 ### E. Companion And Repository Commands
 
-- [ ] `desktop.repository.init` initializes from the packaged template through a structured command.
-- [ ] `desktop.repository.git.commit` commits approved repository changes with a provided message.
-- [ ] Commands remain narrow and auditable; no generic shell command is exposed.
+- [x] `desktop.repository.init` initializes from the packaged template through a structured command.
+- [x] `desktop.repository.git.commit` commits approved repository changes with a provided message.
+- [x] Commands remain narrow and auditable; no generic shell command is exposed.
 - [x] Capability declarations include the full repository/outputs command set.
 
 ### F. Gateway-Local Advanced Mode
@@ -100,9 +100,9 @@
 
 ### H. Collaboration
 
-- [ ] Collaboration hub keeps Teams and 3D Office as first-class OpenClaw features.
-- [ ] Collaboration activity can link to relevant Workbench runs where available.
-- [ ] Team/Office pages do not get subsumed by Repository concepts.
+- [x] Collaboration hub keeps Teams and 3D Office as first-class OpenClaw features.
+- [x] Collaboration activity can link to relevant Workbench runs where available.
+- [x] Team/Office pages do not get subsumed by Repository concepts.
 
 ## Execution Batches
 
@@ -123,7 +123,7 @@
 - [x] Render 最近更新 and 关系 cards in `KnowledgeRepositoryPanel`.
 - [x] Verify with `npm test -- src/__tests__/repository-knowledge.test.ts`.
 - [x] Run Electron CDP on existing app to verify `#/knowledge`.
-- [ ] Commit.
+- [x] Commit.
 
 ### Batch 3: Workbench Repository Status Views
 
@@ -133,7 +133,7 @@
 - [x] Add selected Markdown preview for matters/plans.
 - [x] Verify with `npm test -- src/__tests__/repository-workbench.test.ts`.
 - [x] Run Electron CDP on existing app to verify `#/workbench`.
-- [ ] Commit.
+- [x] Commit.
 
 ### Batch 4: Runs, Outputs, And Artifacts Migration
 
@@ -142,7 +142,7 @@
 - [x] Write failing tests for UI-created artifacts mirroring into `outputs/`.
 - [x] Route legacy artifact node commands through outputs when repository context is available.
 - [x] Verify with repository outputs, session artifacts, desktop node command, and AI action tests.
-- [ ] Commit.
+- [x] Commit.
 
 ### Batch 5: Control Center Repository Protocol
 

@@ -64,6 +64,7 @@
     "somedayWork": "以后再说",
     "activePlans": "执行计划",
     "completedPlans": "已完成计划",
+    "planMetadata": "计划状态",
     "preview": "Markdown 预览",
     "previewEmpty": "选择一个事项或计划查看 Markdown",
     "runs": "执行记录",
@@ -139,7 +140,9 @@
   "collaboration": {
     "pageDesc": "管理 OpenClaw Agent 团队、办公室和多 Agent 协作。",
     "teamsDesc": "查看和编排 Gateway 中的 Agent 团队。",
-    "officeDesc": "用空间视图观察 Agent 状态和协作关系。"
+    "officeDesc": "用空间视图观察 Agent 状态和协作关系。",
+    "relatedRuns": "相关执行记录",
+    "relatedRunsDesc": "跳转到工作台查看团队和办公室相关运行记录。"
   },
   "controlCenter": {
     "pageDesc": "管理 Agent 能力、运行环境、权限和实例设置。",

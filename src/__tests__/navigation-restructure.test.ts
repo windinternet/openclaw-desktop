@@ -110,6 +110,9 @@ describe('navigation hub pages', () => {
     expect(collaboration).toContain("t('nav.collaboration')");
     expect(collaboration).toContain('/teams');
     expect(collaboration).toContain('/office');
+    expect(collaboration).toContain('loadAiActionRuns');
+    expect(collaboration).toContain("navigate('/workbench')");
+    expect(collaboration).toContain("t('collaboration.relatedRuns')");
 
     expect(control).toContain("t('nav.controlCenter')");
     expect(control).toContain('/taskkanban');
