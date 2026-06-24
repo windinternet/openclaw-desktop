@@ -1115,9 +1115,15 @@ function handleOfficeShot(state: SceneState, container: HTMLDivElement): boolean
   const origin = state.firstPersonCamera.position.clone();
   const fallbackEnd = origin.clone().add(state.raycaster.ray.direction.clone().multiplyScalar(8));
   const hits = state.raycaster.intersectObjects(state.scene.children, true);
-  const hit = hits.find((item) => (
-    typeof item.object.userData.agentId === 'string' && item.object.userData.agentId !== state.controlledAgentId
-  ));
+  const hit = hits.find((item) => {
+    if (typeof item.object.userData.agentId !== 'string') return false;
+    const agentId = item.object.userData.agentId;
+    if (agentId === state.controlledAgentId) return false;
+    const actor = state.actors.get(agentId);
+    if (!actor) return false;
+    if (actor.combat.downedUntil !== null) return false;
+    return true;
+  });
   const theme = state.currentTheme;
   const end = hit?.point ?? fallbackEnd;
 
@@ -1749,6 +1755,9 @@ export default function OfficeScene({
       const onMouseDown = (event: MouseEvent) => {
         event.preventDefault();
         container.focus();
+        if (event.button === 0 && state.cameraMode === 'first-person' && state.weaponMode === 'toy-blaster') {
+          return;
+        }
         if (event.button === 1) {
           state.middleDrag = {
             active: true,
@@ -1756,11 +1765,9 @@ export default function OfficeScene({
             lastY: event.clientY,
           };
         } else if (event.button === 0) {
-          state.leftDrag = {
-            active: true,
-            lastX: event.clientX,
-            lastY: event.clientY,
-          };
+          state.leftDrag.active = true;
+          state.leftDrag.lastX = event.clientX;
+          state.leftDrag.lastY = event.clientY;
         }
       };
       const onMouseMove = (event: MouseEvent) => {
