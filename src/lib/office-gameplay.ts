@@ -62,16 +62,6 @@ export function createOfficeCombatState(now = 0): OfficeCombatState {
 }
 
 export function applyOfficeShot(
-  combat: OfficeCombatState & { downedUntil: number },
-  now: number,
-  random?: () => number,
-): OfficeShotResult & { event: 'ignored'; message: null };
-export function applyOfficeShot(
-  combat: OfficeCombatState,
-  now: number,
-  random?: () => number,
-): OfficeShotResult & { message: string };
-export function applyOfficeShot(
   combat: OfficeCombatState,
   now: number,
   random = Math.random,
@@ -121,16 +111,6 @@ export function applyOfficeShot(
   };
 }
 
-export function reviveOfficeCombatIfReady(
-  combat: OfficeCombatState & { downedUntil: null },
-  now: number,
-  random?: () => number,
-): OfficeReviveResult & { revived: false; message: null };
-export function reviveOfficeCombatIfReady(
-  combat: OfficeCombatState & { downedUntil: number },
-  now: number,
-  random?: () => number,
-): OfficeReviveResult & { message: string };
 export function reviveOfficeCombatIfReady(
   combat: OfficeCombatState,
   now: number,
