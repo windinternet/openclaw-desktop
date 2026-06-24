@@ -70,7 +70,7 @@
 ### D. Outputs And Artifacts
 
 - [ ] New artifact creation from the Desktop UI mirrors into Repository `outputs/` when a ready binding exists.
-- [ ] Legacy `desktop.artifacts.create` internally follows the outputs path when `repoPath` or a ready binding is available.
+- [x] Legacy `desktop.artifacts.create` internally follows the outputs path when `repoPath` is available.
 - [ ] Outputs list in Workbench reflects newly mirrored outputs without requiring the user to understand legacy artifact storage.
 - [ ] Output metadata returns `outputId/path/previewPath` consistently.
 

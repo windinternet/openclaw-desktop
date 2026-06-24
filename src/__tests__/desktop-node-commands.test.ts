@@ -68,6 +68,50 @@ describe('desktop node commands', () => {
     }));
   });
 
+  it('mirrors legacy artifact creation into repository outputs when repoPath is provided', async () => {
+    mockedArtifactService.generate.mockResolvedValue({
+      id: 'art_legacy',
+      title: '旧产物',
+      icon: '📊',
+      type: 'report',
+      source: { type: 'mcp_tool' },
+      tags: [],
+      currentVersion: 1,
+      status: 'draft',
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    mockedCreateRepositoryOutput.mockResolvedValue({
+      outputPath: 'outputs/reports/art_legacy.md',
+      previewPath: 'outputs/html/art_legacy.html',
+    });
+
+    await expect(handleDesktopNodeCommand('desktop.artifacts.create', {
+      repoPath: '/repo',
+      gatewayInstanceId: 'inst-1',
+      title: '旧产物',
+      type: 'report',
+      html: '<html>legacy</html>',
+    })).resolves.toEqual({
+      ok: true,
+      artifact: {
+        id: 'art_legacy',
+        title: '旧产物',
+        currentVersion: 1,
+      },
+      output: {
+        path: 'outputs/reports/art_legacy.md',
+        previewPath: 'outputs/html/art_legacy.html',
+      },
+    });
+
+    expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(expect.objectContaining({
+      html: '<html>legacy</html>',
+      artifact: expect.objectContaining({ id: 'art_legacy' }),
+      binding: expect.objectContaining({ repoPath: '/repo', gatewayInstanceId: 'inst-1' }),
+    }));
+  });
+
   it('creates a repository output while preserving artifact compatibility', async () => {
     mockedArtifactService.generate.mockResolvedValue({
       id: 'art_2',

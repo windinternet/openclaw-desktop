@@ -73,6 +73,7 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
   }
 
   if (command === 'desktop.artifacts.create') {
+    const repoPath = stringValue(params.repoPath);
     const title = stringValue(params.title);
     const html = stringValue(params.html);
     const type = artifactTypeValue(params.type);
@@ -90,7 +91,11 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
       source: { type: 'mcp_tool', name: command },
     });
 
-    return {
+    const result: {
+      ok: true;
+      artifact: { id: string; title: string; currentVersion: number };
+      output?: { path: string; previewPath?: string };
+    } = {
       ok: true,
       artifact: {
         id: artifact.id,
@@ -98,6 +103,21 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
         currentVersion: artifact.currentVersion,
       },
     };
+    if (repoPath) {
+      const output = await createRepositoryOutput({
+        binding: createDefaultRepositoryBinding({
+          gatewayInstanceId: stringValue(params.gatewayInstanceId) ?? 'desktop-node',
+          repoPath,
+        }),
+        artifact,
+        html,
+      });
+      result.output = {
+        path: output.outputPath,
+        previewPath: output.previewPath,
+      };
+    }
+    return result;
   }
 
   if (command === 'desktop.outputs.create') {
