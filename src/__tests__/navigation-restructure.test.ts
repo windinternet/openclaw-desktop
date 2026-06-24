@@ -100,6 +100,9 @@ describe('navigation hub pages', () => {
     expect(sessions).toContain('/search');
 
     expect(workbench).toContain("t('nav.workbench')");
+    expect(workbench).toContain('<Tabs');
+    expect(workbench).toContain('<ActionCenterPage />');
+    expect(workbench).toContain('<ArtifactsPage />');
     expect(workbench).toContain('WorkbenchRepositoryPanel');
     expect(workbench).not.toContain('/taskkanban');
 
@@ -108,17 +111,20 @@ describe('navigation hub pages', () => {
     expect(knowledge).toContain('KnowledgeRepositoryPanel');
 
     expect(collaboration).toContain("t('nav.collaboration')");
-    expect(collaboration).toContain('/teams');
-    expect(collaboration).toContain('/office');
+    expect(collaboration).toContain('<Tabs');
+    expect(collaboration).toContain('<TeamsPage />');
+    expect(collaboration).toContain('<Office3DPage />');
     expect(collaboration).toContain('loadAiActionRuns');
     expect(collaboration).toContain("navigate('/workbench')");
     expect(collaboration).toContain("t('collaboration.relatedRuns')");
 
     expect(control).toContain("t('nav.controlCenter')");
-    expect(control).toContain('/taskkanban');
-    expect(control).toContain('/extensions');
-    expect(control).toContain('/tuning');
-    expect(control).toContain('/settings');
+    expect(control).toContain('<Tabs');
+    expect(control).toContain('<TaskKanbanPage />');
+    expect(control).toContain('<ExtensionsPage />');
+    expect(control).toContain('<TuningPage />');
+    expect(control).toContain('<RepositoryProtocolPage />');
+    expect(control).toContain('<SettingsPage />');
   });
 });
 

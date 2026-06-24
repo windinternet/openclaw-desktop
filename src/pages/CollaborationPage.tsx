@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Card, Space, Typography } from '@douyinfe/semi-ui';
+import { Card, Space, Tabs, Typography } from '@douyinfe/semi-ui';
 import { IconBolt, IconDesktop, IconUserGroup } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { loadAiActionRuns } from '../lib/ai-action-run-store';
 import { useStore } from '../lib';
 import type { AiActionRun } from '../lib/types';
+import TeamsPage from './TeamsPage';
+import Office3DPage from './Office3DPage';
 
 const { Title, Text } = Typography;
 
@@ -14,6 +16,7 @@ export default function CollaborationPage() {
   const navigate = useNavigate();
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const actionRunsVersion = useStore((s) => s.actionRunsVersion);
+  const [activeTab, setActiveTab] = useState('teams');
   const [runs, setRuns] = useState<AiActionRun[]>([]);
 
   useEffect(() => {
@@ -38,37 +41,24 @@ export default function CollaborationPage() {
     <div style={{ height: '100%', overflow: 'auto', padding: 24 }}>
       <Title heading={3} style={{ marginTop: 0 }}>{t('nav.collaboration')}</Title>
       <Text type="tertiary">{t('collaboration.pageDesc')}</Text>
-      <Space align="start" wrap style={{ marginTop: 20 }}>
-        <div onClick={() => navigate('/teams')}>
-          <Card style={{ width: 280, cursor: 'pointer' }} bodyStyle={{ minHeight: 132 }}>
-            <Space vertical align="start">
-              <IconUserGroup size="extra-large" />
-              <Text strong>{t('nav.teams')}</Text>
-              <Text type="tertiary" size="small">{t('collaboration.teamsDesc')}</Text>
-            </Space>
-          </Card>
-        </div>
-        <div onClick={() => navigate('/office')}>
-          <Card style={{ width: 280, cursor: 'pointer' }} bodyStyle={{ minHeight: 132 }}>
-            <Space vertical align="start">
-              <IconDesktop size="extra-large" />
-              <Text strong>{t('nav.office')}</Text>
-              <Text type="tertiary" size="small">{t('collaboration.officeDesc')}</Text>
-            </Space>
-          </Card>
-        </div>
-        <div onClick={() => navigate('/workbench')}>
-          <Card style={{ width: 280, cursor: 'pointer' }} bodyStyle={{ minHeight: 132 }}>
-            <Space vertical align="start">
-              <IconBolt size="extra-large" />
-              <Text strong>{t('collaboration.relatedRuns')}</Text>
-              <Text type="tertiary" size="small">
-                {runs[0]?.resultSummary || runs[0]?.input || t('collaboration.relatedRunsDesc')}
-              </Text>
-            </Space>
-          </Card>
-        </div>
-      </Space>
+      <Tabs activeKey={activeTab} onChange={setActiveTab} type="line" style={{ marginTop: 20 }}>
+        <Tabs.TabPane tab={<><IconUserGroup /> {t('nav.teams')}</>} itemKey="teams">{activeTab === 'teams' && <TeamsPage />}</Tabs.TabPane>
+        <Tabs.TabPane tab={<><IconDesktop /> {t('nav.office')}</>} itemKey="office">{activeTab === 'office' && <Office3DPage />}</Tabs.TabPane>
+        <Tabs.TabPane tab={<><IconBolt /> {t('collaboration.relatedRuns')}</>} itemKey="runs">
+          {activeTab === 'runs' && <Space align="start" wrap>
+            <div onClick={() => navigate('/workbench')}>
+              <Card style={{ width: 320, cursor: 'pointer' }} bodyStyle={{ minHeight: 132 }}>
+                <Space vertical align="start">
+                  <Text strong>{t('collaboration.relatedRuns')}</Text>
+                  <Text type="tertiary" size="small">
+                    {runs[0]?.resultSummary || runs[0]?.input || t('collaboration.relatedRunsDesc')}
+                  </Text>
+                </Space>
+              </Card>
+            </div>
+          </Space>}
+        </Tabs.TabPane>
+      </Tabs>
     </div>
   );
 }

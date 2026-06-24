@@ -1,39 +1,29 @@
-import { Card, Space, Typography } from '@douyinfe/semi-ui';
-import { IconCheckList, IconCustomize, IconFile, IconPuzzle, IconSetting } from '@douyinfe/semi-icons';
+import { useState } from 'react';
+import { Tabs, Typography } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import TaskKanbanPage from './TaskKanbanPage';
+import ExtensionsPage from './ExtensionsPage';
+import TuningPage from './TuningPage';
+import RepositoryProtocolPage from './RepositoryProtocolPage';
+import SettingsPage from './SettingsPage';
 
 const { Title, Text } = Typography;
 
 export default function ControlCenterPage() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-
-  const items = [
-    { title: t('nav.tasks'), desc: t('controlCenter.tasksDesc'), path: '/taskkanban', icon: <IconCheckList size="extra-large" /> },
-    { title: t('nav.extensions'), desc: t('controlCenter.extensionsDesc'), path: '/extensions', icon: <IconPuzzle size="extra-large" /> },
-    { title: t('nav.tuning'), desc: t('controlCenter.tuningDesc'), path: '/tuning', icon: <IconCustomize size="extra-large" /> },
-    { title: t('nav.settings'), desc: t('controlCenter.settingsDesc'), path: '/settings', icon: <IconSetting size="extra-large" /> },
-    { title: t('controlCenter.repositoryProtocol'), desc: t('controlCenter.repositoryProtocolDesc'), path: '/repository-protocol', icon: <IconFile size="extra-large" /> },
-  ];
+  const [activeTab, setActiveTab] = useState('tasks');
 
   return (
     <div style={{ height: '100%', overflow: 'auto', padding: 24 }}>
       <Title heading={3} style={{ marginTop: 0 }}>{t('nav.controlCenter')}</Title>
       <Text type="tertiary">{t('controlCenter.pageDesc')}</Text>
-      <Space align="start" wrap style={{ marginTop: 20 }}>
-        {items.map((item) => (
-          <div key={item.path} onClick={() => navigate(item.path)}>
-            <Card style={{ width: 280, cursor: 'pointer' }} bodyStyle={{ minHeight: 132 }}>
-              <Space vertical align="start">
-                {item.icon}
-                <Text strong>{item.title}</Text>
-                <Text type="tertiary" size="small">{item.desc}</Text>
-              </Space>
-            </Card>
-          </div>
-        ))}
-      </Space>
+      <Tabs activeKey={activeTab} onChange={setActiveTab} type="line" style={{ marginTop: 20 }}>
+        <Tabs.TabPane tab={t('nav.tasks')} itemKey="tasks">{activeTab === 'tasks' && <TaskKanbanPage />}</Tabs.TabPane>
+        <Tabs.TabPane tab={t('nav.extensions')} itemKey="extensions">{activeTab === 'extensions' && <ExtensionsPage />}</Tabs.TabPane>
+        <Tabs.TabPane tab={t('nav.tuning')} itemKey="tuning">{activeTab === 'tuning' && <TuningPage />}</Tabs.TabPane>
+        <Tabs.TabPane tab={t('controlCenter.repositoryProtocol')} itemKey="repository-protocol">{activeTab === 'repository-protocol' && <RepositoryProtocolPage />}</Tabs.TabPane>
+        <Tabs.TabPane tab={t('nav.settings')} itemKey="settings">{activeTab === 'settings' && <SettingsPage />}</Tabs.TabPane>
+      </Tabs>
     </div>
   );
 }

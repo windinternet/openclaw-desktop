@@ -66,6 +66,7 @@ import {
   getChatRoute,
   resolveCreatedSessionKey,
 } from '../lib/new-session';
+import { buildModelOptions, fetchGatewayDefaultModel, resolvePreferredModel } from '../lib/model-selection';
 import {
   buildGatewayChatSendPayload,
   buildSemiMessageContent,
@@ -652,6 +653,7 @@ export default function SessionChatPage() {
   const [generating, setGenerating] = useState(false);
   const [switchingAgent, setSwitchingAgent] = useState(false);
   const [chatModel, setChatModel] = useState('');
+  const [gatewayDefaultModel, setGatewayDefaultModel] = useState<string | undefined>();
   const [chatThinking, setChatThinking] = useState('medium');
 
   const PAGE_SIZE = 30;
@@ -668,6 +670,7 @@ export default function SessionChatPage() {
   const patchAppliedRef = useRef(false);
   const patchModelRef = useRef('');
   const patchThinkingRef = useRef('');
+  const chatModelTouchedRef = useRef(false);
   const sendingRef = useRef(false);
   const genTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -727,9 +730,38 @@ export default function SessionChatPage() {
     };
   }, [currentInstanceId, rootSessionKey]);
 
+  const activeAgentId = useMemo(
+    () => getAgentIdFromSessionKey(activeSessionKey || '') || 'main',
+    [activeSessionKey],
+  );
+  const sessionModel = sessionContextSnapshot?.model ?? sessionContextSnapshot?.configuredModel ?? sessionContextSnapshot?.selectedModel;
+  const defaultChatModel = useMemo(() => resolvePreferredModel({
+    models,
+    agents,
+    selectedAgentId: activeAgentId,
+    gatewayDefaultModel,
+    sessionModel,
+  }), [activeAgentId, agents, gatewayDefaultModel, models, sessionModel]);
+
   useEffect(() => {
-    if (!chatModel && models.length > 0) queueMicrotask(() => setChatModel(models[0].id));
-  }, [models, chatModel]);
+    if (!activeClient || connectionStatus !== 'connected') {
+      setGatewayDefaultModel(undefined);
+      return;
+    }
+    let cancelled = false;
+    fetchGatewayDefaultModel(activeClient).then((model) => {
+      if (!cancelled) setGatewayDefaultModel(model);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeClient, connectionStatus]);
+
+  useEffect(() => {
+    if (!chatModelTouchedRef.current && defaultChatModel && chatModel !== defaultChatModel) {
+      queueMicrotask(() => setChatModel(defaultChatModel));
+    }
+  }, [defaultChatModel, chatModel]);
 
   /* ── 草稿保存 ── */
   const DRAFT_PREFIX = 'chat-draft:';
@@ -1241,6 +1273,7 @@ export default function SessionChatPage() {
 
   useEffect(() => {
     patchAppliedRef.current = false;
+    chatModelTouchedRef.current = false;
   }, [activeSessionKey]);
 
   const handleSend = useCallback(
@@ -1362,7 +1395,10 @@ export default function SessionChatPage() {
     initialMessageSentRef.current = sentKey;
 
     queueMicrotask(() => {
-      if (initialMessage.model) setChatModel(initialMessage.model);
+      if (initialMessage.model) {
+        chatModelTouchedRef.current = true;
+        setChatModel(initialMessage.model);
+      }
       if (initialMessage.thinking) setChatThinking(initialMessage.thinking);
     });
     void handleSend(initialMessage.content, {
@@ -1497,7 +1533,7 @@ export default function SessionChatPage() {
         const summary = await requestVisibleSummary();
         const createParams = buildNewSessionCreateParams({
           agentId: targetAgentId,
-          model: chatModel || models[0]?.id,
+          model: chatModel || defaultChatModel,
           content: t('chat.switchContinueWith', { name: targetAgentName }),
         });
         const result = await activeClient.request<{ key?: string; sessionKey?: string }>(
@@ -1577,6 +1613,7 @@ export default function SessionChatPage() {
     generating,
     globalAgentSwitchStrategy,
     models,
+    defaultChatModel,
     navigate,
     rootSessionKey,
     sessions,
@@ -1597,8 +1634,8 @@ export default function SessionChatPage() {
         />
         <Configure.Select
           field="model"
-          optionList={models.map((m) => ({ value: m.id, label: m.alias || m.name || m.id }))}
-          initValue={chatModel || models[0]?.id}
+          optionList={buildModelOptions(models)}
+          initValue={chatModel || defaultChatModel}
         />
         <Configure.Select
           field="thinking"
@@ -1613,13 +1650,16 @@ export default function SessionChatPage() {
         />
       </>
     )},
-    [agentOptions, models, chatModel, chatThinking, activeSessionKey, t],
+    [agentOptions, models, chatModel, defaultChatModel, chatThinking, activeSessionKey, t],
   );
 
   const handleConfigChange = useCallback((_v: Record<string, unknown> | undefined, changed: Record<string, unknown> | undefined) => {
     if (!changed) return;
     if ('agent' in changed) void handleAgentSwitch(changed.agent as string);
-    if ('model' in changed) setChatModel(changed.model as string);
+    if ('model' in changed) {
+      chatModelTouchedRef.current = true;
+      setChatModel(changed.model as string);
+    }
     if ('thinking' in changed) setChatThinking(changed.thinking as string);
   }, [handleAgentSwitch]);
 
