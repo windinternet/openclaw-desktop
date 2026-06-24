@@ -31,16 +31,36 @@ describe('dashboard redesign', () => {
 
   it('surfaces Gateway, usage, repository, knowledge, and artifact data sources', () => {
     const dashboard = readFileSync('src/pages/DashboardPage.tsx', 'utf8');
+    const usage = readFileSync('src/lib/gateway-usage.ts', 'utf8');
 
     expect(dashboard).toContain('loadRepositoryBinding');
     expect(dashboard).toContain('loadWorkbenchSnapshot');
     expect(dashboard).toContain('loadKnowledgeSnapshot');
     expect(dashboard).toContain('loadAiActionRuns');
+    expect(dashboard).toContain('fetchGatewayUsageDashboard');
+    expect(usage).toContain('usage.status');
+    expect(usage).toContain('usage.cost');
+    expect(usage).toContain('sessions.usage');
     expect(dashboard).toContain('fetchArtifacts');
     expect(dashboard).toContain('artifacts');
-    expect(dashboard).toContain("t('dashboard.usageUnavailable')");
+    expect(dashboard).toContain("t('dashboard.realUsageUnavailable')");
     expect(dashboard).toContain("t('dashboard.repositoryUnavailable')");
     expect(dashboard).not.toContain('Math.random');
+  });
+
+  it('renders rich real Gateway usage instead of local estimate-only metrics', () => {
+    const dashboard = readFileSync('src/pages/DashboardPage.tsx', 'utf8');
+
+    expect(dashboard).toContain('dashboard-usage-layout');
+    expect(dashboard).toContain('dashboard-model-usage-list');
+    expect(dashboard).toContain('dashboard-usage-trend');
+    expect(dashboard).toContain('dashboard-provider-quota-list');
+    expect(dashboard).toContain("t('dashboard.totalTokens')");
+    expect(dashboard).toContain("t('dashboard.modelUsage')");
+    expect(dashboard).toContain("t('dashboard.providerQuota')");
+    expect(dashboard).toContain("t('dashboard.usageTrend')");
+    expect(dashboard).not.toContain("label={t('dashboard.messageCount')}");
+    expect(dashboard).not.toContain('estimatedFromSessions');
   });
 
   it('lets the dashboard occupy the full horizontal content width', () => {
@@ -70,7 +90,16 @@ describe('dashboard redesign', () => {
       'dashboard.outputsArtifacts',
       'dashboard.attention',
       'dashboard.quickStart',
-      'dashboard.usageUnavailable',
+      'dashboard.realUsageUnavailable',
+      'dashboard.totalTokens',
+      'dashboard.inputTokens',
+      'dashboard.outputTokens',
+      'dashboard.cacheTokens',
+      'dashboard.estimatedCost',
+      'dashboard.modelUsage',
+      'dashboard.providerQuota',
+      'dashboard.usageTrend',
+      'dashboard.recentHighUsageSessions',
       'dashboard.repositoryUnavailable',
       'dashboard.viewWorkbench',
       'dashboard.viewKnowledge',

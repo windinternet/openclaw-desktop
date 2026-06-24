@@ -11,7 +11,6 @@ import {
   IconRefresh,
   IconSearch,
   IconServer,
-  IconUserGroup,
 } from '@douyinfe/semi-icons';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +19,7 @@ import NewSessionComposer from '../components/NewSessionComposer';
 import type { ArtifactMeta } from '../lib/artifact-types';
 import { loadAiActionRuns } from '../lib/ai-action-run-store';
 import { loadRepositoryBinding } from '../lib/agentic-repository-store';
+import { fetchGatewayUsageDashboard, type GatewayUsageDashboard } from '../lib/gateway-usage';
 import { loadKnowledgeSnapshot, type KnowledgeSnapshot, type RepositoryMarkdownFile } from '../lib/repository-knowledge';
 import { loadWorkbenchSnapshot, type WorkbenchSnapshot } from '../lib/repository-workbench';
 
@@ -45,6 +45,21 @@ function formatRetryDelay(delayMs: number): string {
 function formatDate(value?: number): string {
   if (!value) return '-';
   return new Date(value).toLocaleDateString();
+}
+
+function formatNumber(value?: number): string {
+  if (value === undefined) return '-';
+  return Math.round(value).toLocaleString();
+}
+
+function formatCost(value?: number): string {
+  if (value === undefined) return '-';
+  return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
+}
+
+function formatPercent(value?: number): string {
+  if (value === undefined) return '-';
+  return `${Math.max(0, Math.min(100, value)).toFixed(0)}%`;
 }
 
 function getSessionTime(session: SessionInfo): number {
@@ -144,6 +159,7 @@ export default function DashboardPage() {
   const agents = useStore((s) => s.agents);
   const sessions = useStore((s) => s.sessions);
   const models = useStore((s) => s.models);
+  const activeClient = useStore((s) => s.activeClient);
   const health = useStore((s) => s.health);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const connectionRetry = useStore((s) => s.connectionRetry);
@@ -154,6 +170,7 @@ export default function DashboardPage() {
   const [workbenchSnapshot, setWorkbenchSnapshot] = useState<WorkbenchSnapshot | null>(null);
   const [knowledgeSnapshot, setKnowledgeSnapshot] = useState<KnowledgeSnapshot | null>(null);
   const [actionRuns, setActionRuns] = useState<AiActionRun[]>([]);
+  const [usageDashboard, setUsageDashboard] = useState<GatewayUsageDashboard | null>(null);
   const [repositoryUnavailable, setRepositoryUnavailable] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
 
@@ -163,6 +180,26 @@ export default function DashboardPage() {
   useEffect(() => {
     void fetchArtifacts().catch(() => undefined);
   }, [currentInstanceId, fetchArtifacts]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeClient || connectionStatus !== 'connected') {
+      setUsageDashboard(null);
+      return;
+    }
+
+    void fetchGatewayUsageDashboard(activeClient, { models })
+      .then((dashboard) => {
+        if (!cancelled) setUsageDashboard(dashboard);
+      })
+      .catch(() => {
+        if (!cancelled) setUsageDashboard(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeClient, connectionStatus, models, refreshTick]);
 
   useEffect(() => {
     let cancelled = false;
@@ -207,11 +244,6 @@ export default function DashboardPage() {
     [agents],
   );
 
-  const activeSessionCount = useMemo(
-    () => sessions.filter((s) => s.status === 'active' || s.status === 'idle').length,
-    [sessions],
-  );
-
   const recentSessions = useMemo(
     () => [...sessions].sort((a, b) => getSessionTime(b) - getSessionTime(a)).slice(0, 5),
     [sessions],
@@ -236,11 +268,6 @@ export default function DashboardPage() {
   const recentKnowledge = useMemo(
     () => (knowledgeSnapshot?.recentFiles ?? []).slice(0, 5),
     [knowledgeSnapshot],
-  );
-
-  const totalMessages = useMemo(
-    () => sessions.reduce((sum, session) => sum + (session.messageCount ?? 0), 0),
-    [sessions],
   );
 
   const statusBadgeType: 'success' | 'warning' | 'danger' | 'default' =
@@ -297,12 +324,91 @@ export default function DashboardPage() {
 
   const renderUsageSection = () => (
     <DashboardSection title={t('dashboard.gatewayUsage')} description={t('dashboard.gatewayUsageDesc')}>
-      <div className="dashboard-metric-grid">
-        <MetricPill icon={<IconComment />} label={t('dashboard.activeSessions')} value={activeSessionCount} note={t('dashboard.totalSessions', { count: sessions.length })} />
-        <MetricPill icon={<IconUserGroup />} label={t('dashboard.connectedAgents')} value={agents.length} note={t('dashboard.modelCount', { count: models.length })} />
-        <MetricPill icon={<IconBolt />} label={t('dashboard.actionRuns')} value={actionRuns.length} note={t('dashboard.recentRunsCount', { count: recentRuns.length })} />
-        <MetricPill icon={<IconAppCenter />} label={t('dashboard.outputsArtifacts')} value={artifacts.length} note={t('dashboard.usageUnavailable')} />
-        <MetricPill icon={<IconFile />} label={t('dashboard.messageCount')} value={totalMessages} note={t('dashboard.estimatedFromSessions')} />
+      <div className="dashboard-usage-layout">
+        <div className="dashboard-usage-summary-grid">
+          <MetricPill icon={<IconBolt />} label={t('dashboard.totalTokens')} value={formatNumber(usageDashboard?.totals.totalTokens)} note={usageDashboard?.available ? t('dashboard.realUsageSource') : t('dashboard.realUsageUnavailable')} />
+          <MetricPill icon={<IconComment />} label={t('dashboard.inputTokens')} value={formatNumber(usageDashboard?.totals.inputTokens)} note={t('dashboard.outputTokensValue', { count: formatNumber(usageDashboard?.totals.outputTokens) })} />
+          <MetricPill icon={<IconBox />} label={t('dashboard.cacheTokens')} value={formatNumber((usageDashboard?.totals.cacheReadTokens ?? 0) + (usageDashboard?.totals.cacheWriteTokens ?? 0))} note={t('dashboard.cacheTokenBreakdown', { read: formatNumber(usageDashboard?.totals.cacheReadTokens), write: formatNumber(usageDashboard?.totals.cacheWriteTokens) })} />
+          <MetricPill icon={<IconAppCenter />} label={t('dashboard.estimatedCost')} value={formatCost(usageDashboard?.totals.estimatedCostUsd)} note={t('dashboard.costAvailabilityNote')} />
+        </div>
+
+        <div className="dashboard-usage-panel dashboard-model-usage-list">
+          <div className="dashboard-usage-panel-title">
+            <Text style={{ fontWeight: 700 }}>{t('dashboard.modelUsage')}</Text>
+            <Tag size="small" color="blue">{models.length}</Tag>
+          </div>
+          {usageDashboard?.modelRows.length ? usageDashboard.modelRows.slice(0, 6).map((row) => (
+            <div key={row.model} className="dashboard-model-usage-row">
+              <div className="dashboard-model-usage-main">
+                <Text ellipsis={{ showTooltip: true }} style={{ fontWeight: 600 }}>{row.label}</Text>
+                <Text type="tertiary" size="small">
+                  {formatNumber(row.totalTokens)} tokens · {row.sessionCount} sessions
+                </Text>
+              </div>
+              <div className="dashboard-model-tags">
+                {row.thinking ? <Tag size="small" color="purple">thinking</Tag> : null}
+                {row.vision ? <Tag size="small" color="cyan">vision</Tag> : null}
+                {row.contextWindow ? <Tag size="small" color="grey">{formatNumber(row.contextWindow)}</Tag> : null}
+              </div>
+            </div>
+          )) : <Text type="tertiary" size="small">{t('dashboard.realUsageUnavailable')}</Text>}
+        </div>
+
+        <div className="dashboard-usage-panel dashboard-provider-quota-list">
+          <div className="dashboard-usage-panel-title">
+            <Text style={{ fontWeight: 700 }}>{t('dashboard.providerQuota')}</Text>
+            <Tag size="small" color="green">{usageDashboard?.providerQuotas.length ?? 0}</Tag>
+          </div>
+          {usageDashboard?.providerQuotas.length ? usageDashboard.providerQuotas.slice(0, 6).map((quota) => (
+            <div key={quota.provider} className="dashboard-provider-quota-row">
+              <div>
+                <Text style={{ fontWeight: 600 }}>{quota.label}</Text>
+                <Text type="tertiary" size="small" style={{ display: 'block' }}>
+                  {quota.summary || t('dashboard.providerQuotaWindow')}
+                </Text>
+              </div>
+              <div className="dashboard-quota-meter">
+                <span style={{ width: `${Math.max(4, Math.min(100, quota.percentLeft ?? 0))}%` }} />
+              </div>
+              <Text size="small" style={{ fontWeight: 700 }}>{formatPercent(quota.percentLeft)}</Text>
+            </div>
+          )) : <Text type="tertiary" size="small">{t('dashboard.providerQuotaUnavailable')}</Text>}
+        </div>
+
+        <div className="dashboard-usage-panel dashboard-usage-trend">
+          <div className="dashboard-usage-panel-title">
+            <Text style={{ fontWeight: 700 }}>{t('dashboard.usageTrend')}</Text>
+            {usageDashboard?.errors.length ? <Tag size="small" color="orange">{usageDashboard.errors.join(', ')}</Tag> : null}
+          </div>
+          <div className="dashboard-usage-bars">
+            {(usageDashboard?.trend.length ? usageDashboard.trend : []).map((point) => {
+              const maxTokens = Math.max(...(usageDashboard?.trend.map((item) => item.totalTokens) ?? [1]), 1);
+              return (
+                <div key={point.date} className="dashboard-usage-bar">
+                  <span style={{ height: `${Math.max(6, (point.totalTokens / maxTokens) * 100)}%` }} />
+                  <Text type="tertiary" size="small">{point.date.slice(5)}</Text>
+                </div>
+              );
+            })}
+            {!usageDashboard?.trend.length ? <Text type="tertiary" size="small">{t('dashboard.usageTrendUnavailable')}</Text> : null}
+          </div>
+        </div>
+
+        <div className="dashboard-usage-panel dashboard-high-usage-sessions">
+          <div className="dashboard-usage-panel-title">
+            <Text style={{ fontWeight: 700 }}>{t('dashboard.recentHighUsageSessions')}</Text>
+            <Tag size="small" color="grey">{usageDashboard?.recentSessions.length ?? 0}</Tag>
+          </div>
+          {usageDashboard?.recentSessions.length ? usageDashboard.recentSessions.slice(0, 4).map((session) => (
+            <AssetRow
+              key={session.key}
+              icon={<IconFile />}
+              title={session.title}
+              meta={`${session.model ?? session.agentId ?? 'session'} · ${formatNumber(session.totalTokens)} tokens`}
+              onClick={() => navigate(`/chat/${encodeURIComponent(session.key)}`)}
+            />
+          )) : <Text type="tertiary" size="small">{t('dashboard.realUsageUnavailable')}</Text>}
+        </div>
       </div>
     </DashboardSection>
   );
