@@ -4,7 +4,10 @@ import type { RepositoryMarkdownFile } from './repository-knowledge';
 export interface WorkbenchSnapshot {
   inboxMarkdown: string;
   activeWork: RepositoryMarkdownFile[];
+  completedWork: RepositoryMarkdownFile[];
+  somedayWork: RepositoryMarkdownFile[];
   activePlans: RepositoryMarkdownFile[];
+  completedPlans: RepositoryMarkdownFile[];
   runsMarkdown: string;
   outputsMarkdown: string;
   reviews: RepositoryMarkdownFile[];
@@ -12,10 +15,23 @@ export interface WorkbenchSnapshot {
 
 export async function loadWorkbenchSnapshot(binding: RepositoryBinding): Promise<WorkbenchSnapshot> {
   const repository = getWorkbenchReadApi();
-  const [inboxMarkdown, activeWork, activePlans, runsMarkdown, outputsMarkdown, reviews] = await Promise.all([
+  const [
+    inboxMarkdown,
+    activeWork,
+    completedWork,
+    somedayWork,
+    activePlans,
+    completedPlans,
+    runsMarkdown,
+    outputsMarkdown,
+    reviews,
+  ] = await Promise.all([
     repository.readText(binding.repoPath, `${binding.paths.work}/inbox.md`),
     repository.listMarkdown(binding.repoPath, `${binding.paths.work}/active`),
+    repository.listMarkdown(binding.repoPath, `${binding.paths.work}/completed`),
+    repository.listMarkdown(binding.repoPath, `${binding.paths.work}/someday`),
     repository.listMarkdown(binding.repoPath, `${binding.paths.plans}/active`),
+    repository.listMarkdown(binding.repoPath, `${binding.paths.plans}/completed`),
     repository.readText(binding.repoPath, `${binding.paths.runs}/index.md`),
     repository.readText(binding.repoPath, `${binding.paths.outputs}/index.md`),
     repository.listMarkdown(binding.repoPath, binding.paths.reviews),
@@ -24,7 +40,10 @@ export async function loadWorkbenchSnapshot(binding: RepositoryBinding): Promise
   return {
     inboxMarkdown,
     activeWork,
+    completedWork,
+    somedayWork,
     activePlans,
+    completedPlans,
     runsMarkdown,
     outputsMarkdown,
     reviews,
@@ -41,4 +60,3 @@ function getWorkbenchReadApi() {
     readText: repository.readText,
   };
 }
-

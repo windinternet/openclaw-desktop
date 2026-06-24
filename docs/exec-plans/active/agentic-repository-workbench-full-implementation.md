@@ -58,10 +58,10 @@
 
 ### C. Workbench
 
-- [ ] Workbench shows work status view for `work/active`, `work/completed`, and `work/someday`.
-- [ ] Workbench exposes a Kanban/status view based on Repository `work/`, separate from OpenClaw scheduled tasks.
+- [x] Workbench shows work status view for `work/active`, `work/completed`, and `work/someday`.
+- [x] Workbench exposes a Kanban/status view based on Repository `work/`, separate from OpenClaw scheduled tasks.
 - [ ] Workbench previews selected matter Markdown.
-- [ ] Workbench shows `plans/active` and `plans/completed`.
+- [x] Workbench shows `plans/active` and `plans/completed`.
 - [ ] Workbench shows plan approval/status metadata when present in Markdown.
 - [ ] Workbench shows reviews grouped by weekly/project folders.
 - [ ] ActionRun activity can write or mirror summaries into `runs/action-runs/`.
@@ -124,12 +124,12 @@
 
 ### Batch 3: Workbench Repository Status Views
 
-- [ ] Write failing tests for active/completed/someday work and active/completed plans.
-- [ ] Extend `repository-workbench.ts` snapshot.
-- [ ] Render Repository status view without using OpenClaw Tasks.
+- [x] Write failing tests for active/completed/someday work and active/completed plans.
+- [x] Extend `repository-workbench.ts` snapshot.
+- [x] Render Repository status view without using OpenClaw Tasks.
 - [ ] Add selected Markdown preview for matters/plans.
-- [ ] Verify with `npm test -- src/__tests__/repository-workbench.test.ts`.
-- [ ] Run Electron CDP on existing app to verify `#/workbench`.
+- [x] Verify with `npm test -- src/__tests__/repository-workbench.test.ts`.
+- [x] Run Electron CDP on existing app to verify `#/workbench`.
 - [ ] Commit.
 
 ### Batch 4: Runs, Outputs, And Artifacts Migration

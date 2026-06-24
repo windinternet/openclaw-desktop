@@ -11,7 +11,10 @@ describe('repository workbench', () => {
   it('loads matters, plans, runs, outputs, and reviews from the repository', async () => {
     const listMarkdown = vi.fn(async (_repoPath: string, directory: string) => {
       if (directory === 'work/active') return [{ path: 'work/active/project.md', name: 'project.md', size: 10, updatedAt: 1 }];
+      if (directory === 'work/completed') return [{ path: 'work/completed/done.md', name: 'done.md', size: 11, updatedAt: 2 }];
+      if (directory === 'work/someday') return [{ path: 'work/someday/later.md', name: 'later.md', size: 12, updatedAt: 3 }];
       if (directory === 'plans/active') return [{ path: 'plans/active/plan.md', name: 'plan.md', size: 20, updatedAt: 2 }];
+      if (directory === 'plans/completed') return [{ path: 'plans/completed/plan-done.md', name: 'plan-done.md', size: 21, updatedAt: 4 }];
       if (directory === 'reviews') return [{ path: 'reviews/weekly/2026-W26.md', name: '2026-W26.md', size: 30, updatedAt: 3 }];
       return [];
     });
@@ -34,7 +37,10 @@ describe('repository workbench', () => {
 
     expect(snapshot.inboxMarkdown).toBe('# Inbox');
     expect(snapshot.activeWork).toHaveLength(1);
+    expect(snapshot.completedWork).toHaveLength(1);
+    expect(snapshot.somedayWork).toHaveLength(1);
     expect(snapshot.activePlans).toHaveLength(1);
+    expect(snapshot.completedPlans).toHaveLength(1);
     expect(snapshot.runsMarkdown).toBe('# Runs');
     expect(snapshot.outputsMarkdown).toBe('# Outputs');
     expect(snapshot.reviews).toHaveLength(1);
@@ -46,6 +52,9 @@ describe('repository workbench', () => {
     expect(source).toContain('loadAiActionRuns');
     expect(source).toContain('actionRunsVersion');
     expect(source).toContain('binding.gatewayInstanceId');
+    expect(source).toContain('snapshot?.completedWork');
+    expect(source).toContain('snapshot?.somedayWork');
+    expect(source).toContain('snapshot?.completedPlans');
     expect(source).toContain("t('workbench.activityRuns')");
     expect(source).toContain("navigate('/actions')");
   });

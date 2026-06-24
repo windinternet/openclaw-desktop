@@ -71,7 +71,10 @@ export default function WorkbenchRepositoryPanel({ binding }: { binding: Reposit
     <Space vertical align="start" spacing={16} style={{ width: '100%' }}>
       <Space wrap>
         <Tag color="blue">{t('workbench.activeWorkCount', { count: snapshot?.activeWork.length ?? 0 })}</Tag>
+        <Tag color="grey">{t('workbench.completedWork')}: {snapshot?.completedWork.length ?? 0}</Tag>
+        <Tag color="grey">{t('workbench.somedayWork')}: {snapshot?.somedayWork.length ?? 0}</Tag>
         <Tag color="green">{t('workbench.activePlanCount', { count: snapshot?.activePlans.length ?? 0 })}</Tag>
+        <Tag color="grey">{t('workbench.completedPlans')}: {snapshot?.completedPlans.length ?? 0}</Tag>
         <Tag color="orange">{t('workbench.reviewCount', { count: snapshot?.reviews.length ?? 0 })}</Tag>
       </Space>
 
@@ -103,11 +106,35 @@ export default function WorkbenchRepositoryPanel({ binding }: { binding: Reposit
           )}
         </Card>
         <Card>
+          <Title heading={5} style={{ marginTop: 0 }}>{t('workbench.completedWork')}</Title>
+          {snapshot?.completedWork && snapshot.completedWork.length > 0 ? (
+            <Space vertical align="start">{snapshot.completedWork.map((file) => <Text key={file.path}>{file.path}</Text>)}</Space>
+          ) : (
+            <Empty description={t('workbench.emptyCompletedWork')} />
+          )}
+        </Card>
+        <Card>
+          <Title heading={5} style={{ marginTop: 0 }}>{t('workbench.somedayWork')}</Title>
+          {snapshot?.somedayWork && snapshot.somedayWork.length > 0 ? (
+            <Space vertical align="start">{snapshot.somedayWork.map((file) => <Text key={file.path}>{file.path}</Text>)}</Space>
+          ) : (
+            <Empty description={t('workbench.emptySomedayWork')} />
+          )}
+        </Card>
+        <Card>
           <Title heading={5} style={{ marginTop: 0 }}>{t('workbench.activePlans')}</Title>
           {snapshot && snapshot.activePlans.length > 0 ? (
             <Space vertical align="start">{snapshot.activePlans.map((file) => <Text key={file.path}>{file.path}</Text>)}</Space>
           ) : (
             <Empty description={t('workbench.emptyActivePlans')} />
+          )}
+        </Card>
+        <Card>
+          <Title heading={5} style={{ marginTop: 0 }}>{t('workbench.completedPlans')}</Title>
+          {snapshot?.completedPlans && snapshot.completedPlans.length > 0 ? (
+            <Space vertical align="start">{snapshot.completedPlans.map((file) => <Text key={file.path}>{file.path}</Text>)}</Space>
+          ) : (
+            <Empty description={t('workbench.emptyCompletedPlans')} />
           )}
         </Card>
       </div>
