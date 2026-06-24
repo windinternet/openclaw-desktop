@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import {
   Button,
   Card,
@@ -217,7 +217,12 @@ function AgentRosterItem({
   );
 }
 
-export default function TeamsPage() {
+interface EmbeddedPageProps {
+  embedded?: boolean;
+  onHeaderActionsChange?: (actions: ReactNode | null) => void;
+}
+
+export default function TeamsPage({ embedded = false, onHeaderActionsChange }: EmbeddedPageProps = {}) {
   const { t } = useTranslation();
 
   const agents = useStore((s) => s.agents);
@@ -721,35 +726,47 @@ export default function TeamsPage() {
     </div>
   );
 
+  const headerActions = useMemo(() => (
+    <Space>
+      <Button icon={<IconRefresh />} onClick={handleRefresh} loading={refreshing}>
+        {t('common.refresh')}
+      </Button>
+      <Button icon={<IconSend />} onClick={() => setComposerModalVisible(true)}>
+        {t('teams.compose')}
+      </Button>
+      <Button icon={<IconPlus />} type="primary" theme="solid" onClick={() => setQuickModalVisible(true)}>
+        {t('teams.createAgent')}
+      </Button>
+    </Space>
+  ), [handleRefresh, refreshing, t]);
+
+  useEffect(() => {
+    if (!embedded) return undefined;
+    onHeaderActionsChange?.(headerActions);
+    return () => onHeaderActionsChange?.(null);
+  }, [embedded, headerActions, onHeaderActionsChange]);
+
   return (
-    <div style={{ height: '100%', overflow: 'auto', padding: 24 }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          marginBottom: 18,
-          gap: 16,
-        }}
-      >
-        <div>
-          <Title heading={3} style={{ margin: 0 }}>
-            {t('teams.title')}
-          </Title>
-          <Text type="tertiary">{t('page.teamsDesc')} · {t('teams.subtitle')}</Text>
+    <div style={{ height: '100%', overflow: 'auto', padding: embedded ? '12px 0 0' : 24 }}>
+      {!embedded && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            marginBottom: 18,
+            gap: 16,
+          }}
+        >
+          <div>
+            <Title heading={3} style={{ margin: 0 }}>
+              {t('teams.title')}
+            </Title>
+            <Text type="tertiary">{t('page.teamsDesc')} · {t('teams.subtitle')}</Text>
+          </div>
+          {headerActions}
         </div>
-        <Space>
-          <Button icon={<IconRefresh />} onClick={handleRefresh} loading={refreshing}>
-            {t('common.refresh')}
-          </Button>
-          <Button icon={<IconSend />} onClick={() => setComposerModalVisible(true)}>
-            {t('teams.compose')}
-          </Button>
-          <Button icon={<IconPlus />} type="primary" theme="solid" onClick={() => setQuickModalVisible(true)}>
-            {t('teams.createAgent')}
-          </Button>
-        </Space>
-      </div>
+      )}
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         <Tag color="blue">{t('teams.nMembers', { count: members.length })}</Tag>

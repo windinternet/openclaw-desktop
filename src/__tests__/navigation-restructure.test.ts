@@ -101,8 +101,10 @@ describe('navigation hub pages', () => {
 
     expect(workbench).toContain("t('nav.workbench')");
     expect(workbench).toContain('<Tabs');
-    expect(workbench).toContain('<ActionCenterPage />');
-    expect(workbench).toContain('<ArtifactsPage />');
+    expect(workbench).toContain('tabBarExtraContent');
+    expect(workbench).not.toContain('<Title heading');
+    expect(workbench).toContain('<ActionCenterPage embedded');
+    expect(workbench).toContain('<ArtifactsPage embedded');
     expect(workbench).toContain('WorkbenchRepositoryPanel');
     expect(workbench).not.toContain('/taskkanban');
 
@@ -110,21 +112,44 @@ describe('navigation hub pages', () => {
     expect(knowledge).toContain('RepositoryGate');
     expect(knowledge).toContain('KnowledgeRepositoryPanel');
 
-    expect(collaboration).toContain("t('nav.collaboration')");
     expect(collaboration).toContain('<Tabs');
-    expect(collaboration).toContain('<TeamsPage />');
-    expect(collaboration).toContain('<Office3DPage />');
+    expect(collaboration).toContain('tabBarExtraContent');
+    expect(collaboration).not.toContain('<Title heading');
+    expect(collaboration).toContain('<TeamsPage embedded');
+    expect(collaboration).toContain('<Office3DPage embedded');
     expect(collaboration).toContain('loadAiActionRuns');
     expect(collaboration).toContain("navigate('/workbench')");
     expect(collaboration).toContain("t('collaboration.relatedRuns')");
 
-    expect(control).toContain("t('nav.controlCenter')");
     expect(control).toContain('<Tabs');
-    expect(control).toContain('<TaskKanbanPage />');
-    expect(control).toContain('<ExtensionsPage />');
-    expect(control).toContain('<TuningPage />');
-    expect(control).toContain('<RepositoryProtocolPage />');
-    expect(control).toContain('<SettingsPage />');
+    expect(control).toContain('tabBarExtraContent');
+    expect(control).not.toContain('<Title heading');
+    expect(control).toContain('<TaskKanbanPage embedded');
+    expect(control).toContain('<ExtensionsPage embedded');
+    expect(control).toContain('<TuningPage embedded');
+    expect(control).toContain('<RepositoryProtocolPage embedded');
+    expect(control).toContain('<SettingsPage embedded');
+  });
+
+  it('lets embedded child pages hide their own page headers', () => {
+    const pages = [
+      'src/pages/ActionCenterPage.tsx',
+      'src/pages/ArtifactsPage.tsx',
+      'src/pages/TeamsPage.tsx',
+      'src/pages/Office3DPage.tsx',
+      'src/pages/TaskKanbanPage.tsx',
+      'src/pages/ExtensionsPage.tsx',
+      'src/pages/TuningPage.tsx',
+      'src/pages/RepositoryProtocolPage.tsx',
+      'src/pages/SettingsPage.tsx',
+    ];
+
+    for (const pagePath of pages) {
+      const source = readFileSync(pagePath, 'utf8');
+      expect(source, pagePath).toContain('embedded?: boolean');
+      expect(source, pagePath).toContain('embedded = false');
+      expect(source, pagePath).toContain('!embedded &&');
+    }
   });
 });
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Card, Space, Tabs, Typography } from '@douyinfe/semi-ui';
 import { IconBolt, IconDesktop, IconUserGroup } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +9,7 @@ import type { AiActionRun } from '../lib/types';
 import TeamsPage from './TeamsPage';
 import Office3DPage from './Office3DPage';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 export default function CollaborationPage() {
   const { t } = useTranslation();
@@ -17,7 +17,13 @@ export default function CollaborationPage() {
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const actionRunsVersion = useStore((s) => s.actionRunsVersion);
   const [activeTab, setActiveTab] = useState('teams');
+  const [tabActions, setTabActions] = useState<ReactNode | null>(null);
   const [runs, setRuns] = useState<AiActionRun[]>([]);
+
+  const handleTabChange = (key: string) => {
+    setActiveTab(key);
+    setTabActions(null);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -38,12 +44,12 @@ export default function CollaborationPage() {
   }, [currentInstanceId, actionRunsVersion]);
 
   return (
-    <div style={{ height: '100%', overflow: 'auto', padding: 24 }}>
-      <Title heading={3} style={{ marginTop: 0 }}>{t('nav.collaboration')}</Title>
-      <Text type="tertiary">{t('collaboration.pageDesc')}</Text>
-      <Tabs activeKey={activeTab} onChange={setActiveTab} type="line" style={{ marginTop: 20 }}>
-        <Tabs.TabPane tab={<><IconUserGroup /> {t('nav.teams')}</>} itemKey="teams">{activeTab === 'teams' && <TeamsPage />}</Tabs.TabPane>
-        <Tabs.TabPane tab={<><IconDesktop /> {t('nav.office')}</>} itemKey="office">{activeTab === 'office' && <Office3DPage />}</Tabs.TabPane>
+    <div style={{ height: '100%', overflow: 'auto', padding: '16px 24px 24px' }}>
+      <Tabs activeKey={activeTab} onChange={handleTabChange} type="line" tabBarExtraContent={tabActions}>
+        <Tabs.TabPane tab={<><IconUserGroup /> {t('nav.teams')}</>} itemKey="teams">
+          {activeTab === 'teams' && <TeamsPage embedded onHeaderActionsChange={setTabActions} />}
+        </Tabs.TabPane>
+        <Tabs.TabPane tab={<><IconDesktop /> {t('nav.office')}</>} itemKey="office">{activeTab === 'office' && <Office3DPage embedded />}</Tabs.TabPane>
         <Tabs.TabPane tab={<><IconBolt /> {t('collaboration.relatedRuns')}</>} itemKey="runs">
           {activeTab === 'runs' && <Space align="start" wrap>
             <div onClick={() => navigate('/workbench')}>

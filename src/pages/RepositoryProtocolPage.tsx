@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Button, Card, Empty, Space, Spin, Tabs, Tag, Typography } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
 import { loadRepositoryBinding } from '../lib/agentic-repository-store';
@@ -7,7 +7,12 @@ import { useStore } from '../lib/store';
 
 const { Title, Text } = Typography;
 
-export default function RepositoryProtocolPage() {
+interface EmbeddedPageProps {
+  embedded?: boolean;
+  onHeaderActionsChange?: (actions: ReactNode | null) => void;
+}
+
+export default function RepositoryProtocolPage({ embedded = false, onHeaderActionsChange }: EmbeddedPageProps = {}) {
   const { t } = useTranslation();
   const currentInstanceId = useStore((state) => state.currentInstanceId);
   const [snapshot, setSnapshot] = useState<RepositoryProtocolSnapshot | null>(null);
@@ -23,7 +28,7 @@ export default function RepositoryProtocolPage() {
     t('controlCenter.execution'),
   ], [t]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!currentInstanceId) {
       setStatus('empty');
       setSnapshot(null);
@@ -44,22 +49,33 @@ export default function RepositoryProtocolPage() {
       setStatus('error');
       setError(err instanceof Error ? err.message : String(err));
     }
-  };
+  }, [currentInstanceId]);
 
   useEffect(() => {
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentInstanceId]);
+  }, [load]);
+
+  const headerActions = useMemo(() => (
+    <Button onClick={load}>{t('common.refresh')}</Button>
+  ), [load, t]);
+
+  useEffect(() => {
+    if (!embedded) return undefined;
+    onHeaderActionsChange?.(headerActions);
+    return () => onHeaderActionsChange?.(null);
+  }, [embedded, headerActions, onHeaderActionsChange]);
 
   return (
-    <div style={{ height: '100%', overflow: 'auto', padding: 24 }}>
-      <Space align="center" style={{ justifyContent: 'space-between', width: '100%', marginBottom: 16 }}>
-        <div>
-          <Title heading={3} style={{ marginTop: 0, marginBottom: 4 }}>{t('controlCenter.repositoryProtocol')}</Title>
-          <Text type="tertiary">{t('controlCenter.repositoryProtocolDesc')}</Text>
-        </div>
-        <Button onClick={load}>{t('common.refresh')}</Button>
-      </Space>
+    <div style={{ height: '100%', overflow: 'auto', padding: embedded ? '12px 0 0' : 24 }}>
+      {!embedded && (
+        <Space align="center" style={{ justifyContent: 'space-between', width: '100%', marginBottom: 16 }}>
+          <div>
+            <Title heading={3} style={{ marginTop: 0, marginBottom: 4 }}>{t('controlCenter.repositoryProtocol')}</Title>
+            <Text type="tertiary">{t('controlCenter.repositoryProtocolDesc')}</Text>
+          </div>
+          {headerActions}
+        </Space>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginBottom: 16 }}>
         <Card>

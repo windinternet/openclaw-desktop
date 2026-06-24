@@ -95,7 +95,11 @@ function SectionCard({
 
 /* ── Page ── */
 
-export default function SettingsPage() {
+interface SettingsPageProps {
+  embedded?: boolean;
+}
+
+export default function SettingsPage({ embedded = false }: SettingsPageProps = {}) {
   const { t } = useTranslation();
 
   const settings = useSettingsStore((s) => s.settings);
@@ -138,20 +142,21 @@ export default function SettingsPage() {
         overflow: 'hidden',
       }}
     >
-      {/* Header */}
-      <div
-        style={{
-          padding: '24px 28px 8px',
-          flexShrink: 0,
-        }}
-      >
-        <Title heading={3} style={{ margin: 0 }}>
-          {t('settings.title')}
-        </Title>
-      </div>
+      {!embedded && (
+        <div
+          style={{
+            padding: '24px 28px 8px',
+            flexShrink: 0,
+          }}
+        >
+          <Title heading={3} style={{ margin: 0 }}>
+            {t('settings.title')}
+          </Title>
+        </div>
+      )}
 
       {/* Content */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '16px 28px 28px', minHeight: 0 }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: embedded ? '12px 0 0' : '16px 28px 28px', minHeight: 0 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* ═══ Theme ═══ */}
         <SectionCard icon="🎨" title={t('settings.theme')} desc={t('settings.themeDesc')}>

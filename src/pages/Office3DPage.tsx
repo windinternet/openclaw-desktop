@@ -195,7 +195,11 @@ function themeColorValue(themeColor: string): string {
   return PRESET_THEME_COLORS.find((color) => color.name === themeColor)?.value ?? PRESET_THEME_COLORS[0].value;
 }
 
-export default function Office3DPage() {
+interface Office3DPageProps {
+  embedded?: boolean;
+}
+
+export default function Office3DPage({ embedded = false }: Office3DPageProps = {}) {
   const { t } = useTranslation();
   const agents = useStore((s) => s.agents);
   const sessions = useStore((s) => s.sessions);
@@ -327,9 +331,11 @@ export default function Office3DPage() {
           <Space vertical align="start" spacing={8}>
             <Space>
               <IconUserGroup style={{ color: officeTheme.scene.accent }} />
-              <Title heading={5} style={{ margin: 0, color: officeTheme.panel.text }}>
-                {t('office.title')}
-              </Title>
+              {!embedded && (
+                <Title heading={5} style={{ margin: 0, color: officeTheme.panel.text }}>
+                  {t('office.title')}
+                </Title>
+              )}
             </Space>
             <Space>
               <Badge dot type={connectionBadgeType(connectionStatus)} />
