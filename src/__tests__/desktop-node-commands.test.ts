@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleDesktopNodeCommand } from '../lib/desktop-node-commands';
 import { artifactService } from '../lib/artifact-service';
+import { artifactPersistence } from '../lib/artifact-persistence';
 import { createRepositoryOutput } from '../lib/repository-outputs';
 
 vi.mock('../lib/artifact-service', () => ({
@@ -11,11 +12,20 @@ vi.mock('../lib/artifact-service', () => ({
   },
 }));
 
+vi.mock('../lib/artifact-persistence', () => ({
+  artifactPersistence: {
+    loadMeta: vi.fn(),
+    loadHtml: vi.fn(),
+    openWindow: vi.fn(),
+  },
+}));
+
 vi.mock('../lib/repository-outputs', () => ({
   createRepositoryOutput: vi.fn(),
 }));
 
 const mockedArtifactService = vi.mocked(artifactService);
+const mockedArtifactPersistence = vi.mocked(artifactPersistence);
 const mockedCreateRepositoryOutput = vi.mocked(createRepositoryOutput);
 
 describe('desktop node commands', () => {
@@ -97,6 +107,117 @@ describe('desktop node commands', () => {
     expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(expect.objectContaining({
       html: '<html>ok</html>',
       artifact: expect.objectContaining({ id: 'art_2' }),
+      binding: expect.objectContaining({ repoPath: '/repo' }),
+    }));
+  });
+
+  it('opens a repository output through the compatible artifact window', async () => {
+    mockedArtifactPersistence.loadMeta.mockResolvedValue({
+      id: 'art_2',
+      title: '成果',
+      icon: '📊',
+      type: 'report',
+      source: { type: 'mcp_tool' },
+      tags: [],
+      currentVersion: 3,
+      status: 'draft',
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    mockedArtifactPersistence.openWindow.mockResolvedValue(1);
+
+    await expect(handleDesktopNodeCommand('desktop.outputs.open', {
+      artifactId: 'art_2',
+    })).resolves.toEqual({
+      ok: true,
+      artifactId: 'art_2',
+    });
+
+    expect(mockedArtifactPersistence.openWindow).toHaveBeenCalledWith('art_2', 3);
+  });
+
+  it('updates and mirrors a repository output through artifact compatibility', async () => {
+    const artifact = {
+      id: 'art_2',
+      title: '成果 v2',
+      icon: '📊',
+      type: 'report' as const,
+      source: { type: 'mcp_tool' as const },
+      tags: ['repo'],
+      currentVersion: 2,
+      status: 'draft' as const,
+      createdAt: 1,
+      updatedAt: 2,
+    };
+    mockedArtifactPersistence.loadMeta.mockResolvedValue(artifact);
+    mockedArtifactPersistence.loadHtml.mockResolvedValue('<html>v2</html>');
+    mockedCreateRepositoryOutput.mockResolvedValue({
+      outputPath: 'outputs/reports/art_2.md',
+      previewPath: 'outputs/html/art_2.html',
+    });
+
+    await expect(handleDesktopNodeCommand('desktop.outputs.update', {
+      repoPath: '/repo',
+      artifactId: 'art_2',
+      title: '成果 v2',
+      tags: ['repo'],
+    })).resolves.toEqual({
+      ok: true,
+      artifactId: 'art_2',
+      output: {
+        path: 'outputs/reports/art_2.md',
+        previewPath: 'outputs/html/art_2.html',
+      },
+    });
+
+    expect(mockedArtifactService.update).toHaveBeenCalledWith('art_2', expect.objectContaining({
+      title: '成果 v2',
+      tags: ['repo'],
+    }));
+    expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(expect.objectContaining({
+      artifact,
+      html: '<html>v2</html>',
+      binding: expect.objectContaining({ repoPath: '/repo' }),
+    }));
+  });
+
+  it('appends and mirrors a repository output through artifact compatibility', async () => {
+    const artifact = {
+      id: 'art_2',
+      title: '成果',
+      icon: '📊',
+      type: 'report' as const,
+      source: { type: 'mcp_tool' as const },
+      tags: [],
+      currentVersion: 2,
+      status: 'draft' as const,
+      createdAt: 1,
+      updatedAt: 2,
+    };
+    mockedArtifactPersistence.loadMeta.mockResolvedValue(artifact);
+    mockedArtifactPersistence.loadHtml.mockResolvedValue('<html>v2</html>');
+    mockedCreateRepositoryOutput.mockResolvedValue({
+      outputPath: 'outputs/reports/art_2.md',
+      previewPath: 'outputs/html/art_2.html',
+    });
+
+    await expect(handleDesktopNodeCommand('desktop.outputs.append', {
+      repoPath: '/repo',
+      artifactId: 'art_2',
+      htmlChunk: '<section>more</section>',
+    })).resolves.toEqual({
+      ok: true,
+      artifactId: 'art_2',
+      output: {
+        path: 'outputs/reports/art_2.md',
+        previewPath: 'outputs/html/art_2.html',
+      },
+    });
+
+    expect(mockedArtifactService.append).toHaveBeenCalledWith('art_2', '<section>more</section>');
+    expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(expect.objectContaining({
+      artifact,
+      html: '<html>v2</html>',
       binding: expect.objectContaining({ repoPath: '/repo' }),
     }));
   });

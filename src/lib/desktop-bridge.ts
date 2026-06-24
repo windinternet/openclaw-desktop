@@ -27,6 +27,9 @@ export const DESKTOP_NODE_COMMANDS = [
   'desktop.repository.git.status',
   'desktop.repository.git.diff',
   'desktop.outputs.create',
+  'desktop.outputs.open',
+  'desktop.outputs.update',
+  'desktop.outputs.append',
   'desktop.notify',
 ];
 

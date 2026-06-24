@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
 import { loadWorkbenchSnapshot } from '../lib/repository-workbench';
@@ -38,5 +39,14 @@ describe('repository workbench', () => {
     expect(snapshot.outputsMarkdown).toBe('# Outputs');
     expect(snapshot.reviews).toHaveLength(1);
   });
-});
 
+  it('surfaces ActionRun records as workbench activity infrastructure', () => {
+    const source = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
+
+    expect(source).toContain('loadAiActionRuns');
+    expect(source).toContain('actionRunsVersion');
+    expect(source).toContain('binding.gatewayInstanceId');
+    expect(source).toContain("t('workbench.activityRuns')");
+    expect(source).toContain("navigate('/actions')");
+  });
+});

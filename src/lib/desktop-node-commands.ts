@@ -49,6 +49,24 @@ function repositoryApi() {
   return (globalThis as { window?: Window }).window?.electronAPI?.repository;
 }
 
+async function mirrorRepositoryOutput(params: {
+  repoPath: string;
+  gatewayInstanceId?: string;
+  artifactId: string;
+}) {
+  const artifact = await artifactPersistence.loadMeta(params.artifactId);
+  if (!artifact) return null;
+  const html = await artifactPersistence.loadHtml(params.artifactId, artifact.currentVersion);
+  return createRepositoryOutput({
+    binding: createDefaultRepositoryBinding({
+      gatewayInstanceId: params.gatewayInstanceId ?? 'desktop-node',
+      repoPath: params.repoPath,
+    }),
+    artifact,
+    html: html ?? undefined,
+  });
+}
+
 export async function handleDesktopNodeCommand(command: string, params: unknown): Promise<unknown> {
   if (!isObject(params)) {
     return invalidParams('params must be an object');
@@ -117,6 +135,68 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
         title: artifact.title,
         currentVersion: artifact.currentVersion,
       },
+      output: {
+        path: output.outputPath,
+        previewPath: output.previewPath,
+      },
+    };
+  }
+
+  if (command === 'desktop.outputs.open') {
+    const artifactId = stringValue(params.artifactId);
+    if (!artifactId) return invalidParams('artifactId is required');
+    const version = typeof params.version === 'number' ? params.version : undefined;
+    const meta = await artifactPersistence.loadMeta(artifactId);
+    if (!meta) return { ok: false, error: 'not-found', artifactId };
+    await artifactPersistence.openWindow(artifactId, version ?? meta.currentVersion);
+    return { ok: true, artifactId };
+  }
+
+  if (command === 'desktop.outputs.update') {
+    const repoPath = stringValue(params.repoPath);
+    const artifactId = stringValue(params.artifactId);
+    if (!repoPath) return invalidParams('repoPath is required');
+    if (!artifactId) return invalidParams('artifactId is required');
+    await artifactService.update(artifactId, {
+      title: stringValue(params.title),
+      description: stringValue(params.description),
+      icon: stringValue(params.icon),
+      type: params.type === undefined ? undefined : artifactTypeValue(params.type),
+      tags: tagsValue(params.tags),
+    });
+    const output = await mirrorRepositoryOutput({
+      repoPath,
+      artifactId,
+      gatewayInstanceId: stringValue(params.gatewayInstanceId),
+    });
+    if (!output) return { ok: false, error: 'not-found', artifactId };
+    return {
+      ok: true,
+      artifactId,
+      output: {
+        path: output.outputPath,
+        previewPath: output.previewPath,
+      },
+    };
+  }
+
+  if (command === 'desktop.outputs.append') {
+    const repoPath = stringValue(params.repoPath);
+    const artifactId = stringValue(params.artifactId);
+    const htmlChunk = stringValue(params.htmlChunk);
+    if (!repoPath) return invalidParams('repoPath is required');
+    if (!artifactId) return invalidParams('artifactId is required');
+    if (!htmlChunk) return invalidParams('htmlChunk is required');
+    await artifactService.append(artifactId, htmlChunk);
+    const output = await mirrorRepositoryOutput({
+      repoPath,
+      artifactId,
+      gatewayInstanceId: stringValue(params.gatewayInstanceId),
+    });
+    if (!output) return { ok: false, error: 'not-found', artifactId };
+    return {
+      ok: true,
+      artifactId,
       output: {
         path: output.outputPath,
         previewPath: output.previewPath,

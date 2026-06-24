@@ -162,6 +162,8 @@ describe('navigation locale strings', () => {
       'workbench.outputsDesc',
       'workbench.plansReviews',
       'workbench.plansReviewsDesc',
+      'workbench.activityRuns',
+      'workbench.emptyActivityRuns',
       'knowledge.pageDesc',
       'knowledge.repoGateTitle',
       'knowledge.repoGateDesc',

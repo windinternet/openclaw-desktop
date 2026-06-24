@@ -57,6 +57,7 @@
     "outputsDesc": "View reports, HTML, documents, and other deliverables.",
     "plansReviews": "Plans and Reviews",
     "plansReviewsDesc": "Repository plans/ and reviews/ will be connected in a later phase.",
+    "activityRuns": "Run Activity",
     "inbox": "Inbox",
     "activeWork": "Active Matters",
     "activePlans": "Execution Plans",
@@ -67,6 +68,7 @@
     "reviewCount": "{{count}} reviews",
     "emptyActiveWork": "No active matters",
     "emptyActivePlans": "No active plans",
+    "emptyActivityRuns": "No run activity yet",
     "emptyReviews": "No reviews yet"
   },
   "knowledge": {

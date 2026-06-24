@@ -3,17 +3,40 @@ import { Card, Empty, Space, Tag, Typography } from '@douyinfe/semi-ui';
 import { IconAppCenter, IconBolt } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { useStore } from '../lib';
 import type { RepositoryBinding } from '../lib/agentic-repository';
+import { loadAiActionRuns } from '../lib/ai-action-run-store';
 import type { WorkbenchSnapshot } from '../lib/repository-workbench';
 import { loadWorkbenchSnapshot } from '../lib/repository-workbench';
+import type { AiActionRun, AiActionRunStatus } from '../lib/types';
 import MarkdownView from './MarkdownView';
 
 const { Text, Title } = Typography;
 
+const ACTION_STATUS_LABEL_KEYS: Record<AiActionRunStatus, string> = {
+  draft: 'actions.statusDraft',
+  planning: 'actions.statusPlanning',
+  awaiting_approval: 'actions.statusAwaitingApproval',
+  running: 'actions.statusRunning',
+  done: 'actions.statusDone',
+  failed: 'actions.statusFailed',
+  cancelled: 'actions.statusCancelled',
+};
+
+function actionStatusColor(status: AiActionRunStatus): 'blue' | 'green' | 'orange' | 'red' | 'grey' {
+  if (status === 'done') return 'green';
+  if (status === 'failed') return 'red';
+  if (status === 'cancelled') return 'grey';
+  if (status === 'awaiting_approval') return 'orange';
+  return 'blue';
+}
+
 export default function WorkbenchRepositoryPanel({ binding }: { binding: RepositoryBinding }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const actionRunsVersion = useStore((s) => s.actionRunsVersion);
   const [snapshot, setSnapshot] = useState<WorkbenchSnapshot | null>(null);
+  const [activityRuns, setActivityRuns] = useState<AiActionRun[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -24,6 +47,20 @@ export default function WorkbenchRepositoryPanel({ binding }: { binding: Reposit
       cancelled = true;
     };
   }, [binding]);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadAiActionRuns(binding.gatewayInstanceId)
+      .then((runs) => {
+        if (!cancelled) setActivityRuns(runs.slice(0, 5));
+      })
+      .catch(() => {
+        if (!cancelled) setActivityRuns([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [binding.gatewayInstanceId, actionRunsVersion]);
 
   const shortcuts = [
     { title: t('nav.actions'), desc: t('workbench.activityDesc'), path: '/actions', icon: <IconBolt size="extra-large" /> },
@@ -81,6 +118,29 @@ export default function WorkbenchRepositoryPanel({ binding }: { binding: Reposit
           <MarkdownView content={snapshot?.runsMarkdown ?? ''} />
         </Card>
         <Card>
+          <Space align="center" style={{ justifyContent: 'space-between', width: '100%', marginBottom: 8 }}>
+            <Title heading={5} style={{ margin: 0 }}>{t('workbench.activityRuns')}</Title>
+            <Text link onClick={() => navigate('/actions')}>{t('nav.actions')}</Text>
+          </Space>
+          {activityRuns.length > 0 ? (
+            <Space vertical align="start" style={{ width: '100%' }}>
+              {activityRuns.map((run) => (
+                <div key={run.id} style={{ width: '100%' }}>
+                  <Space align="center" wrap>
+                    <Tag color={actionStatusColor(run.status)}>{t(ACTION_STATUS_LABEL_KEYS[run.status])}</Tag>
+                    <Text strong>{run.input || run.type}</Text>
+                  </Space>
+                  <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>
+                    {run.resultSummary || run.error || run.gatewaySessionKey || run.type}
+                  </Text>
+                </div>
+              ))}
+            </Space>
+          ) : (
+            <Empty description={t('workbench.emptyActivityRuns')} />
+          )}
+        </Card>
+        <Card>
           <Title heading={5} style={{ marginTop: 0 }}>{t('workbench.outputs')}</Title>
           <MarkdownView content={snapshot?.outputsMarkdown ?? ''} />
         </Card>
@@ -96,4 +156,3 @@ export default function WorkbenchRepositoryPanel({ binding }: { binding: Reposit
     </Space>
   );
 }
-
