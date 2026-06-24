@@ -57,9 +57,13 @@ describe('OfficeScene agent labels', () => {
     expect(source).toContain("weaponMode: 'hands'");
     expect(source).toContain("weaponMode === 'toy-blaster'");
     expect(source).toContain("if (key === 'q')");
+    expect(source).toContain('event.stopPropagation()');
     expect(source).toContain('toggleOfficeWeaponMode(state)');
     expect(source).toContain('createBlasterGroup(theme)');
     expect(source).toContain('createCrosshair(theme)');
+    expect(source).toContain('createHitHint(theme)');
+    expect(source).toContain('updateWeaponHud(state)');
+    expect(source).toContain('showShotBeam(state');
     expect(source).not.toContain('useStore.setState');
     expect(source).not.toContain('saveInstanceData');
   });
@@ -83,5 +87,6 @@ describe('OfficeScene agent labels', () => {
     expect(source).toContain("state.actors.set('office-receptionist', receptionActor)");
     expect(source).toContain("state.actors.set('office-cleaner', cleanerActor)");
     expect(source).toContain('updateCombatState(actor, now, delta, themeRef.current)');
+    expect(source).toContain('a.combat.downedUntil !== null');
   });
 });

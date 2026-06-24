@@ -1804,6 +1804,7 @@ export default function OfficeScene({
         const key = event.key.toLowerCase();
         if (key === 'q') {
           event.preventDefault();
+          event.stopPropagation();
           toggleOfficeWeaponMode(state);
           return;
         }
@@ -1821,7 +1822,7 @@ export default function OfficeScene({
           const targetId = state.interactTargetId;
           if (targetId && state.currentTheme) {
             const actor = state.actors.get(targetId);
-            if (actor) {
+            if (actor && actor.combat.downedUntil === null) {
               const msg = targetId === 'office-receptionist'
                 ? (receptionInfoRef.current || '\u6b22\u8fce\uff01')
                 : INTERACTION_MESSAGES[Math.floor(Math.random() * INTERACTION_MESSAGES.length)];
@@ -1874,7 +1875,7 @@ export default function OfficeScene({
           const targetId = state.interactTargetId;
           if (targetId && state.currentTheme) {
             const actor = state.actors.get(targetId);
-            if (actor) {
+            if (actor && actor.combat.downedUntil === null) {
               const msg = targetId === 'office-receptionist'
                 ? (receptionInfoRef.current || '\u6b22\u8fce\uff01')
                 : INTERACTION_MESSAGES[Math.floor(Math.random() * INTERACTION_MESSAGES.length)];
@@ -1956,6 +1957,7 @@ export default function OfficeScene({
           const bc = pp.clone().add(cd.clone().multiplyScalar(bl / 2));
           let tgt: ActorState | null = null;
           state.actors.forEach((a) => {
+            if (a.combat.downedUntil !== null) return;
             const ta = a.group.position.clone().sub(bc);
             if (ta.dot(cd) <= 0 || ta.dot(cd) >= bl) return;
             if (Math.abs(ta.dot(cr)) >= bw / 2) return;
