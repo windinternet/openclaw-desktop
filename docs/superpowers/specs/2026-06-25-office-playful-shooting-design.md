@@ -1,9 +1,9 @@
 # 3D Office Playful Shooting Design
 
-> 决定日期: 2026-06-25  
-> 状态: 已确认设计，待实施计划  
-> 相关页面: `src/pages/Office3DPage.tsx`  
-> 相关场景: `src/components/office/OfficeScene.tsx`  
+> 决定日期: 2026-06-25
+> 状态: 已确认设计，待实施计划
+> 相关页面: `src/pages/Office3DPage.tsx`
+> 相关场景: `src/components/office/OfficeScene.tsx`
 > 设计方向: 第一人称办公室恶作剧模式 + 玩具光束枪 + Agent/NPC 护盾反馈
 
 ## 背景
