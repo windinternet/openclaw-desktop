@@ -161,14 +161,14 @@
 
 ### Batch 7: Final Design Compliance Verification
 
-- [ ] Run `npm test`.
-- [ ] Run `npm run typecheck`.
-- [ ] Run `npm run build`.
-- [ ] Use existing Electron CDP to verify:
+- [x] Run `npm test`.
+- [x] Run `npm run typecheck`.
+- [x] Run `npm run build`.
+- [x] Use existing Electron CDP to verify:
   - `#/knowledge`
   - `#/workbench`
   - `#/control-center`
   - `#/artifacts`
   - `#/taskkanban`
-- [ ] Update this plan to mark all implemented requirements.
-- [ ] Move completed plan to `docs/exec-plans/completed/`.
+- [x] Update this plan to mark all implemented requirements.
+- [x] Move completed plan to `docs/exec-plans/completed/`.
