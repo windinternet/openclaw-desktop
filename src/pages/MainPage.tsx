@@ -183,14 +183,13 @@ export default function MainPage() {
         <Layout style={{height: '100vh', boxSizing: 'border-box'}}>
             <Sider
                 style={{
-                    flex: '0 0 288px',
-                    width: 288,
+                    flex: '0 0 300px',
+                    width: 300,
                     overflow: 'hidden',
                     backgroundColor: 'var(--semi-color-bg-1)',
                     display: 'flex',
                     flexDirection: 'column',
                     height: '100%',
-                    width: 300,
                     flexShrink: 0,
                 }}
             >
