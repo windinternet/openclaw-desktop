@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Column } from '@ant-design/charts';
 import type { GatewayUsageTrendPoint } from '../../lib/gateway-usage';
 import { formatCompactTokenValue } from './chart-format';
@@ -6,6 +6,8 @@ import { formatCompactTokenValue } from './chart-format';
 interface UsageTrendChartProps {
   trend: GatewayUsageTrendPoint[];
 }
+
+const MIN_CHART_HEIGHT = 220;
 
 function cssVar(name: string, fallback: string): string {
   if (typeof window === 'undefined') return fallback;
@@ -18,6 +20,8 @@ function formatNumber(value: number): string {
 }
 
 export default function UsageTrendChart({ trend }: UsageTrendChartProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [chartHeight, setChartHeight] = useState(MIN_CHART_HEIGHT);
   const data = useMemo(
     () => trend.map((point) => ({
       date: point.date.slice(5),
@@ -27,13 +31,30 @@ export default function UsageTrendChart({ trend }: UsageTrendChartProps) {
     [trend],
   );
 
+  useLayoutEffect(() => {
+    const node = containerRef.current;
+    if (!node || typeof ResizeObserver === 'undefined') return undefined;
+
+    const updateHeight = (height: number) => {
+      setChartHeight(Math.max(MIN_CHART_HEIGHT, Math.round(height)));
+    };
+
+    updateHeight(node.getBoundingClientRect().height);
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return;
+      updateHeight(entry.contentRect.height);
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   const config = useMemo(() => ({
     data,
     xField: 'date',
     yField: 'tokens',
-    height: 132,
+    height: chartHeight,
     autoFit: true,
-    padding: [8, 8, 24, 34],
+    padding: [16, 12, 32, 42],
     colorField: 'date',
     scale: {
       color: {
@@ -83,10 +104,10 @@ export default function UsageTrendChart({ trend }: UsageTrendChartProps) {
         },
       ],
     },
-  }), [data]);
+  }), [chartHeight, data]);
 
   return (
-    <div className="dashboard-antv-chart">
+    <div ref={containerRef} className="dashboard-antv-chart">
       <Column {...config} />
     </div>
   );

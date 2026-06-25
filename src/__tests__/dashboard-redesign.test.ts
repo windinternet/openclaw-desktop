@@ -62,7 +62,9 @@ describe('dashboard redesign', () => {
     expect(chart).toContain("import { Column } from '@ant-design/charts'");
     expect(chart).toContain("import { formatCompactTokenValue } from './chart-format'");
     expect(chart).toContain('dashboard-antv-chart');
-    expect(chart).toContain('height: 132');
+    expect(chart).toContain('ResizeObserver');
+    expect(chart).toContain('height: chartHeight');
+    expect(chart).not.toContain('height: 132');
     expect(chart).toContain('labelFormatter: (value: string) => formatCompactTokenValue(Number(value))');
     expect(chart).toContain("labelFill: cssVar('--semi-color-text-1'");
     expect(pkg.dependencies['@ant-design/charts']).toBeTruthy();
