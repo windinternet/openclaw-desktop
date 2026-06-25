@@ -50,15 +50,23 @@ describe('dashboard redesign', () => {
 
   it('renders rich real Gateway usage instead of local estimate-only metrics', () => {
     const dashboard = readFileSync('src/pages/DashboardPage.tsx', 'utf8');
+    const chart = readFileSync('src/components/charts/UsageTrendChart.tsx', 'utf8');
+    const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 
     expect(dashboard).toContain('dashboard-usage-layout');
     expect(dashboard).toContain('dashboard-model-usage-list');
     expect(dashboard).toContain('dashboard-usage-trend');
     expect(dashboard).toContain('dashboard-provider-quota-list');
+    expect(dashboard).toContain("import UsageTrendChart from '../components/charts/UsageTrendChart'");
+    expect(dashboard).toContain('<UsageTrendChart trend={usageDashboard.trend} />');
+    expect(chart).toContain("import { Column } from '@ant-design/charts'");
+    expect(chart).toContain('dashboard-antv-chart');
+    expect(pkg.dependencies['@ant-design/charts']).toBeTruthy();
     expect(dashboard).toContain("t('dashboard.totalTokens')");
     expect(dashboard).toContain("t('dashboard.modelUsage')");
     expect(dashboard).toContain("t('dashboard.providerQuota')");
     expect(dashboard).toContain("t('dashboard.usageTrend')");
+    expect(dashboard).not.toContain('dashboard-usage-bar');
     expect(dashboard).not.toContain("label={t('dashboard.messageCount')}");
     expect(dashboard).not.toContain('estimatedFromSessions');
   });

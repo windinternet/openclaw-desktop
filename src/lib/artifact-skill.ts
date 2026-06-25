@@ -48,8 +48,9 @@ Wrap your artifact in an \`<artifact>\` XML block with a JSON header and HTML bo
 4. For interactive elements (tabs, charts, collapsible sections), use vanilla
    JavaScript inside \`<script>\` tags.
 5. For reports: include title, metadata, summary, body sections, and footer.
-6. For dashboards: include metric cards, charts (use inline SVG or Canvas),
-   and summary sections.
+6. For dashboards: include metric cards, charts, and summary sections. App-native
+   OpenClaw charts use AntV components; standalone artifacts must stay
+   self-contained, so artifact charts should use inline SVG or Canvas.
 7. For checklists: make items clickable to toggle checked/unchecked state.
 8. Use clean, modern design with appropriate typography and spacing.
 9. **Do NOT** use external CSS frameworks or CDN links — everything must be

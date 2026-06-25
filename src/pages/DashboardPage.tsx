@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useStore, type AiActionRun, type SessionInfo } from '../lib';
 import NewSessionComposer from '../components/NewSessionComposer';
+import UsageTrendChart from '../components/charts/UsageTrendChart';
 import type { ArtifactMeta } from '../lib/artifact-types';
 import { loadAiActionRuns } from '../lib/ai-action-run-store';
 import { loadRepositoryBinding } from '../lib/agentic-repository-store';
@@ -367,18 +368,9 @@ export default function DashboardPage() {
             <Text style={{ fontWeight: 700 }}>{t('dashboard.usageTrend')}</Text>
             {usageDashboard?.errors.length ? <Tag size="small" color="orange">{usageDashboard.errors.join(', ')}</Tag> : null}
           </div>
-          <div className="dashboard-usage-bars">
-            {(usageDashboard?.trend.length ? usageDashboard.trend : []).map((point) => {
-              const maxTokens = Math.max(...(usageDashboard?.trend.map((item) => item.totalTokens) ?? [1]), 1);
-              return (
-                <div key={point.date} className="dashboard-usage-bar">
-                  <span style={{ height: `${Math.max(6, (point.totalTokens / maxTokens) * 100)}%` }} />
-                  <Text type="tertiary" size="small">{point.date.slice(5)}</Text>
-                </div>
-              );
-            })}
-            {!usageDashboard?.trend.length ? <Text type="tertiary" size="small">{t('dashboard.usageTrendUnavailable')}</Text> : null}
-          </div>
+          {usageDashboard?.trend.length ? (
+            <UsageTrendChart trend={usageDashboard.trend} />
+          ) : <Text type="tertiary" size="small">{t('dashboard.usageTrendUnavailable')}</Text>}
         </div>
 
         <div className="dashboard-usage-panel dashboard-high-usage-sessions">

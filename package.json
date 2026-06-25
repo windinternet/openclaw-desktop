@@ -25,6 +25,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@ant-design/charts": "^2.6.7",
     "@douyinfe/semi-icons": "^2.74.0",
     "@douyinfe/semi-illustrations": "^2.74.0",
     "@douyinfe/semi-ui": "^2.74.0",
