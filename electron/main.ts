@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Notification, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, Notification, shell } from 'electron'
 import path from 'node:path'
 import { execFile, execFileSync, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
@@ -14,6 +14,7 @@ import { setupMainLogger, writeRenderer } from './logger'
 import { getPetWindow } from './pet-window-manager'
 import { registerPetIpcHandlers } from './pet-ipc'
 import { registerRepositoryIpcHandlers } from './repository-handlers'
+import { readStartupThemeMode } from './startup-theme'
 
 const execFileAsync = promisify(execFile)
 
@@ -55,6 +56,7 @@ function isSameOrigin(currentUrl: string, targetUrl: string): boolean {
 
 
 function createWindow() {
+  const startupThemeMode = readStartupThemeMode(app.getPath('userData'), nativeTheme.shouldUseDarkColors)
   const win = new BrowserWindow({
     width: 1200,
     height: 900,
@@ -62,6 +64,7 @@ function createWindow() {
     minHeight: 600,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      additionalArguments: [`--openclaw-startup-theme-mode=${startupThemeMode}`],
       contextIsolation: true,
       nodeIntegration: false,
     },

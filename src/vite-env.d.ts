@@ -3,6 +3,7 @@
 interface Window {
   electronAPI: {
     platform: string;
+    startupThemeMode?: 'light' | 'dark';
     versions: {
       node: string;
       electron: string;

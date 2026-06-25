@@ -1,7 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
+function getStartupThemeMode(): 'light' | 'dark' {
+  const arg = process.argv.find((value) => value.startsWith('--openclaw-startup-theme-mode='))
+  const mode = arg?.split('=')[1]
+  return mode === 'light' ? 'light' : 'dark'
+}
+
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
+  startupThemeMode: getStartupThemeMode(),
   versions: {
     node: process.versions.node,
     electron: process.versions.electron,
