@@ -35,7 +35,7 @@ describe('OfficeScene agent labels', () => {
     expect(source).toContain('createHitBox(0.92, 1.55, 0.92');
     expect(source).toContain('state.controlledAgentId !== agent.agentId');
     expect(source).toContain('intersectPlane(groundPlane, groundPoint)');
-    expect(source).toContain('nearestDistance <= 1.45');
+    expect(source).toContain('resolveNearestOfficeControlTarget');
   });
 
   it('passes only the explicitly selected Agent into the 3D scene control state', () => {
@@ -48,5 +48,48 @@ describe('OfficeScene agent labels', () => {
     expect(sceneSource).toContain('selectedRef.current = null;');
     expect(sceneSource).toContain('onSelectRef.current(null);');
     expect(sceneSource).toContain('resetCameraControl(state, container);');
+  });
+
+  it('defines a local toy blaster mode without changing Gateway-backed state', () => {
+    const source = readFileSync('src/components/office/OfficeScene.tsx', 'utf8');
+
+    expect(source).toContain('OfficeWeaponMode');
+    expect(source).toContain("weaponMode: 'hands'");
+    expect(source).toContain("weaponMode === 'toy-blaster'");
+    expect(source).toContain("if (key === 'q')");
+    expect(source).toContain('event.stopPropagation()');
+    expect(source).toContain('toggleOfficeWeaponMode(state)');
+    expect(source).toContain('createBlasterGroup(theme)');
+    expect(source).toContain('createCrosshair(theme)');
+    expect(source).toContain('createHitHint(theme)');
+    expect(source).toContain('updateWeaponHud(state)');
+    expect(source).toContain('showShotBeam(state');
+    expect(source).not.toContain('useStore.setState');
+    expect(source).not.toContain('saveInstanceData');
+  });
+
+  it('routes first-person left-clicks through the shooting raycast only while armed', () => {
+    const source = readFileSync('src/components/office/OfficeScene.tsx', 'utf8');
+
+    expect(source).toContain('handleOfficeShot(state, container)');
+    expect(source).toContain("state.cameraMode === 'first-person'");
+    expect(source).toContain("state.weaponMode === 'toy-blaster'");
+    expect(source).toContain('state.raycaster.setFromCamera(new THREE.Vector2(0, 0), state.firstPersonCamera)');
+    expect(source).toContain('resolveOfficeShotTarget(hits, state.actors, state.controlledAgentId)');
+    expect(source).toContain('const actor = state.actors.get(agentId)');
+    expect(source).toContain('applyOfficeShot(actor.combat, performance.now())');
+    expect(source).toContain('shouldSkipBlasterMouseDown(event.button, state.cameraMode, state.weaponMode)');
+    expect(source).toContain('state.leftDrag.active = true');
+  });
+
+  it('initializes combat state for both Gateway Agents and scene NPCs', () => {
+    const source = readFileSync('src/components/office/OfficeScene.tsx', 'utf8');
+
+    expect(source).toContain('combat: createOfficeCombatState()');
+    expect(source).toContain('shieldBar: createShieldBar(theme)');
+    expect(source).toContain("state.actors.set('office-receptionist', receptionActor)");
+    expect(source).toContain("state.actors.set('office-cleaner', cleanerActor)");
+    expect(source).toContain('updateCombatState(actor, now, delta, themeRef.current)');
+    expect(source).toContain('a.combat.downedUntil !== null');
   });
 });
