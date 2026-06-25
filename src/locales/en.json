@@ -470,10 +470,13 @@
     "sessionMessageDisplay": "Session Message Display",
     "sessionMessageDisplayDesc": "Configure how the session detail page displays OpenClaw replies and tool events",
     "sessionToolCallDisplay": "Tool call display",
+    "sessionToolCallDisplayDesc": "Show OpenClaw tool events and historical tool calls in the session detail page.",
     "sessionToolCallDisplayOptions": {
       "hidden": "Hide tool calls",
       "compact": "Show tool call cards"
     },
+    "sessionReasoningDisplay": "Reasoning display",
+    "sessionReasoningDisplayDesc": "Show Gateway thinking/reasoning content blocks.",
     "assistantReplyGrouping": "Agent multi-part replies",
     "assistantReplyGroupingOptions": {
       "merged": "Merge by run",

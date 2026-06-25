@@ -470,10 +470,13 @@
     "sessionMessageDisplay": "会话消息展示",
     "sessionMessageDisplayDesc": "配置会话详情页如何展示 OpenClaw 回复与工具事件",
     "sessionToolCallDisplay": "工具调用展示",
+    "sessionToolCallDisplayDesc": "开启后在会话详情页展示 OpenClaw tool 事件和历史工具调用。",
     "sessionToolCallDisplayOptions": {
       "hidden": "隐藏工具调用",
       "compact": "显示工具调用卡片"
     },
+    "sessionReasoningDisplay": "思考过程展示",
+    "sessionReasoningDisplayDesc": "开启后展示 Gateway thinking/reasoning 内容块。",
     "assistantReplyGrouping": "Agent 多段回复",
     "assistantReplyGroupingOptions": {
       "merged": "按同一次运行合并",

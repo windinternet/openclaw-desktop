@@ -1,5 +1,5 @@
 import type { AgentSwitchStrategy } from './agent-switch-settings';
-import type { AssistantReplyGrouping, SessionToolCallDisplay } from './session-content';
+import type { AssistantReplyGrouping, SessionReasoningDisplay, SessionToolCallDisplay } from './session-content';
 
 export type ThemeMode = 'light' | 'dark' | 'auto';
 
@@ -21,6 +21,7 @@ export const PRESET_THEME_COLORS: ThemeColor[] = [
 export type SupportedLocale = 'zh-CN' | 'en-US';
 
 export interface AppSettings {
+  settingsSchemaVersion?: number;
   initialized: boolean;
   themeMode: ThemeMode;
   themeColor: string;
@@ -31,12 +32,14 @@ export interface AppSettings {
   externalLinkMode: 'system' | 'internal';
   agentSwitchStrategy: AgentSwitchStrategy;
   sessionToolCallDisplay: SessionToolCallDisplay;
+  sessionReasoningDisplay: SessionReasoningDisplay;
   assistantReplyGrouping: AssistantReplyGrouping;
   openTuningOnStartup: boolean;
   sidebarNavGrouped: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  settingsSchemaVersion: 3,
   initialized: false,
   themeMode: 'dark',
   themeColor: 'blue',
@@ -46,7 +49,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   connectAllInstancesOnStartup: false,
   externalLinkMode: 'system',
   agentSwitchStrategy: 'new-session',
-  sessionToolCallDisplay: 'hidden',
+  sessionToolCallDisplay: 'compact',
+  sessionReasoningDisplay: 'visible',
   assistantReplyGrouping: 'merged',
   openTuningOnStartup: false,
   sidebarNavGrouped: false,

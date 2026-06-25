@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
+  DEFAULT_SESSION_MESSAGE_DISPLAY_SETTINGS,
   decodeSessionKeyParam,
   extractContentText,
   extractSessionMessageItems,
@@ -16,14 +17,62 @@ import {
   parseSessionContextSnapshot,
   deriveSessionInsight,
 } from '../lib/session-content';
-import {
-  buildGatewayChatSendPayload,
-  normalizeChatInputAttachments,
-} from '../lib/chat-attachments';
+import { buildGatewayChatSendPayload, normalizeChatInputAttachments } from '../lib/chat-attachments';
 import type { SessionTimelineChat } from '../lib/session-content';
 import { buildContextualUserMessage } from '../lib/agent-switching';
 
 describe('session content helpers', () => {
+  it('shows OpenClaw tool messages by default alongside reasoning content', () => {
+    expect(DEFAULT_SESSION_MESSAGE_DISPLAY_SETTINGS.toolCallDisplay).toBe('compact');
+    expect(DEFAULT_SESSION_MESSAGE_DISPLAY_SETTINGS.reasoningDisplay).toBe('visible');
+
+    const historyContent = parseHistoryMessageToContentItems({
+      role: 'assistant',
+      content: [
+        { type: 'thinking', thinking: '先查工具目录。' },
+        { type: 'toolCall', id: 'call-default', name: 'tools.catalog', arguments: {} },
+      ],
+    });
+
+    const realtimeContent = parseToolEventToContentItems({
+      toolName: 'tools.catalog',
+      toolStatus: 'completed',
+      toolOutput: 'ok',
+    });
+
+    expect(historyContent.map((item) => item.type)).toEqual(['function_call', 'reasoning']);
+    expect(extractContentText(historyContent)).toContain('tools.catalog');
+    expect(realtimeContent[0]).toEqual(
+      expect.objectContaining({
+        type: 'function_call',
+        name: 'tools.catalog',
+        status: 'completed',
+      }),
+    );
+  });
+
+  it('can hide OpenClaw reasoning content without hiding tool calls', () => {
+    const content = parseHistoryMessageToContentItems(
+      {
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: '先查工具目录。' },
+          { type: 'toolCall', id: 'call-default', name: 'tools.catalog', arguments: {} },
+          { type: 'text', text: '查完了。' },
+        ],
+      },
+      {
+        toolCallDisplay: 'compact',
+        reasoningDisplay: 'hidden',
+        assistantReplyGrouping: 'merged',
+      },
+    );
+
+    expect(content.map((item) => item.type)).toEqual(['function_call', 'message']);
+    expect(extractContentText(content)).toContain('tools.catalog');
+    expect(extractContentText(content)).not.toContain('先查工具目录');
+  });
+
   it('decodes route session keys before comparing them with session records', () => {
     expect(decodeSessionKeyParam('agent%3Amain%3Adashboard%3Aabc')).toBe('agent:main:dashboard:abc');
   });
@@ -176,8 +225,8 @@ describe('session content helpers', () => {
 
   it('documents that model selection is applied through sessions.patch before chat.send', () => {
     const source = readFileSync('src/pages/SessionChatPage.tsx', 'utf8');
-    const patchStart = source.indexOf("activeClient.request('sessions.patch', {");
-    const patchEnd = source.indexOf('}).then(() => {', patchStart);
+    const patchStart = source.indexOf(".request('sessions.patch', {");
+    const patchEnd = source.indexOf('.then(() => {', patchStart);
     const patchBlock = source.slice(patchStart, patchEnd);
     const sendPayloadStart = source.indexOf('const sendPayload = await buildGatewayChatSendPayload({');
     const sendPayloadEnd = source.indexOf('const sendResult = await activeClient.request', sendPayloadStart);
@@ -335,11 +384,13 @@ describe('session content helpers', () => {
     expect(extractContentText(compact)).toContain('read');
     expect(extractContentText(compact)).not.toContain('products');
     expect(compact[0]?.type).toBe('function_call');
-    expect(compact[0]).toEqual(expect.objectContaining({
-      call_id: 'call-3',
-      name: 'read',
-      status: 'completed',
-    }));
+    expect(compact[0]).toEqual(
+      expect.objectContaining({
+        call_id: 'call-3',
+        name: 'read',
+        status: 'completed',
+      }),
+    );
   });
 
   it('uses the message index in history IDs when preserving OpenClaw message boundaries', () => {
@@ -412,11 +463,13 @@ describe('session content helpers', () => {
       { toolCallDisplay: 'compact', assistantReplyGrouping: 'merged' },
     );
 
-    expect(content[0]).toEqual(expect.objectContaining({
-      type: 'function_call',
-      call_id: 'call-4',
-      name: 'exec',
-    }));
+    expect(content[0]).toEqual(
+      expect.objectContaining({
+        type: 'function_call',
+        call_id: 'call-4',
+        name: 'exec',
+      }),
+    );
     expect(extractContentText(content)).toContain('exec');
   });
 
@@ -443,13 +496,15 @@ describe('session content helpers', () => {
       { toolCallDisplay: 'compact', assistantReplyGrouping: 'merged' },
     );
 
-    expect(content[0]).toEqual(expect.objectContaining({
-      type: 'function_call',
-      call_id: 'call-5',
-      name: 'exec',
-      arguments: 'taobao-runner search_products --args {"keyword":"牙刷"}',
-      status: 'running',
-    }));
+    expect(content[0]).toEqual(
+      expect.objectContaining({
+        type: 'function_call',
+        call_id: 'call-5',
+        name: 'exec',
+        arguments: 'taobao-runner search_products --args {"keyword":"牙刷"}',
+        status: 'running',
+      }),
+    );
   });
 
   it('preserves optimistic local messages across history refresh until matching history arrives', () => {
@@ -470,9 +525,10 @@ describe('session content helpers', () => {
       localOnly: true,
     };
 
-    expect(
-      mergeVisibleHistoryWithLiveChats([], [], [localUserMessage, assistantPlaceholder]),
-    ).toEqual([localUserMessage, assistantPlaceholder]);
+    expect(mergeVisibleHistoryWithLiveChats([], [], [localUserMessage, assistantPlaceholder])).toEqual([
+      localUserMessage,
+      assistantPlaceholder,
+    ]);
 
     const historyUserMessage: SessionTimelineChat = {
       id: 'history-user-1',
@@ -483,7 +539,11 @@ describe('session content helpers', () => {
     };
 
     expect(
-      mergeVisibleHistoryWithLiveChats([historyUserMessage], [historyUserMessage], [localUserMessage, assistantPlaceholder]),
+      mergeVisibleHistoryWithLiveChats(
+        [historyUserMessage],
+        [historyUserMessage],
+        [localUserMessage, assistantPlaceholder],
+      ),
     ).toEqual([historyUserMessage, assistantPlaceholder]);
   });
 
@@ -549,13 +609,15 @@ describe('session content helpers', () => {
       },
     ];
 
-    expect(deriveSessionInsight(chats, { contextWindow: 6000 })).toEqual(expect.objectContaining({
-      messageCount: 2,
-      toolCallCount: 1,
-      usedContextTokens: 1500,
-      contextLimit: 6000,
-      contextUsageRatio: 0.25,
-    }));
+    expect(deriveSessionInsight(chats, { contextWindow: 6000 })).toEqual(
+      expect.objectContaining({
+        messageCount: 2,
+        toolCallCount: 1,
+        usedContextTokens: 1500,
+        contextLimit: 6000,
+        contextUsageRatio: 0.25,
+      }),
+    );
   });
 
   it('uses OpenClaw session context snapshots before local usage estimates', () => {
@@ -573,17 +635,19 @@ describe('session content helpers', () => {
       },
     });
 
-    expect(snapshot).toEqual(expect.objectContaining({
-      inputTokens: 335,
-      outputTokens: 1107,
-      totalTokens: 16469,
-      remainingTokens: 983531,
-      percentUsed: 2,
-      contextTokens: 1000000,
-      totalTokensFresh: true,
-      model: 'deepseek-v4-flash',
-      source: 'sessions.describe',
-    }));
+    expect(snapshot).toEqual(
+      expect.objectContaining({
+        inputTokens: 335,
+        outputTokens: 1107,
+        totalTokens: 16469,
+        remainingTokens: 983531,
+        percentUsed: 2,
+        contextTokens: 1000000,
+        totalTokensFresh: true,
+        model: 'deepseek-v4-flash',
+        source: 'sessions.describe',
+      }),
+    );
 
     expect(
       deriveSessionInsight(
@@ -591,26 +655,32 @@ describe('session content helpers', () => {
         { contextWindow: 6000 },
         snapshot,
       ),
-    ).toEqual(expect.objectContaining({
-      usedContextTokens: 16469,
-      contextLimit: 1000000,
-      contextUsageRatio: 0.02,
-      remainingContextTokens: 983531,
-      contextFresh: true,
-      contextModel: 'deepseek-v4-flash',
-      contextStatus: 'running',
-      contextSource: 'sessions.describe',
-    }));
+    ).toEqual(
+      expect.objectContaining({
+        usedContextTokens: 16469,
+        contextLimit: 1000000,
+        contextUsageRatio: 0.02,
+        remainingContextTokens: 983531,
+        contextFresh: true,
+        contextModel: 'deepseek-v4-flash',
+        contextStatus: 'running',
+        contextSource: 'sessions.describe',
+      }),
+    );
 
-    expect(parseSessionContextSnapshot({
-      session: {
-        totalTokens: 16469,
-        contextTokens: 1000000,
-      },
-    })).toEqual(expect.objectContaining({
-      remainingTokens: 983531,
-      percentUsed: 1.6469,
-    }));
+    expect(
+      parseSessionContextSnapshot({
+        session: {
+          totalTokens: 16469,
+          contextTokens: 1000000,
+        },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        remainingTokens: 983531,
+        percentUsed: 1.6469,
+      }),
+    );
   });
 
   it('documents actual agent identities and collapsed context summaries in the session page', () => {
@@ -620,5 +690,14 @@ describe('session content helpers', () => {
     expect(source).toContain('...buildAgentRoleConfig(agents)');
     expect(source).toContain('<ContextSummary summary={message.contextSummary} />');
     expect(source).toContain('<AgentSelectOption agent={agent} />');
+  });
+
+  it('documents that Desktop settings expose tool and reasoning display toggles', () => {
+    const source = readFileSync('src/pages/SettingsPage.tsx', 'utf8');
+
+    expect(source).toContain('settings.sessionToolCallDisplay');
+    expect(source).toContain('settings.sessionReasoningDisplay');
+    expect(source).toContain("updateSettings({ sessionToolCallDisplay: checked ? 'compact' : 'hidden' })");
+    expect(source).toContain("updateSettings({ sessionReasoningDisplay: checked ? 'visible' : 'hidden' })");
   });
 });

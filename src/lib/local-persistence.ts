@@ -67,9 +67,28 @@ function isInstanceList(value: unknown): value is InstanceConfig[] {
   return Array.isArray(value) && value.every(isInstanceConfig);
 }
 
+function normalizeLoadedSettings(settings?: Partial<AppSettings> | null): { settings: AppSettings; migrated: boolean } {
+  const raw = settings ?? {};
+  const merged = { ...DEFAULT_SETTINGS, ...raw };
+  let migrated = false;
+
+  const schemaVersion = typeof raw.settingsSchemaVersion === 'number' ? raw.settingsSchemaVersion : 1;
+  if (schemaVersion < 2 && raw.sessionToolCallDisplay === 'hidden') {
+    merged.sessionToolCallDisplay = 'compact';
+    migrated = true;
+  }
+
+  if (merged.settingsSchemaVersion !== DEFAULT_SETTINGS.settingsSchemaVersion) {
+    merged.settingsSchemaVersion = DEFAULT_SETTINGS.settingsSchemaVersion;
+    migrated = true;
+  }
+
+  return { settings: merged, migrated };
+}
+
 function readLegacySettings(): AppSettings | null {
   const settings = readLegacyJson<Partial<AppSettings>>(LEGACY_SETTINGS_KEY, isSettings);
-  return settings ? { ...DEFAULT_SETTINGS, ...settings } : null;
+  return settings ? normalizeLoadedSettings(settings).settings : null;
 }
 
 function readLegacyInstances(): InstanceConfig[] {
@@ -92,7 +111,7 @@ function clearLegacyAppKeys(): void {
 function readFallbackSnapshot(): LocalAppSnapshot {
   const instances = readLegacyInstances();
   return {
-    settings: readLegacySettings() ?? { ...DEFAULT_SETTINGS },
+    settings: readLegacySettings() ?? normalizeLoadedSettings().settings,
     instances,
     currentInstanceId: readLegacyCurrentInstanceId(instances),
   };
@@ -112,9 +131,10 @@ export async function loadAppSnapshot(): Promise<LocalAppSnapshot> {
     storedCurrentId && instances.some((instance) => instance.id === storedCurrentId)
       ? storedCurrentId
       : legacyCurrentId;
-  const settings = { ...DEFAULT_SETTINGS, ...(stored.settings ?? legacySettings ?? {}) };
+  const normalizedSettings = normalizeLoadedSettings(stored.settings ?? legacySettings);
+  const settings = normalizedSettings.settings;
 
-  if (legacySettings || legacyInstances.length > 0 || legacyCurrentId) {
+  if (legacySettings || legacyInstances.length > 0 || legacyCurrentId || normalizedSettings.migrated) {
     await Promise.all([
       storage.saveSettings(settings),
       storage.saveInstances(instances),

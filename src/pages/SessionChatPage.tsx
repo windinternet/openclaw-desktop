@@ -1,7 +1,18 @@
 import { useState, useEffect, useRef, useCallback, useMemo, type Ref } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { AIChatDialogue, AIChatInput, Button, Empty, Progress, SideSheet, Tabs, Tag, Toast, Typography } from '@douyinfe/semi-ui';
+import {
+  AIChatDialogue,
+  AIChatInput,
+  Button,
+  Empty,
+  Progress,
+  SideSheet,
+  Tabs,
+  Tag,
+  Toast,
+  Typography,
+} from '@douyinfe/semi-ui';
 import { IconAppCenter, IconClose, IconInfoCircle, IconList, IconPlay, IconWrench } from '@douyinfe/semi-icons';
 import type {
   DialogueContentItemRendererMap,
@@ -9,10 +20,7 @@ import type {
 } from '@douyinfe/semi-ui/lib/es/aiChatDialogue/interface';
 import { useStore } from '../lib';
 import { saveArtifactFromChat } from '../lib/artifact-parser';
-import {
-  collectChatArtifactCandidates,
-  filterArtifactsForSessionKeys,
-} from '../lib/session-artifacts';
+import { collectChatArtifactCandidates, filterArtifactsForSessionKeys } from '../lib/session-artifacts';
 import type { ArtifactMeta } from '../lib/artifact-types';
 import type { EventFrame } from '../lib/types';
 import {
@@ -35,11 +43,7 @@ import type { ChatContentItem, SessionContextSnapshot, SessionMessageDisplaySett
 import { isAssistantCompletionEvent } from '../lib/assistant-completion-notifier';
 import AgentSelectOption from '../components/AgentSelectOption';
 import ContextSummary from '../components/ContextSummary';
-import {
-  buildAgentRoleConfig,
-  getAgentDisplayName,
-  getAgentRoleKey,
-} from '../lib/agent-presentation';
+import { buildAgentRoleConfig, getAgentDisplayName, getAgentRoleKey } from '../lib/agent-presentation';
 import { resolveAgentSwitchStrategy } from '../lib/agent-switch-settings';
 import { useSettingsStore } from '../lib/settings-store';
 import {
@@ -61,11 +65,7 @@ import {
   requestAgentHandoffSummary,
   spawnAgentChildSession,
 } from '../lib/agent-switching';
-import {
-  buildNewSessionCreateParams,
-  getChatRoute,
-  resolveCreatedSessionKey,
-} from '../lib/new-session';
+import { buildNewSessionCreateParams, getChatRoute, resolveCreatedSessionKey } from '../lib/new-session';
 import { buildModelOptions, fetchGatewayDefaultModel, resolvePreferredModel } from '../lib/model-selection';
 import {
   buildGatewayChatSendPayload,
@@ -139,10 +139,7 @@ function appendTextToContent(contentArr: ChatContentItem[], delta: string): Chat
       ...contentArr.slice(0, -1),
       {
         ...last,
-        content: [
-          ...last.content,
-          { type: 'output_text' as const, text: delta },
-        ],
+        content: [...last.content, { type: 'output_text' as const, text: delta }],
       },
     ];
   }
@@ -174,6 +171,37 @@ function appendDeltaToLastText(contentArr: ChatContentItem[], delta: string): Ch
     }
   }
   return appendTextToContent(contentArr, delta);
+}
+
+function appendReasoningDeltaToContent(contentArr: ChatContentItem[], delta: string): ChatContentItem[] {
+  for (let i = contentArr.length - 1; i >= 0; i--) {
+    const item = contentArr[i];
+    if (item.type === 'reasoning') {
+      const content = item.content.length > 0 ? [...item.content] : [{ type: 'reasoning', text: '' }];
+      const last = content[content.length - 1];
+      content[content.length - 1] = { ...last, text: `${last.text}${delta}` };
+      return [
+        ...contentArr.slice(0, i),
+        {
+          ...item,
+          content,
+          summary: content,
+          status: 'in_progress',
+        },
+        ...contentArr.slice(i + 1),
+      ];
+    }
+  }
+
+  return [
+    ...contentArr,
+    {
+      type: 'reasoning',
+      content: [{ type: 'reasoning', text: delta }],
+      summary: [{ type: 'reasoning', text: delta }],
+      status: 'in_progress',
+    },
+  ];
 }
 
 interface ChatLocationState {
@@ -215,7 +243,7 @@ function getSessionKey(session: { key?: string; sessionKey?: string }): string {
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
-  return typeof value === 'object' && value !== null ? value as Record<string, unknown> : {};
+  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
 }
 
 function buildDisplayChat(
@@ -235,9 +263,10 @@ function buildDisplayChat(
     role: getMessageRole(record.role, sessionKey),
     content,
     createAt: Number(record.timestamp || record.createdAt || Date.now()),
-    status: record.role === 'assistant' && (record.status === 'in_progress' || record.status === 'running')
-      ? 'completed'
-      : String(record.status || 'completed'),
+    status:
+      record.role === 'assistant' && (record.status === 'in_progress' || record.status === 'running')
+        ? 'completed'
+        : String(record.status || 'completed'),
     sourceSessionKey: sessionKey,
     agentId,
     contextSummary: parsedContext?.summary,
@@ -254,9 +283,9 @@ function mergeChats(chats: DisplayChat[]): DisplayChat[] {
 
 function isToolOnlyChat(chat: DisplayChat): boolean {
   return (
-    Array.isArray(chat.content)
-    && chat.content.length > 0
-    && chat.content.every((item) => item.type === 'function_call')
+    Array.isArray(chat.content) &&
+    chat.content.length > 0 &&
+    chat.content.every((item) => item.type === 'function_call')
   );
 }
 
@@ -278,7 +307,7 @@ function flushToolGroup(group: DisplayChat[], output: DisplayChat[]): void {
   output.push({
     ...first,
     id: `${first.id}:tool-group:${last.id}:${group.length}`,
-    content: group.flatMap((chat) => Array.isArray(chat.content) ? chat.content : []),
+    content: group.flatMap((chat) => (Array.isArray(chat.content) ? chat.content : [])),
     status: resolveGroupedStatus(group),
     usage: last.usage ?? first.usage,
     model: last.model ?? first.model,
@@ -290,17 +319,12 @@ function groupAdjacentToolCallChats(chats: DisplayChat[]): DisplayChat[] {
   let group: DisplayChat[] = [];
 
   for (const chat of chats) {
-    const canJoinGroup = (
-      isToolOnlyChat(chat)
-      && (
-        group.length === 0
-        || (
-          chat.role === group[0].role
-          && chat.sourceSessionKey === group[0].sourceSessionKey
-          && chat.agentId === group[0].agentId
-        )
-      )
-    );
+    const canJoinGroup =
+      isToolOnlyChat(chat) &&
+      (group.length === 0 ||
+        (chat.role === group[0].role &&
+          chat.sourceSessionKey === group[0].sourceSessionKey &&
+          chat.agentId === group[0].agentId));
 
     if (canJoinGroup) {
       group.push(chat);
@@ -427,9 +451,7 @@ function SessionSidePanel({
   onClose?: () => void;
 }) {
   const { t } = useTranslation();
-  const contextPercent = insight.contextUsageRatio !== undefined
-    ? Math.round(insight.contextUsageRatio * 100)
-    : 0;
+  const contextPercent = insight.contextUsageRatio !== undefined ? Math.round(insight.contextUsageRatio * 100) : 0;
 
   return (
     <SideSheet
@@ -458,15 +480,25 @@ function SessionSidePanel({
         <Tabs.TabPane tab={t('chat.sidePanel.overview')} itemKey="overview">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <section>
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>{t('chat.insight.contextWindow')}</Text>
+              <Text strong style={{ display: 'block', marginBottom: 8 }}>
+                {t('chat.insight.contextWindow')}
+              </Text>
               <Progress
                 percent={contextPercent}
                 showInfo
                 size="small"
-                stroke={insight.contextUsageRatio && insight.contextUsageRatio > 0.8 ? 'var(--semi-color-warning)' : 'var(--semi-color-primary)'}
+                stroke={
+                  insight.contextUsageRatio && insight.contextUsageRatio > 0.8
+                    ? 'var(--semi-color-warning)'
+                    : 'var(--semi-color-primary)'
+                }
               />
               <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 6 }}>
-                {t('chat.insight.tokensUsed', { used: formatNumber(insight.usedContextTokens, t), limit: formatNumber(insight.contextLimit, t), percent: formatPercent(insight.contextUsageRatio, t) })}
+                {t('chat.insight.tokensUsed', {
+                  used: formatNumber(insight.usedContextTokens, t),
+                  limit: formatNumber(insight.contextLimit, t),
+                  percent: formatPercent(insight.contextUsageRatio, t),
+                })}
               </Text>
               <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>
                 {contextSourceLabel(insight.contextSource, t)}
@@ -475,10 +507,16 @@ function SessionSidePanel({
             </section>
 
             <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <Metric label={t('chat.insight.remainingContext')} value={formatNumber(insight.remainingContextTokens, t)} />
+              <Metric
+                label={t('chat.insight.remainingContext')}
+                value={formatNumber(insight.remainingContextTokens, t)}
+              />
               <Metric label={t('chat.insight.inputTokens')} value={formatNumber(insight.inputTokens, t)} />
               <Metric label={t('chat.insight.outputTokens')} value={formatNumber(insight.outputTokens, t)} />
-              <Metric label={t('chat.insight.cacheTokens')} value={formatNumber(sumOptionalNumbers(insight.cacheReadTokens, insight.cacheWriteTokens), t)} />
+              <Metric
+                label={t('chat.insight.cacheTokens')}
+                value={formatNumber(sumOptionalNumbers(insight.cacheReadTokens, insight.cacheWriteTokens), t)}
+              />
               <Metric label={t('chat.insight.messages')} value={formatNumber(insight.messageCount, t)} />
               <Metric label={t('chat.insight.toolCalls')} value={formatNumber(insight.toolCallCount, t)} />
               <Metric label={t('chat.insight.userMessages')} value={formatNumber(insight.userMessageCount, t)} />
@@ -493,12 +531,16 @@ function SessionSidePanel({
             )}
 
             <section>
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>{t('chat.insight.sessionArtifacts')}</Text>
+              <Text strong style={{ display: 'block', marginBottom: 8 }}>
+                {t('chat.insight.sessionArtifacts')}
+              </Text>
               <Metric label={t('chat.insight.identifiedArtifacts')} value={formatNumber(artifacts.length, t)} />
             </section>
 
             <section>
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>{t('chat.insight.futureInsights')}</Text>
+              <Text strong style={{ display: 'block', marginBottom: 8 }}>
+                {t('chat.insight.futureInsights')}
+              </Text>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <FutureItem label={t('chat.insight.sessionSummary')} />
                 <FutureItem label={t('chat.insight.keyFacts')} />
@@ -533,17 +575,23 @@ function SessionSidePanel({
               </div>
 
               <section>
-                <Text strong size="small" style={{ display: 'block', marginBottom: 6 }}>{t('chat.tool.arguments')}</Text>
+                <Text strong size="small" style={{ display: 'block', marginBottom: 6 }}>
+                  {t('chat.tool.arguments')}
+                </Text>
                 <DetailCodeBlock value={selectedTool.item.arguments} t={t} />
               </section>
 
               <section>
-                <Text strong size="small" style={{ display: 'block', marginBottom: 6 }}>{t('chat.tool.result')}</Text>
+                <Text strong size="small" style={{ display: 'block', marginBottom: 6 }}>
+                  {t('chat.tool.result')}
+                </Text>
                 <DetailCodeBlock value={selectedTool.item.toolResult} t={t} />
               </section>
 
               <section>
-                <Text strong size="small" style={{ display: 'block', marginBottom: 6 }}>{t('chat.tool.rawStructure')}</Text>
+                <Text strong size="small" style={{ display: 'block', marginBottom: 6 }}>
+                  {t('chat.tool.rawStructure')}
+                </Text>
                 <DetailCodeBlock value={selectedTool.item.raw ?? selectedTool.item} t={t} />
               </section>
             </div>
@@ -588,7 +636,9 @@ function SessionSidePanel({
                       v{artifact.currentVersion} · {new Date(artifact.updatedAt).toLocaleString()}
                     </Text>
                   </span>
-                  <Tag color="orange" size="small">{artifact.type}</Tag>
+                  <Tag color="orange" size="small">
+                    {artifact.type}
+                  </Tag>
                   <IconPlay size="small" />
                 </button>
               ))}
@@ -613,7 +663,9 @@ function SessionSidePanel({
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ padding: 10, borderRadius: 6, background: 'var(--semi-color-fill-0)' }}>
-      <Text type="tertiary" size="small" style={{ display: 'block' }}>{label}</Text>
+      <Text type="tertiary" size="small" style={{ display: 'block' }}>
+        {label}
+      </Text>
       <Text strong>{value}</Text>
     </div>
   );
@@ -625,7 +677,9 @@ function FutureItem({ label }: { label: string }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <IconList size="small" />
       <Text size="small">{label}</Text>
-      <Tag color="grey" size="small">{t('common.reserved')}</Tag>
+      <Tag color="grey" size="small">
+        {t('common.reserved')}
+      </Tag>
     </div>
   );
 }
@@ -633,8 +687,12 @@ function FutureItem({ label }: { label: string }) {
 function InsightPlaceholder({ title, desc }: { title: string; desc: string }) {
   return (
     <div style={{ padding: 10, borderRadius: 6, border: '1px solid var(--semi-color-border)' }}>
-      <Text strong style={{ display: 'block', marginBottom: 4 }}>{title}</Text>
-      <Text type="tertiary" size="small">{desc}</Text>
+      <Text strong style={{ display: 'block', marginBottom: 4 }}>
+        {title}
+      </Text>
+      <Text type="tertiary" size="small">
+        {desc}
+      </Text>
     </div>
   );
 }
@@ -653,15 +711,18 @@ export default function SessionChatPage() {
   const fetchArtifacts = useStore((s) => s.fetchArtifacts);
   const openArtifactWindow = useStore((s) => s.openArtifactWindow);
   const currentInstanceId = useStore((s) => s.currentInstanceId);
-  const currentInstance = useStore(
-    (s) => s.instances.find((instance) => instance.id === s.currentInstanceId) ?? null,
-  );
+  const currentInstance = useStore((s) => s.instances.find((instance) => instance.id === s.currentInstanceId) ?? null);
   const globalAgentSwitchStrategy = useSettingsStore((s) => s.settings.agentSwitchStrategy);
   const sessionToolCallDisplay = useSettingsStore((s) => s.settings.sessionToolCallDisplay);
+  const sessionReasoningDisplay = useSettingsStore((s) => s.settings.sessionReasoningDisplay);
   const assistantReplyGrouping = useSettingsStore((s) => s.settings.assistantReplyGrouping);
   const sessionMessageDisplaySettings = useMemo(
-    () => ({ toolCallDisplay: sessionToolCallDisplay, assistantReplyGrouping }),
-    [assistantReplyGrouping, sessionToolCallDisplay],
+    () => ({
+      toolCallDisplay: sessionToolCallDisplay,
+      reasoningDisplay: sessionReasoningDisplay,
+      assistantReplyGrouping,
+    }),
+    [assistantReplyGrouping, sessionReasoningDisplay, sessionToolCallDisplay],
   );
 
   const initialSessionKey = decodeSessionKeyParam(urlSessionKey);
@@ -684,7 +745,6 @@ export default function SessionChatPage() {
   const [sessionContextSnapshot, setSessionContextSnapshot] = useState<SessionContextSnapshot | null>(null);
   const [pageDragActive, setPageDragActive] = useState(false);
 
-  
   const streamingIdRef = useRef<string | null>(null);
   const patchAppliedRef = useRef(false);
   const patchModelRef = useRef('');
@@ -749,18 +809,20 @@ export default function SessionChatPage() {
     };
   }, [currentInstanceId, rootSessionKey]);
 
-  const activeAgentId = useMemo(
-    () => getAgentIdFromSessionKey(activeSessionKey || '') || 'main',
-    [activeSessionKey],
+  const activeAgentId = useMemo(() => getAgentIdFromSessionKey(activeSessionKey || '') || 'main', [activeSessionKey]);
+  const sessionModel =
+    sessionContextSnapshot?.model ?? sessionContextSnapshot?.configuredModel ?? sessionContextSnapshot?.selectedModel;
+  const defaultChatModel = useMemo(
+    () =>
+      resolvePreferredModel({
+        models,
+        agents,
+        selectedAgentId: activeAgentId,
+        gatewayDefaultModel,
+        sessionModel,
+      }),
+    [activeAgentId, agents, gatewayDefaultModel, models, sessionModel],
   );
-  const sessionModel = sessionContextSnapshot?.model ?? sessionContextSnapshot?.configuredModel ?? sessionContextSnapshot?.selectedModel;
-  const defaultChatModel = useMemo(() => resolvePreferredModel({
-    models,
-    agents,
-    selectedAgentId: activeAgentId,
-    gatewayDefaultModel,
-    sessionModel,
-  }), [activeAgentId, agents, gatewayDefaultModel, models, sessionModel]);
 
   useEffect(() => {
     if (!activeClient || connectionStatus !== 'connected') {
@@ -787,26 +849,35 @@ export default function SessionChatPage() {
 
   const getDraftKey = useCallback((sessionKey: string) => `${DRAFT_PREFIX}${sessionKey}`, []);
 
-  const saveDraft = useCallback((sessionKey: string, text: string, attachments: Array<{ uid: string; name: string; size: string }> = []) => {
-    const hasContent = text.trim() || attachments.length > 0;
-    if (hasContent) {
-      localStorage.setItem(getDraftKey(sessionKey), JSON.stringify({ text, attachments }));
-    } else {
-      localStorage.removeItem(getDraftKey(sessionKey));
-    }
-  }, [getDraftKey]);
+  const saveDraft = useCallback(
+    (sessionKey: string, text: string, attachments: Array<{ uid: string; name: string; size: string }> = []) => {
+      const hasContent = text.trim() || attachments.length > 0;
+      if (hasContent) {
+        localStorage.setItem(getDraftKey(sessionKey), JSON.stringify({ text, attachments }));
+      } else {
+        localStorage.removeItem(getDraftKey(sessionKey));
+      }
+    },
+    [getDraftKey],
+  );
 
-  const loadDraft = useCallback((sessionKey: string): { text: string; attachments: Array<{ uid: string; name: string; size: string }> } => {
-    try {
-      const raw = localStorage.getItem(getDraftKey(sessionKey));
-      if (!raw) return { text: '', attachments: [] };
-      return JSON.parse(raw);
-    } catch {
-      return { text: '', attachments: [] };
-    }
-  }, [getDraftKey]);
+  const loadDraft = useCallback(
+    (sessionKey: string): { text: string; attachments: Array<{ uid: string; name: string; size: string }> } => {
+      try {
+        const raw = localStorage.getItem(getDraftKey(sessionKey));
+        if (!raw) return { text: '', attachments: [] };
+        return JSON.parse(raw);
+      } catch {
+        return { text: '', attachments: [] };
+      }
+    },
+    [getDraftKey],
+  );
 
-  const [draftState, setDraftState] = useState<{ text: string; attachments: Array<{ uid: string; name: string; size: string }> }>({ text: '', attachments: [] });
+  const [draftState, setDraftState] = useState<{
+    text: string;
+    attachments: Array<{ uid: string; name: string; size: string }>;
+  }>({ text: '', attachments: [] });
 
   // 切换会话时加载草稿
   useEffect(() => {
@@ -827,28 +898,34 @@ export default function SessionChatPage() {
 
   const draftAttachmentsRef = useRef<Array<{ uid: string; name: string; size: string }>>([]);
 
-  const handleContentChange = useCallback((_content: unknown) => {
-    if (!activeSessionKey) return;
-    const text = extractMessageText(_content);
-    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
-    draftSaveTimerRef.current = setTimeout(() => {
-      saveDraft(activeSessionKey, text, draftAttachmentsRef.current);
-    }, 500);
-  }, [activeSessionKey, saveDraft]);
+  const handleContentChange = useCallback(
+    (_content: unknown) => {
+      if (!activeSessionKey) return;
+      const text = extractMessageText(_content);
+      if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = setTimeout(() => {
+        saveDraft(activeSessionKey, text, draftAttachmentsRef.current);
+      }, 500);
+    },
+    [activeSessionKey, saveDraft],
+  );
 
-  const handleUploadChange = useCallback((props: { fileList?: Array<{ uid: string; name: string; size: string }> }) => {
-    if (!activeSessionKey) return;
-    const attachments = (props.fileList || []).map((f) => ({ uid: f.uid, name: f.name, size: f.size }));
-    draftAttachmentsRef.current = attachments;
-    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
-    draftSaveTimerRef.current = setTimeout(() => {
-      const editor = document.querySelector('.semi-ai-chat-input .ProseMirror') as HTMLElement | null;
-      const currentText = editor?.textContent || '';
-      saveDraft(activeSessionKey, currentText, attachments);
-    }, 500);
-  }, [activeSessionKey, saveDraft]);
+  const handleUploadChange = useCallback(
+    (props: { fileList?: Array<{ uid: string; name: string; size: string }> }) => {
+      if (!activeSessionKey) return;
+      const attachments = (props.fileList || []).map((f) => ({ uid: f.uid, name: f.name, size: f.size }));
+      draftAttachmentsRef.current = attachments;
+      if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = setTimeout(() => {
+        const editor = document.querySelector('.semi-ai-chat-input .ProseMirror') as HTMLElement | null;
+        const currentText = editor?.textContent || '';
+        saveDraft(activeSessionKey, currentText, attachments);
+      }, 500);
+    },
+    [activeSessionKey, saveDraft],
+  );
 
-    /**
+  /**
    * Auto-scroll to bottom when new chats arrive, but only if the user
    * is already near the bottom (within 200px).  This keeps the user
    * at the bottom during streaming while letting them freely scroll
@@ -925,11 +1002,12 @@ export default function SessionChatPage() {
     if (candidates.length === 0) return;
 
     for (const candidate of candidates) {
-      const alreadySaved = artifacts.some((artifact) => (
-        artifact.source.type === 'chat'
-        && artifact.source.id === candidate.sourceSessionKey
-        && artifact.source.name === candidate.sourceMessageId
-      ));
+      const alreadySaved = artifacts.some(
+        (artifact) =>
+          artifact.source.type === 'chat' &&
+          artifact.source.id === candidate.sourceSessionKey &&
+          artifact.source.name === candidate.sourceMessageId,
+      );
       if (alreadySaved) {
         savedArtifactKeysRef.current.add(candidate.key);
         continue;
@@ -937,12 +1015,7 @@ export default function SessionChatPage() {
       if (savedArtifactKeysRef.current.has(candidate.key)) continue;
 
       savedArtifactKeysRef.current.add(candidate.key);
-      void saveArtifactFromChat(
-        candidate.parsed,
-        'chat',
-        candidate.sourceSessionKey,
-        candidate.sourceMessageId,
-      )
+      void saveArtifactFromChat(candidate.parsed, 'chat', candidate.sourceSessionKey, candidate.sourceMessageId)
         .then(() => fetchArtifacts())
         .catch(() => {
           savedArtifactKeysRef.current.delete(candidate.key);
@@ -957,17 +1030,19 @@ export default function SessionChatPage() {
     (async () => {
       try {
         const sessionKeys = [...new Set([rootSessionKey, ...relatedSessionKeys])];
-        const histories = await Promise.all(sessionKeys.map(async (sessionKey) => {
-          let data: unknown;
-          try {
-            data = await activeClient.request('chat.history', { sessionKey });
-          } catch {
-            data = await activeClient.request('sessions.preview', { keys: [sessionKey] });
-          }
-          return extractSessionMessageItems(data)
-            .map((message, index) => buildDisplayChat(sessionKey, message, index, sessionMessageDisplaySettings))
-            .filter((chat): chat is DisplayChat => chat !== null);
-        }));
+        const histories = await Promise.all(
+          sessionKeys.map(async (sessionKey) => {
+            let data: unknown;
+            try {
+              data = await activeClient.request('chat.history', { sessionKey });
+            } catch {
+              data = await activeClient.request('sessions.preview', { keys: [sessionKey] });
+            }
+            return extractSessionMessageItems(data)
+              .map((message, index) => buildDisplayChat(sessionKey, message, index, sessionMessageDisplaySettings))
+              .filter((chat): chat is DisplayChat => chat !== null);
+          }),
+        );
         if (cancelled) return;
         const loadedChats = mergeChats(histories.flat());
         const newLimit = Math.min(PAGE_SIZE, loadedChats.length);
@@ -1032,7 +1107,10 @@ export default function SessionChatPage() {
   const endGeneration = useCallback((status: string, runId?: string) => {
     setGenerating(false);
     sendingRef.current = false;
-    if (genTimeoutRef.current) { clearTimeout(genTimeoutRef.current); genTimeoutRef.current = null; }
+    if (genTimeoutRef.current) {
+      clearTimeout(genTimeoutRef.current);
+      genTimeoutRef.current = null;
+    }
     const sid = runId || streamingIdRef.current || 'done';
     setChats((prev) => {
       let changed = false;
@@ -1068,7 +1146,10 @@ export default function SessionChatPage() {
         // ── 文本流式回复 ──
         if (isActiveLensEvent) {
           setGenerating(true);
-          if (genTimeoutRef.current) { clearTimeout(genTimeoutRef.current); genTimeoutRef.current = null; }
+          if (genTimeoutRef.current) {
+            clearTimeout(genTimeoutRef.current);
+            genTimeoutRef.current = null;
+          }
         }
         const data = p.data as Record<string, unknown> | undefined;
         const delta = (data?.delta ?? data?.text ?? data?.content ?? '') as string;
@@ -1079,7 +1160,9 @@ export default function SessionChatPage() {
           const contentItems = parseHistoryMessageToContentItems(completeMessage, sessionMessageDisplaySettings);
           if (contentItems.length === 0) return;
           setChats((prev) => {
-            const existingIndex = prev.findIndex((chat) => chat.id === displayChatId && chat.sourceSessionKey === sourceSessionKey);
+            const existingIndex = prev.findIndex(
+              (chat) => chat.id === displayChatId && chat.sourceSessionKey === sourceSessionKey,
+            );
             if (existingIndex >= 0) {
               const next = [...prev];
               next[existingIndex] = {
@@ -1111,7 +1194,9 @@ export default function SessionChatPage() {
           return;
         }
         setChats((prev) => {
-          const existingIndex = prev.findIndex((chat) => chat.id === displayChatId && chat.sourceSessionKey === sourceSessionKey);
+          const existingIndex = prev.findIndex(
+            (chat) => chat.id === displayChatId && chat.sourceSessionKey === sourceSessionKey,
+          );
           const existing = existingIndex >= 0 ? prev[existingIndex] : undefined;
           if (existing) {
             // 已有流式消息：直接拼接纯文本内容到最后一个 text block
@@ -1128,12 +1213,13 @@ export default function SessionChatPage() {
             next[existingIndex] = { ...existing, content: String(existing.content || '') + delta };
             return next;
           }
-          const placeholderIndex = prev.findIndex((chat) => (
-            chat.id === runId
-            && chat.sourceSessionKey === sourceSessionKey
-            && Array.isArray(chat.content)
-            && chat.content.length === 0
-          ));
+          const placeholderIndex = prev.findIndex(
+            (chat) =>
+              chat.id === runId &&
+              chat.sourceSessionKey === sourceSessionKey &&
+              Array.isArray(chat.content) &&
+              chat.content.length === 0,
+          );
           if (placeholderIndex >= 0) {
             const next = [...prev];
             next[placeholderIndex] = {
@@ -1160,11 +1246,62 @@ export default function SessionChatPage() {
           ];
         });
         streamingIdRef.current = runId;
+      } else if (stream === 'thinking' || stream === 'reasoning') {
+        if (sessionMessageDisplaySettings.reasoningDisplay === 'hidden') return;
+        if (isActiveLensEvent) {
+          setGenerating(true);
+          if (genTimeoutRef.current) {
+            clearTimeout(genTimeoutRef.current);
+            genTimeoutRef.current = null;
+          }
+        }
+        const data = p.data as Record<string, unknown> | undefined;
+        const delta = extractSessionMessageText(data?.delta ?? data?.text ?? data?.content ?? data);
+        if (!delta) return;
+        const displayChatId = getStreamMessageDisplayId(runId, p, sessionMessageDisplaySettings);
+        setChats((prev) => {
+          const existingIndex = prev.findIndex(
+            (chat) =>
+              (chat.id === displayChatId || chat.id === runId || chat.runId === runId) &&
+              chat.sourceSessionKey === sourceSessionKey &&
+              Array.isArray(chat.content),
+          );
+          if (existingIndex >= 0) {
+            const existing = prev[existingIndex];
+            const next = [...prev];
+            next[existingIndex] = {
+              ...existing,
+              id: existing.id === runId ? displayChatId : existing.id,
+              runId,
+              content: appendReasoningDeltaToContent(existing.content as ChatContentItem[], delta),
+              status: 'in_progress',
+            };
+            return next;
+          }
+
+          return [
+            ...prev,
+            {
+              id: displayChatId,
+              runId,
+              role: assistantRole,
+              content: appendReasoningDeltaToContent([], delta),
+              status: 'in_progress',
+              createAt: Date.now(),
+              sourceSessionKey,
+              agentId: getAgentIdFromSessionKey(sourceSessionKey),
+            },
+          ];
+        });
+        streamingIdRef.current = runId;
       } else if (isRealtimeToolStream(stream, p.data)) {
         // ── 工具调用事件：独立为单独的 DisplayChat 条目 ──
         if (isActiveLensEvent) {
           setGenerating(true);
-          if (genTimeoutRef.current) { clearTimeout(genTimeoutRef.current); genTimeoutRef.current = null; }
+          if (genTimeoutRef.current) {
+            clearTimeout(genTimeoutRef.current);
+            genTimeoutRef.current = null;
+          }
         }
         const data = p.data as Record<string, unknown> | undefined;
         const phase = (p.phase ?? data?.phase) as string | undefined;
@@ -1185,17 +1322,17 @@ export default function SessionChatPage() {
 
         const toolRecord = asRecord(data);
         const toolChatId = `${runId}-tool-${String(
-          toolRecord.callId
-          ?? toolRecord.call_id
-          ?? toolRecord.toolCallId
-          ?? toolRecord.tool_call_id
-          ?? toolRecord.itemId
-          ?? toolRecord.id
-          ?? toolRecord.toolName
-          ?? toolRecord.name
-          ?? 'tool',
+          toolRecord.callId ??
+            toolRecord.call_id ??
+            toolRecord.toolCallId ??
+            toolRecord.tool_call_id ??
+            toolRecord.itemId ??
+            toolRecord.id ??
+            toolRecord.toolName ??
+            toolRecord.name ??
+            'tool',
         )}`;
-        const toolStatus = isToolCompleted(data) ? 'completed' : (phase === 'error' ? 'failed' : 'in_progress');
+        const toolStatus = isToolCompleted(data) ? 'completed' : phase === 'error' ? 'failed' : 'in_progress';
         const toolChat: DisplayChat = {
           id: toolChatId,
           runId,
@@ -1234,13 +1371,15 @@ export default function SessionChatPage() {
         } else if (isAssistantCompletionEvent(frame)) {
           if (isActiveLensEvent) endGeneration('completed', runId);
           else {
-            setChats((prev) => prev.map((chat) => (
-              chat.id === runId && chat.sourceSessionKey === sourceSessionKey
-                ? { ...chat, status: 'completed' }
-                : chat.runId === runId && chat.sourceSessionKey === sourceSessionKey
+            setChats((prev) =>
+              prev.map((chat) =>
+                chat.id === runId && chat.sourceSessionKey === sourceSessionKey
                   ? { ...chat, status: 'completed' }
-                : chat
-            )));
+                  : chat.runId === runId && chat.sourceSessionKey === sourceSessionKey
+                    ? { ...chat, status: 'completed' }
+                    : chat,
+              ),
+            );
           }
         } else if (phase === 'start' || phase === 'running') {
           if (isActiveLensEvent) setGenerating(true);
@@ -1269,37 +1408,52 @@ export default function SessionChatPage() {
       }
     };
     return activeClient.subscribeEvent(handleEvent);
-  }, [activeClient, activeSessionKey, rootSessionKey, relatedSessionKeys, endGeneration, sessionMessageDisplaySettings]);
+  }, [
+    activeClient,
+    activeSessionKey,
+    rootSessionKey,
+    relatedSessionKeys,
+    endGeneration,
+    sessionMessageDisplaySettings,
+  ]);
 
-  const patchSessionConfig = useCallback((options?: { model?: string }): Promise<void> => {
-    const model = options?.model || chatModel;
-    if (!activeClient || !activeSessionKey || !model) return Promise.resolve();
-    if (patchAppliedRef.current && patchModelRef.current === model) {
-      return pendingSessionPatchRef.current ?? Promise.resolve();
-    }
-
-    const request = activeClient.request('sessions.patch', {
-      key: activeSessionKey,
-      model,
-    }).then(() => {
-      patchAppliedRef.current = true;
-      patchModelRef.current = model;
-    });
-
-    const trackedRequest = request.finally(() => {
-      if (pendingSessionPatchRef.current === trackedRequest) {
-        pendingSessionPatchRef.current = null;
+  const patchSessionConfig = useCallback(
+    (options?: { model?: string }): Promise<void> => {
+      const model = options?.model || chatModel;
+      if (!activeClient || !activeSessionKey || !model) return Promise.resolve();
+      if (patchAppliedRef.current && patchModelRef.current === model) {
+        return pendingSessionPatchRef.current ?? Promise.resolve();
       }
-    });
-    pendingSessionPatchRef.current = trackedRequest;
-    return trackedRequest;
-  }, [activeClient, activeSessionKey, chatModel]);
 
-  const patchSessionConfigSafely = useCallback((options?: { model?: string }) => {
-    void patchSessionConfig(options).catch((error) => {
-      Toast.error(getErrorMessage(error) || t('errors.sendFailed'));
-    });
-  }, [patchSessionConfig, t]);
+      const request = activeClient
+        .request('sessions.patch', {
+          key: activeSessionKey,
+          model,
+        })
+        .then(() => {
+          patchAppliedRef.current = true;
+          patchModelRef.current = model;
+        });
+
+      const trackedRequest = request.finally(() => {
+        if (pendingSessionPatchRef.current === trackedRequest) {
+          pendingSessionPatchRef.current = null;
+        }
+      });
+      pendingSessionPatchRef.current = trackedRequest;
+      return trackedRequest;
+    },
+    [activeClient, activeSessionKey, chatModel],
+  );
+
+  const patchSessionConfigSafely = useCallback(
+    (options?: { model?: string }) => {
+      void patchSessionConfig(options).catch((error) => {
+        Toast.error(getErrorMessage(error) || t('errors.sendFailed'));
+      });
+    },
+    [patchSessionConfig, t],
+  );
 
   const resetPendingSessionPatch = useCallback(() => {
     pendingSessionPatchRef.current = null;
@@ -1326,15 +1480,12 @@ export default function SessionChatPage() {
       // 清除草稿
       saveDraft(activeSessionKey, '', []);
       draftAttachmentsRef.current = [];
-      const pendingSummary = currentInstanceId
-        ? getPendingSummary(currentInstanceId, activeSessionKey)
-        : undefined;
+      const pendingSummary = currentInstanceId ? getPendingSummary(currentInstanceId, activeSessionKey) : undefined;
       const gatewayMessage = pendingSummary
         ? buildContextualUserMessage(pendingSummary.summary, message.trim())
         : message.trim();
-      const displayContent = attachments.length > 0
-        ? buildSemiMessageContent(message.trim(), attachments)
-        : message.trim();
+      const displayContent =
+        attachments.length > 0 ? buildSemiMessageContent(message.trim(), attachments) : message.trim();
 
       sendingRef.current = true;
       useStore.getState().patchSessionActivityState(activeSessionKey, 'generating');
@@ -1382,18 +1533,19 @@ export default function SessionChatPage() {
         if (sendResult?.runId) {
           streamingIdRef.current = sendResult.runId;
           setChats((prev) => {
-            const hasRunChat = prev.some((chat) => (
-              (chat.id === sendResult.runId || chat.runId === sendResult.runId)
-              && chat.sourceSessionKey === activeSessionKey
-            ));
+            const hasRunChat = prev.some(
+              (chat) =>
+                (chat.id === sendResult.runId || chat.runId === sendResult.runId) &&
+                chat.sourceSessionKey === activeSessionKey,
+            );
             if (hasRunChat) {
               return prev.filter((chat) => chat.id !== pendingAssistantId);
             }
-            return prev.map((chat) => (
+            return prev.map((chat) =>
               chat.id === pendingAssistantId
                 ? { ...chat, id: sendResult.runId!, runId: sendResult.runId, localOnly: true }
-                : chat
-            ));
+                : chat,
+            );
           });
         }
         if (currentInstanceId && pendingSummary) {
@@ -1413,9 +1565,7 @@ export default function SessionChatPage() {
         Toast.error(err instanceof Error ? err.message : t('errors.sendFailed'));
         setGenerating(false);
         sendingRef.current = false;
-        setChats((prev) => prev.map((chat) => (
-          chat.id === pendingAssistantId ? { ...chat, status: 'failed' } : chat
-        )));
+        setChats((prev) => prev.map((chat) => (chat.id === pendingAssistantId ? { ...chat, status: 'failed' } : chat)));
       }
     },
     [
@@ -1460,7 +1610,16 @@ export default function SessionChatPage() {
     });
 
     navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
-  }, [activeClient, activeSessionKey, connectionStatus, handleSend, location.pathname, location.search, location.state, navigate]);
+  }, [
+    activeClient,
+    activeSessionKey,
+    connectionStatus,
+    handleSend,
+    location.pathname,
+    location.search,
+    location.state,
+    navigate,
+  ]);
 
   const handleStop = useCallback(async () => {
     if (!activeClient || !activeSessionKey) return;
@@ -1482,38 +1641,50 @@ export default function SessionChatPage() {
     return Array.from(event.dataTransfer?.files ?? []).filter((file) => file.size > 0);
   }, []);
 
-  const handlePageDragEnter = useCallback((event: FileDropEvent) => {
-    if (!hasFilesInDrag(event)) return;
-    event.preventDefault();
-    pageDragDepthRef.current += 1;
-    setPageDragActive(true);
-  }, [hasFilesInDrag]);
+  const handlePageDragEnter = useCallback(
+    (event: FileDropEvent) => {
+      if (!hasFilesInDrag(event)) return;
+      event.preventDefault();
+      pageDragDepthRef.current += 1;
+      setPageDragActive(true);
+    },
+    [hasFilesInDrag],
+  );
 
-  const handlePageDragOver = useCallback((event: FileDropEvent) => {
-    if (!hasFilesInDrag(event)) return;
-    event.preventDefault();
-    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
-    setPageDragActive(true);
-  }, [hasFilesInDrag]);
+  const handlePageDragOver = useCallback(
+    (event: FileDropEvent) => {
+      if (!hasFilesInDrag(event)) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+      setPageDragActive(true);
+    },
+    [hasFilesInDrag],
+  );
 
-  const handlePageDragLeave = useCallback((event: FileDropEvent) => {
-    if (!hasFilesInDrag(event)) return;
-    event.preventDefault();
-    pageDragDepthRef.current = Math.max(0, pageDragDepthRef.current - 1);
-    if (pageDragDepthRef.current === 0) setPageDragActive(false);
-  }, [hasFilesInDrag]);
+  const handlePageDragLeave = useCallback(
+    (event: FileDropEvent) => {
+      if (!hasFilesInDrag(event)) return;
+      event.preventDefault();
+      pageDragDepthRef.current = Math.max(0, pageDragDepthRef.current - 1);
+      if (pageDragDepthRef.current === 0) setPageDragActive(false);
+    },
+    [hasFilesInDrag],
+  );
 
-  const handlePageDrop = useCallback((event: FileDropEvent) => {
-    const files = getPageDropFiles(event);
-    if (files.length === 0) return;
-    event.preventDefault();
-    pageDragDepthRef.current = 0;
-    setPageDragActive(false);
-    chatInputRef.current?.uploadRef?.current?.insert?.(files);
-    requestAnimationFrame(() => {
-      Toast.success(t('chat.attachmentsAdded', { count: files.length }));
-    });
-  }, [getPageDropFiles, t]);
+  const handlePageDrop = useCallback(
+    (event: FileDropEvent) => {
+      const files = getPageDropFiles(event);
+      if (files.length === 0) return;
+      event.preventDefault();
+      pageDragDepthRef.current = 0;
+      setPageDragActive(false);
+      chatInputRef.current?.uploadRef?.current?.insert?.(files);
+      requestAnimationFrame(() => {
+        Toast.success(t('chat.attachmentsAdded', { count: files.length }));
+      });
+    },
+    [getPageDropFiles, t],
+  );
 
   useEffect(() => {
     window.addEventListener('dragenter', handlePageDragEnter);
@@ -1528,156 +1699,162 @@ export default function SessionChatPage() {
     };
   }, [handlePageDragEnter, handlePageDragLeave, handlePageDragOver, handlePageDrop]);
 
-  const roleConfig = useMemo(() => ({
-    user: { name: 'You', avatar: '👤' },
-    assistant: { name: t('chat.assistantName'), avatar: '🤖' },
-    system: { name: 'System', avatar: '🛎️' },
-    ...buildAgentRoleConfig(agents),
-  }), [agents, t]);
+  const roleConfig = useMemo(
+    () => ({
+      user: { name: 'You', avatar: '👤' },
+      assistant: { name: t('chat.assistantName'), avatar: '🤖' },
+      system: { name: 'System', avatar: '🛎️' },
+      ...buildAgentRoleConfig(agents),
+    }),
+    [agents, t],
+  );
 
   const agentOptions = useMemo(
-    () => agents.filter((agent) => agent.id).map((agent) => ({
-      value: agent.id,
-      label: <AgentSelectOption agent={agent} />,
-    })),
+    () =>
+      agents
+        .filter((agent) => agent.id)
+        .map((agent) => ({
+          value: agent.id,
+          label: <AgentSelectOption agent={agent} />,
+        })),
     [agents],
   );
 
-  const handleAgentSwitch = useCallback(async (targetAgentId: string) => {
-    if (!activeClient || !activeSessionKey || !rootSessionKey || !currentInstanceId) return;
-    if (targetAgentId === getAgentIdFromSessionKey(activeSessionKey)) return;
-    if (generating || switchingAgent) {
-      Toast.warning(t('chat.agentSwitchWait'));
-      return;
-    }
-
-    const targetAgent = agents.find((agent) => agent.id === targetAgentId);
-    const targetAgentName = getAgentDisplayName(targetAgent);
-    const strategy = resolveAgentSwitchStrategy(
-      globalAgentSwitchStrategy,
-      currentInstance?.agentSwitchStrategy,
-    );
-
-    const requestVisibleSummary = async (): Promise<string | undefined> => {
-      const prompt = buildAgentHandoffPrompt(targetAgentName);
-      setChats((prev) => [
-        ...prev,
-        {
-          id: generateIdempotencyKey(),
-          role: 'user',
-          content: prompt,
-          createAt: Date.now(),
-          status: 'completed',
-          sourceSessionKey: activeSessionKey,
-          agentId: getAgentIdFromSessionKey(activeSessionKey),
-        },
-      ]);
-      try {
-        return await requestAgentHandoffSummary(activeClient, activeSessionKey, targetAgentName);
-      } catch (error) {
-        Toast.warning(error instanceof Error ? error.message : t('chat.contextSummaryFailed'));
-        return undefined;
-      }
-    };
-
-    setSwitchingAgent(true);
-    try {
-      if (strategy === 'new-session') {
-        const summary = await requestVisibleSummary();
-        const createParams = buildNewSessionCreateParams({
-          agentId: targetAgentId,
-          model: chatModel || defaultChatModel,
-          content: t('chat.switchContinueWith', { name: targetAgentName }),
-        });
-        const result = await activeClient.request<{ key?: string; sessionKey?: string }>(
-          'sessions.create',
-          createParams.request,
-        );
-        const destinationSessionKey = resolveCreatedSessionKey(result, createParams.key);
-        if (summary) {
-          savePendingSummary(currentInstanceId, {
-            destinationSessionKey,
-            sourceSessionKey: activeSessionKey,
-            targetAgentId,
-            summary,
-            createdAt: Date.now(),
-          });
-        }
-        await useStore.getState().fetchSessions();
-        navigate(getChatRoute(destinationSessionKey));
+  const handleAgentSwitch = useCallback(
+    async (targetAgentId: string) => {
+      if (!activeClient || !activeSessionKey || !rootSessionKey || !currentInstanceId) return;
+      if (targetAgentId === getAgentIdFromSessionKey(activeSessionKey)) return;
+      if (generating || switchingAgent) {
+        Toast.warning(t('chat.agentSwitchWait'));
         return;
       }
 
-      const rootAgentId = getAgentIdFromSessionKey(rootSessionKey);
-      let destinationSessionKey = rootSessionKey;
-      let mapping = getSubagentMapping(currentInstanceId, rootSessionKey, targetAgentId);
-      if (targetAgentId !== rootAgentId) {
-        const mappingStillExists = !mapping || sessions.length === 0 || sessions.some(
-          (session) => getSessionKey(session) === mapping?.childSessionKey,
-        );
-        if (!mapping || !mappingStillExists) {
-          const childSessionKey = await spawnAgentChildSession(activeClient, rootSessionKey, targetAgentId);
-          mapping = {
-            rootSessionKey,
-            agentId: targetAgentId,
-            childSessionKey,
-            createdAt: Date.now(),
-            lastValidatedAt: Date.now(),
-            lastSyncedTimelineIndex: 0,
-          };
-          saveSubagentMapping(currentInstanceId, mapping);
-        }
-        destinationSessionKey = mapping.childSessionKey;
-      }
+      const targetAgent = agents.find((agent) => agent.id === targetAgentId);
+      const targetAgentName = getAgentDisplayName(targetAgent);
+      const strategy = resolveAgentSwitchStrategy(globalAgentSwitchStrategy, currentInstance?.agentSwitchStrategy);
 
-      const timeline = getLogicalTimeline(currentInstanceId, rootSessionKey);
-      const destinationIsBehind = !mapping || (mapping.lastSyncedTimelineIndex ?? 0) < timeline.length;
-      if (destinationSessionKey !== activeSessionKey && destinationIsBehind && chats.length > 0) {
-        const generatedSummary = await requestVisibleSummary();
-        const fallbackSummary = buildRecentTimelineExcerpt(timeline);
-        const summary = generatedSummary || fallbackSummary;
-        if (summary) {
-          savePendingSummary(currentInstanceId, {
-            destinationSessionKey,
+      const requestVisibleSummary = async (): Promise<string | undefined> => {
+        const prompt = buildAgentHandoffPrompt(targetAgentName);
+        setChats((prev) => [
+          ...prev,
+          {
+            id: generateIdempotencyKey(),
+            role: 'user',
+            content: prompt,
+            createAt: Date.now(),
+            status: 'completed',
             sourceSessionKey: activeSessionKey,
-            targetAgentId,
-            summary,
-            createdAt: Date.now(),
-          });
+            agentId: getAgentIdFromSessionKey(activeSessionKey),
+          },
+        ]);
+        try {
+          return await requestAgentHandoffSummary(activeClient, activeSessionKey, targetAgentName);
+        } catch (error) {
+          Toast.warning(error instanceof Error ? error.message : t('chat.contextSummaryFailed'));
+          return undefined;
         }
+      };
+
+      setSwitchingAgent(true);
+      try {
+        if (strategy === 'new-session') {
+          const summary = await requestVisibleSummary();
+          const createParams = buildNewSessionCreateParams({
+            agentId: targetAgentId,
+            model: chatModel || defaultChatModel,
+            content: t('chat.switchContinueWith', { name: targetAgentName }),
+          });
+          const result = await activeClient.request<{ key?: string; sessionKey?: string }>(
+            'sessions.create',
+            createParams.request,
+          );
+          const destinationSessionKey = resolveCreatedSessionKey(result, createParams.key);
+          if (summary) {
+            savePendingSummary(currentInstanceId, {
+              destinationSessionKey,
+              sourceSessionKey: activeSessionKey,
+              targetAgentId,
+              summary,
+              createdAt: Date.now(),
+            });
+          }
+          await useStore.getState().fetchSessions();
+          navigate(getChatRoute(destinationSessionKey));
+          return;
+        }
+
+        const rootAgentId = getAgentIdFromSessionKey(rootSessionKey);
+        let destinationSessionKey = rootSessionKey;
+        let mapping = getSubagentMapping(currentInstanceId, rootSessionKey, targetAgentId);
+        if (targetAgentId !== rootAgentId) {
+          const mappingStillExists =
+            !mapping ||
+            sessions.length === 0 ||
+            sessions.some((session) => getSessionKey(session) === mapping?.childSessionKey);
+          if (!mapping || !mappingStillExists) {
+            const childSessionKey = await spawnAgentChildSession(activeClient, rootSessionKey, targetAgentId);
+            mapping = {
+              rootSessionKey,
+              agentId: targetAgentId,
+              childSessionKey,
+              createdAt: Date.now(),
+              lastValidatedAt: Date.now(),
+              lastSyncedTimelineIndex: 0,
+            };
+            saveSubagentMapping(currentInstanceId, mapping);
+          }
+          destinationSessionKey = mapping.childSessionKey;
+        }
+
+        const timeline = getLogicalTimeline(currentInstanceId, rootSessionKey);
+        const destinationIsBehind = !mapping || (mapping.lastSyncedTimelineIndex ?? 0) < timeline.length;
+        if (destinationSessionKey !== activeSessionKey && destinationIsBehind && chats.length > 0) {
+          const generatedSummary = await requestVisibleSummary();
+          const fallbackSummary = buildRecentTimelineExcerpt(timeline);
+          const summary = generatedSummary || fallbackSummary;
+          if (summary) {
+            savePendingSummary(currentInstanceId, {
+              destinationSessionKey,
+              sourceSessionKey: activeSessionKey,
+              targetAgentId,
+              summary,
+              createdAt: Date.now(),
+            });
+          }
+        }
+
+        setRelatedSessionKeys((keys) => [...new Set([...keys, destinationSessionKey])]);
+        setActiveSessionKey(destinationSessionKey);
+        Toast.success(t('chat.switchSuccess', { name: targetAgentName }));
+      } catch (error) {
+        Toast.error(error instanceof Error ? error.message : t('chat.switchFailed'));
+      } finally {
+        setSwitchingAgent(false);
       }
+    },
+    [
+      activeClient,
+      activeSessionKey,
+      agents,
+      chatModel,
+      chats.length,
+      currentInstance,
+      currentInstanceId,
+      generating,
+      globalAgentSwitchStrategy,
+      models,
+      defaultChatModel,
+      navigate,
+      rootSessionKey,
+      sessions,
+      switchingAgent,
+      t,
+    ],
+  );
 
-      setRelatedSessionKeys((keys) => [...new Set([...keys, destinationSessionKey])]);
-      setActiveSessionKey(destinationSessionKey);
-      Toast.success(t('chat.switchSuccess', { name: targetAgentName }));
-    } catch (error) {
-      Toast.error(error instanceof Error ? error.message : t('chat.switchFailed'));
-    } finally {
-      setSwitchingAgent(false);
-    }
-  }, [
-    activeClient,
-    activeSessionKey,
-    agents,
-    chatModel,
-    chats.length,
-    currentInstance,
-    currentInstanceId,
-    generating,
-    globalAgentSwitchStrategy,
-    models,
-    defaultChatModel,
-    navigate,
-    rootSessionKey,
-    sessions,
-    switchingAgent,
-    t,
-  ]);
-
-  const renderConfig = useCallback(
-    () => {
-      const currentAgentId = getAgentIdFromSessionKey(activeSessionKey || '') || 'main';
-      return (
+  const renderConfig = useCallback(() => {
+    const currentAgentId = getAgentIdFromSessionKey(activeSessionKey || '') || 'main';
+    return (
       <>
         <Configure.Select
           {...configureSelectProps}
@@ -1705,29 +1882,28 @@ export default function SessionChatPage() {
           initValue={chatThinking}
         />
       </>
-    )},
-    [agentOptions, models, chatModel, defaultChatModel, chatThinking, activeSessionKey, t],
+    );
+  }, [agentOptions, models, chatModel, defaultChatModel, chatThinking, activeSessionKey, t]);
+
+  const handleConfigChange = useCallback(
+    (_v: Record<string, unknown> | undefined, changed: Record<string, unknown> | undefined) => {
+      if (!changed) return;
+      if ('agent' in changed) void handleAgentSwitch(changed.agent as string);
+      const nextModel = typeof changed.model === 'string' ? changed.model : chatModel || defaultChatModel;
+      const nextThinking = typeof changed.thinking === 'string' ? changed.thinking : chatThinking;
+      if ('model' in changed) {
+        chatModelTouchedRef.current = true;
+        setChatModel(nextModel);
+      }
+      if ('thinking' in changed) setChatThinking(nextThinking);
+      if ('model' in changed) {
+        patchSessionConfigSafely({ model: nextModel });
+      }
+    },
+    [chatModel, chatThinking, defaultChatModel, handleAgentSwitch, patchSessionConfigSafely],
   );
 
-  const handleConfigChange = useCallback((_v: Record<string, unknown> | undefined, changed: Record<string, unknown> | undefined) => {
-    if (!changed) return;
-    if ('agent' in changed) void handleAgentSwitch(changed.agent as string);
-    const nextModel = typeof changed.model === 'string' ? changed.model : chatModel || defaultChatModel;
-    const nextThinking = typeof changed.thinking === 'string' ? changed.thinking : chatThinking;
-    if ('model' in changed) {
-      chatModelTouchedRef.current = true;
-      setChatModel(nextModel);
-    }
-    if ('thinking' in changed) setChatThinking(nextThinking);
-    if ('model' in changed) {
-      patchSessionConfigSafely({ model: nextModel });
-    }
-  }, [chatModel, chatThinking, defaultChatModel, handleAgentSwitch, patchSessionConfigSafely]);
-
-  const currentModel = useMemo(
-    () => models.find((model) => model.id === chatModel) ?? models[0],
-    [chatModel, models],
-  );
+  const currentModel = useMemo(() => models.find((model) => model.id === chatModel) ?? models[0], [chatModel, models]);
 
   const sessionInsight = useMemo(
     () => deriveSessionInsight(chats, currentModel, sessionContextSnapshot),
@@ -1739,69 +1915,75 @@ export default function SessionChatPage() {
     return filterArtifactsForSessionKeys(artifacts, sessionKeys).sort((a, b) => b.updatedAt - a.updatedAt);
   }, [artifacts, relatedSessionKeys, rootSessionKey]);
 
-  const displayChats = useMemo(
-    () => groupAdjacentToolCallChats(chats),
-    [chats],
-  );
+  const displayChats = useMemo(() => groupAdjacentToolCallChats(chats), [chats]);
 
-  const renderDialogueContentItem = useMemo<DialogueContentItemRendererMap>(() => ({
-    function_call: (item: SelectedToolCall['item'], message?: { id?: string; sourceSessionKey?: string }) => (
-      <button
-        type="button"
-        className="semi-ai-chat-dialogue-content-tool-call"
-        onClick={() => {
-          setSelectedToolCall({
-            item,
-            messageId: message?.id,
-            sourceSessionKey: message?.sourceSessionKey,
-          });
-          setSidePanelTab('tool');
-          setSidePanelVisible(true);
-        }}
-        style={{
-          border: 0,
-          cursor: 'pointer',
-          width: 'clamp(180px, calc(100vw - 560px), 560px)',
-          maxWidth: '100%',
-          justifyContent: 'flex-start',
-          font: 'inherit',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          overflow: 'hidden',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        <IconWrench style={{ flex: '0 0 auto' }} />
-        <span style={{ flex: '0 0 auto' }}>{item.name}</span>
-        {item.arguments ? (
-          <span
-            style={{
-              minWidth: 0,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {item.arguments}
-          </span>
-        ) : null}
-      </button>
-    ),
-  }), []);
+  const renderDialogueContentItem = useMemo<DialogueContentItemRendererMap>(
+    () => ({
+      function_call: (item: SelectedToolCall['item'], message?: { id?: string; sourceSessionKey?: string }) => (
+        <button
+          type="button"
+          className="semi-ai-chat-dialogue-content-tool-call"
+          onClick={() => {
+            setSelectedToolCall({
+              item,
+              messageId: message?.id,
+              sourceSessionKey: message?.sourceSessionKey,
+            });
+            setSidePanelTab('tool');
+            setSidePanelVisible(true);
+          }}
+          style={{
+            border: 0,
+            cursor: 'pointer',
+            width: 'clamp(180px, calc(100vw - 560px), 560px)',
+            maxWidth: '100%',
+            justifyContent: 'flex-start',
+            font: 'inherit',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            overflow: 'hidden',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <IconWrench style={{ flex: '0 0 auto' }} />
+          <span style={{ flex: '0 0 auto' }}>{item.name}</span>
+          {item.arguments ? (
+            <span
+              style={{
+                minWidth: 0,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {item.arguments}
+            </span>
+          ) : null}
+        </button>
+      ),
+    }),
+    [],
+  );
 
   if (!activeSessionKey) {
     return (
-      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--semi-color-text-2)' }}>
+      <div
+        style={{
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'var(--semi-color-text-2)',
+        }}
+      >
         <div>{t('chat.selectSession')}</div>
       </div>
     );
   }
 
   return (
-    <div
-      style={{ height: '100%', display: 'flex', overflow: 'hidden', position: 'relative' }}
-    >
+    <div style={{ height: '100%', display: 'flex', overflow: 'hidden', position: 'relative' }}>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div ref={chatContainerRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: '16px 16px 0' }}>
           <AIChatDialogue
@@ -1825,9 +2007,10 @@ export default function SessionChatPage() {
                   if (typeof ts !== 'number') return '';
                   const d = new Date(ts);
                   const now = new Date();
-                  const isToday = d.getFullYear() === now.getFullYear()
-                    && d.getMonth() === now.getMonth()
-                    && d.getDate() === now.getDate();
+                  const isToday =
+                    d.getFullYear() === now.getFullYear() &&
+                    d.getMonth() === now.getMonth() &&
+                    d.getDate() === now.getDate();
                   if (isToday) {
                     return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
                   }

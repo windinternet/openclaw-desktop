@@ -70,4 +70,32 @@ describe('local persistence migration', () => {
     expect(localStorage.removeItem).toHaveBeenCalledWith('openclaw-instances');
     expect(localStorage.removeItem).toHaveBeenCalledWith('openclaw-current-instance');
   });
+
+  it('migrates old default-hidden tool call display settings to compact', async () => {
+    vi.stubGlobal('window', {
+      electronAPI: {
+        storage: {
+          loadAppState: vi.fn(async () => ({
+            settings: {
+              initialized: true,
+              themeMode: 'dark',
+              themeColor: 'blue',
+              locale: 'zh-CN',
+              sessionToolCallDisplay: 'hidden',
+            },
+            instances: [],
+            currentInstanceId: null,
+          })),
+          saveSettings: vi.fn(),
+          saveInstances: vi.fn(),
+          saveCurrentInstanceId: vi.fn(),
+        },
+      },
+    });
+
+    const snapshot = await loadAppSnapshot();
+
+    expect(snapshot.settings.sessionToolCallDisplay).toBe('compact');
+    expect(snapshot.settings.sessionReasoningDisplay).toBe('visible');
+  });
 });

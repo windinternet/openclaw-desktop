@@ -54,15 +54,9 @@ describe('applyTheme', () => {
 
     expect(body.style.getPropertyValue('--semi-color-primary')).toBe('#722ED1');
     expect(body.style.getPropertyValue('--semi-color-primary-hover')).toBe('#8043d6');
-    expect(body.style.getPropertyValue('--semi-color-primary-light-default')).toBe(
-      'rgba(114, 46, 209, 0.2)',
-    );
-    expect(body.style.getPropertyValue('--semi-color-primary-light-hover')).toBe(
-      'rgba(114, 46, 209, 0.3)',
-    );
-    expect(body.style.getPropertyValue('--semi-color-primary-light-active')).toBe(
-      'rgba(114, 46, 209, 0.4)',
-    );
+    expect(body.style.getPropertyValue('--semi-color-primary-light-default')).toBe('rgba(114, 46, 209, 0.2)');
+    expect(body.style.getPropertyValue('--semi-color-primary-light-hover')).toBe('rgba(114, 46, 209, 0.3)');
+    expect(body.style.getPropertyValue('--semi-color-primary-light-active')).toBe('rgba(114, 46, 209, 0.4)');
     expect(body.getAttribute('theme-mode')).toBe('dark');
     expect(documentElement.style.getPropertyValue('--semi-color-primary')).toBe('#722ED1');
   });
@@ -99,7 +93,8 @@ describe('applyTheme', () => {
   });
 
   it('defaults to a simple session message display for non-technical users', () => {
-    expect(DEFAULT_SETTINGS.sessionToolCallDisplay).toBe('hidden');
+    expect(DEFAULT_SETTINGS.sessionToolCallDisplay).toBe('compact');
+    expect(DEFAULT_SETTINGS.sessionReasoningDisplay).toBe('visible');
     expect(DEFAULT_SETTINGS.assistantReplyGrouping).toBe('merged');
   });
 
