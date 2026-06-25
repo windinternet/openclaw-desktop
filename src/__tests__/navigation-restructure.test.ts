@@ -32,11 +32,16 @@ describe('navigation restructure', () => {
     ]);
   });
 
-  it('renders primary navigation without visible group headings', () => {
+  it('defaults to primary navigation without visible group headings but supports a settings toggle', () => {
     const sidebar = readFileSync('src/components/Sidebar.tsx', 'utf8');
+    const settingsPage = readFileSync('src/pages/SettingsPage.tsx', 'utf8');
 
-    expect(sidebar).not.toContain('NavSectionLabel');
-    expect(sidebar).not.toContain('group.labelKey');
+    expect(sidebar).toContain('settings.sidebarNavGrouped');
+    expect(sidebar).toContain('sidebarNavGrouped ?');
+    expect(sidebar).toContain('sidebar-nav-section-label');
+    expect(sidebar).toContain('NAV_GROUPS.flatMap((group) => group.items).map');
+    expect(settingsPage).toContain("t('settings.sidebarNavGrouped')");
+    expect(settingsPage).toContain('updateSettings({ sidebarNavGrouped: checked })');
   });
 
   it('maps primary entries to their routes', () => {

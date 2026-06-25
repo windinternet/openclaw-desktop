@@ -99,6 +99,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
   const currentInstance = instances.find((i) => i.id === currentId);
   const themeMode = useSettingsStore((s) => s.settings.themeMode);
   const userDisplayName = useSettingsStore((s) => s.settings.userDisplayName);
+  const sidebarNavGrouped = useSettingsStore((s) => s.settings.sidebarNavGrouped);
   const agentIdentity = useStore((s) => s.agentIdentity);
   const sessions = useStore((s) => s.sessions);
   const visibleSessions = filterUserVisibleSessions(sessions);
@@ -617,9 +618,20 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
         }}
         footer={footer}
       >
-        {NAV_GROUPS.flatMap((group) => group.items).map((item) => (
-          <Nav.Item key={item.key} itemKey={item.key} text={t(item.labelKey)} icon={getNavIcon(item)} />
-        ))}
+        {sidebarNavGrouped ? (
+          NAV_GROUPS.map((group) => (
+            <div key={group.key} className="sidebar-nav-group">
+              <div className="sidebar-nav-section-label">{t(group.labelKey)}</div>
+              {group.items.map((item) => (
+                <Nav.Item key={item.key} itemKey={item.key} text={t(item.labelKey)} icon={getNavIcon(item)} />
+              ))}
+            </div>
+          ))
+        ) : (
+          NAV_GROUPS.flatMap((group) => group.items).map((item) => (
+            <Nav.Item key={item.key} itemKey={item.key} text={t(item.labelKey)} icon={getNavIcon(item)} />
+          ))
+        )}
       </Nav>
     </div>
       {showPopover && createPortal(

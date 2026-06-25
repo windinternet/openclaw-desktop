@@ -102,4 +102,8 @@ describe('applyTheme', () => {
     expect(DEFAULT_SETTINGS.sessionToolCallDisplay).toBe('hidden');
     expect(DEFAULT_SETTINGS.assistantReplyGrouping).toBe('merged');
   });
+
+  it('defaults sidebar navigation grouping to off', () => {
+    expect(DEFAULT_SETTINGS.sidebarNavGrouped).toBe(false);
+  });
 });

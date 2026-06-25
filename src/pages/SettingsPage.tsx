@@ -278,6 +278,24 @@ export default function SettingsPage({ embedded = false }: SettingsPageProps = {
           </Select>
         </SectionCard>
 
+        {/* ═══ Navigation ═══ */}
+        <SectionCard icon="🧭" title={t('settings.navigation')} desc={t('settings.navigationDesc')}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24 }}>
+            <div style={{ minWidth: 0 }}>
+              <Text style={{ display: 'block', color: 'var(--semi-color-text-0)' }}>
+                {t('settings.sidebarNavGrouped')}
+              </Text>
+              <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>
+                {t('settings.sidebarNavGroupedDesc')}
+              </Text>
+            </div>
+            <Switch
+              checked={settings.sidebarNavGrouped}
+              onChange={(checked: boolean) => updateSettings({ sidebarNavGrouped: checked })}
+            />
+          </div>
+        </SectionCard>
+
         {/* ═══ Desktop Pet ═══ */}
         <SectionCard icon="🐱" title={t('settings.desktopPet')} desc={t('settings.desktopPetDesc')}>
           <Switch

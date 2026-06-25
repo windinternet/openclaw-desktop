@@ -63,6 +63,18 @@ body,
   transition: color 0.2s ease;
 }
 
+.sidebar-nav-group {
+  padding: 4px 0 8px;
+}
+
+.sidebar-nav-section-label {
+  padding: 8px 24px 4px;
+  color: var(--semi-color-text-2);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+}
+
 /* ── Nav: Icon Gradient Colors ─────────────────────────────────── */
 .semi-icon-pie_chart_2_stroked svg path {
   fill: url('#ig-dashboard') !important;
@@ -755,7 +767,9 @@ body,
   border-radius: 8px;
   outline: 1px solid color-mix(in srgb, var(--semi-color-bg-0) 88%, transparent);
   background: color-mix(in srgb, var(--semi-color-bg-0) 92%, transparent);
-  box-shadow: 0 22px 70px color-mix(in srgb, var(--semi-color-shadow) 24%, transparent);
+  box-shadow:
+    0 28px 90px color-mix(in srgb, var(--semi-color-shadow) 30%, transparent),
+    0 10px 28px color-mix(in srgb, var(--semi-color-primary) 12%, transparent);
   backdrop-filter: blur(18px);
 }
 

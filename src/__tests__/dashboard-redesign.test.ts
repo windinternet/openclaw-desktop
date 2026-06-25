@@ -86,7 +86,7 @@ describe('dashboard redesign', () => {
 
     expect(dashboard).toContain('dashboard-floating-composer-accent');
     expect(css).toContain('.dashboard-floating-composer-accent');
-    expect(css).toContain('box-shadow: 0 22px 70px');
+    expect(css).toContain('0 28px 90px');
     expect(css).toContain('backdrop-filter: blur(18px)');
     expect(css).toContain('outline: 1px solid color-mix');
   });
