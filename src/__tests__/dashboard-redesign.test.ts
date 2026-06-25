@@ -60,7 +60,11 @@ describe('dashboard redesign', () => {
     expect(dashboard).toContain("import UsageTrendChart from '../components/charts/UsageTrendChart'");
     expect(dashboard).toContain('<UsageTrendChart trend={usageDashboard.trend} />');
     expect(chart).toContain("import { Column } from '@ant-design/charts'");
+    expect(chart).toContain("import { formatCompactTokenValue } from './chart-format'");
     expect(chart).toContain('dashboard-antv-chart');
+    expect(chart).toContain('height: 132');
+    expect(chart).toContain('labelFormatter: (value: string) => formatCompactTokenValue(Number(value))');
+    expect(chart).toContain("labelFill: cssVar('--semi-color-text-1'");
     expect(pkg.dependencies['@ant-design/charts']).toBeTruthy();
     expect(dashboard).toContain("t('dashboard.totalTokens')");
     expect(dashboard).toContain("t('dashboard.modelUsage')");

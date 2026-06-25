@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Column } from '@ant-design/charts';
 import type { GatewayUsageTrendPoint } from '../../lib/gateway-usage';
+import { formatCompactTokenValue } from './chart-format';
 
 interface UsageTrendChartProps {
   trend: GatewayUsageTrendPoint[];
@@ -30,9 +31,9 @@ export default function UsageTrendChart({ trend }: UsageTrendChartProps) {
     data,
     xField: 'date',
     yField: 'tokens',
-    height: 168,
+    height: 132,
     autoFit: true,
-    padding: [12, 8, 28, 38],
+    padding: [8, 8, 24, 34],
     colorField: 'date',
     scale: {
       color: {
@@ -47,17 +48,17 @@ export default function UsageTrendChart({ trend }: UsageTrendChartProps) {
       x: {
         title: false,
         labelFontSize: 11,
-        labelFill: cssVar('--semi-color-text-2', '#8a8f99'),
+        labelFill: cssVar('--semi-color-text-1', '#4e5969'),
         lineStroke: cssVar('--semi-color-border', '#e5e6eb'),
         tick: false,
       },
       y: {
         title: false,
         labelFontSize: 11,
-        labelFill: cssVar('--semi-color-text-2', '#8a8f99'),
+        labelFill: cssVar('--semi-color-text-1', '#4e5969'),
         gridStroke: cssVar('--semi-color-border', '#e5e6eb'),
         gridLineDash: [3, 3],
-        labelFormatter: (value: string) => formatNumber(Number(value)),
+        labelFormatter: (value: string) => formatCompactTokenValue(Number(value)),
       },
     },
     style: {

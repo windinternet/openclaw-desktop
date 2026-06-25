@@ -728,7 +728,7 @@ body,
 }
 
 .dashboard-antv-chart {
-  min-height: 180px;
+  min-height: 144px;
   overflow: hidden;
 }
 
