@@ -1,0 +1,121 @@
+{
+  "brand": "OpenClaw Desktop",
+  "clubBrand": "OpenClaw Desktop Club",
+  "direction": "Crayfish Operator D2 / image2 chroma-key masters with verified alpha PNG outputs",
+  "generatedBy": "scripts/export-brand-assets.mjs",
+  "sourceType": "image2-chroma-master-to-alpha-png",
+  "alphaPolicy": "Production PNG outputs must be sRGBA and intended transparent corners must have alpha 0. Chroma masters are archived in assets/brand/source and raw-ai-renders.",
+  "chromaMasters": {
+    "appIcon": "assets/brand/source/openclaw-app-icon-chroma-master.png",
+    "mascot": "assets/brand/source/openclaw-mascot-chroma-master.png",
+    "desktopLogoLight": "assets/brand/source/openclaw-desktop-logo-light-chroma-master.png",
+    "desktopLogoDark": "assets/brand/source/openclaw-desktop-logo-dark-chroma-master.png",
+    "desktopClubLogoLight": "assets/brand/source/openclaw-desktop-club-logo-light-chroma-master.png",
+    "desktopClubLogoDark": "assets/brand/source/openclaw-desktop-club-logo-dark-chroma-master.png"
+  },
+  "transparentMasters": {
+    "appIcon": "assets/brand/source/openclaw-app-icon-transparent-master.png",
+    "mascot": "assets/brand/source/openclaw-mascot-transparent-master.png",
+    "desktopLogoLight": "assets/brand/source/openclaw-desktop-logo-light-transparent-master.png",
+    "desktopLogoDark": "assets/brand/source/openclaw-desktop-logo-dark-transparent-master.png",
+    "desktopClubLogoLight": "assets/brand/source/openclaw-desktop-club-logo-light-transparent-master.png",
+    "desktopClubLogoDark": "assets/brand/source/openclaw-desktop-club-logo-dark-transparent-master.png"
+  },
+  "assets": [
+    {
+      "id": "app-icon-1024",
+      "path": "assets/brand/openclaw-app-icon-1024.png",
+      "usage": "OpenClaw Desktop app icon with transparent alpha outside the icon plate."
+    },
+    {
+      "id": "electron-icns",
+      "path": "build/icons/icon.icns",
+      "usage": "macOS Electron Builder app icon."
+    },
+    {
+      "id": "electron-ico",
+      "path": "build/icons/icon.ico",
+      "usage": "Windows Electron Builder app icon."
+    },
+    {
+      "id": "electron-linux-icon",
+      "path": "build/icons/512x512/apps.png",
+      "usage": "Linux Electron Builder icon directory representative file."
+    },
+    {
+      "id": "web-apple-touch-icon",
+      "path": "src/assets/apple-touch-icon.png",
+      "usage": "Web touch/favicon image."
+    },
+    {
+      "id": "pet-app-icon",
+      "path": "src/pet/assets/app-icon-256.png",
+      "usage": "Pet window app icon."
+    },
+    {
+      "id": "pet-mascot",
+      "path": "src/pet/assets/mascot-transparent-256.png",
+      "usage": "Pet window mascot sprite with transparent alpha."
+    },
+    {
+      "id": "desktop-logo-light-transparent",
+      "path": "assets/brand/openclaw-desktop-logo-light-transparent-1200x360.png",
+      "usage": "OpenClaw Desktop transparent logo for light surfaces."
+    },
+    {
+      "id": "desktop-logo-dark-transparent",
+      "path": "assets/brand/openclaw-desktop-logo-dark-transparent-1200x360.png",
+      "usage": "OpenClaw Desktop transparent logo for dark surfaces."
+    },
+    {
+      "id": "desktop-club-logo-light-transparent",
+      "path": "assets/brand/openclaw-desktop-club-logo-light-transparent-1200x360.png",
+      "usage": "OpenClaw Desktop Club transparent logo for light surfaces."
+    },
+    {
+      "id": "desktop-club-logo-dark-transparent",
+      "path": "assets/brand/openclaw-desktop-club-logo-dark-transparent-1200x360.png",
+      "usage": "OpenClaw Desktop Club transparent logo for dark surfaces."
+    },
+    {
+      "id": "desktop-logo-light-panel",
+      "path": "assets/brand/openclaw-desktop-logo-light-panel-1200x360.png",
+      "usage": "OpenClaw Desktop logo with semi-transparent light gradient panel."
+    },
+    {
+      "id": "desktop-logo-dark-panel",
+      "path": "assets/brand/openclaw-desktop-logo-dark-panel-1200x360.png",
+      "usage": "OpenClaw Desktop logo with semi-transparent dark gradient panel."
+    },
+    {
+      "id": "desktop-club-logo-light-panel",
+      "path": "assets/brand/openclaw-desktop-club-logo-light-panel-1200x360.png",
+      "usage": "OpenClaw Desktop Club logo with semi-transparent light gradient panel."
+    },
+    {
+      "id": "desktop-club-logo-dark-panel",
+      "path": "assets/brand/openclaw-desktop-club-logo-dark-panel-1200x360.png",
+      "usage": "OpenClaw Desktop Club logo with semi-transparent dark gradient panel."
+    },
+    {
+      "id": "desktop-product-logo-horizontal",
+      "path": "assets/brand/openclaw-desktop-logo-horizontal-1200x360.png",
+      "usage": "Compatibility alias for the OpenClaw Desktop light transparent logo."
+    },
+    {
+      "id": "product-logo-horizontal",
+      "path": "assets/brand/openclaw-logo-horizontal-1200x360.png",
+      "usage": "Compatibility alias for the OpenClaw Desktop light transparent logo."
+    },
+    {
+      "id": "desktop-club-logo-horizontal",
+      "path": "assets/brand/openclaw-desktop-club-logo-1200x360.png",
+      "usage": "Compatibility alias for the OpenClaw Desktop Club dark transparent logo."
+    },
+    {
+      "id": "desktop-club-badge",
+      "path": "assets/brand/openclaw-desktop-club-badge-512.png",
+      "usage": "OpenClaw Desktop Club compact transparent badge."
+    }
+  ]
+}

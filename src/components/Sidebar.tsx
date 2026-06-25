@@ -134,6 +134,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
 
   const assistantName = currentInstance?.assistantName;
   const instanceName = currentInstance?.name;
+  const headerTitle = assistantName || agentIdentity?.name || instanceName || t('nav.openclaw');
 
   const instanceHeaderText = (
     <div
@@ -145,26 +146,38 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
       }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
-        <Text
-          ellipsis
+        <span
+          className="sidebar-instance-title"
+          title={headerTitle}
           style={{
+            display: 'block',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
             fontWeight: 600,
             color: 'var(--semi-color-text-0)',
             fontSize: 14,
-            display: 'block',
+            lineHeight: '20px',
           }}
         >
-          {assistantName || agentIdentity?.name || instanceName || t('nav.openclaw')}
-        </Text>
+          {headerTitle}
+        </span>
         {assistantName && instanceName && (
-          <Text
-            ellipsis
-            type="tertiary"
-            size="small"
-            style={{ display: 'block', lineHeight: '16px' }}
+          <span
+            className="sidebar-instance-subtitle"
+            title={instanceName}
+            style={{
+              display: 'block',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              color: 'var(--semi-color-text-2)',
+              fontSize: 12,
+              lineHeight: '16px',
+            }}
           >
             {instanceName}
-          </Text>
+          </span>
         )}
       </div>
       <div style={{ display: 'flex', gap: 2, flexShrink: 0, marginLeft: 8 }}>
@@ -554,12 +567,25 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
             {currentInstance?.name?.charAt(0).toUpperCase() ?? <IconServer />}
           </Avatar>
           <div ref={triggerRef} onMouseEnter={showPopup} onMouseMove={movePopup} onMouseLeave={hidePopup}
-            style={{ flex: 1, minWidth: 0, overflow: 'hidden', cursor: hasPopover ? 'default' : undefined }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Text ellipsis size="small" style={{ flex: 1, minWidth: 0, color: 'var(--semi-color-text-0)', fontWeight: 600 }}>
-                {displayName}
-              </Text>
-              <Button icon={themeMode === 'dark' ? <IconSun size="small" /> : <IconMoon size="small" />} size="small" theme="borderless" onClick={toggleTheme} />
+             style={{ flex: 1, minWidth: 0, overflow: 'hidden', cursor: hasPopover ? 'default' : undefined }}>
+             <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <span
+                className="sidebar-footer-display-name"
+                title={displayName}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  color: 'var(--semi-color-text-0)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
+              >
+                 {displayName}
+              </span>
+               <Button icon={themeMode === 'dark' ? <IconSun size="small" /> : <IconMoon size="small" />} size="small" theme="borderless" onClick={toggleTheme} />
               <Button icon={<IconSetting size="small" />} size="small" theme="borderless" onClick={() => navigate('/settings')} />
               <Button icon={<IconGithubLogo size="small" />} size="small" theme="borderless" onClick={openGitHub} />
 

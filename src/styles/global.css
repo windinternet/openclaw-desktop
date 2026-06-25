@@ -55,7 +55,9 @@ body,
   transition: background-color 0.2s ease;
 }
 
-.semi-navigation-item .semi-navigation-item-text {
+.semi-navigation-item .semi-navigation-item-text,
+.sidebar-nav-group .semi-navigation-item-text {
+  font-weight: 600;
   transition: color 0.2s ease;
 }
 
@@ -522,7 +524,8 @@ body,
 .dashboard-column-grid,
 .dashboard-output-layout,
 .dashboard-usage-layout,
-.dashboard-usage-summary-grid {
+.dashboard-usage-summary-grid,
+.dashboard-visual-row {
   display: grid;
   gap: 12px;
 }
@@ -552,12 +555,18 @@ body,
   grid-template-columns: repeat(4, minmax(180px, 1fr));
 }
 
+.dashboard-visual-row {
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
+}
+
 .dashboard-status-panel,
 .dashboard-metric-pill,
 .dashboard-asset-column,
 .dashboard-output-list,
 .dashboard-run-list,
 .dashboard-usage-panel,
+.dashboard-chart-panel,
 .dashboard-attention-item {
   border: 1px solid var(--semi-color-border);
   border-radius: 8px;
@@ -569,7 +578,8 @@ body,
 .dashboard-asset-column,
 .dashboard-output-list,
 .dashboard-run-list,
-.dashboard-usage-panel {
+.dashboard-usage-panel,
+.dashboard-chart-panel {
   padding: 12px;
 }
 
@@ -670,6 +680,23 @@ body,
   min-width: 0;
 }
 
+.dashboard-chart-panel {
+  min-width: 0;
+  min-height: 274px;
+}
+
+.dashboard-chart-panel-compact {
+  min-height: 232px;
+}
+
+.dashboard-chart-panel-wide {
+  min-height: 274px;
+}
+
+.dashboard-activity-panel {
+  margin-bottom: 12px;
+}
+
 .dashboard-usage-panel-title,
 .dashboard-model-usage-row,
 .dashboard-provider-quota-row {
@@ -739,6 +766,19 @@ body,
   overflow: hidden;
 }
 
+.dashboard-antv-chart-compact {
+  min-height: 180px;
+}
+
+.dashboard-chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--semi-color-border);
+  border-radius: 8px;
+  background: var(--semi-color-fill-0);
+}
+
 .dashboard-floating-composer-shell {
   position: fixed;
   left: calc(288px + 24px);
@@ -800,7 +840,8 @@ body,
 
   .dashboard-column-grid,
   .dashboard-output-layout,
-  .dashboard-usage-layout {
+  .dashboard-usage-layout,
+  .dashboard-visual-row {
     grid-template-columns: 1fr;
   }
 

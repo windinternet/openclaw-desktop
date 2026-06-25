@@ -2,24 +2,33 @@ import { describe, expect, it } from 'vitest';
 import {
   canControlOfficeActor,
   canOfficeActorJump,
-  canUseOfficeBlaster,
+  canUseOfficeDiagnosticPulse,
   copyBillboardQuaternion,
   isOfficeActorDowned,
   resolveNearestOfficeControlTarget,
   resolveOfficeControlTarget,
   resolveOfficeShotTarget,
-  shouldSkipBlasterMouseDown,
+  shouldStartDiagnosticPulseAutoFire,
+  shouldSkipDiagnosticPulseMouseDown,
   type OfficeShotTargetActor,
   type OfficeShotTargetHit,
 } from '../components/office/office-scene-interactions';
 
 describe('office scene interaction helpers', () => {
   it('skips mouse drag start only for armed first-person left clicks', () => {
-    expect(shouldSkipBlasterMouseDown(0, 'first-person', 'toy-blaster')).toBe(true);
+    expect(shouldSkipDiagnosticPulseMouseDown(0, 'first-person', 'diagnostic-pulse')).toBe(true);
 
-    expect(shouldSkipBlasterMouseDown(0, 'third-person', 'toy-blaster')).toBe(false);
-    expect(shouldSkipBlasterMouseDown(0, 'first-person', 'hands')).toBe(false);
-    expect(shouldSkipBlasterMouseDown(1, 'first-person', 'toy-blaster')).toBe(false);
+    expect(shouldSkipDiagnosticPulseMouseDown(0, 'third-person', 'diagnostic-pulse')).toBe(false);
+    expect(shouldSkipDiagnosticPulseMouseDown(0, 'first-person', 'hands')).toBe(false);
+    expect(shouldSkipDiagnosticPulseMouseDown(1, 'first-person', 'diagnostic-pulse')).toBe(false);
+  });
+
+  it('starts auto fire only for armed first-person left pointer holds', () => {
+    expect(shouldStartDiagnosticPulseAutoFire(0, 'first-person', 'diagnostic-pulse')).toBe(true);
+
+    expect(shouldStartDiagnosticPulseAutoFire(0, 'third-person', 'diagnostic-pulse')).toBe(false);
+    expect(shouldStartDiagnosticPulseAutoFire(0, 'first-person', 'hands')).toBe(false);
+    expect(shouldStartDiagnosticPulseAutoFire(1, 'first-person', 'diagnostic-pulse')).toBe(false);
   });
 
   it('returns the first live shot target after skipping self, missing actors, and downed actors', () => {
@@ -54,7 +63,7 @@ describe('office scene interaction helpers', () => {
     expect(resolveOfficeShotTarget(hits, actors, 'self-agent')).toBeNull();
   });
 
-  it('blocks control and blaster use for missing or downed actors', () => {
+  it('blocks control and diagnostic pulse use for missing or downed actors', () => {
     const live = { combat: { downedUntil: null } };
     const downed = { combat: { downedUntil: 5000 } };
 
@@ -66,9 +75,9 @@ describe('office scene interaction helpers', () => {
     expect(canControlOfficeActor(downed)).toBe(false);
     expect(canControlOfficeActor(null)).toBe(false);
 
-    expect(canUseOfficeBlaster(live)).toBe(true);
-    expect(canUseOfficeBlaster(downed)).toBe(false);
-    expect(canUseOfficeBlaster(null)).toBe(false);
+    expect(canUseOfficeDiagnosticPulse(live)).toBe(true);
+    expect(canUseOfficeDiagnosticPulse(downed)).toBe(false);
+    expect(canUseOfficeDiagnosticPulse(null)).toBe(false);
   });
 
   it('resolves control raycast hits by skipping missing and downed actors', () => {

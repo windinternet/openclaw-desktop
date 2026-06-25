@@ -1,27 +1,23 @@
-import {
-  CONTEXT_SUMMARY_END,
-  CONTEXT_SUMMARY_START,
-  USER_MESSAGE_START,
-} from './agent-switching';
-import {
-  buildSemiMessageContent,
-  type GatewayChatAttachment,
-} from './chat-attachments';
+import { CONTEXT_SUMMARY_END, CONTEXT_SUMMARY_START, USER_MESSAGE_START } from './agent-switching';
+import { buildSemiMessageContent, type GatewayChatAttachment } from './chat-attachments';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
 export type SessionToolCallDisplay = 'hidden' | 'compact';
+export type SessionReasoningDisplay = 'hidden' | 'visible';
 export type AssistantReplyGrouping = 'merged' | 'message-boundary';
 
 export interface SessionMessageDisplaySettings {
   toolCallDisplay: SessionToolCallDisplay;
+  reasoningDisplay: SessionReasoningDisplay;
   assistantReplyGrouping: AssistantReplyGrouping;
 }
 
 export const DEFAULT_SESSION_MESSAGE_DISPLAY_SETTINGS: SessionMessageDisplaySettings = {
-  toolCallDisplay: 'hidden',
+  toolCallDisplay: 'compact',
+  reasoningDisplay: 'visible',
   assistantReplyGrouping: 'merged',
 };
 
@@ -29,7 +25,8 @@ export function normalizeSessionMessageDisplaySettings(
   value?: Partial<SessionMessageDisplaySettings>,
 ): SessionMessageDisplaySettings {
   return {
-    toolCallDisplay: value?.toolCallDisplay === 'compact' ? 'compact' : 'hidden',
+    toolCallDisplay: value?.toolCallDisplay === 'hidden' ? 'hidden' : 'compact',
+    reasoningDisplay: value?.reasoningDisplay === 'hidden' ? 'hidden' : 'visible',
     assistantReplyGrouping: value?.assistantReplyGrouping === 'message-boundary' ? 'message-boundary' : 'merged',
   };
 }
@@ -226,11 +223,12 @@ function hasMatchingHistoryChat(localChat: SessionTimelineChat, loadedHistory: S
   if (!localChat.localOnly) return false;
   const localText = extractSessionMessageText(localChat.content);
   if (!localText) return false;
-  return loadedHistory.some((historyChat) => (
-    historyChat.sourceSessionKey === localChat.sourceSessionKey
-    && historyChat.role === localChat.role
-    && extractSessionMessageText(historyChat.content) === localText
-  ));
+  return loadedHistory.some(
+    (historyChat) =>
+      historyChat.sourceSessionKey === localChat.sourceSessionKey &&
+      historyChat.role === localChat.role &&
+      extractSessionMessageText(historyChat.content) === localText,
+  );
 }
 
 export function mergeVisibleHistoryWithLiveChats<T extends SessionTimelineChat>(
@@ -251,22 +249,14 @@ function isFunctionCallContent(value: unknown): value is ChatToolCallContent {
   return isRecord(value) && value.type === 'function_call';
 }
 
-function upsertToolContent(
-  currentContent: unknown,
-  incomingContent: unknown,
-): ChatContentItem[] {
-  const currentItems = Array.isArray(currentContent) ? currentContent as ChatContentItem[] : [];
-  const incomingItems = Array.isArray(incomingContent)
-    ? incomingContent.filter(isFunctionCallContent)
-    : [];
+function upsertToolContent(currentContent: unknown, incomingContent: unknown): ChatContentItem[] {
+  const currentItems = Array.isArray(currentContent) ? (currentContent as ChatContentItem[]) : [];
+  const incomingItems = Array.isArray(incomingContent) ? incomingContent.filter(isFunctionCallContent) : [];
   if (incomingItems.length === 0) return currentItems;
 
   const next = [...currentItems];
   for (const incoming of incomingItems) {
-    const existingIndex = next.findIndex((item) => (
-      item.type === 'function_call'
-      && item.call_id === incoming.call_id
-    ));
+    const existingIndex = next.findIndex((item) => item.type === 'function_call' && item.call_id === incoming.call_id);
     if (existingIndex >= 0) {
       next[existingIndex] = incoming;
     } else {
@@ -284,12 +274,13 @@ export function mergeRealtimeToolChatIntoRun<T extends SessionTimelineChat>(
     return { chats: currentChats, merged: false };
   }
 
-  const targetIndex = currentChats.findIndex((chat) => (
-    chat.sourceSessionKey === toolChat.sourceSessionKey
-    && chat.role === toolChat.role
-    && (chat.id === toolChat.runId || chat.runId === toolChat.runId)
-    && Array.isArray(chat.content)
-  ));
+  const targetIndex = currentChats.findIndex(
+    (chat) =>
+      chat.sourceSessionKey === toolChat.sourceSessionKey &&
+      chat.role === toolChat.role &&
+      (chat.id === toolChat.runId || chat.runId === toolChat.runId) &&
+      Array.isArray(chat.content),
+  );
 
   if (targetIndex < 0) return { chats: currentChats, merged: false };
 
@@ -299,9 +290,7 @@ export function mergeRealtimeToolChatIntoRun<T extends SessionTimelineChat>(
     ...target,
     runId: target.runId ?? toolChat.runId,
     content: upsertToolContent(target.content, toolChat.content),
-    status: target.status === 'failed' || toolChat.status === 'failed'
-      ? 'failed'
-      : 'in_progress',
+    status: target.status === 'failed' || toolChat.status === 'failed' ? 'failed' : 'in_progress',
   };
   return { chats: next, merged: true };
 }
@@ -334,10 +323,9 @@ function extractToolCallsFromMessage(raw: unknown): unknown[] | null {
   if (Array.isArray(tc) && tc.length > 0) return tc;
 
   if (Array.isArray(raw.content)) {
-    const contentToolCalls = raw.content.filter((item) => (
-      isRecord(item)
-      && ['toolCall', 'tool_call', 'function_call'].includes(String(item.type ?? ''))
-    ));
+    const contentToolCalls = raw.content.filter(
+      (item) => isRecord(item) && ['toolCall', 'tool_call', 'function_call'].includes(String(item.type ?? '')),
+    );
     if (contentToolCalls.length > 0) return contentToolCalls;
   }
 
@@ -356,7 +344,9 @@ function normalizeToolResult(raw: unknown): ChatToolCallContent | null {
   return {
     type: 'function_call',
     name,
-    call_id: String(raw.toolCallId ?? raw.tool_call_id ?? raw.callId ?? raw.call_id ?? raw.id ?? `${name}_${Date.now()}`),
+    call_id: String(
+      raw.toolCallId ?? raw.tool_call_id ?? raw.callId ?? raw.call_id ?? raw.id ?? `${name}_${Date.now()}`,
+    ),
     arguments: '',
     status: raw.isError === true ? 'failed' : 'completed',
     toolResult: extractSessionMessageText(raw),
@@ -376,10 +366,14 @@ function normalizeToolCall(tc: unknown): ChatToolCallContent | null {
     type: 'function_call',
     name,
     call_id: String(tc.callId ?? tc.call_id ?? tc.toolCallId ?? tc.id ?? `${name}_${Date.now()}`),
-    arguments: typeof tc.arguments === 'string' ? tc.arguments
-      : typeof tc.input === 'string' ? tc.input
-      : typeof tc.args === 'string' ? tc.args
-      : JSON.stringify(tc.arguments ?? tc.input ?? tc.args ?? {}),
+    arguments:
+      typeof tc.arguments === 'string'
+        ? tc.arguments
+        : typeof tc.input === 'string'
+          ? tc.input
+          : typeof tc.args === 'string'
+            ? tc.args
+            : JSON.stringify(tc.arguments ?? tc.input ?? tc.args ?? {}),
     status: String(tc.status ?? tc.toolStatus ?? 'completed'),
     raw: tc,
   };
@@ -430,10 +424,7 @@ function normalizeReasoningContent(value: unknown, fallbackStatus?: unknown): Ch
   const directValue = value.thinking ?? value.reasoning ?? value.reasoning_content;
   if (!isReasoningType && directValue == null) return null;
 
-  const content = [
-    ...normalizeReasoningParts(directValue),
-    ...normalizeReasoningParts(value.content),
-  ];
+  const content = [...normalizeReasoningParts(directValue), ...normalizeReasoningParts(value.content)];
   const summary = normalizeReasoningParts(value.summary);
   const effectiveContent = content.length > 0 ? content : summary;
   const effectiveSummary = summary.length > 0 ? summary : effectiveContent;
@@ -492,7 +483,9 @@ export function parseHistoryMessageToContentItems(
     }
   }
 
-  items.push(...reasoningItems);
+  if (settings.reasoningDisplay === 'visible') {
+    items.push(...reasoningItems);
+  }
 
   const text = extractSessionMessageText(message);
   const attachments = extractHistoryAttachments(message);
@@ -511,15 +504,14 @@ export function parseHistoryMessageToContentItems(
 /**
  * 将 tool 流的 gateway 事件 data 转为 ChatToolCallContent
  */
-export function parseToolEventToContentItem(
-  data: unknown,
-  phase?: string,
-): ChatToolCallContent | null {
+export function parseToolEventToContentItem(data: unknown, phase?: string): ChatToolCallContent | null {
   const record = normalizeToolEventRecord(data);
   if (!record) return null;
 
   const funcName = isRecord(record.function) ? String(record.function.name) : '';
-  const name = String(record.toolName ?? record.name ?? record.functionName ?? record.function_name ?? (funcName || ''));
+  const name = String(
+    record.toolName ?? record.name ?? record.functionName ?? record.function_name ?? (funcName || ''),
+  );
   if (!name) return null;
 
   const toolStatus = String(phase ?? record.toolStatus ?? record.status ?? 'in_progress');
@@ -527,13 +519,26 @@ export function parseToolEventToContentItem(
   return {
     type: 'function_call',
     name,
-    call_id: String(record.callId ?? record.call_id ?? record.toolCallId ?? record.tool_call_id ?? record.id ?? `${name}_${Date.now()}`),
-    arguments: typeof record.toolInput === 'string' ? record.toolInput
-      : typeof record.arguments === 'string' ? record.arguments
-      : typeof record.input === 'string' ? record.input
-      : typeof record.meta === 'string' ? record.meta
-      : typeof record.title === 'string' ? record.title
-      : JSON.stringify(record.toolInput ?? record.arguments ?? record.input ?? {}),
+    call_id: String(
+      record.callId ??
+        record.call_id ??
+        record.toolCallId ??
+        record.tool_call_id ??
+        record.id ??
+        `${name}_${Date.now()}`,
+    ),
+    arguments:
+      typeof record.toolInput === 'string'
+        ? record.toolInput
+        : typeof record.arguments === 'string'
+          ? record.arguments
+          : typeof record.input === 'string'
+            ? record.input
+            : typeof record.meta === 'string'
+              ? record.meta
+              : typeof record.title === 'string'
+                ? record.title
+                : JSON.stringify(record.toolInput ?? record.arguments ?? record.input ?? {}),
     status: toolStatus,
     toolResult: extractToolOutputText(record),
     raw: data,
@@ -551,10 +556,12 @@ export function parseToolEventToContentItems(
   const toolItem = parseToolEventToContentItem(data, phase);
   if (!toolItem) return [];
 
-  return [visibleToolCallContent({
-    ...toolItem,
-    status: isToolCompleted(data) ? 'completed' : toolItem.status,
-  })];
+  return [
+    visibleToolCallContent({
+      ...toolItem,
+      status: isToolCompleted(data) ? 'completed' : toolItem.status,
+    }),
+  ];
 }
 
 export function isRealtimeToolStream(stream: unknown, data: unknown): boolean {
@@ -617,9 +624,7 @@ export function getHistoryMessageDisplayId(
 
   const runId = record.runId ?? record.run_id;
   if (runId != null && runId !== '') {
-    return settings.assistantReplyGrouping === 'message-boundary'
-      ? `${String(runId)}:${index}`
-      : String(runId);
+    return settings.assistantReplyGrouping === 'message-boundary' ? `${String(runId)}:${index}` : String(runId);
   }
 
   return `${sessionKey}:${String(record.timestamp ?? record.createdAt ?? index)}:${index}`;
@@ -714,19 +719,36 @@ export function parseSessionContextSnapshot(
   const context = isRecord(session.context) ? session.context : undefined;
 
   const totalTokens = getNumber(session.totalTokens ?? session.total_tokens ?? usage?.totalTokens ?? usage?.total);
-  const contextTokens = getNumber(session.contextTokens ?? session.context_tokens ?? session.contextWindow ?? session.context_window ?? context?.tokens ?? context?.limit);
-  const directRemainingTokens = getNumber(session.remainingTokens ?? session.remaining_tokens ?? context?.remainingTokens);
+  const contextTokens = getNumber(
+    session.contextTokens ??
+      session.context_tokens ??
+      session.contextWindow ??
+      session.context_window ??
+      context?.tokens ??
+      context?.limit,
+  );
+  const directRemainingTokens = getNumber(
+    session.remainingTokens ?? session.remaining_tokens ?? context?.remainingTokens,
+  );
   const directPercentUsed = getNumber(session.percentUsed ?? session.percent_used ?? context?.percentUsed);
 
   const snapshot: SessionContextSnapshot = {
     inputTokens: getNumber(session.inputTokens ?? session.input_tokens ?? usage?.inputTokens ?? usage?.input),
     outputTokens: getNumber(session.outputTokens ?? session.output_tokens ?? usage?.outputTokens ?? usage?.output),
-    cacheReadTokens: getNumber(session.cacheReadTokens ?? session.cacheRead ?? usage?.cacheReadTokens ?? usage?.cacheRead),
-    cacheWriteTokens: getNumber(session.cacheWriteTokens ?? session.cacheWrite ?? usage?.cacheWriteTokens ?? usage?.cacheWrite),
+    cacheReadTokens: getNumber(
+      session.cacheReadTokens ?? session.cacheRead ?? usage?.cacheReadTokens ?? usage?.cacheRead,
+    ),
+    cacheWriteTokens: getNumber(
+      session.cacheWriteTokens ?? session.cacheWrite ?? usage?.cacheWriteTokens ?? usage?.cacheWrite,
+    ),
     totalTokens,
-    remainingTokens: directRemainingTokens ?? (totalTokens !== undefined && contextTokens !== undefined ? Math.max(0, contextTokens - totalTokens) : undefined),
+    remainingTokens:
+      directRemainingTokens ??
+      (totalTokens !== undefined && contextTokens !== undefined ? Math.max(0, contextTokens - totalTokens) : undefined),
     contextTokens,
-    percentUsed: directPercentUsed ?? (totalTokens !== undefined && contextTokens ? (totalTokens / contextTokens) * 100 : undefined),
+    percentUsed:
+      directPercentUsed ??
+      (totalTokens !== undefined && contextTokens ? (totalTokens / contextTokens) * 100 : undefined),
     totalTokensFresh: getBoolean(session.totalTokensFresh ?? session.total_tokens_fresh),
     model: getString(session.model),
     configuredModel: getString(session.configuredModel ?? session.configured_model),
@@ -740,11 +762,9 @@ export function parseSessionContextSnapshot(
     source,
   };
 
-  const hasData = Object.entries(snapshot).some(([key, currentValue]) => (
-    key !== 'updatedAt'
-    && key !== 'source'
-    && currentValue !== undefined
-  ));
+  const hasData = Object.entries(snapshot).some(
+    ([key, currentValue]) => key !== 'updatedAt' && key !== 'source' && currentValue !== undefined,
+  );
 
   return hasData ? snapshot : null;
 }
@@ -795,13 +815,16 @@ export function deriveSessionInsight(
   }
 
   const contextLimit = contextSnapshot?.contextTokens ?? model?.contextWindow;
-  const snapshotPercentRatio = contextSnapshot?.percentUsed !== undefined
-    ? Math.min(1, Math.max(0, contextSnapshot.percentUsed / 100))
-    : undefined;
+  const snapshotPercentRatio =
+    contextSnapshot?.percentUsed !== undefined
+      ? Math.min(1, Math.max(0, contextSnapshot.percentUsed / 100))
+      : undefined;
   const actualUsedContextTokens = contextSnapshot?.totalTokens ?? usedContextTokens;
-  const contextUsageRatio = snapshotPercentRatio ?? (actualUsedContextTokens !== undefined && contextLimit
-    ? Math.min(1, actualUsedContextTokens / contextLimit)
-    : undefined);
+  const contextUsageRatio =
+    snapshotPercentRatio ??
+    (actualUsedContextTokens !== undefined && contextLimit
+      ? Math.min(1, actualUsedContextTokens / contextLimit)
+      : undefined);
 
   return {
     messageCount: chats.length,

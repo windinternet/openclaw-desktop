@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   AGENTIC_REPOSITORY_STORAGE_KEY,
+  DEFAULT_KNOWLEDGE_REPOSITORY_MAPPING,
   DEFAULT_REPOSITORY_PATHS,
   createDefaultRepositoryBinding,
   getRepositoryGateStatus,
@@ -26,6 +27,14 @@ describe('agentic repository model', () => {
       reviews: 'reviews',
       schemas: 'schemas',
     });
+    expect(DEFAULT_KNOWLEDGE_REPOSITORY_MAPPING).toEqual({
+      sourceRoot: 'sources',
+      wikiRoot: 'wiki',
+      indexPath: 'wiki/index.md',
+      logPath: 'wiki/log.md',
+      schemaPath: 'AGENTS.md',
+      mappingSource: 'default',
+    });
   });
 
   it('creates a desktop-local binding with stable defaults', () => {
@@ -42,11 +51,12 @@ describe('agentic repository model', () => {
       gatewayInstanceId: 'inst-1',
       schemaProfile: 'default',
       paths: DEFAULT_REPOSITORY_PATHS,
+      knowledge: DEFAULT_KNOWLEDGE_REPOSITORY_MAPPING,
       status: 'repo_unbound',
     });
   });
 
-  it('normalizes stored bindings and fills missing paths', () => {
+  it('normalizes stored bindings and fills missing paths and knowledge mapping', () => {
     const binding = normalizeRepositoryBinding({
       id: 'custom',
       name: 'My Repo',
@@ -54,12 +64,25 @@ describe('agentic repository model', () => {
       repoPath: '/repo',
       gatewayInstanceId: 'inst-1',
       paths: { wiki: 'knowledge' },
+      knowledge: {
+        sourceRoot: 'raw',
+        wikiRoot: 'knowledge/wiki',
+        indexPath: 'knowledge/index.md',
+        logPath: 'knowledge/log.md',
+      },
       status: 'repo_ready',
     });
 
     expect(binding?.paths).toEqual({
       ...DEFAULT_REPOSITORY_PATHS,
       wiki: 'knowledge',
+    });
+    expect(binding?.knowledge).toMatchObject({
+      sourceRoot: 'raw',
+      wikiRoot: 'knowledge/wiki',
+      indexPath: 'knowledge/index.md',
+      logPath: 'knowledge/log.md',
+      mappingSource: 'manual',
     });
     expect(binding?.schemaProfile).toBe('default');
   });
@@ -168,7 +191,11 @@ describe('agentic repository storage and templates', () => {
     expect(preload).toContain('repository:inspect');
     expect(preload).toContain('repository:bootstrap');
     expect(preload).toContain('repository:init');
+    expect(preload).toContain('repository:listTree');
+    expect(preload).toContain('repository:gitLog');
     expect(preload).toContain('repository:gitCommit');
+    expect(handlers).toContain('function listTree');
+    expect(handlers).toContain('function gitLog');
     expect(handlers).toContain('showOpenDialog');
     expect(handlers).toContain("app.getPath('home')");
     expect(main).toContain('registerRepositoryIpcHandlers');
@@ -268,6 +295,50 @@ describe('agentic repository storage and templates', () => {
     expect(result.binding.status).toBe('repo_ready');
   });
 
+  it('adapts an existing LLM Wiki repository with a knowledge-only mapping instead of requiring bootstrap', async () => {
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: {
+          checkGit: vi.fn(async () => true),
+          inspect: vi.fn(async () => ({
+            pathExists: true,
+            isDirectory: true,
+            isGitRepo: true,
+            isEmpty: false,
+            hasRequiredTemplate: true,
+            permissionDenied: false,
+            detectedProfile: 'llm-wiki',
+            suggestedKnowledge: {
+              sourceRoot: '30-knowledge/sources',
+              wikiRoot: '30-knowledge/wiki',
+              indexPath: '30-knowledge/index.md',
+              logPath: '30-knowledge/log.md',
+              schemaPath: 'AGENTS.md',
+              mapsRoot: '30-knowledge/maps',
+              mappingSource: 'fallback',
+            },
+          })),
+        },
+      },
+    });
+
+    const result = await inspectRepositoryBinding(createDefaultRepositoryBinding({
+      gatewayInstanceId: 'inst-1',
+      repoPath: '/Users/deepin/Desktop/Company/any-thing',
+    }));
+
+    expect(result.status).toBe('repo_ready');
+    expect(result.binding.schemaProfile).toBe('llm-wiki');
+    expect(result.binding.paths).toEqual(DEFAULT_REPOSITORY_PATHS);
+    expect(result.binding.knowledge).toMatchObject({
+      sourceRoot: '30-knowledge/sources',
+      wikiRoot: '30-knowledge/wiki',
+      indexPath: '30-knowledge/index.md',
+      logPath: '30-knowledge/log.md',
+      mappingSource: 'fallback',
+    });
+  });
+
   it('wires repository gate into workbench and knowledge pages', () => {
     const knowledge = readFileSync('src/pages/KnowledgeBasePage.tsx', 'utf8');
     const workbench = readFileSync('src/pages/WorkbenchPage.tsx', 'utf8');
@@ -300,6 +371,9 @@ describe('agentic repository storage and templates', () => {
     expect(gate).toContain('repositoryGate.gatewayClone');
     expect(gate).toContain('repositoryGate.gatewayInitializeHome');
     expect(gate).toContain('repositoryGate.advancedManualPath');
+    expect(gate).toContain('handleSemanticKnowledgeMapping');
+    expect(gate).toContain('knowledge_repository_map');
+    expect(gate).toContain('repositoryGate.semanticMapKnowledge');
 
     expect(zh.repositoryGate.desktopChooseFolder).toContain('选择');
     expect(zh.repositoryGate.desktopInitializeDefault).toContain('自动');
@@ -307,6 +381,17 @@ describe('agentic repository storage and templates', () => {
     expect(zh.repositoryGate.gatewayInitializeHome).toContain('主目录');
     expect(en.repositoryGate.desktopChooseFolder.toLowerCase()).toContain('choose');
     expect(en.repositoryGate.gatewayClone.toLowerCase()).toContain('clone');
+  });
+
+  it('keeps the temporary any-thing layout detection as LLM Wiki fallback only', () => {
+    const handlers = readFileSync('electron/repository-handlers.ts', 'utf8');
+
+    expect(handlers).toContain('detectRepositoryProfile');
+    expect(handlers).toContain('suggestedKnowledge');
+    expect(handlers).toContain('30-knowledge/index.md');
+    expect(handlers).toContain('30-knowledge/sources');
+    expect(handlers).toContain("detectedProfile: 'llm-wiki'");
+    expect(handlers).not.toContain("detectedProfile: 'any-thing'");
   });
 });
 

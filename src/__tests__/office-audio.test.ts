@@ -7,27 +7,27 @@ import {
 } from '../lib/office-audio';
 
 describe('office audio cues', () => {
-  it('maps hit results to a shield hit sound and spoken reaction', () => {
-    const cue = resolveOfficeImpactAudioCue({ event: 'hit', message: '护盾滋啦一下。' }, () => 0);
+  it('maps hit results to a diagnostic hit sound and spoken reaction', () => {
+    const cue = resolveOfficeImpactAudioCue({ event: 'hit', message: '状态灯抖了一下。' }, () => 0);
 
     if (!cue) throw new Error('expected hit cue');
-    expect(cue.effect).toBe('shield-hit');
-    expect(cue.voice).toBe('护盾滋啦一下。');
+    expect(cue.effect).toBe('diagnostic-hit');
+    expect(cue.voice).toBe('状态灯抖了一下。');
   });
 
   it('maps downed results to a yelp, downed sound, and last words', () => {
-    const cue = resolveOfficeImpactAudioCue({ event: 'downed', message: '等我重启一下。' }, () => 0);
+    const cue = resolveOfficeImpactAudioCue({ event: 'downed', message: '等我重启一下钳子驱动。' }, () => 0);
 
     if (!cue) throw new Error('expected downed cue');
     expect(cue.effect).toBe('npc-downed');
     expect(cue.yelp).toBe(OFFICE_NPC_YELPS[0]);
-    expect(cue.voice).toBe('等我重启一下。');
+    expect(cue.voice).toBe('等我重启一下钳子驱动。');
   });
 
   it('does not speak for ignored shots or absent messages', () => {
     expect(resolveOfficeImpactAudioCue({ event: 'ignored', message: null })).toBeNull();
     expect(resolveOfficeImpactAudioCue({ event: 'hit', message: null })).toEqual({
-      effect: 'shield-hit',
+      effect: 'diagnostic-hit',
       voice: null,
       yelp: null,
     });

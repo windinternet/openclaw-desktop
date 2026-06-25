@@ -1168,8 +1168,13 @@ export const useStore = create<StoreState>((set, get) => ({
     try {
       type AssistantInfo = { displayName?: string; name?: string; avatarUrl?: string; avatar?: string };
       const info = await client
-        .request<AssistantInfo>('assistant.info')
-        .catch(() => client.request<AssistantInfo>('assistant.get'));
+        .request<AssistantInfo>('agent.identity.get', { agentId: 'main' })
+        .catch(() =>
+          client
+            .request<AssistantInfo>('assistant.info')
+            .catch(() => client.request<AssistantInfo>('assistant.get').catch(() => null)),
+        );
+      if (!info) return;
       console.log('[fetchAssistantInfo]', JSON.stringify(info));
       const assistantName = info?.displayName || info?.name;
       const avatarUrl = info?.avatarUrl || info?.avatar;

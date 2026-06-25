@@ -317,11 +317,19 @@ describe('desktop node commands', () => {
       hasRequiredTemplate: true,
       permissionDenied: false,
     }));
+    const gitLog = vi.fn(async () => [{
+      hash: 'abcdef',
+      shortHash: 'abcdef',
+      date: '2026-06-25',
+      author: 'OpenClaw',
+      subject: 'Update knowledge page',
+    }]);
     const gitCommit = vi.fn(async () => 'abc123 Initial repository state');
     vi.stubGlobal('window', {
       electronAPI: {
         repository: {
           init,
+          gitLog,
           gitCommit,
         },
       },
@@ -341,6 +349,21 @@ describe('desktop node commands', () => {
       },
     });
 
+    await expect(handleDesktopNodeCommand('desktop.repository.git.log', {
+      repoPath: '/repo',
+      path: 'wiki/topic.md',
+      limit: 5,
+    })).resolves.toEqual({
+      ok: true,
+      commits: [{
+        hash: 'abcdef',
+        shortHash: 'abcdef',
+        date: '2026-06-25',
+        author: 'OpenClaw',
+        subject: 'Update knowledge page',
+      }],
+    });
+
     await expect(handleDesktopNodeCommand('desktop.repository.git.commit', {
       repoPath: '/repo',
       message: 'Initial repository state',
@@ -350,6 +373,7 @@ describe('desktop node commands', () => {
     });
 
     expect(init).toHaveBeenCalledWith('/repo');
+    expect(gitLog).toHaveBeenCalledWith('/repo', 'wiki/topic.md', 5);
     expect(gitCommit).toHaveBeenCalledWith('/repo', 'Initial repository state');
   });
 

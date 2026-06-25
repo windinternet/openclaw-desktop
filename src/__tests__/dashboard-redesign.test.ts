@@ -77,6 +77,44 @@ describe('dashboard redesign', () => {
     expect(dashboard).not.toContain('estimatedFromSessions');
   });
 
+  it('adds expressive AntV dashboard charts for the option B visual pass', () => {
+    const dashboard = readFileSync('src/pages/DashboardPage.tsx', 'utf8');
+    const charts = readFileSync('src/components/charts/DashboardVisualCharts.tsx', 'utf8');
+    const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
+    const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
+
+    expect(dashboard).toContain("import { ActivityTrendChart, ModelUsageBarChart, ProviderQuotaBarChart, StatusDistributionChart, TokenCompositionChart } from '../components/charts/DashboardVisualCharts'");
+    expect(dashboard).toContain('modelUsageChartData');
+    expect(dashboard).toContain('tokenCompositionData');
+    expect(dashboard).toContain('providerQuotaChartData');
+    expect(dashboard).toContain('activityTrendData');
+    expect(dashboard).toContain('actionRunStatusData');
+    expect(dashboard).toContain('artifactTypeData');
+    expect(dashboard).toContain("<ModelUsageBarChart data={modelUsageChartData} emptyText={t('dashboard.noChartData')} />");
+    expect(dashboard).toContain("<TokenCompositionChart data={tokenCompositionData} emptyText={t('dashboard.noChartData')} />");
+    expect(dashboard).toContain("<ProviderQuotaBarChart data={providerQuotaChartData} emptyText={t('dashboard.noChartData')} />");
+    expect(dashboard).toContain("<ActivityTrendChart data={activityTrendData} emptyText={t('dashboard.noChartData')} />");
+    expect(dashboard).toContain("<StatusDistributionChart data={actionRunStatusData} emptyText={t('dashboard.noChartData')} />");
+    expect(dashboard).toContain("<StatusDistributionChart data={artifactTypeData} emptyText={t('dashboard.noChartData')} />");
+    expect(dashboard).toContain('dashboard-chart-panel');
+    expect(dashboard).toContain('dashboard-visual-row');
+    expect(charts).toContain("import { Bar, Line, Pie } from '@ant-design/charts'");
+    expect(charts).toContain('formatCompactTokenValue');
+    expect(charts).toContain('useResponsiveChartHeight');
+    expect(charts).toContain('dashboard-antv-chart');
+    expect(charts).toContain('isEmpty');
+    expect(getByPath(zh, 'dashboard.tokenComposition')).toBeTruthy();
+    expect(getByPath(zh, 'dashboard.activityTrend')).toBeTruthy();
+    expect(getByPath(zh, 'dashboard.actionRunStatus')).toBeTruthy();
+    expect(getByPath(zh, 'dashboard.artifactTypes')).toBeTruthy();
+    expect(getByPath(zh, 'dashboard.noChartData')).toBeTruthy();
+    expect(getByPath(en, 'dashboard.tokenComposition')).toBeTruthy();
+    expect(getByPath(en, 'dashboard.activityTrend')).toBeTruthy();
+    expect(getByPath(en, 'dashboard.actionRunStatus')).toBeTruthy();
+    expect(getByPath(en, 'dashboard.artifactTypes')).toBeTruthy();
+    expect(getByPath(en, 'dashboard.noChartData')).toBeTruthy();
+  });
+
   it('lets the dashboard occupy the full horizontal content width', () => {
     const css = readFileSync('src/styles/global.css', 'utf8');
 
@@ -135,5 +173,16 @@ describe('dashboard redesign', () => {
       expect(getByPath(zh, key), `zh ${key}`).toBeTruthy();
       expect(getByPath(en, key), `en ${key}`).toBeTruthy();
     }
+  });
+
+  it('uses native ellipsis for dashboard list labels to avoid Semi ResizeObserver findDOMNode warnings', () => {
+    const dashboard = readFileSync('src/pages/DashboardPage.tsx', 'utf8');
+
+    expect(dashboard).toContain('className="dashboard-asset-title"');
+    expect(dashboard).toContain('className="dashboard-asset-meta"');
+    expect(dashboard).toContain('className="dashboard-model-usage-label"');
+    expect(dashboard).not.toContain('<Text ellipsis={{ showTooltip: true }} style={{ fontWeight: 600 }}>{title}</Text>');
+    expect(dashboard).not.toContain('<Text type="tertiary" size="small" ellipsis={{ showTooltip: true }}>{meta}</Text>');
+    expect(dashboard).not.toContain('<Text ellipsis={{ showTooltip: true }} style={{ fontWeight: 600 }}>{row.label}</Text>');
   });
 });

@@ -1,6 +1,6 @@
 import type { OfficeShotEvent } from './office-gameplay';
 
-export type OfficeAudioEffect = 'blaster-shot' | 'shield-hit' | 'npc-downed' | 'npc-revived';
+export type OfficeAudioEffect = 'diagnostic-pulse' | 'diagnostic-hit' | 'npc-downed' | 'npc-revived';
 
 export interface OfficeAudioCue {
   effect: OfficeAudioEffect;
@@ -25,10 +25,10 @@ type WindowWithAudio = Window & {
 };
 
 export const OFFICE_NPC_YELPS = [
-  '啊！',
-  '哎哟！',
-  '救命，我的工位！',
-  '这不在需求里！',
+  '诶，收到诊断。',
+  '钳子驱动重校准。',
+  '日志有点痒。',
+  '这不在任务说明里。',
 ];
 
 let officeAudioContext: BrowserAudioContext | null = null;
@@ -48,7 +48,7 @@ export function resolveOfficeImpactAudioCue(
   }
 
   return {
-    effect: 'shield-hit',
+    effect: 'diagnostic-hit',
     yelp: null,
     voice: result.message,
   };
@@ -69,12 +69,12 @@ export function resolveOfficeVoiceText(cue: Pick<OfficeAudioCue, 'voice' | 'yelp
   return text || null;
 }
 
-export function playOfficeBlasterShotAudio(): void {
+export function playOfficeDiagnosticPulseAudio(): void {
   const context = getOfficeAudioContext();
   if (!context) return;
 
-  playSweep(context, 780, 220, 0.12, 0.08, 'sawtooth');
-  playNoiseBurst(context, 0.055, 0.035, 3600);
+  playSweep(context, 620, 1040, 0.11, 0.065, 'triangle');
+  playNoiseBurst(context, 0.045, 0.028, 4200);
 }
 
 export function playOfficeImpactAudio(cue: OfficeAudioCue | null): void {
@@ -82,7 +82,7 @@ export function playOfficeImpactAudio(cue: OfficeAudioCue | null): void {
 
   const context = getOfficeAudioContext();
   if (context) {
-    if (cue.effect === 'shield-hit') {
+    if (cue.effect === 'diagnostic-hit') {
       playSweep(context, 420, 190, 0.1, 0.06, 'triangle');
       playNoiseBurst(context, 0.075, 0.04, 1800);
     } else if (cue.effect === 'npc-downed') {

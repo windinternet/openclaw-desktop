@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Button, Card, Input, Select, Space, Tag, Toast, Typography } from '@douyinfe/semi-ui';
+import { Button, Card, Input, Modal, Select, Space, Tag, Toast, Typography } from '@douyinfe/semi-ui';
 import { IconBranch, IconCloud, IconFolderOpen, IconRefresh, IconTickCircle } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
-import { useStore } from '../lib';
-import type { RepositoryBinding, RepositoryLocation, RepositoryStatus } from '../lib/agentic-repository';
+import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway, useStore } from '../lib';
+import { upsertAiActionRun } from '../lib/ai-action-run-store';
+import type { KnowledgeRepositoryMapping, RepositoryBinding, RepositoryLocation, RepositoryStatus } from '../lib/agentic-repository';
 import {
   bootstrapRepositoryBinding,
   createAndSaveRepositoryBinding,
@@ -12,6 +13,10 @@ import {
   loadRepositoryBinding,
   saveRepositoryBinding,
 } from '../lib/agentic-repository-store';
+import {
+  buildKnowledgeRepositoryMappingPrompt,
+  parseKnowledgeRepositoryMappingResponse,
+} from '../lib/repository-knowledge';
 
 const { Text, Title } = Typography;
 
@@ -30,12 +35,18 @@ const STATUS_COLOR: Record<RepositoryStatus, 'green' | 'orange' | 'red' | 'blue'
 export default function RepositoryGate({
   area,
   children,
+  fallback,
+  setupVisible = true,
 }: {
   area: 'knowledge' | 'workbench';
-  children: ReactNode | ((binding: RepositoryBinding) => ReactNode);
+  children?: ReactNode | ((binding: RepositoryBinding) => ReactNode);
+  fallback?: ReactNode;
+  setupVisible?: boolean;
 }) {
   const { t } = useTranslation();
   const currentInstanceId = useStore((s) => s.currentInstanceId);
+  const activeClient = useStore((s) => s.activeClient);
+  const agents = useStore((s) => s.agents);
   const [binding, setBinding] = useState<RepositoryBinding | null>(null);
   const [repoPath, setRepoPath] = useState('');
   const [gatewayRepoUrl, setGatewayRepoUrl] = useState('');
@@ -43,6 +54,7 @@ export default function RepositoryGate({
   const [location, setLocation] = useState<RepositoryLocation>('desktop-local');
   const [status, setStatus] = useState<RepositoryStatus>('repo_unbound');
   const [loading, setLoading] = useState(false);
+  const [mappingLoading, setMappingLoading] = useState(false);
   const [advancedManualPath, setAdvancedManualPath] = useState(false);
 
   const inspect = useCallback(async (nextBinding: RepositoryBinding) => {
@@ -191,9 +203,143 @@ export default function RepositoryGate({
     }
   };
 
-  const ready = status === 'repo_ready';
+  const readMappingExcerpts = async (path: string, tree: string[]) => {
+    const repository = window.electronAPI?.repository;
+    if (!repository?.readText) return [];
+    const readText = repository.readText;
+    const candidates = ['AGENTS.md', 'README.md', 'CLAUDE.md', 'GEMINI.md', ...tree.filter((entry) => /(^|\/)(README|index|log)\.md$/i.test(entry)).slice(0, 8)];
+    const unique = Array.from(new Set(candidates.filter((entry) => !entry.endsWith('/')))).slice(0, 10);
+    const excerpts = await Promise.all(unique.map(async (entry) => ({
+      path: entry,
+      content: await readText(path, entry),
+    })));
+    return excerpts.filter((item) => item.content.trim().length > 0);
+  };
+
+  const isSafeMapping = (mapping: KnowledgeRepositoryMapping): boolean => {
+    const paths = [
+      mapping.sourceRoot,
+      mapping.wikiRoot,
+      mapping.indexPath,
+      mapping.logPath,
+      mapping.schemaPath,
+      mapping.mapsRoot,
+      mapping.assetsRoot,
+    ].filter(Boolean) as string[];
+    return paths.every((item) => !item.startsWith('/') && !item.includes('..') && item.trim().length > 0);
+  };
+
+  const saveKnowledgeMapping = async (base: RepositoryBinding, mapping: KnowledgeRepositoryMapping) => {
+    const next: RepositoryBinding = {
+      ...base,
+      schemaProfile: 'llm-wiki',
+      knowledge: mapping,
+    };
+    setBinding(next);
+    setRepoPath(next.repoPath);
+    await saveRepositoryBinding(next);
+  };
+
+  const handleSemanticKnowledgeMapping = async () => {
+    if (!currentInstanceId) return;
+    if (!activeClient) {
+      Toast.error(t('repositoryGate.mappingNotConnected'));
+      return;
+    }
+    const agent = agents[0];
+    if (!agent) {
+      Toast.error(t('repositoryGate.mappingNoAgent'));
+      return;
+    }
+    const path = repoPath.trim() || binding?.repoPath;
+    if (!path) {
+      Toast.warning(t('repositoryGate.noFolderSelected'));
+      return;
+    }
+    const repository = window.electronAPI?.repository;
+    if (!repository?.listTree) {
+      Toast.error(t('repositoryGate.localRepositoryUnavailable'));
+      return;
+    }
+
+    setMappingLoading(true);
+    try {
+      const base = binding ?? await createAndSaveRepositoryBinding({
+        gatewayInstanceId: currentInstanceId,
+        repoPath: path,
+        location,
+      });
+      const tree = await repository.listTree(path, 400);
+      const excerpts = await readMappingExcerpts(path, tree);
+      const run = createAiActionRun({
+        type: 'knowledge_repository_map',
+        sourcePage: 'knowledge',
+        instanceId: currentInstanceId,
+        agentId: agent.id,
+        executionMode: 'isolated-session',
+        input: t('repositoryGate.mappingActionInput', { path }),
+      });
+      await upsertAiActionRun(currentInstanceId, { ...run, status: 'planning', updatedAt: Date.now() });
+      const running = await executeAiActionRunWithGateway(activeClient, run, {
+        title: t('repositoryGate.mappingActionTitle'),
+        prompt: buildKnowledgeRepositoryMappingPrompt({ repoPath: path, tree, excerpts }),
+      });
+      await upsertAiActionRun(currentInstanceId, running);
+
+      let latest = running;
+      for (let index = 0; index < 10; index += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        latest = await syncAiActionRunWithGateway(activeClient, latest);
+        await upsertAiActionRun(currentInstanceId, latest);
+        if (latest.status === 'done' || latest.status === 'failed' || latest.status === 'cancelled') break;
+      }
+
+      const parsed = parseKnowledgeRepositoryMappingResponse(latest.lastAssistantResponse ?? '');
+      if (!parsed?.isKnowledgeRepository || !parsed.mapping) {
+        Toast.error(parsed?.reason || t('repositoryGate.mappingFailed'));
+        return;
+      }
+      if (!isSafeMapping(parsed.mapping)) {
+        Toast.error(t('repositoryGate.mappingUnsafe'));
+        return;
+      }
+
+      Modal.confirm({
+        title: t('repositoryGate.mappingConfirmTitle'),
+        content: (
+          <Space vertical align="start">
+            <Text>{t('repositoryGate.mappingConfirmDesc')}</Text>
+            <Text size="small">sourceRoot: {parsed.mapping.sourceRoot}</Text>
+            <Text size="small">wikiRoot: {parsed.mapping.wikiRoot}</Text>
+            <Text size="small">indexPath: {parsed.mapping.indexPath}</Text>
+            <Text size="small">logPath: {parsed.mapping.logPath}</Text>
+          </Space>
+        ),
+        okText: t('common.save'),
+        cancelText: t('common.cancel'),
+        onOk: async () => {
+          await saveKnowledgeMapping(base, parsed.mapping!);
+          await inspect({ ...base, knowledge: parsed.mapping! });
+          Toast.success(t('repositoryGate.mappingSaved'));
+        },
+      });
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('repositoryGate.mappingFailed'));
+    } finally {
+      setMappingLoading(false);
+    }
+  };
+
+  const knowledgeMappingReady = Boolean(binding?.knowledge && binding.knowledge.mappingSource !== 'default');
+  const ready = status === 'repo_ready' || (area === 'knowledge' && knowledgeMappingReady);
+  const displayStatus = ready ? 'repo_ready' : status;
   const showDesktopActions = location === 'desktop-local';
   const canRefresh = Boolean(binding);
+
+  if (!setupVisible) {
+    if (ready && binding) return <>{typeof children === 'function' ? children(binding) : children}</>;
+    return <>{fallback ?? null}</>;
+  }
 
   return (
     <div style={{ marginTop: 20 }}>
@@ -204,7 +350,7 @@ export default function RepositoryGate({
             <Title heading={5} style={{ margin: 0 }}>
               {t(`repositoryGate.${area}Title`)}
             </Title>
-            <Tag color={STATUS_COLOR[status]}>{t(`repositoryGate.status.${status}`)}</Tag>
+            <Tag color={STATUS_COLOR[displayStatus]}>{t(`repositoryGate.status.${displayStatus}`)}</Tag>
           </Space>
           <Text type="tertiary">{t(`repositoryGate.${area}Desc`)}</Text>
           <Space wrap style={{ width: '100%' }}>
@@ -246,6 +392,11 @@ export default function RepositoryGate({
                   <Button loading={loading} disabled={!binding || ready} onClick={handleBootstrap}>
                     {t('repositoryGate.bootstrap')}
                   </Button>
+                  {area === 'knowledge' && (
+                    <Button loading={mappingLoading} disabled={!currentInstanceId || !repoPath.trim()} onClick={() => void handleSemanticKnowledgeMapping()}>
+                      {t('repositoryGate.semanticMapKnowledge')}
+                    </Button>
+                  )}
                 </Space>
                 {repoPath ? (
                   <Text type="tertiary" size="small">{t('repositoryGate.currentPath', { path: repoPath })}</Text>
@@ -305,7 +456,7 @@ export default function RepositoryGate({
           )}
         </Space>
       </Card>
-      {ready && binding && (
+      {ready && binding && children && (
         <div style={{ marginTop: 20 }}>
           {typeof children === 'function' ? children(binding) : children}
         </div>

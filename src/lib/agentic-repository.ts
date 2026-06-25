@@ -24,6 +24,18 @@ export interface RepositoryPaths {
   schemas: string;
 }
 
+export interface KnowledgeRepositoryMapping {
+  sourceRoot: string;
+  wikiRoot: string;
+  indexPath: string;
+  logPath: string;
+  schemaPath?: string;
+  mapsRoot?: string;
+  assetsRoot?: string;
+  confidence?: 'low' | 'medium' | 'high';
+  mappingSource: 'default' | 'agent' | 'manual' | 'fallback';
+}
+
 export interface RepositoryBinding {
   id: string;
   name: string;
@@ -33,6 +45,7 @@ export interface RepositoryBinding {
   defaultAgentId?: string;
   schemaProfile: string;
   paths: RepositoryPaths;
+  knowledge: KnowledgeRepositoryMapping;
   status: RepositoryStatus;
 }
 
@@ -59,6 +72,15 @@ export const DEFAULT_REPOSITORY_PATHS: RepositoryPaths = {
   schemas: 'schemas',
 };
 
+export const DEFAULT_KNOWLEDGE_REPOSITORY_MAPPING: KnowledgeRepositoryMapping = {
+  sourceRoot: 'sources',
+  wikiRoot: 'wiki',
+  indexPath: 'wiki/index.md',
+  logPath: 'wiki/log.md',
+  schemaPath: 'AGENTS.md',
+  mappingSource: 'default',
+};
+
 export function createDefaultRepositoryBinding(options: {
   gatewayInstanceId: string;
   repoPath: string;
@@ -75,6 +97,7 @@ export function createDefaultRepositoryBinding(options: {
     defaultAgentId: options.defaultAgentId,
     schemaProfile: 'default',
     paths: { ...DEFAULT_REPOSITORY_PATHS },
+    knowledge: { ...DEFAULT_KNOWLEDGE_REPOSITORY_MAPPING },
     status: 'repo_unbound',
   };
 }
@@ -86,6 +109,16 @@ export function normalizeRepositoryBinding(value: unknown): RepositoryBinding | 
   const location = value.location === 'gateway-local' ? 'gateway-local' : 'desktop-local';
   const status = isRepositoryStatus(value.status) ? value.status : 'repo_unbound';
   const paths = isRecord(value.paths) ? value.paths : {};
+  const normalizedPaths: RepositoryPaths = {
+    sources: stringOrDefault(paths.sources, DEFAULT_REPOSITORY_PATHS.sources),
+    wiki: stringOrDefault(paths.wiki, DEFAULT_REPOSITORY_PATHS.wiki),
+    work: stringOrDefault(paths.work, DEFAULT_REPOSITORY_PATHS.work),
+    plans: stringOrDefault(paths.plans, DEFAULT_REPOSITORY_PATHS.plans),
+    runs: stringOrDefault(paths.runs, DEFAULT_REPOSITORY_PATHS.runs),
+    outputs: stringOrDefault(paths.outputs, DEFAULT_REPOSITORY_PATHS.outputs),
+    reviews: stringOrDefault(paths.reviews, DEFAULT_REPOSITORY_PATHS.reviews),
+    schemas: stringOrDefault(paths.schemas, DEFAULT_REPOSITORY_PATHS.schemas),
+  };
 
   return {
     id: value.id,
@@ -95,16 +128,8 @@ export function normalizeRepositoryBinding(value: unknown): RepositoryBinding | 
     gatewayInstanceId: value.gatewayInstanceId,
     defaultAgentId: typeof value.defaultAgentId === 'string' ? value.defaultAgentId : undefined,
     schemaProfile: typeof value.schemaProfile === 'string' ? value.schemaProfile : 'default',
-    paths: {
-      sources: stringOrDefault(paths.sources, DEFAULT_REPOSITORY_PATHS.sources),
-      wiki: stringOrDefault(paths.wiki, DEFAULT_REPOSITORY_PATHS.wiki),
-      work: stringOrDefault(paths.work, DEFAULT_REPOSITORY_PATHS.work),
-      plans: stringOrDefault(paths.plans, DEFAULT_REPOSITORY_PATHS.plans),
-      runs: stringOrDefault(paths.runs, DEFAULT_REPOSITORY_PATHS.runs),
-      outputs: stringOrDefault(paths.outputs, DEFAULT_REPOSITORY_PATHS.outputs),
-      reviews: stringOrDefault(paths.reviews, DEFAULT_REPOSITORY_PATHS.reviews),
-      schemas: stringOrDefault(paths.schemas, DEFAULT_REPOSITORY_PATHS.schemas),
-    },
+    paths: normalizedPaths,
+    knowledge: normalizeKnowledgeRepositoryMapping(value.knowledge, normalizedPaths),
     status,
   };
 }
@@ -134,6 +159,43 @@ function stringOrDefault(value: unknown, fallback: string): string {
   return typeof value === 'string' && value.trim().length > 0 ? value : fallback;
 }
 
+function normalizeKnowledgeRepositoryMapping(value: unknown, paths: RepositoryPaths): KnowledgeRepositoryMapping {
+  const fallback = knowledgeMappingFromRepositoryPaths(paths);
+  if (!isRecord(value)) return fallback;
+
+  return {
+    sourceRoot: stringOrDefault(value.sourceRoot, fallback.sourceRoot),
+    wikiRoot: stringOrDefault(value.wikiRoot, fallback.wikiRoot),
+    indexPath: stringOrDefault(value.indexPath, fallback.indexPath),
+    logPath: stringOrDefault(value.logPath, fallback.logPath),
+    schemaPath: optionalString(value.schemaPath) ?? fallback.schemaPath,
+    mapsRoot: optionalString(value.mapsRoot),
+    assetsRoot: optionalString(value.assetsRoot),
+    confidence: value.confidence === 'low' || value.confidence === 'medium' || value.confidence === 'high'
+      ? value.confidence
+      : undefined,
+    mappingSource:
+      value.mappingSource === 'agent' || value.mappingSource === 'manual' || value.mappingSource === 'fallback'
+        ? value.mappingSource
+        : 'manual',
+  };
+}
+
+function knowledgeMappingFromRepositoryPaths(paths: RepositoryPaths): KnowledgeRepositoryMapping {
+  return {
+    sourceRoot: paths.sources,
+    wikiRoot: paths.wiki,
+    indexPath: `${paths.wiki}/index.md`,
+    logPath: `${paths.wiki}/log.md`,
+    schemaPath: 'AGENTS.md',
+    mappingSource: 'default',
+  };
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+}
+
 function isRepositoryStatus(value: unknown): value is RepositoryStatus {
   return (
     value === 'repo_ready' ||
@@ -147,4 +209,3 @@ function isRepositoryStatus(value: unknown): value is RepositoryStatus {
     value === 'repo_permission_denied'
   );
 }
-

@@ -11,6 +11,7 @@ const INSTANCE_DATA_KEYS = new Set([
   'office-profile',
   'office-layout-instructions',
   'agent-team-profile',
+  'agent-switch-state',
   'ai-action-runs',
   'artifacts',
   'agentic-repository-binding',

@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { AGENT_SWITCH_STATE_KEY } from '../lib/agent-switch-persistence';
+import { AGENTIC_REPOSITORY_STORAGE_KEY } from '../lib/agentic-repository';
+import { AI_ACTION_RUNS_STORAGE_KEY } from '../lib/ai-action-center';
+import { AGENT_TEAM_PROFILE_STORAGE_KEY } from '../lib/agent-team';
 import { loadAppSnapshot } from '../lib/local-persistence';
+import { OFFICE_PROFILE_STORAGE_KEY } from '../lib/office-profile';
 
 function createLocalStorageMock(initial: Record<string, string>) {
   const store = new Map(Object.entries(initial));
@@ -69,5 +75,52 @@ describe('local persistence migration', () => {
     expect(saveCurrentInstanceId).toHaveBeenCalledWith('inst-1');
     expect(localStorage.removeItem).toHaveBeenCalledWith('openclaw-instances');
     expect(localStorage.removeItem).toHaveBeenCalledWith('openclaw-current-instance');
+  });
+
+  it('migrates old default-hidden tool call display settings to compact', async () => {
+    vi.stubGlobal('window', {
+      electronAPI: {
+        storage: {
+          loadAppState: vi.fn(async () => ({
+            settings: {
+              initialized: true,
+              themeMode: 'dark',
+              themeColor: 'blue',
+              locale: 'zh-CN',
+              sessionToolCallDisplay: 'hidden',
+            },
+            instances: [],
+            currentInstanceId: null,
+          })),
+          saveSettings: vi.fn(),
+          saveInstances: vi.fn(),
+          saveCurrentInstanceId: vi.fn(),
+        },
+      },
+    });
+
+    const snapshot = await loadAppSnapshot();
+
+    expect(snapshot.settings.sessionToolCallDisplay).toBe('compact');
+    expect(snapshot.settings.sessionReasoningDisplay).toBe('visible');
+  });
+
+  it('keeps Electron instance data whitelist aligned with renderer storage keys', () => {
+    const source = readFileSync('electron/local-storage.ts', 'utf8');
+    const expectedKeys = [
+      'kanban',
+      OFFICE_PROFILE_STORAGE_KEY,
+      AGENT_TEAM_PROFILE_STORAGE_KEY,
+      AI_ACTION_RUNS_STORAGE_KEY,
+      AGENT_SWITCH_STATE_KEY,
+      AGENTIC_REPOSITORY_STORAGE_KEY,
+    ];
+
+    for (const key of expectedKeys) {
+      expect(source).toContain(`'${key}'`);
+    }
+    expect(source).toContain(
+      "const AGENTIC_REPOSITORY_BINDING_LOCATIONS = new Set(['desktop-local', 'gateway-local'])",
+    );
   });
 });

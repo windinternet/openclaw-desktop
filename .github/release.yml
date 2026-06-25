@@ -1,0 +1,45 @@
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+      - skip-changelog
+    authors:
+      - dependabot
+      - dependabot[bot]
+      - github-actions
+      - github-actions[bot]
+  categories:
+    - title: Breaking Changes
+      labels:
+        - breaking-change
+        - semver-major
+        - Semver-Major
+    - title: Features
+      labels:
+        - feature
+        - enhancement
+        - semver-minor
+        - Semver-Minor
+    - title: Fixes
+      labels:
+        - bug
+        - fix
+        - regression
+    - title: Desktop App
+      labels:
+        - desktop
+        - electron
+        - frontend
+        - ui
+    - title: Documentation
+      labels:
+        - documentation
+        - docs
+    - title: Build and Release
+      labels:
+        - ci
+        - build
+        - release
+    - title: Other Changes
+      labels:
+        - '*'

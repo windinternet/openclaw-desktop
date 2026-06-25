@@ -27,22 +27,24 @@ import {
   type OfficeWeaponMode,
 } from '../../lib/office-gameplay';
 import {
-  playOfficeBlasterShotAudio,
+  playOfficeDiagnosticPulseAudio,
   playOfficeImpactAudio,
   resolveOfficeImpactAudioCue,
   resolveOfficeReviveAudioCue,
 } from '../../lib/office-audio';
 import {
   canOfficeActorJump,
-  canUseOfficeBlaster,
+  canUseOfficeDiagnosticPulse,
   copyBillboardQuaternion,
   resolveNearestOfficeControlTarget,
   resolveOfficeControlTarget,
   resolveOfficeShotTarget,
-  shouldSkipBlasterMouseDown,
+  shouldStartDiagnosticPulseAutoFire,
+  shouldSkipDiagnosticPulseMouseDown,
 } from './office-scene-interactions';
 
 const MANUAL_AGENT_WALK_SPEED = 5.8;
+const OFFICE_DIAGNOSTIC_PULSE_AUTO_FIRE_MS = 180;
 
 interface OfficeSceneProps {
   agents: OfficeAgent[];
@@ -98,7 +100,7 @@ interface SceneState {
   interactRing: THREE.Mesh | null;
   bodyGlow: THREE.Mesh | null;
   weaponMode: OfficeWeaponMode;
-  blasterGroup: THREE.Group | null;
+  diagnosticPulseTool: THREE.Group | null;
   crosshair: THREE.Sprite | null;
   shotBeam: THREE.Line | null;
   shotTracer: THREE.Line | null;
@@ -122,6 +124,7 @@ interface SceneState {
     lastX: number;
     lastY: number;
   };
+  autoFireTimer: number | null;
   frame: number;
   lastTime: number;
 }
@@ -132,18 +135,20 @@ function createBox(
   depth: number,
   color: string,
   position: THREE.Vector3Tuple,
-  options: { opacity?: number; roughness?: number } = {},
+  options: { opacity?: number; roughness?: number; metalness?: number; emissive?: string; emissiveIntensity?: number } = {},
 ): THREE.Mesh {
   const material = new THREE.MeshStandardMaterial({
     color,
     roughness: options.roughness ?? 0.72,
-    metalness: 0.08,
+    metalness: options.metalness ?? 0.08,
+    emissive: options.emissive ?? '#000000',
+    emissiveIntensity: options.emissiveIntensity ?? 0,
     transparent: options.opacity !== undefined,
     opacity: options.opacity ?? 1,
   });
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
   mesh.position.set(...position);
-  mesh.castShadow = true;
+  mesh.castShadow = options.opacity === undefined;
   mesh.receiveShadow = true;
   return mesh;
 }
@@ -154,12 +159,14 @@ function createCylinder(
   height: number,
   color: string,
   position: THREE.Vector3Tuple,
-  options: { radialSegments?: number; opacity?: number; roughness?: number } = {},
+  options: { radialSegments?: number; opacity?: number; roughness?: number; metalness?: number; emissive?: string; emissiveIntensity?: number } = {},
 ): THREE.Mesh {
   const material = new THREE.MeshStandardMaterial({
     color,
     roughness: options.roughness ?? 0.7,
-    metalness: 0.08,
+    metalness: options.metalness ?? 0.08,
+    emissive: options.emissive ?? '#000000',
+    emissiveIntensity: options.emissiveIntensity ?? 0,
     transparent: options.opacity !== undefined,
     opacity: options.opacity ?? 1,
   });
@@ -168,22 +175,7 @@ function createCylinder(
     material,
   );
   mesh.position.set(...position);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  return mesh;
-}
-
-function createZonePlane(width: number, depth: number, color: string, position: THREE.Vector3Tuple): THREE.Mesh {
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(width, 0.06, depth),
-    new THREE.MeshStandardMaterial({
-      color,
-      transparent: true,
-      opacity: 1,
-      roughness: 0.85,
-    }),
-  );
-  mesh.position.set(...position);
+  mesh.castShadow = options.opacity === undefined;
   mesh.receiveShadow = true;
   return mesh;
 }
@@ -202,7 +194,7 @@ function createHitBox(width: number, height: number, depth: number, position: TH
   return mesh;
 }
 
-function createZoneGroup(
+function createInsetFloorPanel(
   width: number,
   depth: number,
   color: string,
@@ -210,28 +202,43 @@ function createZoneGroup(
   theme: OfficeTheme,
 ): THREE.Group {
   const group = new THREE.Group();
-  const plane = createZonePlane(width, depth, color, position);
-  const planeMaterial = plane.material as THREE.MeshStandardMaterial;
-  planeMaterial.opacity = theme.scene.zoneOpacity;
-  group.add(plane);
-
-  const borderGeometry = new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(position[0] - width / 2, position[1] + 0.05, position[2] - depth / 2),
-    new THREE.Vector3(position[0] + width / 2, position[1] + 0.05, position[2] - depth / 2),
-    new THREE.Vector3(position[0] + width / 2, position[1] + 0.05, position[2] + depth / 2),
-    new THREE.Vector3(position[0] - width / 2, position[1] + 0.05, position[2] + depth / 2),
-    new THREE.Vector3(position[0] - width / 2, position[1] + 0.05, position[2] - depth / 2),
-  ]);
-  const border = new THREE.Line(
-    borderGeometry,
-    new THREE.LineBasicMaterial({
-      color: theme.scene.zoneBorder,
+  const shadow = new THREE.Mesh(
+    new THREE.PlaneGeometry(width + 0.16, depth + 0.16),
+    new THREE.MeshBasicMaterial({
+      color: theme.scene.propShadow,
       transparent: true,
-      opacity: theme.mode === 'light' ? 0.5 : 0.62,
+      opacity: theme.mode === 'light' ? 0.1 : 0.22,
+      depthWrite: false,
     }),
   );
-  group.add(border);
-
+  shadow.position.set(position[0], position[1] - 0.012, position[2]);
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.renderOrder = 1;
+  const panel = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, depth),
+    new THREE.MeshStandardMaterial({
+      color,
+      transparent: true,
+      opacity: theme.scene.zoneOpacity,
+      roughness: theme.mode === 'light' ? 0.58 : 0.74,
+      metalness: theme.mode === 'light' ? 0.02 : 0.08,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  panel.position.set(...position);
+  panel.rotation.x = -Math.PI / 2;
+  panel.renderOrder = 2;
+  panel.receiveShadow = true;
+  panel.name = 'office-inset-floor-panel-surface';
+  const rim = createBox(width + 0.08, 0.025, depth + 0.08, theme.scene.floorGrid, [position[0], position[1] - 0.006, position[2]], {
+    opacity: theme.mode === 'light' ? 0.18 : 0.34,
+    roughness: 0.72,
+  });
+  shadow.name = 'office-inset-floor-panel-shadow';
+  const frontGlow = createGlowBox(width * 0.88, 0.018, 0.045, theme.scene.zoneBorder, [position[0], position[1] + 0.055, position[2] - depth / 2 + 0.05], theme.mode === 'light' ? 0.18 : 0.32);
+  const sideGlow = createGlowBox(0.045, 0.018, depth * 0.82, theme.scene.screen, [position[0] - width / 2 + 0.05, position[1] + 0.055, position[2]], theme.mode === 'light' ? 0.16 : 0.28);
+  group.add(shadow, rim, panel, frontGlow, sideGlow);
   return group;
 }
 
@@ -240,7 +247,7 @@ function createFloorGrid(theme: OfficeTheme): THREE.Group {
   const material = new THREE.LineBasicMaterial({
     color: theme.scene.floorGrid,
     transparent: true,
-    opacity: theme.mode === 'light' ? 0.3 : 0.24,
+    opacity: theme.mode === 'light' ? 0.24 : 0.24,
   });
 
   for (let x = -9; x <= 9; x += 1) {
@@ -384,7 +391,7 @@ function createHitHint(theme: OfficeTheme): THREE.Sprite {
     ctx.font = '700 17px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('玩具光束枪', 130, 27);
+    ctx.fillText('诊断脉冲', 130, 27);
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -395,24 +402,24 @@ function createHitHint(theme: OfficeTheme): THREE.Sprite {
   return sprite;
 }
 
-function createBlasterGroup(theme: OfficeTheme): THREE.Group {
+function createDiagnosticPulseTool(theme: OfficeTheme): THREE.Group {
   const group = new THREE.Group();
-  group.name = 'office-toy-blaster';
+  group.name = 'office-diagnostic-pulse-tool';
   const receiver = createBox(0.36, 0.2, 0.52, theme.scene.trim, [0, 0, -0.04], { roughness: 0.28 });
-  receiver.name = 'office-toy-blaster-receiver';
+  receiver.name = 'office-diagnostic-pulse-receiver';
 
   const barrel = createCylinder(0.055, 0.075, 0.54, theme.scene.accent, [0, 0.035, -0.44], {
     radialSegments: 24,
     roughness: 0.18,
   });
-  barrel.name = 'office-toy-blaster-barrel';
+  barrel.name = 'office-diagnostic-pulse-emitter';
   barrel.rotation.x = Math.PI / 2;
 
   const muzzle = createCylinder(0.105, 0.13, 0.14, theme.scene.screen, [0, 0.035, -0.76], {
     radialSegments: 24,
     roughness: 0.16,
   });
-  muzzle.name = 'office-toy-blaster-muzzle';
+  muzzle.name = 'office-diagnostic-pulse-lens';
   muzzle.rotation.x = Math.PI / 2;
 
   const energyCell = createCylinder(0.07, 0.07, 0.42, '#22d3ee', [-0.2, -0.005, -0.05], {
@@ -420,18 +427,18 @@ function createBlasterGroup(theme: OfficeTheme): THREE.Group {
     opacity: 0.72,
     roughness: 0.12,
   });
-  energyCell.name = 'office-toy-blaster-energy-cell';
+  energyCell.name = 'office-diagnostic-pulse-core';
   energyCell.rotation.z = Math.PI / 2;
 
   const sight = createBox(0.18, 0.075, 0.22, theme.scene.screen, [0, 0.17, -0.24], { roughness: 0.2 });
-  sight.name = 'office-toy-blaster-sight';
+  sight.name = 'office-diagnostic-pulse-sight';
 
   const grip = createBox(0.14, 0.34, 0.14, theme.scene.desk, [0.075, -0.25, 0.13], { roughness: 0.42 });
-  grip.name = 'office-toy-blaster-grip';
+  grip.name = 'office-diagnostic-pulse-grip';
   grip.rotation.z = -0.18;
 
   const guard = createBox(0.24, 0.055, 0.24, theme.scene.zoneBorder, [0.005, -0.18, -0.05], { roughness: 0.24 });
-  guard.name = 'office-toy-blaster-trigger-guard';
+  guard.name = 'office-diagnostic-pulse-trigger-guard';
 
   group.add(receiver, barrel, muzzle, energyCell, sight, grip, guard);
   group.visible = false;
@@ -545,6 +552,106 @@ function createWallText(text: string, theme: OfficeTheme): THREE.Mesh {
   mesh.castShadow = false;
   mesh.receiveShadow = false;
   return mesh;
+}
+
+function createGlowBox(
+  width: number,
+  height: number,
+  depth: number,
+  color: string,
+  position: THREE.Vector3Tuple,
+  opacity = 0.52,
+): THREE.Mesh {
+  const material = new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+  mesh.position.set(...position);
+  mesh.renderOrder = 8;
+  return mesh;
+}
+
+function createWallLightStrip(
+  width: number,
+  color: string,
+  position: THREE.Vector3Tuple,
+  opacity: number,
+): THREE.Mesh {
+  return createGlowBox(width, 0.08, 0.035, color, position, opacity);
+}
+
+function createScreenGlowPanel(
+  width: number,
+  height: number,
+  position: THREE.Vector3Tuple,
+  theme: OfficeTheme,
+  opacity = 0.42,
+): THREE.Mesh {
+  return createGlowBox(width, height, 0.035, theme.scene.screen, position, opacity);
+}
+
+function createRoomWallBox(
+  width: number,
+  height: number,
+  depth: number,
+  color: string,
+  position: THREE.Vector3Tuple,
+  options: { opacity?: number; roughness?: number; metalness?: number } = {},
+): THREE.Mesh {
+  const mesh = createBox(width, height, depth, color, position, options);
+  mesh.castShadow = false;
+  return mesh;
+}
+
+function createOperationsFloorRoutes(theme: OfficeTheme): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'office-operations-floor-routes';
+
+  [
+    { width: 0.08, depth: 5.2, x: -1.0, z: 1.0, color: theme.scene.screen },
+    { width: 4.8, depth: 0.08, x: -3.3, z: 3.6, color: theme.scene.accent },
+    { width: 5.8, depth: 0.08, x: 2.1, z: 2.2, color: theme.scene.screen },
+    { width: 0.08, depth: 3.4, x: 4.95, z: 0.5, color: theme.scene.screen },
+    { width: 3.4, depth: 0.08, x: -2.9, z: -4.45, color: theme.scene.accent },
+  ].forEach((route) => {
+    group.add(createGlowBox(route.width, 0.026, route.depth, route.color, [route.x, 0.035, route.z], 0.38));
+  });
+
+  [
+    [-1.0, 3.6],
+    [-5.7, 3.6],
+    [4.95, 2.2],
+    [-1.25, -4.45],
+  ].forEach(([x, z], index) => {
+    const node = createCylinder(0.12, 0.12, 0.03, index % 2 === 0 ? theme.scene.screen : theme.scene.accent, [x, 0.065, z], {
+      radialSegments: 18,
+      opacity: 0.72,
+      roughness: 0.16,
+    });
+    node.name = 'office-operations-route-node';
+    node.rotation.x = Math.PI / 2;
+    group.add(node);
+  });
+
+  return group;
+}
+
+function createClawEmblem(theme: OfficeTheme): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'office-abstract-claw-emblem';
+
+  const left = createGlowBox(0.12, 0.82, 0.035, theme.scene.accent, [-1.68, 1.82, -6.14], 0.58);
+  left.rotation.z = -0.46;
+  const right = createGlowBox(0.12, 0.82, 0.035, theme.scene.accent, [-0.82, 1.82, -6.14], 0.58);
+  right.rotation.z = 0.46;
+  const core = createGlowBox(0.5, 0.1, 0.04, theme.scene.screen, [-1.25, 1.63, -6.13], 0.66);
+  group.add(left, right, core);
+
+  return group;
 }
 
 
@@ -755,20 +862,102 @@ function updateLoungeActivityProp(actor: ActorState, theme: OfficeTheme): void {
   }
 }
 
-function createRobot(agent: OfficeAgent, theme: OfficeTheme): ActorState {
+function createCrayfishSegment(
+  color: string,
+  position: THREE.Vector3Tuple,
+  scale: THREE.Vector3Tuple,
+): THREE.Mesh {
+  const segment = new THREE.Mesh(
+    new THREE.SphereGeometry(0.22, 18, 12),
+    new THREE.MeshStandardMaterial({
+      color,
+      roughness: 0.52,
+      metalness: 0.12,
+    }),
+  );
+  segment.name = 'office-crayfish-shell-segment';
+  segment.position.set(...position);
+  segment.scale.set(...scale);
+  segment.castShadow = true;
+  segment.receiveShadow = true;
+  return segment;
+}
+
+function createCrayfishShellMaterial(theme: OfficeTheme, color: string): THREE.MeshPhysicalMaterial {
+  return new THREE.MeshPhysicalMaterial({
+    color,
+    roughness: theme.mode === 'light' ? 0.28 : 0.38,
+    metalness: theme.mode === 'light' ? 0.08 : 0.14,
+    clearcoat: theme.mode === 'light' ? 0.72 : 0.46,
+    clearcoatRoughness: theme.mode === 'light' ? 0.18 : 0.28,
+    emissive: theme.mode === 'light' ? '#3b0b08' : '#7f1d1d',
+    emissiveIntensity: theme.mode === 'light' ? 0.02 : 0.12,
+  });
+}
+
+function createCrayfishAntenna(side: -1 | 1, color: string): THREE.Mesh {
+  const antenna = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.018, 0.38, 5, 8),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.48, metalness: 0.08 }),
+  );
+  antenna.name = side < 0 ? 'office-crayfish-left-antenna' : 'office-crayfish-right-antenna';
+  antenna.position.set(side * 0.13, 1.15, 0.18);
+  antenna.rotation.z = side * -0.42;
+  antenna.rotation.x = -0.58;
+  antenna.castShadow = true;
+  return antenna;
+}
+
+function createCrayfishClaw(side: -1 | 1, color: string, trimColor: string): THREE.Mesh {
+  const claw = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.05, 0.3, 5, 10),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.48, metalness: 0.12 }),
+  );
+  claw.name = side < 0 ? 'office-crayfish-left-claw-arm' : 'office-crayfish-right-claw-arm';
+  claw.position.set(side * 0.34, 0.55, 0.04);
+  claw.rotation.z = side * -0.36;
+  claw.castShadow = true;
+
+  const palm = new THREE.Mesh(
+    new THREE.SphereGeometry(0.13, 16, 10),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.44, metalness: 0.1 }),
+  );
+  palm.name = side < 0 ? 'office-crayfish-left-claw-palm' : 'office-crayfish-right-claw-palm';
+  palm.position.set(side * 0.08, 0.19, 0.05);
+  palm.scale.set(1.05, 0.78, 0.72);
+  palm.castShadow = true;
+  claw.add(palm);
+
+  const upperPincer = createCylinder(0.028, 0.04, 0.22, color, [side * 0.15, 0.27, 0.05], {
+    radialSegments: 12,
+    roughness: 0.42,
+  });
+  upperPincer.name = side < 0 ? 'office-crayfish-left-upper-pincer' : 'office-crayfish-right-upper-pincer';
+  upperPincer.rotation.z = side * 0.72;
+  upperPincer.rotation.x = Math.PI / 2;
+  claw.add(upperPincer);
+
+  const lowerPincer = createCylinder(0.024, 0.038, 0.18, trimColor, [side * 0.08, 0.28, 0.05], {
+    radialSegments: 12,
+    roughness: 0.42,
+  });
+  lowerPincer.name = side < 0 ? 'office-crayfish-left-lower-pincer' : 'office-crayfish-right-lower-pincer';
+  lowerPincer.rotation.z = side * -0.16;
+  lowerPincer.rotation.x = Math.PI / 2;
+  claw.add(lowerPincer);
+
+  return claw;
+}
+
+function createCrayfishOperator(agent: OfficeAgent, theme: OfficeTheme): ActorState {
   const group = new THREE.Group();
   group.position.set(agent.position.x, agent.position.y, agent.position.z);
 
-  const bodyMaterial = new THREE.MeshStandardMaterial({
-    color: agent.color,
-    roughness: 0.5,
-    metalness: 0.18,
-  });
-  const trimMaterial = new THREE.MeshStandardMaterial({
-    color: theme.scene.trim,
-    roughness: 0.45,
-    metalness: 0.12,
-  });
+  const shellColor = theme.mode === 'light' ? '#f04f3f' : '#ff5a43';
+  const shellDark = theme.mode === 'light' ? '#ba2f25' : '#c73a2f';
+  const shellHighlight = theme.mode === 'light' ? '#ff7664' : '#ff7a63';
+  const bodyMaterial = createCrayfishShellMaterial(theme, shellColor);
+  const trimMaterial = createCrayfishShellMaterial(theme, shellHighlight);
   const faceMaterial = new THREE.MeshStandardMaterial({
     color: theme.scene.face,
     emissive: agent.behavior === 'stuck' ? '#ef4444' : '#22d3ee',
@@ -776,37 +965,86 @@ function createRobot(agent: OfficeAgent, theme: OfficeTheme): ActorState {
     roughness: 0.35,
   });
 
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.24, 0.3, 6, 12), bodyMaterial);
-  body.position.y = 0.42;
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.33, 22, 14), bodyMaterial);
+  body.name = 'office-crayfish-operator-body';
+  body.position.y = 0.55;
+  body.scale.set(1.02, 0.84, 0.76);
   body.castShadow = true;
   group.add(body);
 
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 20, 14), trimMaterial);
-  head.position.y = 0.88;
-  head.scale.set(1.08, 0.82, 0.88);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 20, 14), trimMaterial);
+  head.name = 'office-crayfish-operator-head';
+  head.position.y = 0.94;
+  head.scale.set(1.16, 0.86, 0.92);
   head.castShadow = true;
   group.add(head);
 
-  const face = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.14, 0.03), faceMaterial);
-  face.position.set(0, 0.89, 0.24);
+  const face = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.105, 0.032), faceMaterial);
+  face.name = 'office-crayfish-status-face';
+  face.position.set(0, 0.94, 0.225);
   face.castShadow = false;
   group.add(face);
 
-  const leftEye = createBox(0.048, 0.03, 0.018, '#bbf7d0', [-0.09, 0.9, 0.27], { roughness: 0.25 });
-  const rightEye = createBox(0.048, 0.03, 0.018, '#bbf7d0', [0.09, 0.9, 0.27], { roughness: 0.25 });
+  const leftEye = createBox(0.04, 0.024, 0.018, '#bbf7d0', [-0.075, 0.95, 0.252], { roughness: 0.25 });
+  const rightEye = createBox(0.04, 0.024, 0.018, '#bbf7d0', [0.075, 0.95, 0.252], { roughness: 0.25 });
   group.add(leftEye, rightEye);
 
-  const leftArm = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.26, 4, 8), trimMaterial);
-  leftArm.position.set(-0.29, 0.5, 0);
-  leftArm.rotation.z = 0.28;
-  leftArm.castShadow = true;
+  const terminalPanel = createBox(0.34, 0.18, 0.035, theme.scene.screen, [0, 0.57, 0.265], {
+    roughness: 0.18,
+  });
+  terminalPanel.name = 'office-crayfish-terminal-panel';
+  group.add(terminalPanel);
+
+  const terminalPrompt = createBox(0.11, 0.025, 0.018, '#22d3ee', [-0.06, 0.59, 0.292], {
+    roughness: 0.15,
+  });
+  terminalPrompt.name = 'office-crayfish-terminal-prompt';
+  group.add(terminalPrompt);
+
+  const tailSegments = [
+    createCrayfishSegment(shellDark, [0, 0.36, -0.26], [1.14, 0.55, 0.62]),
+    createCrayfishSegment(shellColor, [0, 0.3, -0.43], [0.98, 0.48, 0.54]),
+    createCrayfishSegment(shellDark, [0, 0.25, -0.58], [0.82, 0.4, 0.46]),
+  ];
+  group.add(...tailSegments);
+
+  const leftAntenna = createCrayfishAntenna(-1, shellDark);
+  const rightAntenna = createCrayfishAntenna(1, shellDark);
+  group.add(leftAntenna, rightAntenna);
+
+  const leftArm = createCrayfishClaw(-1, shellColor, shellHighlight);
   group.add(leftArm);
 
-  const rightArm = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.26, 4, 8), trimMaterial);
-  rightArm.position.set(0.29, 0.5, 0);
-  rightArm.rotation.z = -0.28;
-  rightArm.castShadow = true;
+  const rightArm = createCrayfishClaw(1, shellColor, shellHighlight);
   group.add(rightArm);
+
+  [-0.24, -0.08, 0.08, 0.24].forEach((x, index) => {
+    const leftLeg = createCylinder(0.018, 0.014, 0.2, shellDark, [x - 0.12, 0.25, -0.02 - index * 0.055], {
+      radialSegments: 8,
+      roughness: 0.55,
+    });
+    leftLeg.name = 'office-crayfish-left-walking-leg';
+    leftLeg.rotation.z = 0.78;
+    leftLeg.rotation.x = Math.PI / 2;
+    group.add(leftLeg);
+
+    const rightLeg = createCylinder(0.018, 0.014, 0.2, shellDark, [x + 0.12, 0.25, -0.02 - index * 0.055], {
+      radialSegments: 8,
+      roughness: 0.55,
+    });
+    rightLeg.name = 'office-crayfish-right-walking-leg';
+    rightLeg.rotation.z = -0.78;
+    rightLeg.rotation.x = Math.PI / 2;
+    group.add(rightLeg);
+  });
+
+  const statusBadge = createCylinder(0.038, 0.038, 0.018, agent.color, [0.2, 0.72, 0.235], {
+    radialSegments: 16,
+    roughness: 0.2,
+  });
+  statusBadge.name = 'office-crayfish-agent-status-badge';
+  statusBadge.rotation.x = Math.PI / 2;
+  group.add(statusBadge);
 
   const label = createLabel(agent.name, agent.color, theme);
   group.add(label);
@@ -852,19 +1090,25 @@ function createDesk(x: number, z: number, theme: OfficeTheme): THREE.Group {
   desk.add(createBox(1.15, 0.12, 0.68, theme.scene.desk, [x, 0.31, z]));
   desk.add(createBox(0.68, 0.34, 0.06, theme.scene.screen, [x, 0.6, z - 0.29]));
   desk.add(createBox(0.56, 0.03, 0.04, theme.scene.accent, [x, 0.61, z - 0.325], { roughness: 0.2 }));
+  desk.add(createGlowBox(0.42, 0.03, 0.035, '#22d3ee', [x - 0.04, 0.69, z - 0.332], 0.42));
+  desk.add(createGlowBox(0.18, 0.03, 0.035, theme.scene.accent, [x + 0.28, 0.76, z - 0.332], 0.5));
   return desk;
 }
 
 function createRoomShell(scene: THREE.Scene, theme: OfficeTheme, companyName: string): void {
-  scene.add(createBox(20.2, 2.4, 0.16, theme.scene.wall, [0, 1.16, 7.4], { roughness: 0.88 }));
-  scene.add(createBox(0.16, 2.15, 14.0, theme.scene.wall, [-10, 1.02, 0.45], { roughness: 0.88 }));
-  scene.add(createBox(0.16, 2.15, 14.0, theme.scene.wall, [10, 1.02, 0.45], { roughness: 0.88 }));
-  scene.add(createBox(7.4, 2.15, 0.16, theme.scene.wall, [-1.25, 1.08, -6.3], { roughness: 0.88 }));
+  scene.add(createRoomWallBox(20.2, 2.4, 0.16, theme.scene.wall, [0, 1.16, 7.4], { roughness: 0.68 }));
+  scene.add(createRoomWallBox(0.16, 2.15, 14.0, theme.scene.wall, [-10, 1.02, 0.45], { roughness: 0.68 }));
+  scene.add(createRoomWallBox(0.16, 2.15, 14.0, theme.scene.wall, [10, 1.02, 0.45], { roughness: 0.68 }));
+  scene.add(createRoomWallBox(7.4, 2.15, 0.16, theme.scene.wall, [-1.25, 1.08, -6.3], { roughness: 0.68 }));
+  scene.add(createWallLightStrip(18.6, theme.scene.screen, [0, 0.58, 7.29], theme.mode === 'light' ? 0.18 : 0.34));
+  scene.add(createGlowBox(0.035, 0.08, 11.8, theme.scene.screen, [-9.91, 0.5, 0.7], 0.22));
+  scene.add(createGlowBox(0.035, 0.08, 11.8, theme.scene.accent, [9.91, 0.5, 0.7], 0.18));
   const companySign = createWallText(companyName, theme);
   companySign.position.set(-1.25, 1.82, -6.18);
   scene.add(companySign);
-  scene.add(createBox(4.2, 0.16, 0.18, theme.scene.zoneBorder, [-7.4, 2.2, 7.32], { opacity: 0.35 }));
-  scene.add(createBox(4.2, 0.16, 0.18, theme.scene.zoneBorder, [2.2, 2.2, 7.32], { opacity: 0.35 }));
+  scene.add(createClawEmblem(theme));
+  scene.add(createGlowBox(4.2, 0.16, 0.035, theme.scene.zoneBorder, [-7.4, 2.2, 7.28], 0.36));
+  scene.add(createGlowBox(4.2, 0.16, 0.035, theme.scene.zoneBorder, [2.2, 2.2, 7.28], 0.36));
 
   const windowMaterialColor = theme.mode === 'light' ? '#93c5fd' : '#38bdf8';
   scene.add(createBox(2.7, 0.85, 0.035, windowMaterialColor, [-6.2, 1.25, 7.25], { opacity: 0.42, roughness: 0.2 }));
@@ -904,8 +1148,8 @@ function createShelf(x: number, z: number, theme: OfficeTheme): THREE.Group {
 
 function createSofa(x: number, z: number, theme: OfficeTheme): THREE.Group {
   const sofa = new THREE.Group();
-  const upholstery = theme.mode === 'light' ? '#a78bfa' : '#6d28d9';
-  const cushion = theme.mode === 'light' ? '#ede9fe' : '#4c1d95';
+  const upholstery = theme.mode === 'light' ? '#7c554f' : '#6d3d38';
+  const cushion = theme.mode === 'light' ? '#ffe4d6' : '#9f594f';
   sofa.add(createBox(2.65, 0.28, 0.72, upholstery, [x, 0.28, z], { roughness: 0.78 }));
   sofa.add(createBox(2.65, 0.62, 0.18, upholstery, [x, 0.58, z + 0.36], { roughness: 0.78 }));
   sofa.add(createBox(0.16, 0.46, 0.76, upholstery, [x - 1.42, 0.42, z], { roughness: 0.78 }));
@@ -918,8 +1162,8 @@ function createSofa(x: number, z: number, theme: OfficeTheme): THREE.Group {
 
 function createArmchair(x: number, z: number, theme: OfficeTheme): THREE.Group {
   const chair = new THREE.Group();
-  const color = theme.mode === 'light' ? '#bae6fd' : '#0e7490';
-  const cushion = theme.mode === 'light' ? '#f0f9ff' : '#164e63';
+  const color = theme.mode === 'light' ? '#93c5cf' : '#0e7490';
+  const cushion = theme.mode === 'light' ? '#d8f7fb' : '#164e63';
   chair.add(createBox(0.78, 0.26, 0.76, color, [x, 0.25, z], { roughness: 0.78 }));
   chair.add(createBox(0.78, 0.58, 0.16, color, [x, 0.52, z + 0.36], { roughness: 0.78 }));
   chair.add(createBox(0.13, 0.38, 0.76, color, [x - 0.46, 0.38, z], { roughness: 0.78 }));
@@ -975,7 +1219,8 @@ function createFloorLamp(x: number, z: number, theme: OfficeTheme): THREE.Group 
 }
 
 function createLoungeProps(scene: THREE.Scene, theme: OfficeTheme): void {
-  scene.add(createBox(4.9, 0.05, 3.2, theme.scene.lounge, [-7.0, 0.075, 3.6], { opacity: 0.24, roughness: 0.82 }));
+  scene.add(createGlowBox(4.6, 0.024, 0.06, theme.scene.accent, [-7.0, 0.13, 1.98], 0.26));
+  scene.add(createGlowBox(0.06, 0.024, 3.0, theme.scene.screen, [-9.42, 0.13, 3.55], 0.22));
   scene.add(createSofa(-7.15, 5.82, theme));
   scene.add(createArmchair(-8.55, 3.35, theme));
   scene.add(createArmchair(-5.45, 3.1, theme));
@@ -994,26 +1239,89 @@ function createLoungeProps(scene: THREE.Scene, theme: OfficeTheme): void {
 function createReception(theme: OfficeTheme): THREE.Group {
   const group = new THREE.Group();
   group.add(createBox(2.2, 0.44, 0.88, theme.scene.desk, [-1.25, 0.25, -4.8]));
-  group.add(createBox(1.45, 0.08, 0.1, theme.scene.accent, [-1.25, 0.55, -5.25], { roughness: 0.2 }));
+  group.add(createGlowBox(1.45, 0.08, 0.04, theme.scene.accent, [-1.25, 0.55, -5.25], 0.58));
   group.add(createBox(1.1, 0.28, 0.08, theme.scene.screen, [-1.25, 0.74, -4.44], { roughness: 0.24 }));
+  group.add(createScreenGlowPanel(0.96, 0.2, [-1.25, 0.74, -4.49], theme, theme.mode === 'light' ? 0.28 : 0.42));
   group.add(createHitBox(3.2, 2.0, 2.4, [-1.25, 1.0, -4.35]));
   markOfficeAction(group, 'reception');
   return group;
 }
 
+function createTaskFlowSandTable(theme: OfficeTheme): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'office-task-flow-sand-table';
+
+  const tableTop = createCylinder(1.28, 1.38, 0.12, theme.scene.desk, [-1.0, 0.52, 3.55], {
+    radialSegments: 6,
+    roughness: 0.36,
+  });
+  tableTop.name = 'office-task-flow-sand-table-top';
+  tableTop.rotation.y = Math.PI / 6;
+  group.add(tableTop);
+  const underGlow = createGlowBox(2.05, 0.035, 1.72, theme.scene.accent, [-1.0, 0.46, 3.55], 0.22);
+  underGlow.rotation.y = Math.PI / 6;
+  group.add(underGlow);
+
+  const nodePositions: THREE.Vector3Tuple[] = [
+    [-1.72, 0.82, 3.02],
+    [-0.98, 1.15, 3.48],
+    [-0.26, 0.86, 4.06],
+    [-1.35, 1.35, 4.18],
+    [-0.52, 1.42, 3.18],
+  ];
+  const points = nodePositions.map((position, index) => {
+    const node = createCylinder(0.13, 0.13, 0.04, index === 1 ? theme.scene.accent : theme.scene.screen, position, {
+      radialSegments: 18,
+      opacity: 0.88,
+      roughness: 0.18,
+    });
+    node.name = 'office-task-flow-node';
+    node.rotation.x = Math.PI / 2;
+    group.add(node);
+    return new THREE.Vector3(...position);
+  });
+
+  const lineMaterial = new THREE.LineBasicMaterial({
+    color: theme.scene.screen,
+    transparent: true,
+    opacity: 0.72,
+  });
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([points[index], points[index + 1]]), lineMaterial);
+    line.name = 'office-task-flow-route';
+    group.add(line);
+  }
+
+  const halo = new THREE.Mesh(
+    new THREE.TorusGeometry(1.08, 0.018, 8, 72),
+    new THREE.MeshBasicMaterial({
+      color: theme.scene.screen,
+      transparent: true,
+      opacity: 0.38,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }),
+  );
+  halo.name = 'office-task-flow-hologram-ring';
+  halo.position.set(-1.0, 0.82, 3.55);
+  halo.rotation.x = Math.PI / 2;
+  group.add(halo);
+
+  return group;
+}
+
 function createOfficeProps(scene: THREE.Scene, theme: OfficeTheme, companyName: string): void {
   createRoomShell(scene, theme, companyName);
-  scene.add(createZoneGroup(5.6, 5.2, theme.scene.lounge, [-7.0, 0.03, 3.8], theme));
-  scene.add(createZoneGroup(5.8, 5.8, theme.scene.work, [6.1, 0.035, 3.0], theme));
-  scene.add(createZoneGroup(5.7, 5.2, theme.scene.meeting, [-1.0, 0.04, 3.9], theme));
+  scene.add(createInsetFloorPanel(5.6, 5.2, theme.scene.lounge, [-7.0, 0.03, 3.8], theme));
+  scene.add(createInsetFloorPanel(5.8, 5.8, theme.scene.work, [6.1, 0.035, 3.0], theme));
+  scene.add(createInsetFloorPanel(5.7, 5.2, theme.scene.meeting, [-1.0, 0.04, 3.9], theme));
+  scene.add(createOperationsFloorRoutes(theme));
   scene.add(createReception(theme));
   createLoungeProps(scene, theme);
 
-  [-2.25, -1.0, 0.25].forEach((x) => {
-    scene.add(createBox(1.05, 0.14, 1.0, theme.scene.desk, [x, 0.31, 3.5]));
-  });
+  scene.add(createTaskFlowSandTable(theme));
   scene.add(createBox(1.55, 1.12, 0.08, theme.scene.wall, [1.9, 0.88, 6.25]));
-  scene.add(createBox(1.15, 0.04, 0.03, theme.scene.meeting, [1.9, 1.08, 6.3], { roughness: 0.22 }));
+  scene.add(createGlowBox(1.15, 0.04, 0.03, theme.scene.meeting, [1.9, 1.08, 6.3], 0.46));
 
   [
     [5.0, 0.45],
@@ -1029,9 +1337,9 @@ function createOfficeProps(scene: THREE.Scene, theme: OfficeTheme, companyName: 
   scene.add(createPlant(8.8, 6.4, theme));
   scene.add(createShelf(-9.88, 0.5, theme));
   scene.add(createShelf(9.88, -0.9, theme));
-  scene.add(createBox(1.8, 0.04, 1.2, theme.scene.accent, [2.4, 0.04, -4.7], { opacity: 0.32 }));
-  scene.add(createBox(0.85, 0.08, 0.18, theme.scene.meeting, [0.9, 1.92, 7.18], { opacity: 0.7 }));
-  scene.add(createBox(0.85, 0.08, 0.18, theme.scene.work, [6.2, 1.92, 7.18], { opacity: 0.7 }));
+  scene.add(createBox(1.8, 0.04, 1.2, theme.scene.accent, [2.4, 0.04, -4.7], { opacity: 0.2 }));
+  scene.add(createGlowBox(0.85, 0.08, 0.05, theme.scene.meeting, [0.9, 1.92, 7.12], 0.58));
+  scene.add(createGlowBox(0.85, 0.08, 0.05, theme.scene.work, [6.2, 1.92, 7.12], 0.58));
 }
 
 function createScene(container: HTMLDivElement, theme: OfficeTheme, companyName: string): SceneState {
@@ -1055,14 +1363,26 @@ function createScene(container: HTMLDivElement, theme: OfficeTheme, companyName:
   const thirdPersonCamera = new THREE.OrthographicCamera(-7, 7, 5, -5, 0.1, 120);
   const firstPersonCamera = new THREE.PerspectiveCamera(64, 1, 0.05, 90);
 
-  const ambient = new THREE.AmbientLight(theme.mode === 'light' ? '#ffffff' : '#dbeafe', theme.mode === 'light' ? 1.8 : 1.4);
+  const ambient = new THREE.AmbientLight(theme.mode === 'light' ? '#c7d2fe' : '#dbeafe', theme.mode === 'light' ? 1.05 : 1.4);
   scene.add(ambient);
 
-  const keyLight = new THREE.DirectionalLight('#ffffff', 2.5);
+  const keyLight = new THREE.DirectionalLight('#fff3e8', 2.85);
   keyLight.position.set(5, 8, 6);
   keyLight.castShadow = true;
   keyLight.shadow.mapSize.set(2048, 2048);
   scene.add(keyLight);
+
+  const taskLight = new THREE.PointLight('#22d3ee', theme.mode === 'light' ? 1.55 : 1.5, 8);
+  taskLight.position.set(-1.0, 2.0, 3.55);
+  scene.add(taskLight);
+
+  const coralLight = new THREE.PointLight('#ff6b4a', theme.mode === 'light' ? 1.15 : 1.05, 9);
+  coralLight.position.set(-1.3, 1.8, -4.8);
+  scene.add(coralLight);
+
+  const workLight = new THREE.PointLight('#22c7d8', theme.mode === 'light' ? 0.85 : 0.9, 8);
+  workLight.position.set(6.1, 1.8, 2.7);
+  scene.add(workLight);
 
   const floor = createBox(20.0, 0.1, 14.0, theme.scene.floor, [0, -0.05, 0.7], { roughness: 0.9 });
   floor.receiveShadow = true;
@@ -1088,7 +1408,7 @@ function createScene(container: HTMLDivElement, theme: OfficeTheme, companyName:
     interactRing: null as unknown as THREE.Mesh | null,
     bodyGlow: null as unknown as THREE.Mesh | null,
     weaponMode: 'hands' as OfficeWeaponMode,
-    blasterGroup: null as THREE.Group | null,
+    diagnosticPulseTool: null as THREE.Group | null,
     crosshair: null as THREE.Sprite | null,
     shotBeam: null as THREE.Line | null,
     shotTracer: null as THREE.Line | null,
@@ -1104,12 +1424,13 @@ function createScene(container: HTMLDivElement, theme: OfficeTheme, companyName:
     pressedKeys: new Set<string>(),
     middleDrag: { active: false, lastX: 0, lastY: 0 },
     leftDrag: { active: false, lastX: 0, lastY: 0 },
+    autoFireTimer: null as number | null,
     frame: 0,
     lastTime: performance.now(),
   };
   applyCameraControl(state, container);
   // Create NPC actors + visual aids (interact ring/glow/prompt)
-  const receptionActor = createRobot({
+  const receptionActor = createCrayfishOperator({
     agentId: 'office-receptionist', name: '\u524d\u53f0', status: 'online', zone: 'lounge',
     behavior: 'listening', color: theme.scene.accent,
     position: { x: -1.25, y: OFFICE_AGENT_GROUND_Y, z: -5.3 },
@@ -1119,7 +1440,7 @@ function createScene(container: HTMLDivElement, theme: OfficeTheme, companyName:
   state.actors.set('office-receptionist', receptionActor);
   scene.add(receptionActor.group);
 
-  const cleanerActor = createRobot({
+  const cleanerActor = createCrayfishOperator({
     agentId: 'office-cleaner', name: '\u6e05\u6d01\u5de5', status: 'online', zone: 'lounge',
     behavior: 'resting', color: '#60a5fa',
     position: { x: -8.0, y: OFFICE_AGENT_GROUND_Y, z: 4.5 },
@@ -1162,12 +1483,12 @@ function createScene(container: HTMLDivElement, theme: OfficeTheme, companyName:
   overlayScene.add(hitHint);
   state.hitHint = hitHint;
 
-  const blaster = createBlasterGroup(theme);
-  firstPersonCamera.add(blaster);
-  blaster.position.set(0.42, -0.34, -0.78);
-  blaster.rotation.set(-0.08, -0.18, 0.04);
+  const diagnosticTool = createDiagnosticPulseTool(theme);
+  firstPersonCamera.add(diagnosticTool);
+  diagnosticTool.position.set(0.42, -0.34, -0.78);
+  diagnosticTool.rotation.set(-0.08, -0.18, 0.04);
   scene.add(firstPersonCamera);
-  state.blasterGroup = blaster;
+  state.diagnosticPulseTool = diagnosticTool;
 
   return state;
 }
@@ -1190,7 +1511,7 @@ function updateShieldBar(actor: ActorState, now: number): void {
 }
 
 function updateWeaponHud(state: SceneState): void {
-  const armed = state.cameraMode === 'first-person' && state.weaponMode === 'toy-blaster';
+  const armed = state.cameraMode === 'first-person' && state.weaponMode === 'diagnostic-pulse';
   if (state.crosshair) {
     state.crosshair.visible = armed;
     state.crosshair.position.set(state.overlayCamera.right / 2, state.overlayCamera.top / 2, 0);
@@ -1199,14 +1520,17 @@ function updateWeaponHud(state: SceneState): void {
     state.hitHint.visible = armed;
     state.hitHint.position.set(state.overlayCamera.right - 150, state.overlayCamera.top - 46, 0);
   }
-  if (state.blasterGroup) {
-    state.blasterGroup.visible = armed;
+  if (state.diagnosticPulseTool) {
+    state.diagnosticPulseTool.visible = armed;
   }
 }
 
 function toggleOfficeWeaponMode(state: SceneState): void {
   if (state.cameraMode !== 'first-person') return;
-  state.weaponMode = state.weaponMode === 'toy-blaster' ? 'hands' : 'toy-blaster';
+  state.weaponMode = state.weaponMode === 'diagnostic-pulse' ? 'hands' : 'diagnostic-pulse';
+  if (state.weaponMode !== 'diagnostic-pulse') {
+    stopOfficeAutoFire(state);
+  }
   updateWeaponHud(state);
 }
 
@@ -1253,21 +1577,21 @@ function showShotBeam(state: SceneState, start: THREE.Vector3, end: THREE.Vector
 }
 
 function handleOfficeShot(state: SceneState, container: HTMLDivElement): boolean {
-  if (state.cameraMode !== 'first-person' || state.weaponMode !== 'toy-blaster') return false;
+  if (state.cameraMode !== 'first-person' || state.weaponMode !== 'diagnostic-pulse') return false;
 
   const controlledActor = state.controlledAgentId ? state.actors.get(state.controlledAgentId) : null;
-  if (!canUseOfficeBlaster(controlledActor)) {
+  if (!canUseOfficeDiagnosticPulse(controlledActor)) {
     updateWeaponHud(state);
     return true;
   }
 
   const now = performance.now();
-  playOfficeBlasterShotAudio();
+  playOfficeDiagnosticPulseAudio();
   state.raycaster.setFromCamera(new THREE.Vector2(0, 0), state.firstPersonCamera);
   const origin = state.firstPersonCamera.position.clone();
-  state.blasterGroup?.updateWorldMatrix(true, false);
-  const shotStart = state.blasterGroup
-    ? state.blasterGroup.localToWorld(new THREE.Vector3(0, 0.035, -0.86))
+  state.diagnosticPulseTool?.updateWorldMatrix(true, false);
+  const shotStart = state.diagnosticPulseTool
+    ? state.diagnosticPulseTool.localToWorld(new THREE.Vector3(0, 0.035, -0.86))
     : origin;
   const fallbackEnd = origin.clone().add(state.raycaster.ray.direction.clone().multiplyScalar(8));
   const hits = state.raycaster.intersectObjects(state.scene.children, true);
@@ -1279,10 +1603,10 @@ function handleOfficeShot(state: SceneState, container: HTMLDivElement): boolean
   const end = hit?.point ?? fallbackEnd;
 
   if (theme) showShotBeam(state, shotStart, end, theme, now);
-  if (state.blasterGroup) {
-    state.blasterGroup.position.z = -0.84;
+  if (state.diagnosticPulseTool) {
+    state.diagnosticPulseTool.position.z = -0.84;
     setTimeout(() => {
-      if (state.blasterGroup) state.blasterGroup.position.z = -0.78;
+      if (state.diagnosticPulseTool) state.diagnosticPulseTool.position.z = -0.78;
     }, 90);
   }
 
@@ -1313,6 +1637,27 @@ function handleOfficeShot(state: SceneState, container: HTMLDivElement): boolean
   container.dataset.officeLastShotTarget = agentId;
   container.dataset.officeLastShotEvent = result.event;
   return true;
+}
+
+function stopOfficeAutoFire(state: SceneState): void {
+  if (state.autoFireTimer === null) return;
+
+  window.clearInterval(state.autoFireTimer);
+  state.autoFireTimer = null;
+}
+
+function startOfficeAutoFire(state: SceneState, container: HTMLDivElement): void {
+  if (state.autoFireTimer !== null) return;
+
+  const actor = state.controlledAgentId ? state.actors.get(state.controlledAgentId) : null;
+  if (!canUseOfficeDiagnosticPulse(actor)) return;
+
+  state.autoFireTimer = window.setInterval(() => {
+    const currentActor = state.controlledAgentId ? state.actors.get(state.controlledAgentId) : null;
+    if (!canUseOfficeDiagnosticPulse(currentActor) || !handleOfficeShot(state, container)) {
+      stopOfficeAutoFire(state);
+    }
+  }, OFFICE_DIAGNOSTIC_PULSE_AUTO_FIRE_MS);
 }
 
 function resizeScene(state: SceneState, container: HTMLDivElement): void {
@@ -1521,7 +1866,7 @@ function updateActors(state: SceneState, agents: OfficeAgent[], theme: OfficeThe
       return;
     }
 
-    const actor = createRobot(agent, theme);
+    const actor = createCrayfishOperator(agent, theme);
     state.actors.set(agent.agentId, actor);
     state.scene.add(actor.group);
   });
@@ -1893,8 +2238,12 @@ export default function OfficeScene({
       resizeObserver.observe(container);
 
       const showBubble = () => { const r = state.actors.get('office-receptionist'); if (r) showSpeechBubble(state.scene, receptionInfoRef.current || '\u6b22\u8fce\uff01', themeRef.current, new THREE.Vector3(r.group.position.x, r.group.position.y + 1.8, r.group.position.z)); else showReceptionBubble(state, receptionInfoRef.current || '\u6b22\u8fce\uff01', themeRef.current); };
+      const stopAutoFire = () => stopOfficeAutoFire(state);
       const onPointerDown = (event: PointerEvent) => {
         if (event.button === 0 && handleOfficeShot(state, container)) {
+          if (shouldStartDiagnosticPulseAutoFire(event.button, state.cameraMode, state.weaponMode)) {
+            startOfficeAutoFire(state, container);
+          }
           event.preventDefault();
           return;
         }
@@ -1903,7 +2252,7 @@ export default function OfficeScene({
       const onMouseDown = (event: MouseEvent) => {
         event.preventDefault();
         container.focus();
-        if (shouldSkipBlasterMouseDown(event.button, state.cameraMode, state.weaponMode)) {
+        if (shouldSkipDiagnosticPulseMouseDown(event.button, state.cameraMode, state.weaponMode)) {
           return;
         }
         if (event.button === 1) {
@@ -1988,6 +2337,7 @@ export default function OfficeScene({
         }
         if (key === 'v') {
           event.preventDefault();
+          stopOfficeAutoFire(state);
           selectedRef.current = null;
           onSelectRef.current(null);
           document.exitPointerLock();
@@ -2009,6 +2359,7 @@ export default function OfficeScene({
             selectedRef.current = null;
             onSelectRef.current(null);
           }
+          stopOfficeAutoFire(state);
           resetCameraControl(state, container);
           return;
         }
@@ -2041,6 +2392,7 @@ export default function OfficeScene({
         }
         if (event.key.toLowerCase() === 'v') {
           event.preventDefault();
+          stopOfficeAutoFire(state);
           selectedRef.current = null;
           onSelectRef.current(null);
           resetCameraControl(state, container);
@@ -2048,15 +2400,19 @@ export default function OfficeScene({
       };
 
       container.addEventListener('pointerdown', onPointerDown);
+      container.addEventListener('pointerup', stopAutoFire);
+      container.addEventListener('pointercancel', stopAutoFire);
       container.addEventListener('mousedown', onMouseDown);
       container.addEventListener('mousemove', onMouseMove);
       container.addEventListener('mouseup', stopDrag);
       container.addEventListener('mouseleave', stopDrag);
+      container.addEventListener('mouseleave', stopAutoFire);
       container.addEventListener('wheel', onWheel, { passive: false });
       container.addEventListener('keydown', onKeyDown);
       container.addEventListener('keyup', onKeyUp);
       window.addEventListener('keydown', onWindowKeyDown);
       window.addEventListener('mouseup', stopDrag);
+      window.addEventListener('blur', stopAutoFire);
 
       const render = (now: number) => {
         if (disposed) return;
@@ -2189,17 +2545,22 @@ export default function OfficeScene({
 
       return () => {
         disposed = true;
+        stopOfficeAutoFire(state);
         resizeObserver.disconnect();
         container.removeEventListener('pointerdown', onPointerDown);
+        container.removeEventListener('pointerup', stopAutoFire);
+        container.removeEventListener('pointercancel', stopAutoFire);
         container.removeEventListener('mousedown', onMouseDown);
         container.removeEventListener('mousemove', onMouseMove);
         container.removeEventListener('mouseup', stopDrag);
         container.removeEventListener('mouseleave', stopDrag);
+        container.removeEventListener('mouseleave', stopAutoFire);
         container.removeEventListener('wheel', onWheel);
         container.removeEventListener('keydown', onKeyDown);
         container.removeEventListener('keyup', onKeyUp);
         window.removeEventListener('keydown', onWindowKeyDown);
         window.removeEventListener('mouseup', stopDrag);
+        window.removeEventListener('blur', stopAutoFire);
         window.cancelAnimationFrame(state.frame);
         disposeShotEffects(state);
         state.renderer.dispose();

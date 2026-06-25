@@ -43,6 +43,9 @@ interface Window {
         isEmpty: boolean;
         hasRequiredTemplate: boolean;
         permissionDenied: boolean;
+        detectedProfile?: string;
+        suggestedPaths?: Partial<import('./lib/agentic-repository').RepositoryPaths>;
+        suggestedKnowledge?: Partial<import('./lib/agentic-repository').KnowledgeRepositoryMapping>;
       }>;
       bootstrap: (repoPath: string) => Promise<{
         pathExists: boolean;
@@ -51,6 +54,9 @@ interface Window {
         isEmpty: boolean;
         hasRequiredTemplate: boolean;
         permissionDenied: boolean;
+        detectedProfile?: string;
+        suggestedPaths?: Partial<import('./lib/agentic-repository').RepositoryPaths>;
+        suggestedKnowledge?: Partial<import('./lib/agentic-repository').KnowledgeRepositoryMapping>;
       }>;
       init?: (repoPath: string) => Promise<{
         pathExists: boolean;
@@ -59,13 +65,18 @@ interface Window {
         isEmpty: boolean;
         hasRequiredTemplate: boolean;
         permissionDenied: boolean;
+        detectedProfile?: string;
+        suggestedPaths?: Partial<import('./lib/agentic-repository').RepositoryPaths>;
+        suggestedKnowledge?: Partial<import('./lib/agentic-repository').KnowledgeRepositoryMapping>;
       }>;
+      listTree?: (repoPath: string, maxEntries?: number) => Promise<string[]>;
       listMarkdown?: (repoPath: string, directory: string) => Promise<import('./lib/repository-knowledge').RepositoryMarkdownFile[]>;
       readText?: (repoPath: string, relativePath: string) => Promise<string>;
       writeText?: (repoPath: string, relativePath: string, content: string) => Promise<void>;
       search?: (repoPath: string, query: string, directories: string[]) => Promise<import('./lib/repository-knowledge').RepositorySearchResult[]>;
       gitStatus?: (repoPath: string) => Promise<string>;
       gitDiff?: (repoPath: string) => Promise<string>;
+      gitLog?: (repoPath: string, relativePath: string, limit?: number) => Promise<import('./lib/repository-knowledge').RepositoryGitLogEntry[]>;
       gitCommit?: (repoPath: string, message: string) => Promise<string>;
     };
     device: {

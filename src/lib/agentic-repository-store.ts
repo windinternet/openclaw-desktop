@@ -4,7 +4,9 @@ import {
   getRepositoryGateStatus,
   normalizeRepositoryBinding,
   type RepositoryBinding,
+  type KnowledgeRepositoryMapping,
   type RepositoryLocation,
+  type RepositoryPaths,
   type RepositoryStatus,
 } from './agentic-repository';
 import { loadInstanceData, saveInstanceDataAwaited } from './local-persistence';
@@ -17,6 +19,9 @@ export interface RepositoryInspectDetails {
   isEmpty?: boolean;
   hasRequiredTemplate?: boolean;
   permissionDenied?: boolean;
+  detectedProfile?: string;
+  suggestedPaths?: Partial<RepositoryPaths>;
+  suggestedKnowledge?: Partial<KnowledgeRepositoryMapping>;
 }
 
 export interface RepositoryInspectResult {
@@ -95,14 +100,15 @@ export async function inspectRepositoryBinding(
 
   const gitAvailable = await repository.checkGit();
   const details = await repository.inspect(binding.repoPath);
+  const adaptedBinding = applyRepositoryInspectionProfile(binding, details);
   const status = getRepositoryGateStatus({
-    binding,
+    binding: adaptedBinding,
     gitAvailable,
     ...details,
   });
 
   return {
-    binding: { ...binding, status },
+    binding: { ...adaptedBinding, status },
     status,
     details,
   };
@@ -125,5 +131,24 @@ export async function bootstrapRepositoryBinding(binding: RepositoryBinding): Pr
     binding: { ...binding, status },
     status,
     details,
+  };
+}
+
+function applyRepositoryInspectionProfile(
+  binding: RepositoryBinding,
+  details: RepositoryInspectDetails,
+): RepositoryBinding {
+  if (!details.detectedProfile && !details.suggestedPaths && !details.suggestedKnowledge) return binding;
+  return {
+    ...binding,
+    schemaProfile: details.detectedProfile || binding.schemaProfile,
+    paths: {
+      ...binding.paths,
+      ...details.suggestedPaths,
+    },
+    knowledge: {
+      ...binding.knowledge,
+      ...details.suggestedKnowledge,
+    },
   };
 }

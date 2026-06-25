@@ -140,6 +140,14 @@ describe('new session creation params', () => {
     expect(composer).toContain("activeClient.request<{ key?: string; sessionKey?: string }>");
   });
 
+  it('renders agent select labels with native ellipsis to avoid Semi ResizeObserver findDOMNode warnings', () => {
+    const option = readFileSync('src/components/AgentSelectOption.tsx', 'utf8');
+
+    expect(option).toContain('className="agent-select-option-name"');
+    expect(option).not.toContain('<Text ellipsis');
+    expect(option).not.toContain('const { Text } = Typography');
+  });
+
   it('documents that the new session page accepts file drops across the page', () => {
     const source = readFileSync('src/components/NewSessionComposer.tsx', 'utf8');
 

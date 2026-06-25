@@ -44,6 +44,13 @@ describe('navigation restructure', () => {
     expect(settingsPage).toContain('updateSettings({ sidebarNavGrouped: checked })');
   });
 
+  it('keeps grouped primary navigation labels visually emphasized', () => {
+    const css = readFileSync('src/styles/global.css', 'utf8');
+
+    expect(css).toContain('.sidebar-nav-group .semi-navigation-item-text');
+    expect(css).toContain('font-weight: 600;');
+  });
+
   it('maps primary entries to their routes', () => {
     expect(PRIMARY_ROUTE_MAP).toMatchObject({
       dashboard: '/',

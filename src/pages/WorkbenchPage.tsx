@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Tabs, Typography } from '@douyinfe/semi-ui';
+import { Button, Empty, Tabs, Typography } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
 import RepositoryGate from '../components/RepositoryGate';
 import WorkbenchRepositoryPanel from '../components/WorkbenchRepositoryPanel';
@@ -18,6 +18,7 @@ export default function WorkbenchPage() {
     kanban: { title: t('nav.kanban'), desc: t('workbench.kanbanDesc') },
     actions: { title: t('nav.actions'), desc: t('workbench.activityDesc') },
     outputs: { title: t('workbench.outputs'), desc: t('workbench.outputsDesc') },
+    binding: { title: t('repositoryGate.workbenchTitle'), desc: t('repositoryGate.workbenchDesc') },
   }[activeTab] ?? { title: t('nav.workbench'), desc: t('workbench.pageDesc') };
 
   const handleTabChange = (key: string) => {
@@ -34,14 +35,40 @@ export default function WorkbenchPage() {
       <Tabs activeKey={activeTab} onChange={handleTabChange} type="line" tabBarExtraContent={tabActions}>
         <Tabs.TabPane tab={t('nav.workbench')} itemKey="repository">
           {activeTab === 'repository' && (
-            <RepositoryGate area="workbench">
+            <RepositoryGate
+              area="workbench"
+              setupVisible={false}
+              fallback={(
+                <Empty
+                  title={t('workbench.repositoryRequiredTitle')}
+                  description={t('workbench.repositoryRequiredDesc')}
+                >
+                  <Button type="primary" onClick={() => setActiveTab('binding')}>
+                    {t('workbench.openRepositoryTab')}
+                  </Button>
+                </Empty>
+              )}
+            >
               {(binding) => <WorkbenchRepositoryPanel binding={binding} />}
             </RepositoryGate>
           )}
         </Tabs.TabPane>
         <Tabs.TabPane tab={t('nav.kanban')} itemKey="kanban">
           {activeTab === 'kanban' && (
-            <RepositoryGate area="workbench">
+            <RepositoryGate
+              area="workbench"
+              setupVisible={false}
+              fallback={(
+                <Empty
+                  title={t('workbench.repositoryRequiredTitle')}
+                  description={t('workbench.repositoryRequiredDesc')}
+                >
+                  <Button type="primary" onClick={() => setActiveTab('binding')}>
+                    {t('workbench.openRepositoryTab')}
+                  </Button>
+                </Empty>
+              )}
+            >
               {(binding) => <RepositoryWorkbenchKanban binding={binding} />}
             </RepositoryGate>
           )}
@@ -51,6 +78,9 @@ export default function WorkbenchPage() {
         </Tabs.TabPane>
         <Tabs.TabPane tab={t('workbench.outputs')} itemKey="outputs">
           {activeTab === 'outputs' && <ArtifactsPage embedded onHeaderActionsChange={setTabActions} />}
+        </Tabs.TabPane>
+        <Tabs.TabPane tab={t('knowledge.repositoryTab')} itemKey="binding">
+          {activeTab === 'binding' && <RepositoryGate area="workbench" />}
         </Tabs.TabPane>
       </Tabs>
     </div>
