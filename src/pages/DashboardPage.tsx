@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useStore, type AiActionRun, type SessionInfo } from '../lib';
 import NewSessionComposer from '../components/NewSessionComposer';
+import { ActivityTrendChart, ModelUsageBarChart, ProviderQuotaBarChart, StatusDistributionChart, TokenCompositionChart } from '../components/charts/DashboardVisualCharts';
 import UsageTrendChart from '../components/charts/UsageTrendChart';
 import type { ArtifactMeta } from '../lib/artifact-types';
 import { loadAiActionRuns } from '../lib/ai-action-run-store';
@@ -49,6 +50,30 @@ function formatCost(value?: number): string {
 function formatPercent(value?: number): string {
   if (value === undefined) return '-';
   return `${Math.max(0, Math.min(100, value)).toFixed(0)}%`;
+}
+
+function dayKey(value?: number): string | null {
+  if (!value) return null;
+  return new Date(value).toISOString().slice(0, 10);
+}
+
+function shortDayLabel(value: string): string {
+  return value.slice(5);
+}
+
+function buildLastSevenDays(now = new Date()): string[] {
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(now);
+    date.setUTCDate(date.getUTCDate() - (6 - index));
+    return date.toISOString().slice(0, 10);
+  });
+}
+
+function quotaCategory(percentLeft?: number): string {
+  if (percentLeft === undefined) return 'unknown';
+  if (percentLeft >= 50) return 'healthy';
+  if (percentLeft >= 20) return 'watch';
+  return 'critical';
 }
 
 function getSessionTime(session: SessionInfo): number {
@@ -244,20 +269,107 @@ export default function DashboardPage() {
     [actionRuns],
   );
 
-  const recentWork = useMemo(() => [
+  const repositoryWork = useMemo(() => [
     ...(workbenchSnapshot?.activeWork ?? []),
     ...(workbenchSnapshot?.activePlans ?? []),
     ...(workbenchSnapshot?.reviews ?? []),
-  ].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 5), [workbenchSnapshot]);
+  ].sort((a, b) => b.updatedAt - a.updatedAt), [workbenchSnapshot]);
+
+  const recentWork = useMemo(
+    () => repositoryWork.slice(0, 5),
+    [repositoryWork],
+  );
+
+  const knowledgeFiles = useMemo(
+    () => knowledgeSnapshot?.recentFiles ?? [],
+    [knowledgeSnapshot],
+  );
 
   const recentKnowledge = useMemo(
-    () => (knowledgeSnapshot?.recentFiles ?? []).slice(0, 5),
-    [knowledgeSnapshot],
+    () => knowledgeFiles.slice(0, 5),
+    [knowledgeFiles],
   );
   const gatewaySummary = useMemo(
     () => normalizeDashboardGatewaySummary({ health, gatewayStatus, agents }),
     [agents, gatewayStatus, health],
   );
+
+  const modelUsageChartData = useMemo(
+    () => (usageDashboard?.modelRows ?? []).slice(0, 6).map((row) => ({
+      label: row.label,
+      value: row.totalTokens,
+    })),
+    [usageDashboard],
+  );
+
+  const tokenCompositionData = useMemo(() => {
+    const totals = usageDashboard?.totals;
+    if (!totals) return [];
+    return [
+      { label: t('dashboard.inputTokens'), value: totals.inputTokens },
+      { label: t('dashboard.outputTokens'), value: totals.outputTokens },
+      { label: t('dashboard.cacheReadTokens'), value: totals.cacheReadTokens },
+      { label: t('dashboard.cacheWriteTokens'), value: totals.cacheWriteTokens },
+    ].filter((item) => item.value > 0);
+  }, [t, usageDashboard]);
+
+  const providerQuotaChartData = useMemo(
+    () => (usageDashboard?.providerQuotas ?? [])
+      .filter((quota) => quota.percentLeft !== undefined)
+      .slice(0, 6)
+      .map((quota) => ({
+        label: quota.label,
+        value: Math.max(0, Math.min(100, quota.percentLeft ?? 0)),
+        category: quotaCategory(quota.percentLeft),
+      })),
+    [usageDashboard],
+  );
+
+  const activityTrendData = useMemo(() => {
+    const days = buildLastSevenDays();
+    const categories = [
+      t('dashboard.recentSessions'),
+      t('dashboard.repositoryWork'),
+      t('nav.knowledge'),
+      t('dashboard.outputsArtifacts'),
+    ];
+    const counts = new Map<string, number>();
+    days.forEach((date) => categories.forEach((category) => counts.set(`${date}:${category}`, 0)));
+
+    const increment = (timestamp: number | undefined, category: string) => {
+      const date = dayKey(timestamp);
+      if (!date || !days.includes(date)) return;
+      const key = `${date}:${category}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    };
+
+    sessions.forEach((session) => increment(getSessionTime(session), t('dashboard.recentSessions')));
+    repositoryWork.forEach((file) => increment(file.updatedAt, t('dashboard.repositoryWork')));
+    knowledgeFiles.forEach((file) => increment(file.updatedAt, t('nav.knowledge')));
+    artifacts.forEach((artifact) => increment(artifact.updatedAt, t('dashboard.outputsArtifacts')));
+
+    return days.flatMap((date) => categories.map((category) => ({
+      date: shortDayLabel(date),
+      category,
+      value: counts.get(`${date}:${category}`) ?? 0,
+    })));
+  }, [artifacts, knowledgeFiles, repositoryWork, sessions, t]);
+
+  const actionRunStatusData = useMemo(() => {
+    const counts = new Map<string, number>();
+    actionRuns.forEach((run) => counts.set(run.status, (counts.get(run.status) ?? 0) + 1));
+    return [...counts.entries()]
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [actionRuns]);
+
+  const artifactTypeData = useMemo(() => {
+    const counts = new Map<string, number>();
+    artifacts.forEach((artifact) => counts.set(artifact.type, (counts.get(artifact.type) ?? 0) + 1));
+    return [...counts.entries()]
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [artifacts]);
 
   const statusBadgeType: 'success' | 'warning' | 'danger' | 'default' =
     isConnected ? 'success' : isLoading ? 'warning' : 'danger';
@@ -320,6 +432,22 @@ export default function DashboardPage() {
           <MetricPill icon={<IconAppCenter />} label={t('dashboard.estimatedCost')} value={formatCost(usageDashboard?.totals.estimatedCostUsd)} note={t('dashboard.costAvailabilityNote')} />
         </div>
 
+        <div className="dashboard-visual-row">
+          <div className="dashboard-chart-panel dashboard-chart-panel-compact">
+            <div className="dashboard-usage-panel-title">
+              <Text style={{ fontWeight: 700 }}>{t('dashboard.tokenComposition')}</Text>
+            </div>
+            <TokenCompositionChart data={tokenCompositionData} emptyText={t('dashboard.noChartData')} />
+          </div>
+          <div className="dashboard-chart-panel dashboard-chart-panel-wide">
+            <div className="dashboard-usage-panel-title">
+              <Text style={{ fontWeight: 700 }}>{t('dashboard.modelUsage')}</Text>
+              <Tag size="small" color="blue">{modelUsageChartData.length}</Tag>
+            </div>
+            <ModelUsageBarChart data={modelUsageChartData} emptyText={t('dashboard.noChartData')} />
+          </div>
+        </div>
+
         <div className="dashboard-usage-panel dashboard-model-usage-list">
           <div className="dashboard-usage-panel-title">
             <Text style={{ fontWeight: 700 }}>{t('dashboard.modelUsage')}</Text>
@@ -347,6 +475,7 @@ export default function DashboardPage() {
             <Text style={{ fontWeight: 700 }}>{t('dashboard.providerQuota')}</Text>
             <Tag size="small" color="green">{usageDashboard?.providerQuotas.length ?? 0}</Tag>
           </div>
+          <ProviderQuotaBarChart data={providerQuotaChartData} emptyText={t('dashboard.noChartData')} />
           {usageDashboard?.providerQuotas.length ? usageDashboard.providerQuotas.slice(0, 6).map((quota) => (
             <div key={quota.provider} className="dashboard-provider-quota-row">
               <div>
@@ -403,6 +532,12 @@ export default function DashboardPage() {
         </div>
       }
     >
+      <div className="dashboard-chart-panel dashboard-activity-panel">
+        <div className="dashboard-usage-panel-title">
+          <Text style={{ fontWeight: 700 }}>{t('dashboard.activityTrend')}</Text>
+        </div>
+        <ActivityTrendChart data={activityTrendData} emptyText={t('dashboard.noChartData')} />
+      </div>
       <div className="dashboard-column-grid">
         <div className="dashboard-asset-column">
           <Text style={{ fontWeight: 700 }}>{t('dashboard.recentSessions')}</Text>
@@ -455,6 +590,20 @@ export default function DashboardPage() {
       description={t('dashboard.outputsArtifactsDesc')}
       action={<Button size="small" theme="borderless" onClick={() => navigate('/artifacts')}>{t('dashboard.viewArtifacts')}</Button>}
     >
+      <div className="dashboard-visual-row">
+        <div className="dashboard-chart-panel dashboard-chart-panel-compact">
+          <div className="dashboard-usage-panel-title">
+            <Text style={{ fontWeight: 700 }}>{t('dashboard.actionRunStatus')}</Text>
+          </div>
+          <StatusDistributionChart data={actionRunStatusData} emptyText={t('dashboard.noChartData')} />
+        </div>
+        <div className="dashboard-chart-panel dashboard-chart-panel-compact">
+          <div className="dashboard-usage-panel-title">
+            <Text style={{ fontWeight: 700 }}>{t('dashboard.artifactTypes')}</Text>
+          </div>
+          <StatusDistributionChart data={artifactTypeData} emptyText={t('dashboard.noChartData')} />
+        </div>
+      </div>
       <div className="dashboard-output-layout">
         <div className="dashboard-output-list">
           {recentArtifacts.length > 0 ? recentArtifacts.map((artifact: ArtifactMeta) => (
