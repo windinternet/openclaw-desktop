@@ -82,6 +82,38 @@ describe('OfficeScene agent labels', () => {
     expect(source).toContain('state.leftDrag.active = true');
   });
 
+  it('plays local office audio for blaster shots, impacts, and revivals', () => {
+    const source = readFileSync('src/components/office/OfficeScene.tsx', 'utf8');
+
+    expect(source).toContain('playOfficeBlasterShotAudio()');
+    expect(source).toContain('resolveOfficeImpactAudioCue(result)');
+    expect(source).toContain('playOfficeImpactAudio(resolveOfficeImpactAudioCue(result))');
+    expect(source).toContain('playOfficeImpactAudio(resolveOfficeReviveAudioCue(revived.message))');
+  });
+
+  it('renders richer toy blaster feedback with muzzle flash, tracer, and hit pulse', () => {
+    const source = readFileSync('src/components/office/OfficeScene.tsx', 'utf8');
+
+    expect(source).toContain("group.name = 'office-toy-blaster'");
+    expect(source).toContain("receiver.name = 'office-toy-blaster-receiver'");
+    expect(source).toContain("barrel.name = 'office-toy-blaster-barrel'");
+    expect(source).toContain("energyCell.name = 'office-toy-blaster-energy-cell'");
+    expect(source).toContain("sight.name = 'office-toy-blaster-sight'");
+    expect(source).toContain('createMuzzleFlash');
+    expect(source).toContain('createShotTracer');
+    expect(source).toContain('createHitPulse');
+    expect(source).toContain("state.muzzleFlash");
+    expect(source).toContain("state.shotTracer");
+    expect(source).toContain("state.hitPulse");
+  });
+
+  it('billboards combat shield bars toward the active camera every frame', () => {
+    const source = readFileSync('src/components/office/OfficeScene.tsx', 'utf8');
+
+    expect(source).toContain('copyBillboardQuaternion(actor.shieldBar, state.camera)');
+    expect(source).not.toContain('actor.shieldBar.quaternion.copy(actor.group.quaternion).invert();');
+  });
+
   it('initializes combat state for both Gateway Agents and scene NPCs', () => {
     const source = readFileSync('src/components/office/OfficeScene.tsx', 'utf8');
 

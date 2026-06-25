@@ -27,8 +27,15 @@ import {
   type OfficeWeaponMode,
 } from '../../lib/office-gameplay';
 import {
+  playOfficeBlasterShotAudio,
+  playOfficeImpactAudio,
+  resolveOfficeImpactAudioCue,
+  resolveOfficeReviveAudioCue,
+} from '../../lib/office-audio';
+import {
   canOfficeActorJump,
   canUseOfficeBlaster,
+  copyBillboardQuaternion,
   resolveNearestOfficeControlTarget,
   resolveOfficeControlTarget,
   resolveOfficeShotTarget,
@@ -94,6 +101,9 @@ interface SceneState {
   blasterGroup: THREE.Group | null;
   crosshair: THREE.Sprite | null;
   shotBeam: THREE.Line | null;
+  shotTracer: THREE.Line | null;
+  muzzleFlash: THREE.Sprite | null;
+  hitPulse: THREE.Mesh | null;
   hitHint: THREE.Sprite | null;
   shotBeamUntil: number;
   hitPoint: THREE.Vector3 | null;
@@ -388,12 +398,116 @@ function createHitHint(theme: OfficeTheme): THREE.Sprite {
 function createBlasterGroup(theme: OfficeTheme): THREE.Group {
   const group = new THREE.Group();
   group.name = 'office-toy-blaster';
-  group.add(createBox(0.34, 0.18, 0.62, theme.scene.trim, [0, 0, 0], { roughness: 0.36 }));
-  group.add(createBox(0.18, 0.13, 0.42, theme.scene.accent, [0, 0.02, -0.38], { roughness: 0.22 }));
-  group.add(createCylinder(0.08, 0.11, 0.16, theme.scene.screen, [0, 0.02, -0.66], { radialSegments: 18, roughness: 0.2 }));
-  group.add(createBox(0.12, 0.26, 0.12, theme.scene.desk, [0.05, -0.24, 0.18], { roughness: 0.48 }));
+  const receiver = createBox(0.36, 0.2, 0.52, theme.scene.trim, [0, 0, -0.04], { roughness: 0.28 });
+  receiver.name = 'office-toy-blaster-receiver';
+
+  const barrel = createCylinder(0.055, 0.075, 0.54, theme.scene.accent, [0, 0.035, -0.44], {
+    radialSegments: 24,
+    roughness: 0.18,
+  });
+  barrel.name = 'office-toy-blaster-barrel';
+  barrel.rotation.x = Math.PI / 2;
+
+  const muzzle = createCylinder(0.105, 0.13, 0.14, theme.scene.screen, [0, 0.035, -0.76], {
+    radialSegments: 24,
+    roughness: 0.16,
+  });
+  muzzle.name = 'office-toy-blaster-muzzle';
+  muzzle.rotation.x = Math.PI / 2;
+
+  const energyCell = createCylinder(0.07, 0.07, 0.42, '#22d3ee', [-0.2, -0.005, -0.05], {
+    radialSegments: 18,
+    opacity: 0.72,
+    roughness: 0.12,
+  });
+  energyCell.name = 'office-toy-blaster-energy-cell';
+  energyCell.rotation.z = Math.PI / 2;
+
+  const sight = createBox(0.18, 0.075, 0.22, theme.scene.screen, [0, 0.17, -0.24], { roughness: 0.2 });
+  sight.name = 'office-toy-blaster-sight';
+
+  const grip = createBox(0.14, 0.34, 0.14, theme.scene.desk, [0.075, -0.25, 0.13], { roughness: 0.42 });
+  grip.name = 'office-toy-blaster-grip';
+  grip.rotation.z = -0.18;
+
+  const guard = createBox(0.24, 0.055, 0.24, theme.scene.zoneBorder, [0.005, -0.18, -0.05], { roughness: 0.24 });
+  guard.name = 'office-toy-blaster-trigger-guard';
+
+  group.add(receiver, barrel, muzzle, energyCell, sight, grip, guard);
   group.visible = false;
   return group;
+}
+
+function createMuzzleFlash(theme: OfficeTheme): THREE.Sprite {
+  const canvas = document.createElement('canvas');
+  canvas.width = 96;
+  canvas.height = 96;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const gradient = ctx.createRadialGradient(48, 48, 4, 48, 48, 44);
+    gradient.addColorStop(0, '#ffffff');
+    gradient.addColorStop(0.22, theme.scene.accent);
+    gradient.addColorStop(0.58, '#facc15');
+    gradient.addColorStop(1, 'rgba(250,204,21,0)');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(48, 48, 44, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.82)';
+    ctx.lineWidth = 4;
+    for (let i = 0; i < 8; i += 1) {
+      const angle = (Math.PI * 2 * i) / 8;
+      ctx.beginPath();
+      ctx.moveTo(48 + Math.cos(angle) * 12, 48 + Math.sin(angle) * 12);
+      ctx.lineTo(48 + Math.cos(angle) * 42, 48 + Math.sin(angle) * 42);
+      ctx.stroke();
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  }));
+  sprite.name = 'office-muzzle-flash';
+  sprite.scale.set(0.42, 0.42, 1);
+  sprite.renderOrder = 40;
+  return sprite;
+}
+
+function createShotTracer(start: THREE.Vector3, end: THREE.Vector3, theme: OfficeTheme): THREE.Line {
+  const direction = end.clone().sub(start);
+  const length = direction.length();
+  const visibleStart = length > 0.35 ? start.clone().add(direction.clone().normalize().multiplyScalar(0.18)) : start;
+  const geometry = new THREE.BufferGeometry().setFromPoints([visibleStart, end]);
+  const material = new THREE.LineBasicMaterial({
+    color: theme.scene.accent,
+    transparent: true,
+    opacity: 0.95,
+    blending: THREE.AdditiveBlending,
+  });
+  const tracer = new THREE.Line(geometry, material);
+  tracer.name = 'office-shot-tracer';
+  tracer.renderOrder = 35;
+  return tracer;
+}
+
+function createHitPulse(position: THREE.Vector3, theme: OfficeTheme): THREE.Mesh {
+  const material = new THREE.MeshBasicMaterial({
+    color: theme.scene.accent,
+    transparent: true,
+    opacity: 0.78,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const pulse = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.012, 8, 28), material);
+  pulse.name = 'office-hit-pulse';
+  pulse.position.copy(position);
+  pulse.renderOrder = 34;
+  return pulse;
 }
 
 function createWallText(text: string, theme: OfficeTheme): THREE.Mesh {
@@ -977,6 +1091,9 @@ function createScene(container: HTMLDivElement, theme: OfficeTheme, companyName:
     blasterGroup: null as THREE.Group | null,
     crosshair: null as THREE.Sprite | null,
     shotBeam: null as THREE.Line | null,
+    shotTracer: null as THREE.Line | null,
+    muzzleFlash: null as THREE.Sprite | null,
+    hitPulse: null as THREE.Mesh | null,
     hitHint: null as THREE.Sprite | null,
     shotBeamUntil: 0,
     hitPoint: null as THREE.Vector3 | null,
@@ -1093,25 +1210,45 @@ function toggleOfficeWeaponMode(state: SceneState): void {
   updateWeaponHud(state);
 }
 
-function showShotBeam(state: SceneState, start: THREE.Vector3, end: THREE.Vector3, theme: OfficeTheme, now: number): void {
-  if (state.shotBeam) {
-    state.scene.remove(state.shotBeam);
-    state.shotBeam.geometry.dispose();
-    (state.shotBeam.material as THREE.Material).dispose();
+function disposeShotEffects(state: SceneState): void {
+  if (state.shotTracer) {
+    state.scene.remove(state.shotTracer);
+    state.shotTracer.geometry.dispose();
+    (state.shotTracer.material as THREE.Material).dispose();
+    state.shotTracer = null;
   }
+  state.shotBeam = null;
+  if (state.muzzleFlash) {
+    state.scene.remove(state.muzzleFlash);
+    state.muzzleFlash.material.map?.dispose();
+    state.muzzleFlash.material.dispose();
+    state.muzzleFlash = null;
+  }
+  if (state.hitPulse) {
+    state.scene.remove(state.hitPulse);
+    state.hitPulse.geometry.dispose();
+    (state.hitPulse.material as THREE.Material).dispose();
+    state.hitPulse = null;
+  }
+  state.hitPoint = null;
+}
 
-  const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
-  const material = new THREE.LineBasicMaterial({
-    color: theme.scene.accent,
-    transparent: true,
-    opacity: 0.9,
-  });
-  const beam = new THREE.Line(geometry, material);
-  beam.name = 'office-shot-beam';
-  beam.renderOrder = 20;
-  state.scene.add(beam);
-  state.shotBeam = beam;
-  state.shotBeamUntil = now + 160;
+function showShotBeam(state: SceneState, start: THREE.Vector3, end: THREE.Vector3, theme: OfficeTheme, now: number): void {
+  disposeShotEffects(state);
+
+  const tracer = createShotTracer(start, end, theme);
+  const flash = createMuzzleFlash(theme);
+  const pulse = createHitPulse(end, theme);
+  flash.position.copy(start);
+  flash.quaternion.copy(state.camera.quaternion);
+  pulse.quaternion.copy(state.camera.quaternion);
+
+  state.scene.add(tracer, flash, pulse);
+  state.shotTracer = tracer;
+  state.shotBeam = tracer;
+  state.muzzleFlash = flash;
+  state.hitPulse = pulse;
+  state.shotBeamUntil = now + 220;
   state.hitPoint = end.clone();
 }
 
@@ -1125,8 +1262,13 @@ function handleOfficeShot(state: SceneState, container: HTMLDivElement): boolean
   }
 
   const now = performance.now();
+  playOfficeBlasterShotAudio();
   state.raycaster.setFromCamera(new THREE.Vector2(0, 0), state.firstPersonCamera);
   const origin = state.firstPersonCamera.position.clone();
+  state.blasterGroup?.updateWorldMatrix(true, false);
+  const shotStart = state.blasterGroup
+    ? state.blasterGroup.localToWorld(new THREE.Vector3(0, 0.035, -0.86))
+    : origin;
   const fallbackEnd = origin.clone().add(state.raycaster.ray.direction.clone().multiplyScalar(8));
   const hits = state.raycaster.intersectObjects(state.scene.children, true);
   const agentId = resolveOfficeShotTarget(hits, state.actors, state.controlledAgentId);
@@ -1136,7 +1278,7 @@ function handleOfficeShot(state: SceneState, container: HTMLDivElement): boolean
   const theme = state.currentTheme;
   const end = hit?.point ?? fallbackEnd;
 
-  if (theme) showShotBeam(state, origin, end, theme, now);
+  if (theme) showShotBeam(state, shotStart, end, theme, now);
   if (state.blasterGroup) {
     state.blasterGroup.position.z = -0.84;
     setTimeout(() => {
@@ -1153,6 +1295,7 @@ function handleOfficeShot(state: SceneState, container: HTMLDivElement): boolean
   if (!actor) return true;
 
   const result = applyOfficeShot(actor.combat, performance.now());
+  playOfficeImpactAudio(resolveOfficeImpactAudioCue(result));
   actor.combat = result.combat;
   actor.collisionReaction = Math.min(1, actor.collisionReaction + 0.75);
   actor.combat.shieldVisibleUntil = now + 2400;
@@ -1533,6 +1676,7 @@ function updateCombatState(actor: ActorState, now: number, delta: number, theme:
     actor.manualWalking = false;
     actor.target.copy(actor.group.position);
     restoreFaceMaterial(actor);
+    playOfficeImpactAudio(resolveOfficeReviveAudioCue(revived.message));
     if (revived.message) {
       showSpeechBubble(
         actor.group.parent as THREE.Scene,
@@ -1545,7 +1689,6 @@ function updateCombatState(actor: ActorState, now: number, delta: number, theme:
 
   actor.combat.hitReaction = Math.max(0, actor.combat.hitReaction - delta * 2.8);
   updateShieldBar(actor, now);
-  actor.shieldBar.quaternion.copy(actor.group.quaternion).invert();
 
   if (actor.combat.downedUntil !== null) {
     actor.manualWalking = false;
@@ -1919,12 +2062,22 @@ export default function OfficeScene({
         if (disposed) return;
         const delta = Math.min(0.05, (now - state.lastTime) / 1000);
         state.lastTime = now;
-        if (state.shotBeam && now >= state.shotBeamUntil) {
-          state.scene.remove(state.shotBeam);
-          state.shotBeam.geometry.dispose();
-          (state.shotBeam.material as THREE.Material).dispose();
-          state.shotBeam = null;
-          state.hitPoint = null;
+        if (state.shotTracer && now >= state.shotBeamUntil) {
+          disposeShotEffects(state);
+        } else if (state.shotTracer) {
+          const progress = 1 - Math.max(0, state.shotBeamUntil - now) / 220;
+          const opacity = Math.max(0, 1 - progress);
+          (state.shotTracer.material as THREE.LineBasicMaterial).opacity = 0.95 * opacity;
+          if (state.muzzleFlash) {
+            state.muzzleFlash.quaternion.copy(state.camera.quaternion);
+            state.muzzleFlash.scale.setScalar(0.42 + progress * 0.18);
+            state.muzzleFlash.material.opacity = Math.max(0, 1 - progress * 1.25);
+          }
+          if (state.hitPulse) {
+            state.hitPulse.quaternion.copy(state.camera.quaternion);
+            state.hitPulse.scale.setScalar(1 + progress * 2.4);
+            (state.hitPulse.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.78 * (1 - progress));
+          }
         }
         updateWeaponHud(state);
         state.fpsExitAgentId = state.controlledAgentId;
@@ -2022,6 +2175,9 @@ export default function OfficeScene({
         } else if (state.cameraMode === 'first-person') {
           resetCameraControl(state, container);
         }
+        state.actors.forEach((actor) => {
+          copyBillboardQuaternion(actor.shieldBar, state.camera);
+        });
         state.renderer.render(state.scene, state.camera);
         state.renderer.autoClear = false;
         state.renderer.clearDepth();
@@ -2045,12 +2201,7 @@ export default function OfficeScene({
         window.removeEventListener('keydown', onWindowKeyDown);
         window.removeEventListener('mouseup', stopDrag);
         window.cancelAnimationFrame(state.frame);
-        if (state.shotBeam) {
-          state.scene.remove(state.shotBeam);
-          state.shotBeam.geometry.dispose();
-          (state.shotBeam.material as THREE.Material).dispose();
-          state.shotBeam = null;
-        }
+        disposeShotEffects(state);
         state.renderer.dispose();
         state.renderer.domElement.remove();
         stateRef.current = null;

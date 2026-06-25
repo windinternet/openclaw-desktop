@@ -3,6 +3,7 @@ import {
   canControlOfficeActor,
   canOfficeActorJump,
   canUseOfficeBlaster,
+  copyBillboardQuaternion,
   isOfficeActorDowned,
   resolveNearestOfficeControlTarget,
   resolveOfficeControlTarget,
@@ -121,5 +122,22 @@ describe('office scene interaction helpers', () => {
     expect(canOfficeActorJump(liveAirborne, 0)).toBe(false);
     expect(canOfficeActorJump(downedGrounded, 0)).toBe(false);
     expect(canOfficeActorJump(null, 0)).toBe(false);
+  });
+
+  it('copies the active camera quaternion onto billboarded combat UI', () => {
+    const shieldBar = {
+      copied: '',
+      quaternion: {
+        copy(source: { id: string }) {
+          shieldBar.copied = source.id;
+          return this;
+        },
+      },
+    };
+    const camera = { quaternion: { id: 'first-person-camera-facing' } };
+
+    copyBillboardQuaternion(shieldBar, camera);
+
+    expect(shieldBar.copied).toBe('first-person-camera-facing');
   });
 });

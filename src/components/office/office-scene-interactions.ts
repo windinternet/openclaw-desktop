@@ -93,6 +93,13 @@ export function canOfficeActorJump(
   return canControlOfficeActor(actor) && actor.group.position.y <= groundY + 0.01;
 }
 
+export function copyBillboardQuaternion<TQuaternion>(
+  billboard: { quaternion: { copy: (source: TQuaternion) => unknown } },
+  camera: { quaternion: TQuaternion },
+): void {
+  billboard.quaternion.copy(camera.quaternion);
+}
+
 export function resolveOfficeShotTarget(
   hits: OfficeShotTargetHit[],
   actors: Map<string, OfficeInteractionActor>,
