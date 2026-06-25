@@ -5,20 +5,23 @@ OpenClaw Desktop publishes desktop installers through GitHub Releases. The relea
 ## Release Flow
 
 1. Update `package.json` version, for example from `0.1.0` to `0.2.0`.
-2. Commit the version change.
-3. Create an annotated tag:
+2. Add release notes at `docs/release-notes/vX.Y.Z.md`.
+3. Commit the version and release notes changes.
+4. Create an annotated tag:
 
 ```bash
 git tag -a v0.2.0 -m "Release v0.2.0"
 ```
 
-4. Push the tag:
+5. Push the tag:
 
 ```bash
 git push origin v0.2.0
 ```
 
 GitHub Actions will build all configured packages and create a GitHub Release for the tag.
+
+If `docs/release-notes/<tag>.md` exists, the release workflow uses that file as the GitHub Release body. If it does not exist, the workflow falls back to GitHub's generated release notes. The `.github/release.yml` file only configures GitHub's generated release notes categories; it is not a hand-written changelog source, and direct commits without pull request labels may only produce a full changelog link.
 
 ## Manual Dry Run
 
