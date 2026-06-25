@@ -71,6 +71,15 @@ describe('Sidebar session list', () => {
     expect(source).not.toContain('<Text ellipsis size="small"');
   });
 
+  it('keeps visible fallback backgrounds for both sidebar avatars when image URLs fail', () => {
+    const source = readFileSync('src/components/Sidebar.tsx', 'utf8');
+
+    expect(source).toContain("const SIDEBAR_AVATAR_FALLBACK_BG = 'rgb(var(--semi-blue-5))';");
+    expect(source).toContain("backgroundColor: SIDEBAR_AVATAR_FALLBACK_BG");
+    expect(source).not.toContain("backgroundColor: currentInstance.avatarUrl ? 'transparent'");
+    expect(source).not.toContain("backgroundColor: currentInstance?.avatarUrl ? 'transparent'");
+  });
+
   it('renders per-instance runtime status and recent activity in the instance drawer', () => {
     const source = readFileSync('src/components/InstanceDrawer.tsx', 'utf8');
 

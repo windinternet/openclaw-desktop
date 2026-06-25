@@ -70,6 +70,7 @@ interface SidebarProps {
 const SIDEBAR_MACOS_TOP_INSET = 30;
 const SIDEBAR_LINUX_TOP_INSET = 12;
 const SIDEBAR_DRAG_HEIGHT = 36;
+const SIDEBAR_AVATAR_FALLBACK_BG = 'rgb(var(--semi-blue-5))';
 
 function getNavIcon(item: PrimaryNavItem) {
   switch (item.icon) {
@@ -326,7 +327,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
           src={currentInstance.avatarUrl || undefined}
           style={{
             flexShrink: 0,
-            backgroundColor: currentInstance.avatarUrl ? 'transparent' : 'rgb(var(--semi-blue-5))',
+            backgroundColor: SIDEBAR_AVATAR_FALLBACK_BG,
           }}
         >
           {currentInstance.name?.charAt(0).toUpperCase() ?? <IconServer />}
@@ -563,7 +564,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
       <div style={{ width: '100%', borderTop: '1px solid var(--semi-color-border)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', padding: '6px 0 0 0', gap: 8 }}>
           <Avatar size="extra-small" src={currentInstance?.avatarUrl || undefined}
-            style={{ flexShrink: 0, backgroundColor: currentInstance?.avatarUrl ? 'transparent' : 'var(--semi-color-primary-light-default)' }}>
+            style={{ flexShrink: 0, backgroundColor: SIDEBAR_AVATAR_FALLBACK_BG }}>
             {currentInstance?.name?.charAt(0).toUpperCase() ?? <IconServer />}
           </Avatar>
           <div ref={triggerRef} onMouseEnter={showPopup} onMouseMove={movePopup} onMouseLeave={hidePopup}
