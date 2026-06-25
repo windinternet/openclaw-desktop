@@ -84,12 +84,12 @@ describe('model selection helpers', () => {
   });
 
   it('documents new session and chat pages use shared model defaults and full labels', () => {
-    const newSession = readFileSync('src/pages/NewSessionPage.tsx', 'utf8');
+    const newSessionComposer = readFileSync('src/components/NewSessionComposer.tsx', 'utf8');
     const chat = readFileSync('src/pages/SessionChatPage.tsx', 'utf8');
 
-    expect(newSession).toContain('resolvePreferredModel');
-    expect(newSession).toContain('buildModelOptions');
-    expect(newSession).not.toContain('setSelectedModel(models[0].id)');
+    expect(newSessionComposer).toContain('resolvePreferredModel');
+    expect(newSessionComposer).toContain('buildModelOptions');
+    expect(newSessionComposer).not.toContain('setSelectedModel(models[0].id)');
     expect(chat).toContain('resolvePreferredModel');
     expect(chat).toContain('buildModelOptions');
     expect(chat).not.toContain('setChatModel(models[0].id)');
