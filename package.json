@@ -22,7 +22,8 @@
     "check": "npm run lint && npm run format && npm run stylelint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "brand:export": "node scripts/export-brand-assets.mjs"
   },
   "dependencies": {
     "@ant-design/charts": "^2.6.7",

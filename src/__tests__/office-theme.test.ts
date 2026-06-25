@@ -23,12 +23,15 @@ describe('office theme', () => {
     const theme = createOfficeTheme('light', '#00A870');
 
     expect(theme.mode).toBe('light');
-    expect(theme.pageBackground).toContain('#f6fbf8');
+    expect(theme.pageBackground).toContain('#f7eee9');
     expect(theme.scene.background).toBe('#f7fbf9');
+    expect(theme.scene.floor).toBe('#e7eef0');
+    expect(theme.scene.wall).toBe('#f1d8cf');
     expect(theme.panel.background).toContain('255, 255, 255');
     expect(theme.scene.accent).toBe('#00A870');
-    expect(theme.scene.zoneOpacity).toBeGreaterThan(0.34);
-    expect(theme.scene.zoneBorder).toBe('#6b7280');
+    expect(theme.scene.zoneOpacity).toBeLessThan(0.24);
+    expect(theme.scene.zoneBorder).toBe('#ff765f');
+    expect(theme.scene.labelBackground).toContain('255, 255, 255');
   });
 
   it('uses a dark office palette for dark app theme', () => {
@@ -37,10 +40,13 @@ describe('office theme', () => {
     expect(theme.mode).toBe('dark');
     expect(theme.pageBackground).toContain('#08111f');
     expect(theme.scene.background).toBe('#08111f');
+    expect(theme.scene.floor).toBe('#151c26');
+    expect(theme.scene.wall).toBe('#3d2b29');
     expect(theme.panel.background).toContain('15, 23, 42');
     expect(theme.scene.accent).toBe('#722ED1');
     expect(theme.scene.zoneOpacity).toBeGreaterThan(0.3);
-    expect(theme.scene.zoneBorder).toBe('#94a3b8');
+    expect(theme.scene.zoneBorder).toBe('#ff765f');
+    expect(theme.scene.labelBackground).toContain('15, 23, 42');
   });
 
   it('keeps office zone colors visually separated in both themes', () => {

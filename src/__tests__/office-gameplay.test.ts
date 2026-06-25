@@ -1,11 +1,11 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 import {
   DEFAULT_OFFICE_SHIELD,
+  DIAGNOSTIC_PULSE_IMPACT,
   OFFICE_LAST_WORDS_COOLDOWN_MS,
   OFFICE_RESPAWN_MAX_MS,
   OFFICE_RESPAWN_MIN_MS,
   OFFICE_SHIELD_VISIBLE_MS,
-  TOY_BLASTER_DAMAGE,
   type OfficeReviveResult,
   type OfficeShotResult,
   applyOfficeShot,
@@ -15,7 +15,7 @@ import {
 } from '../lib/office-gameplay';
 
 describe('office gameplay rules', () => {
-  it('creates targets with a full default shield', () => {
+  it('creates targets with a full default status buffer', () => {
     const combat = createOfficeCombatState(1000);
 
     expect(combat.maxShield).toBe(DEFAULT_OFFICE_SHIELD);
@@ -27,12 +27,12 @@ describe('office gameplay rules', () => {
     expect(combat.shieldVisibleUntil).toBe(1000);
   });
 
-  it('subtracts toy blaster damage without downing a healthy target', () => {
+  it('subtracts diagnostic pulse impact without downing a healthy target', () => {
     const result = applyOfficeShot(createOfficeCombatState(1000), 1200, () => 0.25);
     expectTypeOf(result).toEqualTypeOf<OfficeShotResult>();
 
     expect(result.event).toBe('hit');
-    expect(result.combat.shield).toBe(DEFAULT_OFFICE_SHIELD - TOY_BLASTER_DAMAGE);
+    expect(result.combat.shield).toBe(DEFAULT_OFFICE_SHIELD - DIAGNOSTIC_PULSE_IMPACT);
     expect(result.combat.downedUntil).toBeNull();
     expect(result.combat.hitReaction).toBe(1);
     expect(result.combat.shieldVisibleUntil).toBe(1200 + OFFICE_SHIELD_VISIBLE_MS);
@@ -132,7 +132,7 @@ describe('office gameplay rules', () => {
     expect(result.combat.downedUntil).toBe(100 + OFFICE_RESPAWN_MIN_MS);
   });
 
-  it('clamps the office shield ratio between zero and one', () => {
+  it('clamps the office status buffer ratio between zero and one', () => {
     expect(officeShieldRatio({ ...createOfficeCombatState(), shield: 50 })).toBe(0.5);
     expect(officeShieldRatio({ ...createOfficeCombatState(), shield: -10 })).toBe(0);
     expect(officeShieldRatio({ ...createOfficeCombatState(), shield: 140 })).toBe(1);

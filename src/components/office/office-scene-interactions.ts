@@ -1,5 +1,5 @@
 export type OfficeSceneCameraMode = 'third-person' | 'first-person';
-export type OfficeSceneWeaponMode = 'hands' | 'toy-blaster';
+export type OfficeSceneWeaponMode = 'hands' | 'diagnostic-pulse';
 
 export interface OfficeInteractionActor {
   combat: {
@@ -29,12 +29,20 @@ export interface OfficeNearestControlCandidate {
 
 export type OfficeShotTargetActor = OfficeInteractionActor;
 
-export function shouldSkipBlasterMouseDown(
+export function shouldSkipDiagnosticPulseMouseDown(
   button: number,
   cameraMode: OfficeSceneCameraMode,
   weaponMode: OfficeSceneWeaponMode,
 ): boolean {
-  return button === 0 && cameraMode === 'first-person' && weaponMode === 'toy-blaster';
+  return button === 0 && cameraMode === 'first-person' && weaponMode === 'diagnostic-pulse';
+}
+
+export function shouldStartDiagnosticPulseAutoFire(
+  button: number,
+  cameraMode: OfficeSceneCameraMode,
+  weaponMode: OfficeSceneWeaponMode,
+): boolean {
+  return button === 0 && cameraMode === 'first-person' && weaponMode === 'diagnostic-pulse';
 }
 
 export function isOfficeActorDowned(actor: OfficeInteractionActor | null | undefined): boolean {
@@ -47,7 +55,7 @@ export function canControlOfficeActor(
   return Boolean(actor) && !isOfficeActorDowned(actor);
 }
 
-export function canUseOfficeBlaster(
+export function canUseOfficeDiagnosticPulse(
   actor: OfficeInteractionActor | null | undefined,
 ): actor is OfficeInteractionActor {
   return canControlOfficeActor(actor);

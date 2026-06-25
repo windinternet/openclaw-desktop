@@ -1,4 +1,4 @@
-export type OfficeWeaponMode = 'hands' | 'toy-blaster';
+export type OfficeWeaponMode = 'hands' | 'diagnostic-pulse';
 
 export type OfficeShotEvent = 'hit' | 'downed' | 'ignored';
 
@@ -25,28 +25,28 @@ export interface OfficeReviveResult {
 }
 
 export const DEFAULT_OFFICE_SHIELD = 100;
-export const TOY_BLASTER_DAMAGE = 34;
+export const DIAGNOSTIC_PULSE_IMPACT = 34;
 export const OFFICE_RESPAWN_MIN_MS = 6000;
 export const OFFICE_RESPAWN_MAX_MS = 18000;
 export const OFFICE_SHIELD_VISIBLE_MS = 2400;
 export const OFFICE_LAST_WORDS_COOLDOWN_MS = 1200;
 
 export const OFFICE_HIT_MESSAGES = [
-  '护盾滋啦一下，假装很疼。',
-  '玩具光束命中，办公室气氛扣一分。',
-  '这一下只伤到了仪式感。',
+  '诊断脉冲扫过，状态灯抖了一下。',
+  '任务外壳被 ping 到，日志开始冒泡。',
+  '这一下只校验到了仪式感。',
 ];
 
 export const OFFICE_LAST_WORDS = [
-  '等我重启一下。',
-  '缓存没了，尊严也没了。',
-  '我只是进入了省电模式。',
+  '等我重启一下钳子驱动。',
+  '缓存没了，甲壳也开始发烫。',
+  '我只是进入了离线检修模式。',
 ];
 
 export const OFFICE_RESPAWN_MESSAGES = [
-  '上线，继续假装认真工作。',
-  '护盾恢复，咖啡也续上了。',
-  '复活完成，刚才什么都没发生。',
+  '上线，继续处理任务流。',
+  '状态恢复，终端也亮了。',
+  '恢复完成，刚才的异常已归档。',
 ];
 
 export function createOfficeCombatState(now = 0): OfficeCombatState {
@@ -74,7 +74,7 @@ export function applyOfficeShot(
     };
   }
 
-  const nextShield = Math.max(0, combat.shield - TOY_BLASTER_DAMAGE);
+  const nextShield = Math.max(0, combat.shield - DIAGNOSTIC_PULSE_IMPACT);
   const shieldVisibleUntil = now + OFFICE_SHIELD_VISIBLE_MS;
 
   if (nextShield <= 0) {
