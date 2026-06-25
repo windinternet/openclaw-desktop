@@ -325,6 +325,63 @@ describe('AI Action Center session rules', () => {
     expect(final.lastAssistantResponse).toContain('ai-action');
   });
 
+  it('treats no-write knowledge refresh replies as completed and reparses previously saved text', () => {
+    const run = createAiActionRun({
+      type: 'knowledge_rewrite',
+      sourcePage: 'knowledge',
+      instanceId: 'instance-1',
+      input: '刷新索引/日志',
+    });
+    const responseText = [
+      '巡检完成，当前无需写入。',
+      '```ai-action',
+      '{"version":1,"kind":"no_write_needed","summary":"索引和日志已经同步，本次无需写入。"}',
+      '```',
+    ].join('\n');
+    const previouslyStuck = {
+      ...run,
+      status: 'running' as const,
+      lastAssistantResponse: responseText,
+    };
+
+    const updated = applyAiActionAssistantResponse(previouslyStuck, responseText);
+
+    expect(updated.status).toBe('done');
+    expect(updated.resultSummary).toBe('索引和日志已经同步，本次无需写入。');
+  });
+
+  it('resyncs a stuck run when the same saved assistant response becomes parseable', async () => {
+    const run = createAiActionRun({
+      type: 'knowledge_rewrite',
+      sourcePage: 'knowledge',
+      instanceId: 'instance-1',
+      input: '刷新索引/日志',
+    });
+    const responseText = [
+      '巡检完成，当前无需写入。',
+      '```ai-action',
+      '{"version":1,"kind":"no_write_needed","summary":"索引和日志已经同步，本次无需写入。"}',
+      '```',
+    ].join('\n');
+    const previouslyStuck = {
+      ...run,
+      status: 'running' as const,
+      lastAssistantResponse: responseText,
+    };
+    const client: GatewayRequestStub = {
+      request: async <T>() => ({
+        messages: [
+          { role: 'assistant', content: [{ type: 'text', text: responseText }] },
+        ],
+      }) as T,
+    };
+
+    const updated = await syncAiActionRunWithGateway(client, previouslyStuck);
+
+    expect(updated.status).toBe('done');
+    expect(updated.resultSummary).toBe('索引和日志已经同步，本次无需写入。');
+  });
+
   it('renders action prompts from disk templates without unresolved placeholders', () => {
     const createPrompt = buildGatewayAgentCreatePrompt({
       input: '创建产品 Agent',

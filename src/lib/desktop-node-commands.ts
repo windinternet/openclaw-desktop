@@ -30,6 +30,13 @@ function stringValue(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined;
 }
 
+function numberValue(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value !== 'string' || !value.trim()) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 function tagsValue(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined;
   return value.filter((item): item is string => typeof item === 'string');
@@ -348,6 +355,17 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
     const repository = repositoryApi();
     if (!repository?.gitDiff) return { ok: false, error: 'repository-api-unavailable' };
     return { ok: true, diff: await repository.gitDiff(repoPath) };
+  }
+
+  if (command === 'desktop.repository.git.log') {
+    const repoPath = stringValue(params.repoPath);
+    const relativePath = stringValue(params.path);
+    const limit = numberValue(params.limit) ?? 12;
+    if (!repoPath) return invalidParams('repoPath is required');
+    if (!relativePath) return invalidParams('path is required');
+    const repository = repositoryApi();
+    if (!repository?.gitLog) return { ok: false, error: 'repository-api-unavailable' };
+    return { ok: true, commits: await repository.gitLog(repoPath, relativePath, limit) };
   }
 
   if (command === 'desktop.repository.git.commit') {

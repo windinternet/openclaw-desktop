@@ -135,7 +135,8 @@ function normalizeRisk(value: unknown): 'low' | 'medium' | 'high' {
 
 function normalizeStructuredResponse(value: unknown): AiActionAssistantResponse | null {
   if (!isRecord(value)) return null;
-  const kind = value.kind;
+  const rawKind = value.kind;
+  const kind = rawKind === 'no_write_needed' ? 'completed' : rawKind;
   if (kind !== 'approval_required' && kind !== 'completed' && kind !== 'failed') return null;
   const summary = typeof value.summary === 'string' ? value.summary.trim() : '';
   if (!summary) return null;
@@ -200,16 +201,23 @@ export function parseAiActionAssistantResponse(text: string): AiActionAssistantR
 
 export function applyAiActionAssistantResponse(run: AiActionRun, text: string): AiActionRun {
   const responseText = text.trim();
-  if (!responseText || responseText === run.lastAssistantResponse) return run;
+  if (!responseText) return run;
   const response = parseAiActionAssistantResponse(responseText);
   const timestamp = now();
 
   if (!response) {
+    if (responseText === run.lastAssistantResponse) return run;
     return {
       ...run,
       lastAssistantResponse: responseText,
       updatedAt: timestamp,
     };
+  }
+
+  if (responseText === run.lastAssistantResponse) {
+    if (response.kind === 'approval_required' && run.status === 'awaiting_approval') return run;
+    if (response.kind === 'failed' && run.status === 'failed') return run;
+    if (response.kind === 'completed' && run.status === 'done') return run;
   }
 
   if (response.kind === 'approval_required' && response.approval) {
@@ -284,7 +292,7 @@ export async function syncAiActionRunWithGateway(
     .filter(Boolean)
     .at(-1);
 
-  if (assistantText && assistantText !== run.lastAssistantResponse) {
+  if (assistantText) {
     return applyAiActionAssistantResponse(run, assistantText);
   }
 
@@ -316,7 +324,7 @@ export async function queryAiActionRunStatus(
       .map((message) => extractSessionMessageText(message))
       .filter(Boolean)
       .at(-1);
-    if (assistantText && assistantText !== run.lastAssistantResponse) {
+    if (assistantText) {
       return applyAiActionAssistantResponse(run, assistantText);
     }
     return run;

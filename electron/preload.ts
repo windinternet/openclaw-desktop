@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     inspect: (repoPath: string) => ipcRenderer.invoke('repository:inspect', repoPath),
     bootstrap: (repoPath: string) => ipcRenderer.invoke('repository:bootstrap', repoPath),
     init: (repoPath: string) => ipcRenderer.invoke('repository:init', repoPath),
+    listTree: (repoPath: string, maxEntries?: number) => ipcRenderer.invoke('repository:listTree', repoPath, maxEntries),
     listMarkdown: (repoPath: string, directory: string) => ipcRenderer.invoke('repository:listMarkdown', repoPath, directory),
     readText: (repoPath: string, relativePath: string) => ipcRenderer.invoke('repository:readText', repoPath, relativePath),
     writeText: (repoPath: string, relativePath: string, content: string) =>
@@ -44,6 +45,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('repository:search', repoPath, query, directories),
     gitStatus: (repoPath: string) => ipcRenderer.invoke('repository:gitStatus', repoPath),
     gitDiff: (repoPath: string) => ipcRenderer.invoke('repository:gitDiff', repoPath),
+    gitLog: (repoPath: string, relativePath: string, limit?: number) =>
+      ipcRenderer.invoke('repository:gitLog', repoPath, relativePath, limit),
     gitCommit: (repoPath: string, message: string) => ipcRenderer.invoke('repository:gitCommit', repoPath, message),
   },
   artifact: {

@@ -27,6 +27,18 @@ interface RepositoryInspectResult {
   isEmpty: boolean
   hasRequiredTemplate: boolean
   permissionDenied: boolean
+  detectedProfile?: 'default' | 'llm-wiki'
+  suggestedKnowledge?: {
+    sourceRoot?: string
+    wikiRoot?: string
+    indexPath?: string
+    logPath?: string
+    schemaPath?: string
+    mapsRoot?: string
+    assetsRoot?: string
+    confidence?: 'low' | 'medium' | 'high'
+    mappingSource?: 'default' | 'agent' | 'manual' | 'fallback'
+  }
 }
 
 interface RepositoryMarkdownFile {
@@ -40,6 +52,14 @@ interface RepositorySearchResult {
   path: string
   line: number
   snippet: string
+}
+
+interface RepositoryGitLogEntry {
+  hash: string
+  shortHash: string
+  date: string
+  author: string
+  subject: string
 }
 
 function templateRoot(): string {
@@ -70,6 +90,64 @@ async function chooseDirectory(): Promise<string | null> {
   return result.canceled ? null : result.filePaths[0] ?? null
 }
 
+async function pathExists(repoPath: string, relativePath: string): Promise<boolean> {
+  try {
+    await access(path.join(repoPath, relativePath))
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function detectRepositoryProfile(repoPath: string, entries: string[]): Promise<Pick<RepositoryInspectResult, 'hasRequiredTemplate' | 'detectedProfile' | 'suggestedKnowledge'>> {
+  const hasDefaultTemplate = REQUIRED_TEMPLATE_ENTRIES.every((entry) => entries.includes(entry))
+  if (hasDefaultTemplate) {
+    return {
+      hasRequiredTemplate: true,
+      detectedProfile: 'default',
+      suggestedKnowledge: {
+        sourceRoot: 'sources',
+        wikiRoot: 'wiki',
+        indexPath: 'wiki/index.md',
+        logPath: 'wiki/log.md',
+        schemaPath: 'AGENTS.md',
+        mappingSource: 'default',
+      },
+    }
+  }
+
+  const hasAnythingKnowledge = (
+    entries.includes('AGENTS.md') &&
+    entries.includes('README.md') &&
+    entries.includes('30-knowledge') &&
+    await pathExists(repoPath, '30-knowledge/index.md') &&
+    await pathExists(repoPath, '30-knowledge/log.md') &&
+    await pathExists(repoPath, '30-knowledge/wiki') &&
+    await pathExists(repoPath, '30-knowledge/sources')
+  )
+
+  if (hasAnythingKnowledge) {
+    return {
+      hasRequiredTemplate: true,
+      detectedProfile: 'llm-wiki',
+      suggestedKnowledge: {
+        sourceRoot: '30-knowledge/sources',
+        wikiRoot: '30-knowledge/wiki',
+        indexPath: '30-knowledge/index.md',
+        logPath: '30-knowledge/log.md',
+        schemaPath: 'AGENTS.md',
+        mapsRoot: '30-knowledge/maps',
+        confidence: 'medium',
+        mappingSource: 'fallback',
+      },
+    }
+  }
+
+  return {
+    hasRequiredTemplate: false,
+  }
+}
+
 async function inspectRepository(repoPath: string): Promise<RepositoryInspectResult> {
   try {
     await access(repoPath)
@@ -87,14 +165,17 @@ async function inspectRepository(repoPath: string): Promise<RepositoryInspectRes
 
     const entries = await readdir(repoPath)
     const contentEntries = entries.filter((entry) => entry !== '.git' && entry !== '.DS_Store')
+    const profile = await detectRepositoryProfile(repoPath, entries)
 
     return {
       pathExists: true,
       isDirectory: true,
       isGitRepo: entries.includes('.git'),
       isEmpty: contentEntries.length === 0,
-      hasRequiredTemplate: REQUIRED_TEMPLATE_ENTRIES.every((entry) => entries.includes(entry)),
+      hasRequiredTemplate: profile.hasRequiredTemplate,
       permissionDenied: false,
+      detectedProfile: profile.detectedProfile,
+      suggestedKnowledge: profile.suggestedKnowledge,
     }
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code
@@ -174,6 +255,27 @@ async function listMarkdown(repoPath: string, directory: string): Promise<Reposi
   return files.sort((a, b) => a.path.localeCompare(b.path)).slice(0, 500)
 }
 
+async function listTree(repoPath: string, maxEntries = 300): Promise<string[]> {
+  const root = path.resolve(repoPath)
+  const entries: string[] = []
+
+  async function visit(currentPath: string, depth: number): Promise<void> {
+    if (entries.length >= maxEntries || depth > 4) return
+    const items = await readdir(currentPath, { withFileTypes: true }).catch(() => [])
+    for (const item of items.sort((a, b) => a.name.localeCompare(b.name))) {
+      if (entries.length >= maxEntries) return
+      if (item.name === '.git' || item.name === 'node_modules' || item.name === '.DS_Store') continue
+      const fullPath = path.join(currentPath, item.name)
+      const relativePath = path.relative(root, fullPath).split(path.sep).join('/')
+      entries.push(item.isDirectory() ? `${relativePath}/` : relativePath)
+      if (item.isDirectory()) await visit(fullPath, depth + 1)
+    }
+  }
+
+  await visit(root, 0)
+  return entries
+}
+
 async function readText(repoPath: string, relativePath: string): Promise<string> {
   return readFile(resolveRepoPath(repoPath, relativePath), 'utf-8').catch(() => '')
 }
@@ -218,6 +320,31 @@ async function gitDiff(repoPath: string): Promise<string> {
   return result.stdout
 }
 
+async function gitLog(repoPath: string, relativePath: string, limit = 12): Promise<RepositoryGitLogEntry[]> {
+  resolveRepoPath(repoPath, relativePath)
+  const safeLimit = Math.max(1, Math.min(Math.trunc(limit) || 12, 50))
+  const result = await execFileAsync('git', [
+    'log',
+    `--max-count=${safeLimit}`,
+    '--date=short',
+    '--pretty=format:%H%x1f%h%x1f%ad%x1f%an%x1f%s',
+    '--',
+    relativePath,
+  ], {
+    cwd: path.resolve(repoPath),
+    timeout: 10000,
+    maxBuffer: 1024 * 1024,
+  })
+  return result.stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [hash = '', shortHash = '', date = '', author = '', subject = ''] = line.split('\x1f')
+      return { hash, shortHash, date, author, subject }
+    })
+}
+
 async function gitCommit(repoPath: string, message: string): Promise<string> {
   const trimmed = message.trim()
   if (!trimmed) throw new Error('commit-message-required')
@@ -237,6 +364,7 @@ export function registerRepositoryIpcHandlers(): void {
   ipcMain.handle('repository:inspect', (_event, repoPath: string) => inspectRepository(repoPath))
   ipcMain.handle('repository:bootstrap', (_event, repoPath: string) => bootstrapRepository(repoPath))
   ipcMain.handle('repository:init', (_event, repoPath: string) => initRepository(repoPath))
+  ipcMain.handle('repository:listTree', (_event, repoPath: string, maxEntries?: number) => listTree(repoPath, maxEntries))
   ipcMain.handle('repository:listMarkdown', (_event, repoPath: string, directory: string) => listMarkdown(repoPath, directory))
   ipcMain.handle('repository:readText', (_event, repoPath: string, relativePath: string) => readText(repoPath, relativePath))
   ipcMain.handle('repository:writeText', (_event, repoPath: string, relativePath: string, content: string) =>
@@ -247,5 +375,6 @@ export function registerRepositoryIpcHandlers(): void {
   )
   ipcMain.handle('repository:gitStatus', (_event, repoPath: string) => gitStatus(repoPath))
   ipcMain.handle('repository:gitDiff', (_event, repoPath: string) => gitDiff(repoPath))
+  ipcMain.handle('repository:gitLog', (_event, repoPath: string, relativePath: string, limit?: number) => gitLog(repoPath, relativePath, limit))
   ipcMain.handle('repository:gitCommit', (_event, repoPath: string, message: string) => gitCommit(repoPath, message))
 }
