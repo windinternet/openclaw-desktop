@@ -23,6 +23,24 @@ GitHub Actions will build all configured packages and create a GitHub Release fo
 
 If `docs/release-notes/<tag>.md` exists, the release workflow uses that file as the GitHub Release body. If it does not exist, the workflow falls back to GitHub's generated release notes. The `.github/release.yml` file only configures GitHub's generated release notes categories; it is not a hand-written changelog source, and direct commits without pull request labels may only produce a full changelog link.
 
+## Release Notes Rule
+
+The release notes file must exist before the release tag is created. The release workflow checks out the tagged commit, so the tagged commit must already contain `docs/release-notes/<tag>.md`.
+
+Use this order for every release:
+
+```bash
+npm version 0.1.3 --no-git-tag-version
+# Write docs/release-notes/v0.1.3.md
+git add package.json package-lock.json docs/release-notes/v0.1.3.md
+git commit -m "chore: release v0.1.3"
+git tag -a v0.1.3 -m "Release v0.1.3"
+git push origin main
+git push origin v0.1.3
+```
+
+Do not create the tag before committing the release notes. If the tag points to a commit without `docs/release-notes/<tag>.md`, the workflow cannot read the hand-written release body and will fall back to generated notes.
+
 ## Manual Dry Run
 
 Use the `Build & Release` workflow's `workflow_dispatch` button to run packaging manually.
