@@ -1,8 +1,6 @@
-import { Avatar, Typography } from '@douyinfe/semi-ui';
+import { Avatar } from '@douyinfe/semi-ui';
 import type { AgentInfo } from '../lib/types';
 import { getAgentAvatarValue, getAgentDisplayName } from '../lib/agent-presentation';
-
-const { Text } = Typography;
 
 function isImageAvatar(value: string): boolean {
   return /^(https?:|data:|file:|blob:)/i.test(value) || value.startsWith('/');
@@ -19,9 +17,20 @@ export default function AgentSelectOption({ agent }: { agent: AgentInfo }) {
         {imageAvatar ? name.charAt(0).toUpperCase() : avatar}
       </Avatar>
       <div style={{ minWidth: 0, lineHeight: 1.25 }}>
-        <Text ellipsis style={{ display: 'block', fontSize: 13, color: 'var(--semi-color-text-0)' }}>
+        <span
+          className="agent-select-option-name"
+          title={name}
+          style={{
+            display: 'block',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            fontSize: 13,
+            color: 'var(--semi-color-text-0)',
+          }}
+        >
           {name}
-        </Text>
+        </span>
       </div>
     </div>
   );

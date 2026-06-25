@@ -174,4 +174,15 @@ describe('dashboard redesign', () => {
       expect(getByPath(en, key), `en ${key}`).toBeTruthy();
     }
   });
+
+  it('uses native ellipsis for dashboard list labels to avoid Semi ResizeObserver findDOMNode warnings', () => {
+    const dashboard = readFileSync('src/pages/DashboardPage.tsx', 'utf8');
+
+    expect(dashboard).toContain('className="dashboard-asset-title"');
+    expect(dashboard).toContain('className="dashboard-asset-meta"');
+    expect(dashboard).toContain('className="dashboard-model-usage-label"');
+    expect(dashboard).not.toContain('<Text ellipsis={{ showTooltip: true }} style={{ fontWeight: 600 }}>{title}</Text>');
+    expect(dashboard).not.toContain('<Text type="tertiary" size="small" ellipsis={{ showTooltip: true }}>{meta}</Text>');
+    expect(dashboard).not.toContain('<Text ellipsis={{ showTooltip: true }} style={{ fontWeight: 600 }}>{row.label}</Text>');
+  });
 });

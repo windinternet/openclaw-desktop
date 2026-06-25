@@ -176,6 +176,35 @@ describe('multi-instance gateway runtime', () => {
     expect(useStore.getState().sessions).toEqual([{ key: 'session-b', title: 'B' }]);
   });
 
+  it('fetches assistant display data from agent identity without probing unsupported legacy assistant RPCs', async () => {
+    responses.set(
+      instanceA.gatewayUrl,
+      new Map([
+        [
+          'agent.identity.get',
+          {
+            agentId: 'main',
+            name: 'Claw',
+            avatar: '🦞',
+          },
+        ],
+      ]),
+    );
+
+    useStore.getState().hydrateInstances([instanceA], instanceA.id);
+    await useStore.getState().connectToGateway(instanceA.id);
+    await useStore.getState().fetchAssistantInfo(instanceA.id);
+
+    const client = clients.get(instanceA.gatewayUrl);
+    expect(client?.request).toHaveBeenCalledWith('agent.identity.get', { agentId: 'main' });
+    expect(client?.request).not.toHaveBeenCalledWith('assistant.info');
+    expect(client?.request).not.toHaveBeenCalledWith('assistant.get');
+    expect(useStore.getState().instances.find((item) => item.id === instanceA.id)).toMatchObject({
+      assistantName: 'Claw',
+      avatarUrl: '🦞',
+    });
+  });
+
   it('marks a background instance with a completion summary without changing the current view', async () => {
     responses.set(
       instanceA.gatewayUrl,

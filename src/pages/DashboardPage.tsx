@@ -157,8 +157,22 @@ function AssetRow({
     <button type="button" className="dashboard-asset-row" onClick={onClick}>
       <span className="dashboard-asset-icon">{icon}</span>
       <span className="dashboard-asset-main">
-        <Text ellipsis={{ showTooltip: true }} style={{ fontWeight: 600 }}>{title}</Text>
-        {meta ? <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }}>{meta}</Text> : null}
+        <span
+          className="dashboard-asset-title"
+          title={title}
+          style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}
+        >
+          {title}
+        </span>
+        {meta ? (
+          <span
+            className="dashboard-asset-meta"
+            title={meta}
+            style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--semi-color-text-2)', fontSize: 12 }}
+          >
+            {meta}
+          </span>
+        ) : null}
       </span>
       {tag}
     </button>
@@ -456,7 +470,13 @@ export default function DashboardPage() {
           {usageDashboard?.modelRows.length ? usageDashboard.modelRows.slice(0, 6).map((row) => (
             <div key={row.model} className="dashboard-model-usage-row">
               <div className="dashboard-model-usage-main">
-                <Text ellipsis={{ showTooltip: true }} style={{ fontWeight: 600 }}>{row.label}</Text>
+                <span
+                  className="dashboard-model-usage-label"
+                  title={row.label}
+                  style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}
+                >
+                  {row.label}
+                </span>
                 <Text type="tertiary" size="small">
                   {formatNumber(row.totalTokens)} tokens · {row.sessionCount} sessions
                 </Text>

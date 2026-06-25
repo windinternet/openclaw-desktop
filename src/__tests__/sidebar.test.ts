@@ -55,6 +55,22 @@ describe('Sidebar session list', () => {
     expect(css).toContain('padding-top: 10px !important;');
   });
 
+  it('uses native ellipsis for the nav header text to avoid Semi ResizeObserver findDOMNode warnings', () => {
+    const source = readFileSync('src/components/Sidebar.tsx', 'utf8');
+    const start = source.indexOf('const instanceHeaderText = (');
+    const end = source.indexOf('const gatewayUser', start);
+    const headerSource = source.slice(start, end);
+
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    expect(headerSource).toContain('className="sidebar-instance-title"');
+    expect(headerSource).toContain("textOverflow: 'ellipsis'");
+    expect(headerSource).not.toContain('<Text\n          ellipsis');
+    expect(headerSource).not.toContain('<Text\n            ellipsis');
+    expect(source).toContain('className="sidebar-footer-display-name"');
+    expect(source).not.toContain('<Text ellipsis size="small"');
+  });
+
   it('renders per-instance runtime status and recent activity in the instance drawer', () => {
     const source = readFileSync('src/components/InstanceDrawer.tsx', 'utf8');
 
