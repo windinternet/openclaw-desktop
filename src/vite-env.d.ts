@@ -79,6 +79,7 @@ interface Window {
       gitDiff?: (repoPath: string) => Promise<string>;
       gitLog?: (repoPath: string, relativePath: string, limit?: number) => Promise<import('./lib/repository-knowledge').RepositoryGitLogEntry[]>;
       gitCommit?: (repoPath: string, message: string) => Promise<string>;
+      watchAgentsFile?: (repoPath: string, cb: (event: { watchId: string; repoPath: string }) => void) => Promise<() => void>;
     };
     device: {
       signChallenge: (params: {

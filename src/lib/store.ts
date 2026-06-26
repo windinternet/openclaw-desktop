@@ -57,13 +57,19 @@ import {
 import { recoverInterruptedAiActionRuns, syncAiActionRunsWithGateway } from './ai-action-run-store';
 import { writeArtifactSkill } from './artifact-skill';
 import { loadAppSnapshot, removePersistedInstance, saveCurrentInstanceId, saveInstances } from './local-persistence';
-import { syncRepositoryContextWithCompanion } from './repository-context-sync';
+import {
+  startRepositoryAgentsFileSyncWatcher,
+  syncRepositoryContextWithCompanion,
+} from './repository-context-sync';
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 }
 
 const processedCompletionEventKeys = new Set<string>();
+const repositoryAgentsFileSyncWatchers = new Map<string, { repoPath: string; cleanup: () => void }>();
+const repositoryAgentsFileSyncWatcherTokens = new Map<string, number>();
+let repositoryAgentsFileSyncWatcherSeq = 0;
 
 function getCompletionEventKey(instanceId: string, event: { payload?: unknown; seq?: number }): string {
   const payload =
@@ -327,6 +333,41 @@ function getCompanionApprovalInfo(message = 'Desktop node 需要 Gateway 授权'
   };
 }
 
+function cleanupRepositoryAgentsFileSyncWatcher(instanceId: string): void {
+  repositoryAgentsFileSyncWatcherTokens.set(instanceId, repositoryAgentsFileSyncWatcherSeq += 1);
+  const watcher = repositoryAgentsFileSyncWatchers.get(instanceId);
+  if (!watcher) return;
+  repositoryAgentsFileSyncWatchers.delete(instanceId);
+  try {
+    watcher.cleanup();
+  } catch (error) {
+    console.warn('[cleanupRepositoryAgentsFileSyncWatcher]', error);
+  }
+}
+
+async function ensureRepositoryAgentsFileSyncWatcher(
+  instanceId: string,
+  repoPath: string,
+  onChanged: () => void,
+  isCurrent: () => boolean,
+): Promise<void> {
+  const existing = repositoryAgentsFileSyncWatchers.get(instanceId);
+  if (existing?.repoPath === repoPath) return;
+  cleanupRepositoryAgentsFileSyncWatcher(instanceId);
+  const watchToken = repositoryAgentsFileSyncWatcherSeq += 1;
+  repositoryAgentsFileSyncWatcherTokens.set(instanceId, watchToken);
+  const cleanup = await startRepositoryAgentsFileSyncWatcher({ repoPath, onChanged });
+  if (
+    repositoryAgentsFileSyncWatcherTokens.get(instanceId) !== watchToken
+    || !isCurrent()
+    || repositoryAgentsFileSyncWatchers.get(instanceId)?.repoPath !== undefined
+  ) {
+    cleanup();
+    return;
+  }
+  repositoryAgentsFileSyncWatchers.set(instanceId, { repoPath, cleanup });
+}
+
 export const useStore = create<StoreState>((set, get) => ({
   instances: [],
   currentInstanceId: null,
@@ -434,6 +475,7 @@ export const useStore = create<StoreState>((set, get) => ({
     } catch {
       /* ignore stale client cleanup failure */
     }
+    cleanupRepositoryAgentsFileSyncWatcher(id);
     disconnectDesktopBridge(id);
     set((state) => {
       const instances = state.instances.filter((i) => i.id !== id);
@@ -666,6 +708,7 @@ export const useStore = create<StoreState>((set, get) => ({
             });
         } else if (status === 'error') {
           emitPetEvent({ type: 'connection:error', payload: { errorMessage: '网关连接错误' }, timestamp: Date.now() })
+          cleanupRepositoryAgentsFileSyncWatcher(instance.id);
           set((current) =>
             withInstanceRuntime(current, instance.id, {
               connectionStatus: 'error',
@@ -674,6 +717,7 @@ export const useStore = create<StoreState>((set, get) => ({
           );
         } else if (status === 'disconnected') {
           emitPetEvent({ type: 'connection:disconnected', timestamp: Date.now() })
+          cleanupRepositoryAgentsFileSyncWatcher(instance.id);
           set((current) => withInstanceRuntime(current, instance.id, { connectionStatus: 'disconnected' }));
           disconnectDesktopBridge(instance.id);
         } else if (status === 'connecting') {
@@ -708,6 +752,7 @@ export const useStore = create<StoreState>((set, get) => ({
       } catch {
         /* ignore failed cleanup after rejected handshake */
       }
+      cleanupRepositoryAgentsFileSyncWatcher(instance.id);
       set((current) =>
         withInstanceRuntime(current, instance.id, {
           connectionStatus: 'error',
@@ -725,6 +770,7 @@ export const useStore = create<StoreState>((set, get) => ({
     if (!instanceId) return;
     const client = state.instanceRuntimes[instanceId]?.client;
     disconnectDesktopBridge(instanceId);
+    cleanupRepositoryAgentsFileSyncWatcher(instanceId);
     if (client) {
       client.disconnect();
     }
@@ -806,13 +852,25 @@ export const useStore = create<StoreState>((set, get) => ({
     try {
       const result = await syncRepositoryContextWithCompanion(target.client, target.instanceId);
       if (result.status === 'failed') {
+        cleanupRepositoryAgentsFileSyncWatcher(target.instanceId);
         console.warn('[syncRepositoryContextForInstance]', result.message);
-      } else if (result.status === 'repository_api_unavailable' || result.status === 'fallback_available') {
+      } else if (
+        result.status === 'repository_api_unavailable'
+        || result.status === 'fallback_available'
+        || result.status === 'no_binding'
+      ) {
+        cleanupRepositoryAgentsFileSyncWatcher(target.instanceId);
         console.info('[syncRepositoryContextForInstance]', result);
-      } else if (result.status === 'synced' && result.warning) {
-        console.warn('[syncRepositoryContextForInstance]', result.warning);
+      } else if (result.status === 'synced') {
+        await ensureRepositoryAgentsFileSyncWatcher(target.instanceId, result.payload.repoPath, () => {
+          void get().syncRepositoryContextForInstance(target.instanceId);
+        }, () => {
+          return get().instanceRuntimes[target.instanceId]?.client?.getStatus() === 'connected';
+        });
+        if (result.warning) console.warn('[syncRepositoryContextForInstance]', result.warning);
       }
     } catch (err) {
+      cleanupRepositoryAgentsFileSyncWatcher(target.instanceId);
       console.error('[syncRepositoryContextForInstance]', err);
     }
   },

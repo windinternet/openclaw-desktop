@@ -55,6 +55,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
     gitLog: (repoPath: string, relativePath: string, limit?: number) =>
       ipcRenderer.invoke('repository:gitLog', repoPath, relativePath, limit),
     gitCommit: (repoPath: string, message: string) => ipcRenderer.invoke('repository:gitCommit', repoPath, message),
+    watchAgentsFile: async (repoPath: string, cb: (event: { watchId: string; repoPath: string }) => void) => {
+      let activeWatchId: string | null = null
+      const handler = (_event: Electron.IpcRendererEvent, payload: { watchId: string; repoPath: string }) => {
+        if (payload.watchId === activeWatchId) cb(payload)
+      }
+      ipcRenderer.on('repository:agentsFileChanged', handler)
+      try {
+        const result = await ipcRenderer.invoke('repository:watchAgentsFile', repoPath) as { watchId: string; repoPath: string }
+        activeWatchId = result.watchId
+        return () => {
+          ipcRenderer.removeListener('repository:agentsFileChanged', handler)
+          void ipcRenderer.invoke('repository:unwatchAgentsFile', result.watchId)
+        }
+      } catch (error) {
+        ipcRenderer.removeListener('repository:agentsFileChanged', handler)
+        throw error
+      }
+    },
   },
   artifact: {
     open: (artifactId: string, version: number) => ipcRenderer.invoke('artifact:open', artifactId, version),

@@ -57,3 +57,28 @@ export async function syncRepositoryContextWithCompanion(
     return { status: 'failed', message: error instanceof Error ? error.message : String(error) };
   }
 }
+
+export async function startRepositoryAgentsFileSyncWatcher(options: {
+  repoPath: string;
+  onChanged: () => void;
+}): Promise<() => void> {
+  if (typeof window === 'undefined') return () => {};
+
+  const fallbackToInterval = () => {
+    const intervalId = window.setInterval(options.onChanged, 15000);
+    return () => window.clearInterval(intervalId);
+  };
+
+  const watchAgentsFile = window.electronAPI?.repository?.watchAgentsFile;
+
+  if (!watchAgentsFile) {
+    return fallbackToInterval();
+  }
+
+  try {
+    return await watchAgentsFile(options.repoPath, () => options.onChanged());
+  } catch (error) {
+    console.warn('[startRepositoryAgentsFileSyncWatcher] watchAgentsFile failed; falling back to interval', error);
+    return fallbackToInterval();
+  }
+}

@@ -1,6 +1,7 @@
 import { app, dialog, ipcMain } from 'electron'
 import path from 'node:path'
 import { execFile } from 'node:child_process'
+import * as fs from 'node:fs'
 import { promisify } from 'node:util'
 import { access, cp, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import {
@@ -10,6 +11,14 @@ import {
 } from '../src/lib/repository-path-safety'
 
 const execFileAsync = promisify(execFile)
+const agentsFileWatchers = new Map<string, {
+  watcher: fs.FSWatcher;
+  sender: Electron.WebContents;
+  webContentsId: number;
+  repoPath: string;
+  destroyedHandler: () => void;
+}>()
+let agentsFileWatchSeq = 0
 
 const REQUIRED_TEMPLATE_ENTRIES = [
   'AGENTS.md',
@@ -406,6 +415,49 @@ async function gitCommit(repoPath: string, message: string): Promise<string> {
   return result.stdout
 }
 
+function cleanupAgentsFileWatcher(watchId: string): void {
+  const entry = agentsFileWatchers.get(watchId)
+  if (!entry) return
+  agentsFileWatchers.delete(watchId)
+  if (!entry.sender.isDestroyed()) {
+    entry.sender.off('destroyed', entry.destroyedHandler)
+  }
+  entry.watcher.close()
+}
+
+function cleanupAgentsFileWatchersForWebContents(webContentsId: number): void {
+  for (const [watchId, entry] of agentsFileWatchers.entries()) {
+    if (entry.webContentsId === webContentsId) cleanupAgentsFileWatcher(watchId)
+  }
+}
+
+function watchAgentsFile(sender: Electron.WebContents, repoPath: string): { watchId: string; repoPath: string } {
+  const watchId = `agents_${agentsFileWatchSeq += 1}`
+  const webContentsId = sender.id
+  const destroyedHandler = () => {
+    cleanupAgentsFileWatchersForWebContents(webContentsId)
+  }
+  const watcher = fs.watch(path.join(repoPath, 'AGENTS.md'), { persistent: false }, () => {
+    if (sender.isDestroyed()) {
+      cleanupAgentsFileWatcher(watchId)
+      return
+    }
+    sender.send('repository:agentsFileChanged', { watchId, repoPath })
+  })
+  watcher.on('error', () => {
+    cleanupAgentsFileWatcher(watchId)
+  })
+  agentsFileWatchers.set(watchId, { watcher, sender, webContentsId, repoPath, destroyedHandler })
+  sender.once('destroyed', destroyedHandler)
+  return { watchId, repoPath }
+}
+
+function unwatchAgentsFile(sender: Electron.WebContents, watchId: string): { ok: true } {
+  const entry = agentsFileWatchers.get(watchId)
+  if (entry?.webContentsId === sender.id) cleanupAgentsFileWatcher(watchId)
+  return { ok: true }
+}
+
 export function registerRepositoryIpcHandlers(): void {
   ipcMain.handle('repository:checkGit', () => checkGitAvailable())
   ipcMain.handle('repository:chooseDirectory', () => chooseDirectory())
@@ -426,4 +478,6 @@ export function registerRepositoryIpcHandlers(): void {
   ipcMain.handle('repository:gitDiff', (_event, repoPath: string) => gitDiff(repoPath))
   ipcMain.handle('repository:gitLog', (_event, repoPath: string, relativePath: string, limit?: number) => gitLog(repoPath, relativePath, limit))
   ipcMain.handle('repository:gitCommit', (_event, repoPath: string, message: string) => gitCommit(repoPath, message))
+  ipcMain.handle('repository:watchAgentsFile', (event, repoPath: string) => watchAgentsFile(event.sender, repoPath))
+  ipcMain.handle('repository:unwatchAgentsFile', (event, watchId: string) => unwatchAgentsFile(event.sender, watchId))
 }

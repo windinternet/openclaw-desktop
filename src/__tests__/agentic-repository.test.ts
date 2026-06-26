@@ -288,6 +288,13 @@ describe('agentic repository storage and templates', () => {
     expect(preload).toContain('repository:listTree');
     expect(preload).toContain('repository:gitLog');
     expect(preload).toContain('repository:gitCommit');
+    expect(preload).toContain('watchAgentsFile');
+    expect(preload).toContain('removeListener');
+    expect(handlers).toContain('repository:watchAgentsFile');
+    expect(handlers).toContain('repository:unwatchAgentsFile');
+    expect(handlers).toContain('repository:agentsFileChanged');
+    expect(handlers).toContain('persistent: false');
+    expect(handlers).toContain("off('destroyed'");
     expect(handlers).toContain('function listTree');
     expect(handlers).toContain('function gitLog');
     expect(handlers).toContain("ls-files");
@@ -299,6 +306,26 @@ describe('agentic repository storage and templates', () => {
     expect(handlers).toContain("app.getPath('home')");
     expect(main).toContain('registerRepositoryIpcHandlers');
     expect(packageJson).toContain('resources/agentic-repo/**/*');
+  });
+
+  it('exposes repository AGENTS.md change watching through renderer helpers and types', () => {
+    const preload = readFileSync('electron/preload.ts', 'utf8');
+    const types = readFileSync('src/vite-env.d.ts', 'utf8');
+    const sync = readFileSync('src/lib/repository-context-sync.ts', 'utf8');
+    const store = readFileSync('src/lib/store.ts', 'utf8');
+
+    expect(preload).toContain('watchAgentsFile');
+    expect(preload).toContain('repository:unwatchAgentsFile');
+    expect(types).toContain('watchAgentsFile');
+    expect(sync).toContain('startRepositoryAgentsFileSyncWatcher');
+    expect(sync).toContain('15000');
+    expect(store).toContain('startRepositoryAgentsFileSyncWatcher');
+    expect(store).toContain('repositoryAgentsFileSyncWatchers');
+    expect(store).toContain('repositoryAgentsFileSyncWatcherSeq');
+    expect(store).toContain('watchToken');
+    expect(store).toContain('cleanupRepositoryAgentsFileSyncWatcher');
+    expect(store).toContain('cleanup();');
+    expect(store).toContain('syncRepositoryContextForInstance(target.instanceId)');
   });
 
   it('loads and saves repository binding through instance-scoped storage', async () => {
