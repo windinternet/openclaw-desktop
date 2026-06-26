@@ -102,6 +102,14 @@ body,
   fill: url('#ig-new-session') !important;
 }
 
+.semi-navigation-item .semi-icon-branch svg path {
+  fill: url('#ig-knowledge') !important;
+}
+
+.semi-navigation-item .semi-icon-setting svg path {
+  fill: url('#ig-control-center') !important;
+}
+
 .semi-icon-puzzle svg path {
   fill: url('#ig-extensions') !important;
 }

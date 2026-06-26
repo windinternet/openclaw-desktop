@@ -613,6 +613,8 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
           <linearGradient id="ig-dashboard" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#3b82f6"/><stop offset="100%" stopColor="#818cf8"/></linearGradient>
           <linearGradient id="ig-search" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#f59e0b"/><stop offset="100%" stopColor="#fbbf24"/></linearGradient>
           <linearGradient id="ig-new-session" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#10b981"/><stop offset="100%" stopColor="#34d399"/></linearGradient>
+          <linearGradient id="ig-knowledge" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#06b6d4"/><stop offset="100%" stopColor="#22d3ee"/></linearGradient>
+          <linearGradient id="ig-control-center" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#64748b"/><stop offset="100%" stopColor="#94a3b8"/></linearGradient>
           <linearGradient id="ig-extensions" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#8b5cf6"/><stop offset="100%" stopColor="#a78bfa"/></linearGradient>
           <linearGradient id="ig-tasks" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#f43f5e"/><stop offset="100%" stopColor="#fb7185"/></linearGradient>
           <linearGradient id="ig-workspace" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#0ea5a8"/><stop offset="100%" stopColor="#2dd4bf"/></linearGradient>

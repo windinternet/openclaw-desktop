@@ -17,7 +17,9 @@ export default function ControlCenterPage() {
   const tasksRef = useRef<TasksPageHandle>(null);
   const activeMeta = {
     tasks: { title: t('nav.tasks'), desc: t('controlCenter.tasksDesc') },
-    extensions: { title: t('nav.extensions'), desc: t('controlCenter.extensionsDesc') },
+    skills: { title: t('extensions.skills'), desc: t('controlCenter.extensionsDesc') },
+    marketplace: { title: t('extensions.marketplace'), desc: t('controlCenter.extensionsDesc') },
+    tools: { title: t('extensions.tools'), desc: t('controlCenter.extensionsDesc') },
     tuning: { title: t('nav.tuning'), desc: t('controlCenter.tuningDesc') },
     'repository-protocol': { title: t('controlCenter.repositoryProtocol'), desc: t('controlCenter.repositoryProtocolDesc') },
   }[activeTab] ?? { title: t('nav.controlCenter'), desc: t('controlCenter.pageDesc') };
@@ -65,7 +67,9 @@ export default function ControlCenterPage() {
         tabBarExtraContent={activeTab === 'tasks' ? taskActions : tabActions}
       >
         <Tabs.TabPane tab={t('nav.tasks')} itemKey="tasks">{activeTab === 'tasks' && <TasksPage ref={tasksRef} embedded />}</Tabs.TabPane>
-        <Tabs.TabPane tab={t('nav.extensions')} itemKey="extensions">{activeTab === 'extensions' && <ExtensionsPage embedded />}</Tabs.TabPane>
+        <Tabs.TabPane tab={t('extensions.skills')} itemKey="skills">{activeTab === 'skills' && <ExtensionsPage embedded section="skills" />}</Tabs.TabPane>
+        <Tabs.TabPane tab={t('extensions.marketplace')} itemKey="marketplace">{activeTab === 'marketplace' && <ExtensionsPage embedded section="marketplace" />}</Tabs.TabPane>
+        <Tabs.TabPane tab={t('extensions.tools')} itemKey="tools">{activeTab === 'tools' && <ExtensionsPage embedded section="tools" />}</Tabs.TabPane>
         <Tabs.TabPane tab={t('nav.tuning')} itemKey="tuning">{activeTab === 'tuning' && <TuningPage embedded />}</Tabs.TabPane>
         <Tabs.TabPane tab={t('controlCenter.repositoryProtocol')} itemKey="repository-protocol">
           {activeTab === 'repository-protocol' && <RepositoryProtocolPage embedded onHeaderActionsChange={setTabActions} />}

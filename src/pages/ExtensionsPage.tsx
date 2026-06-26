@@ -320,11 +320,14 @@ const MARKETPLACE_COLUMNS = (
 
 /* ── Component ── */
 
+export type ExtensionsSection = 'skills' | 'marketplace' | 'tools';
+
 interface ExtensionsPageProps {
   embedded?: boolean;
+  section?: ExtensionsSection;
 }
 
-export default function ExtensionsPage({ embedded = false }: ExtensionsPageProps = {}) {
+export default function ExtensionsPage({ embedded = false, section }: ExtensionsPageProps = {}) {
   const { t } = useTranslation();
 
   const skills = useStore((s) => s.skills);
@@ -341,7 +344,7 @@ export default function ExtensionsPage({ embedded = false }: ExtensionsPageProps
   const installMarketplaceSkill = useStore((s) => s.installMarketplaceSkill);
 
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTabKey, setActiveTabKey] = useState('skills');
+  const [activeTabKey, setActiveTabKey] = useState<ExtensionsSection>('skills');
   const [eligibleOnly, setEligibleOnly] = useState(false);
   const [marketplaceSourceId, setMarketplaceSourceId] = useState<SkillMarketplaceSourceId>(DEFAULT_SKILL_MARKETPLACE_SOURCE_ID);
   const [marketplaceLoadedSourceId, setMarketplaceLoadedSourceId] = useState<SkillMarketplaceSourceId | null>(null);
@@ -406,7 +409,7 @@ export default function ExtensionsPage({ embedded = false }: ExtensionsPageProps
 
   useEffect(() => {
     if (
-      activeTabKey === 'marketplace' &&
+      (section ?? activeTabKey) === 'marketplace' &&
       !marketplaceSearching &&
       marketplaceLoadedSourceId !== marketplaceSourceId
     ) {
@@ -420,6 +423,7 @@ export default function ExtensionsPage({ embedded = false }: ExtensionsPageProps
     marketplaceLoadedSourceId,
     marketplaceSearching,
     marketplaceSourceId,
+    section,
   ]);
 
   const handleMarketplaceKeyDown = useCallback((event: KeyboardEvent) => {
@@ -757,6 +761,13 @@ export default function ExtensionsPage({ embedded = false }: ExtensionsPageProps
     </div>
   );
 
+  const selectedSection = section ?? activeTabKey;
+  const selectedSectionContent = {
+    skills: skillsTab,
+    marketplace: marketplaceTab,
+    tools: toolsTab,
+  }[selectedSection];
+
   return (
     <div
       style={{
@@ -779,24 +790,27 @@ export default function ExtensionsPage({ embedded = false }: ExtensionsPageProps
         </div>
       )}
 
-      {/* Tabs */}
       <div style={{ flex: 1, overflow: 'auto', padding: embedded ? '12px 0 0' : '0 28px 28px' }}>
-        <Tabs
-          type="line"
-          activeKey={activeTabKey}
-          onChange={setActiveTabKey}
-          style={{ height: '100%' }}
-        >
-          <Tabs.TabPane tab={t('extensions.skills')} itemKey="skills">
-            {skillsTab}
-          </Tabs.TabPane>
-          <Tabs.TabPane tab={t('extensions.marketplace')} itemKey="marketplace">
-            {marketplaceTab}
-          </Tabs.TabPane>
-          <Tabs.TabPane tab={t('extensions.tools')} itemKey="tools">
-            {toolsTab}
-          </Tabs.TabPane>
-        </Tabs>
+        {section ? (
+          selectedSectionContent
+        ) : (
+          <Tabs
+            type="line"
+            activeKey={activeTabKey}
+            onChange={(key) => setActiveTabKey(key as ExtensionsSection)}
+            style={{ height: '100%' }}
+          >
+            <Tabs.TabPane tab={t('extensions.skills')} itemKey="skills">
+              {skillsTab}
+            </Tabs.TabPane>
+            <Tabs.TabPane tab={t('extensions.marketplace')} itemKey="marketplace">
+              {marketplaceTab}
+            </Tabs.TabPane>
+            <Tabs.TabPane tab={t('extensions.tools')} itemKey="tools">
+              {toolsTab}
+            </Tabs.TabPane>
+          </Tabs>
+        )}
       </div>
     </div>
   );

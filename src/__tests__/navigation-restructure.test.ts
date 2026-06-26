@@ -65,6 +65,18 @@ describe('navigation restructure', () => {
     expect(css).toContain('font-weight: 600;');
   });
 
+  it('colors knowledge and control center nav icons with sidebar gradients', () => {
+    const sidebar = readFileSync('src/components/Sidebar.tsx', 'utf8');
+    const css = readFileSync('src/styles/global.css', 'utf8');
+
+    expect(sidebar).toContain('id="ig-knowledge"');
+    expect(sidebar).toContain('id="ig-control-center"');
+    expect(css).toContain(".semi-icon-branch svg path");
+    expect(css).toContain("fill: url('#ig-knowledge') !important;");
+    expect(css).toContain(".semi-icon-setting svg path");
+    expect(css).toContain("fill: url('#ig-control-center') !important;");
+  });
+
   it('maps primary entries to their routes', () => {
     expect(PRIMARY_ROUTE_MAP).toMatchObject({
       dashboard: '/',
@@ -175,7 +187,13 @@ describe('navigation hub pages', () => {
     expect(control).toContain('tabBarExtraContent');
     expect(control).toContain('<TasksPage ref={tasksRef} embedded');
     expect(control).not.toContain('TaskKanbanPage');
-    expect(control).toContain('<ExtensionsPage embedded');
+    expect(control).not.toContain('itemKey="extensions"');
+    expect(control).toContain('itemKey="skills"');
+    expect(control).toContain('itemKey="marketplace"');
+    expect(control).toContain('itemKey="tools"');
+    expect(control).toContain('<ExtensionsPage embedded section="skills" />');
+    expect(control).toContain('<ExtensionsPage embedded section="marketplace" />');
+    expect(control).toContain('<ExtensionsPage embedded section="tools" />');
     expect(control).toContain('<TuningPage embedded');
     expect(control).toContain('<RepositoryProtocolPage embedded');
     expect(control).not.toContain('SettingsPage');

@@ -119,7 +119,7 @@ describe('Extensions marketplace UI', () => {
     expect(pageSource).toContain('searchSkillMarketplace');
     expect(pageSource).toContain('installMarketplaceSkill');
     expect(pageSource).toContain('openMarketplaceSource');
-    expect(pageSource).toContain("activeTabKey === 'marketplace'");
+    expect(pageSource).toContain("(section ?? activeTabKey) === 'marketplace'");
     expect(pageSource).toContain('marketplaceLoadedSourceId');
     expect(storeSource).toContain('fetchSkillMarketplaceSkills');
     expect(storeSource).not.toContain('skills.market.search');
