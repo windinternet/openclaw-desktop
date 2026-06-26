@@ -303,6 +303,11 @@ describe('new session creation params', () => {
     expect(css.match(/\.new-session-logo-mark\s*\{[^}]*\}/)?.[0]).not.toContain('border:');
     expect(css.match(/\.new-session-logo-mark\s*\{[^}]*\}/)?.[0]).not.toContain('padding:');
     expect(css.match(/\.new-session-logo-mark\s*\{[^}]*\}/)?.[0]).not.toContain('box-shadow:');
+    expect(css).toContain('body[theme-mode="dark"] .new-session-launch-card');
+    expect(css).toContain('body[theme-mode="dark"] .new-session-card-illustration');
+    expect(css).toContain('body[theme-mode="dark"] .new-session-card-icon');
+    expect(css).toContain('body[theme-mode="dark"] .new-session-card-line');
+    expect(css).toContain('body[theme-mode="dark"] .new-session-card-chip');
     expect(css).not.toMatch(/\.new-session-bottom-composer\s*\{[^}]*background:/s);
   });
 });
