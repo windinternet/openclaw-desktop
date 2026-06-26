@@ -257,39 +257,76 @@ body,
 
 .new-session-logo-mark {
   position: relative;
-  width: 76px;
-  height: 76px;
-  border: 1px solid var(--semi-color-border);
-  border-radius: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px;
-  background: color-mix(in srgb, var(--semi-color-bg-1) 88%, #fff);
-  box-shadow:
-    0 16px 40px rgb(15 23 42 / 8%),
-    inset 0 1px 0 rgb(255 255 255 / 72%);
+  width: 130px;
+  height: 130px;
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+}
+
+.new-session-logo-mark::before,
+.new-session-logo-mark::after {
+  content: '';
+  position: absolute;
+  inset: -20px;
+  z-index: -1;
+  border: 1px solid rgb(34 211 238 / 28%);
+  border-radius: 999px;
+  animation: appOrbitPulse 1.8s ease-in-out infinite;
+}
+
+.new-session-logo-mark::after {
+  inset: -34px;
+  border-color: rgb(255 138 120 / 28%);
+  animation-delay: 0.3s;
 }
 
 .new-session-logo-image {
-  width: 56px;
-  height: 56px;
+  width: 112px;
+  height: 112px;
   display: block;
   object-fit: contain;
-  border-radius: 16px;
-  filter: drop-shadow(0 8px 16px rgb(239 91 77 / 12%));
+  animation: appIconFloat 1.8s ease-in-out infinite;
+  filter: drop-shadow(0 18px 24px rgb(8 17 31 / 14%));
 }
 
-body[theme-mode="dark"] .new-session-logo-mark {
-  border-color: color-mix(in srgb, var(--semi-color-border) 72%, #ef5b4d);
-  background: color-mix(in srgb, var(--semi-color-bg-2) 86%, #ef5b4d);
-  box-shadow:
-    0 18px 44px rgb(0 0 0 / 32%),
-    inset 0 1px 0 rgb(255 255 255 / 9%);
+body[theme-mode="dark"] .new-session-logo-mark::before {
+  border-color: rgb(34 211 238 / 42%);
+}
+
+body[theme-mode="dark"] .new-session-logo-mark::after {
+  border-color: rgb(255 138 120 / 38%);
 }
 
 body[theme-mode="dark"] .new-session-logo-image {
-  filter: drop-shadow(0 10px 22px rgb(239 91 77 / 22%));
+  filter: drop-shadow(0 18px 24px rgb(0 0 0 / 28%));
+}
+
+@keyframes appOrbitPulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+
+  38% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.18);
+  }
+}
+
+@keyframes appIconFloat {
+  0%,
+  100% {
+    transform: translateY(4px) scale(0.98);
+  }
+
+  45% {
+    transform: translateY(-3px) scale(1);
+  }
 }
 
 .new-session-brand-title.semi-typography {
@@ -562,8 +599,21 @@ body[theme-mode="dark"] .new-session-logo-image {
   }
 
   .new-session-logo-mark {
-    width: 64px;
-    height: 64px;
+    width: 104px;
+    height: 104px;
+  }
+
+  .new-session-logo-mark::before {
+    inset: -14px;
+  }
+
+  .new-session-logo-mark::after {
+    inset: -24px;
+  }
+
+  .new-session-logo-image {
+    width: 88px;
+    height: 88px;
   }
 
   .new-session-brand-title.semi-typography {

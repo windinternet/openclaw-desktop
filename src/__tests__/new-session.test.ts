@@ -294,7 +294,15 @@ describe('new session creation params', () => {
     expect(css).toContain('position: sticky');
     expect(css).toContain('backdrop-filter: blur(18px)');
     expect(css).toContain('.new-session-logo-image');
+    expect(css).toContain('.new-session-logo-mark::before');
+    expect(css).toContain('.new-session-logo-mark::after');
+    expect(css).toContain('appOrbitPulse');
+    expect(css).toContain('appIconFloat');
     expect(css).toContain('body[theme-mode="dark"] .new-session-logo-mark');
+    expect(css.match(/\.new-session-logo-mark\s*\{[^}]*\}/)?.[0]).not.toContain('background:');
+    expect(css.match(/\.new-session-logo-mark\s*\{[^}]*\}/)?.[0]).not.toContain('border:');
+    expect(css.match(/\.new-session-logo-mark\s*\{[^}]*\}/)?.[0]).not.toContain('padding:');
+    expect(css.match(/\.new-session-logo-mark\s*\{[^}]*\}/)?.[0]).not.toContain('box-shadow:');
     expect(css).not.toMatch(/\.new-session-bottom-composer\s*\{[^}]*background:/s);
   });
 });
