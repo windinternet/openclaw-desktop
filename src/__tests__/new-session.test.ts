@@ -316,9 +316,12 @@ describe('new session creation params', () => {
     expect(css).toContain('body[theme-mode="dark"] .new-session-card-chip');
     expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput-footer-configure-select.semi-select');
     expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput-footer-configure-select.semi-select:hover');
-    expect(css).toContain('cursor: pointer;');
+    expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput-footer-configure-select.semi-select,');
+    expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput-footer-configure-select.semi-select *');
+    expect(css).toContain('cursor: pointer !important;');
     expect(css).toContain('color: var(--semi-color-primary);');
-    expect(css).toContain('cursor: text;');
+    expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput-editor-content *');
+    expect(css).toContain('cursor: text !important;');
     expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput');
     expect(css).toContain('padding: 12px 14px 14px;');
     expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput-footer');

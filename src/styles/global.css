@@ -599,8 +599,10 @@ body[theme-mode="dark"] .new-session-card-chip {
 
 .chat-composer-frame__card .semi-aiChatInput-editor-content,
 .chat-composer-frame__card .semi-aiChatInput-editor-content .tiptap,
-.chat-composer-frame__card .ProseMirror {
-  cursor: text;
+.chat-composer-frame__card .semi-aiChatInput-editor-content *,
+.chat-composer-frame__card .ProseMirror,
+.chat-composer-frame__card .ProseMirror * {
+  cursor: text !important;
 }
 
 .chat-composer-frame__card .semi-aiChatInput-footer {
@@ -620,18 +622,22 @@ body[theme-mode="dark"] .new-session-card-chip {
   border: 0;
   background: transparent;
   box-shadow: none;
-  cursor: pointer;
+}
+
+.chat-composer-frame__card .semi-aiChatInput-footer-configure-select.semi-select,
+.chat-composer-frame__card .semi-aiChatInput-footer-configure-select.semi-select * {
+  cursor: pointer !important;
 }
 
 .chat-composer-frame__card .semi-select-selection {
   margin-left: 0;
-  cursor: pointer;
+  cursor: pointer !important;
 }
 
 .chat-composer-frame__card .semi-select-selection-text,
 .chat-composer-frame__card .semi-select-arrow {
   transition: color 0.16s ease;
-  cursor: pointer;
+  cursor: pointer !important;
 }
 
 .chat-composer-frame__card .semi-aiChatInput-footer-configure-select.semi-select:hover,
