@@ -260,11 +260,28 @@ describe('new session creation params', () => {
     expect(page).toContain('loadWorkbenchSnapshot');
     expect(page).toContain('buildNewSessionWorkbenchContinuations');
     expect(page).toContain('setStarterMessage');
-    expect(page).toContain('newSessionPage.workbenchContinuations');
+    expect(page).toContain('newSessionPage.workbenchCardDesc');
+    expect(page).toContain('launchCards');
     expect(page).toContain('initialMessage={starterMessage}');
     expect(composer).toContain('initialMessage?: string');
     expect(composer).toContain('defaultContent={defaultContent}');
     expect(zh).toContain('"newSessionPage"');
     expect(en).toContain('"newSessionPage"');
+  });
+
+  it('documents that the new session page uses an airy assistant-style launch layout', () => {
+    const page = readFileSync('src/pages/NewSessionPage.tsx', 'utf8');
+    const css = readFileSync('src/styles/global.css', 'utf8');
+
+    expect(page).toContain('new-session-hero');
+    expect(page).toContain('new-session-logo-mark');
+    expect(page).toContain('new-session-card-visual');
+    expect(page).toContain('new-session-bottom-composer');
+    expect(page).toContain('launchCards');
+    expect(page).not.toContain('new-session-workbench-panel');
+    expect(css).toContain('min-height: 100%');
+    expect(css).toContain('grid-template-columns: repeat(5, minmax(0, 1fr))');
+    expect(css).toContain('position: sticky');
+    expect(css).toContain('backdrop-filter: blur(18px)');
   });
 });
