@@ -1,4 +1,5 @@
 import type { AgentSwitchStrategy } from './agent-switch-settings';
+import { NAV_GROUPS, type PrimaryNavKey } from './navigation';
 import type { AssistantReplyGrouping, SessionReasoningDisplay, SessionToolCallDisplay } from './session-content';
 
 export type ThemeMode = 'light' | 'dark' | 'auto';
@@ -19,6 +20,14 @@ export const PRESET_THEME_COLORS: ThemeColor[] = [
 ];
 
 export type SupportedLocale = 'zh-CN' | 'en-US';
+export type DefaultHomeView = PrimaryNavKey;
+export const DEFAULT_HOME_VIEW_OPTIONS = NAV_GROUPS
+  .flatMap((group) => group.items)
+  .map((item) => ({
+    value: item.key,
+    route: item.route,
+    labelKey: item.labelKey,
+  }));
 
 export interface AppSettings {
   settingsSchemaVersion?: number;
@@ -36,10 +45,11 @@ export interface AppSettings {
   assistantReplyGrouping: AssistantReplyGrouping;
   openTuningOnStartup: boolean;
   sidebarNavGrouped: boolean;
+  defaultHomeView: DefaultHomeView;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  settingsSchemaVersion: 3,
+  settingsSchemaVersion: 4,
   initialized: false,
   themeMode: 'dark',
   themeColor: 'blue',
@@ -54,4 +64,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   assistantReplyGrouping: 'merged',
   openTuningOnStartup: false,
   sidebarNavGrouped: false,
+  defaultHomeView: 'dashboard',
 };

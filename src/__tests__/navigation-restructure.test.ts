@@ -44,6 +44,20 @@ describe('navigation restructure', () => {
     expect(settingsPage).toContain('updateSettings({ sidebarNavGrouped: checked })');
   });
 
+  it('lets users choose which left sidebar page the app home opens', () => {
+    const app = readFileSync('src/App.tsx', 'utf8');
+    const settingsPage = readFileSync('src/pages/SettingsPage.tsx', 'utf8');
+
+    expect(app).toContain('function HomeRoute()');
+    expect(app).toContain('defaultHomeView');
+    expect(app).toContain('DEFAULT_HOME_VIEW_OPTIONS.find');
+    expect(app).toContain('<Navigate to={homeOption.route} replace />');
+    expect(settingsPage).toContain("t('settings.defaultHomeView')");
+    expect(settingsPage).toContain("value={settings.defaultHomeView ?? 'dashboard'}");
+    expect(settingsPage).toContain('updateSettings({ defaultHomeView: val as DefaultHomeView })');
+    expect(settingsPage).toContain('DEFAULT_HOME_VIEW_OPTIONS.map');
+  });
+
   it('keeps grouped primary navigation labels visually emphasized', () => {
     const css = readFileSync('src/styles/global.css', 'utf8');
 
@@ -227,6 +241,10 @@ describe('navigation locale strings', () => {
       'sessions.pageDesc',
       'sessions.newSessionDesc',
       'sessions.searchDesc',
+      'settings.defaultHomeView',
+      'settings.defaultHomeViewDesc',
+      'settings.defaultHomeDashboard',
+      'settings.defaultHomeNewSession',
       'workbench.pageDesc',
       'workbench.kanbanDesc',
       'workbench.activityDesc',

@@ -9,12 +9,14 @@ function getByPath(source: unknown, path: string): unknown {
 }
 
 describe('dashboard redesign', () => {
-  it('uses the shared new-session composer for the floating quick start surface', () => {
+  it('keeps new session composer logic out of the dashboard', () => {
     const dashboard = readFileSync('src/pages/DashboardPage.tsx', 'utf8');
+    const newSession = readFileSync('src/pages/NewSessionPage.tsx', 'utf8');
 
-    expect(dashboard).toContain("import NewSessionComposer from '../components/NewSessionComposer'");
-    expect(dashboard).toContain('<NewSessionComposer');
-    expect(dashboard).toContain('dashboard-floating-composer');
+    expect(newSession).toContain("import NewSessionComposer from '../components/NewSessionComposer'");
+    expect(newSession).toContain('<NewSessionComposer');
+    expect(dashboard).not.toContain('NewSessionComposer');
+    expect(dashboard).not.toContain('dashboard-floating-composer');
     expect(dashboard).not.toContain("activeClient.request<{ key?: string; sessionKey?: string }>");
   });
 
@@ -123,27 +125,17 @@ describe('dashboard redesign', () => {
     expect(css).not.toContain('width: min(100% - 24px');
   });
 
-  it('keeps the quick start composer fixed so it does not jump at the bottom of the scroll area', () => {
-    const css = readFileSync('src/styles/global.css', 'utf8');
-
-    expect(css).toContain('.dashboard-floating-composer-shell {\n  position: fixed;');
-    expect(css).toContain('width: min(760px, calc(100vw - 288px - 48px));');
-    expect(css).toContain('padding: 24px 24px 240px;');
-    expect(css).not.toContain('position: sticky;');
-  });
-
-  it('makes the floating quick start composer visually prominent without changing its inherited composer logic', () => {
+  it('does not embed the quick start composer in the dashboard', () => {
     const dashboard = readFileSync('src/pages/DashboardPage.tsx', 'utf8');
     const css = readFileSync('src/styles/global.css', 'utf8');
 
-    expect(dashboard).toContain('dashboard-floating-composer-accent');
-    expect(css).toContain('.dashboard-floating-composer-accent');
-    expect(css).toContain('0 28px 90px');
-    expect(css).toContain('backdrop-filter: blur(18px)');
-    expect(css).toContain('outline: 1px solid color-mix');
+    expect(dashboard).not.toContain('NewSessionComposer');
+    expect(dashboard).not.toContain('dashboard-floating-composer');
+    expect(css).not.toContain('.dashboard-floating-composer-shell');
+    expect(css).not.toContain('.dashboard-floating-composer-accent');
   });
 
-  it('defines locale strings for the four major dashboard areas and quick start', () => {
+  it('defines locale strings for the four major dashboard areas', () => {
     const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
     const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
     const keys = [
@@ -152,7 +144,6 @@ describe('dashboard redesign', () => {
       'dashboard.recentWorkKnowledge',
       'dashboard.outputsArtifacts',
       'dashboard.attention',
-      'dashboard.quickStart',
       'dashboard.realUsageUnavailable',
       'dashboard.totalTokens',
       'dashboard.inputTokens',

@@ -14,7 +14,6 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useStore, type AiActionRun, type SessionInfo } from '../lib';
-import NewSessionComposer from '../components/NewSessionComposer';
 import { ActivityTrendChart, ModelUsageBarChart, ProviderQuotaBarChart, StatusDistributionChart, TokenCompositionChart } from '../components/charts/DashboardVisualCharts';
 import UsageTrendChart from '../components/charts/UsageTrendChart';
 import type { ArtifactMeta } from '../lib/artifact-types';
@@ -693,18 +692,6 @@ export default function DashboardPage() {
           </div>
         </DashboardSection>
 
-        <div className="dashboard-floating-composer-shell">
-          <span className="dashboard-floating-composer-accent" aria-hidden="true" />
-          <div className="dashboard-floating-composer-title">
-            <Text strong>{t('dashboard.quickStart')}</Text>
-            <Text type="tertiary" size="small">{t('dashboard.quickStartDesc')}</Text>
-          </div>
-          <NewSessionComposer
-            className="dashboard-floating-composer"
-            inputKeyPrefix="dashboard-quick-start"
-            style={{ width: '100%' }}
-          />
-        </div>
       </div>
     </div>
   );

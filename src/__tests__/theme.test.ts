@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { applyTheme } from '../lib/theme';
-import { DEFAULT_SETTINGS } from '../lib/settings-types';
+import { DEFAULT_HOME_VIEW_OPTIONS, DEFAULT_SETTINGS } from '../lib/settings-types';
+import { NAV_GROUPS } from '../lib/navigation';
 
 function createStyleDeclaration() {
   const values = new Map<string, string>();
@@ -100,5 +101,17 @@ describe('applyTheme', () => {
 
   it('defaults sidebar navigation grouping to off', () => {
     expect(DEFAULT_SETTINGS.sidebarNavGrouped).toBe(false);
+  });
+
+  it('defaults the app home view to dashboard', () => {
+    expect(DEFAULT_SETTINGS.defaultHomeView).toBe('dashboard');
+  });
+
+  it('limits selectable default home views to the left sidebar navigation menu', () => {
+    const sidebarItems = NAV_GROUPS.flatMap((group) => group.items);
+
+    expect(DEFAULT_HOME_VIEW_OPTIONS.map((option) => option.value)).toEqual(sidebarItems.map((item) => item.key));
+    expect(DEFAULT_HOME_VIEW_OPTIONS.map((option) => option.route)).toEqual(sidebarItems.map((item) => item.route));
+    expect(DEFAULT_HOME_VIEW_OPTIONS.map((option) => option.labelKey)).toEqual(sidebarItems.map((item) => item.labelKey));
   });
 });

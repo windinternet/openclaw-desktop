@@ -2,8 +2,8 @@ import { useCallback, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, Typography, Select, Input, Button, Tag, Space, Switch } from '@douyinfe/semi-ui';
 import { useSettingsStore } from '../lib/settings-store';
-import { PRESET_THEME_COLORS } from '../lib/settings-types';
-import type { ThemeMode, SupportedLocale } from '../lib/settings-types';
+import { DEFAULT_HOME_VIEW_OPTIONS, PRESET_THEME_COLORS } from '../lib/settings-types';
+import type { ThemeMode, SupportedLocale, DefaultHomeView } from '../lib/settings-types';
 import type { AgentSwitchStrategy, InstanceAgentSwitchStrategy } from '../lib/agent-switch-settings';
 import type { AssistantReplyGrouping } from '../lib/session-content';
 import { useStore } from '../lib';
@@ -256,19 +256,43 @@ export default function SettingsPage({ embedded = false }: SettingsPageProps = {
 
           {/* ═══ Navigation ═══ */}
           <SectionCard icon="🧭" title={t('settings.navigation')} desc={t('settings.navigationDesc')}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24 }}>
-              <div style={{ minWidth: 0 }}>
-                <Text style={{ display: 'block', color: 'var(--semi-color-text-0)' }}>
-                  {t('settings.sidebarNavGrouped')}
-                </Text>
-                <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>
-                  {t('settings.sidebarNavGroupedDesc')}
-                </Text>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24 }}>
+                <div style={{ minWidth: 0 }}>
+                  <Text style={{ display: 'block', color: 'var(--semi-color-text-0)' }}>
+                    {t('settings.sidebarNavGrouped')}
+                  </Text>
+                  <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>
+                    {t('settings.sidebarNavGroupedDesc')}
+                  </Text>
+                </div>
+                <Switch
+                  checked={settings.sidebarNavGrouped}
+                  onChange={(checked: boolean) => updateSettings({ sidebarNavGrouped: checked })}
+                />
               </div>
-              <Switch
-                checked={settings.sidebarNavGrouped}
-                onChange={(checked: boolean) => updateSettings({ sidebarNavGrouped: checked })}
-              />
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24 }}>
+                <div style={{ minWidth: 0 }}>
+                  <Text style={{ display: 'block', color: 'var(--semi-color-text-0)' }}>
+                    {t('settings.defaultHomeView')}
+                  </Text>
+                  <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>
+                    {t('settings.defaultHomeViewDesc')}
+                  </Text>
+                </div>
+                <Select
+                  value={settings.defaultHomeView ?? 'dashboard'}
+                  onChange={(val: any) => updateSettings({ defaultHomeView: val as DefaultHomeView })}
+                  style={{ width: 220 }}
+                >
+                  {DEFAULT_HOME_VIEW_OPTIONS.map((opt) => (
+                    <Select.Option key={opt.value} value={opt.value}>
+                      {t(opt.labelKey)}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </div>
             </div>
           </SectionCard>
 

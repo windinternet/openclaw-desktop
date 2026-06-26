@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Navigate, Routes, Route } from 'react-router-dom';
 import SetupPage from './pages/SetupPage';
 import WelcomePage from './pages/WelcomePage';
 import MainPage from './pages/MainPage';
@@ -22,6 +22,19 @@ import SessionChatPage from './pages/SessionChatPage';
 import ArtifactsPage from './pages/ArtifactsPage';
 import { ArtifactDetailPage } from './pages/ArtifactDetailPage';
 import AppGuard from './components/AppGuard';
+import { useSettingsStore } from './lib/settings-store';
+import { DEFAULT_HOME_VIEW_OPTIONS } from './lib/settings-types';
+
+function HomeRoute() {
+  const defaultHomeView = useSettingsStore((s) => s.settings.defaultHomeView);
+  const homeOption = DEFAULT_HOME_VIEW_OPTIONS.find((option) => option.value === defaultHomeView) ?? DEFAULT_HOME_VIEW_OPTIONS[0];
+
+  if (homeOption.route !== '/') {
+    return <Navigate to={homeOption.route} replace />;
+  }
+
+  return <DashboardPage />;
+}
 
 function App() {
   return (
@@ -37,7 +50,7 @@ function App() {
             </AppGuard>
           }
         >
-          <Route index element={<DashboardPage />} />
+          <Route index element={<HomeRoute />} />
           <Route path="search" element={<SearchPage />} />
           <Route path="new-session" element={<NewSessionPage />} />
           <Route path="sessions" element={<SessionsPage />} />

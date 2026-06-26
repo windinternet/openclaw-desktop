@@ -522,7 +522,7 @@ body,
 .dashboard-main {
   width: 100%;
   min-height: 100%;
-  padding: 24px 24px 240px;
+  padding: 24px;
 }
 
 .dashboard-title-row,
@@ -819,47 +819,6 @@ body,
   background: var(--semi-color-fill-0);
 }
 
-.dashboard-floating-composer-shell {
-  position: fixed;
-  left: calc(288px + 24px);
-  right: 24px;
-  bottom: 18px;
-  z-index: 40;
-  width: min(760px, calc(100vw - 288px - 48px));
-  margin: 0 auto;
-  padding: 12px;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--semi-color-primary) 24%, var(--semi-color-border));
-  border-radius: 8px;
-  outline: 1px solid color-mix(in srgb, var(--semi-color-bg-0) 88%, transparent);
-  background: color-mix(in srgb, var(--semi-color-bg-0) 92%, transparent);
-  box-shadow:
-    0 28px 90px color-mix(in srgb, var(--semi-color-shadow) 30%, transparent),
-    0 10px 28px color-mix(in srgb, var(--semi-color-primary) 12%, transparent);
-  backdrop-filter: blur(18px);
-}
-
-.dashboard-floating-composer-accent {
-  position: absolute;
-  inset: 0 0 auto;
-  height: 3px;
-  background: linear-gradient(90deg, var(--semi-color-primary), var(--semi-color-success), var(--semi-color-primary-light-active));
-  pointer-events: none;
-}
-
-.dashboard-floating-composer-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 2px 2px 10px;
-}
-
-.dashboard-floating-composer {
-  border-radius: 8px;
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--semi-color-bg-0) 80%, transparent) inset;
-}
-
 @media (max-width: 1180px) {
   .dashboard-gateway-grid,
   .dashboard-metric-grid {
@@ -869,13 +828,7 @@ body,
 
 @media (max-width: 900px) {
   .dashboard-main {
-    padding: 16px 12px 240px;
-  }
-
-  .dashboard-floating-composer-shell {
-    left: calc(288px + 12px);
-    right: 12px;
-    width: min(760px, calc(100vw - 288px - 24px));
+    padding: 16px 12px;
   }
 
   .dashboard-column-grid,
@@ -889,11 +842,6 @@ body,
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .dashboard-floating-composer-title {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 2px;
-  }
 }
 
 @media (max-width: 640px) {
