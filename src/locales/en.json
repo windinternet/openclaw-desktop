@@ -51,8 +51,8 @@
     "searchDesc": "Find historical sessions, messages, and related context."
   },
   "newSessionPage": {
-    "title": "OpenClaw",
-    "subtitle": "A 24/7 computer AI assistant, ready whenever work shows up.",
+    "title": "OpenClaw Desktop",
+    "subtitle": "A 24/7 computer AI workspace, ready whenever work shows up.",
     "quickStartTitle": "Common work scenarios",
     "quickStartDesc": "Pick a practical starting point and OpenClaw will prepare the first message.",
     "scenarioReminderTitle": "Set a dedicated timed task",
@@ -90,6 +90,11 @@
     "activityDesc": "Review actions, approvals, and results executed by OpenClaw Agents.",
     "dashboard": "Dashboard",
     "dashboardDesc": "See Workbench projects, tasks, outputs, and execution state at a glance.",
+    "dashboardHeroTitle": "Start here today",
+    "dashboardHeroDesc": "A lighter entry for current tasks, project focus, and recent outputs.",
+    "dashboardContinue": "Continue Work",
+    "dashboardAssetBrief": "Output Summary",
+    "dashboardActivityBrief": "Recent Activity",
     "dashboardMetric": "Overview",
     "dashboardFocus": "Project Focus",
     "dashboardWorkStats": "Progress Stats",

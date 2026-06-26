@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
-import { groupReviewsByFolder, loadWorkbenchSnapshot, parsePlanMetadata, readWorkbenchMarkdown } from '../lib/repository-workbench';
+import {
+  groupReviewsByFolder,
+  loadWorkbenchSnapshot,
+  parsePlanMetadata,
+  readWorkbenchMarkdown,
+} from '../lib/repository-workbench';
 
 describe('repository workbench', () => {
   afterEach(() => {
@@ -10,12 +15,18 @@ describe('repository workbench', () => {
 
   it('loads matters, plans, runs, outputs, and reviews from the repository', async () => {
     const listMarkdown = vi.fn(async (_repoPath: string, directory: string) => {
-      if (directory === 'work/active') return [{ path: 'work/active/project.md', name: 'project.md', size: 10, updatedAt: 1 }];
-      if (directory === 'work/completed') return [{ path: 'work/completed/done.md', name: 'done.md', size: 11, updatedAt: 2 }];
-      if (directory === 'work/someday') return [{ path: 'work/someday/later.md', name: 'later.md', size: 12, updatedAt: 3 }];
-      if (directory === 'plans/active') return [{ path: 'plans/active/plan.md', name: 'plan.md', size: 20, updatedAt: 2 }];
-      if (directory === 'plans/completed') return [{ path: 'plans/completed/plan-done.md', name: 'plan-done.md', size: 21, updatedAt: 4 }];
-      if (directory === 'reviews') return [{ path: 'reviews/weekly/2026-W26.md', name: '2026-W26.md', size: 30, updatedAt: 3 }];
+      if (directory === 'work/active')
+        return [{ path: 'work/active/project.md', name: 'project.md', size: 10, updatedAt: 1 }];
+      if (directory === 'work/completed')
+        return [{ path: 'work/completed/done.md', name: 'done.md', size: 11, updatedAt: 2 }];
+      if (directory === 'work/someday')
+        return [{ path: 'work/someday/later.md', name: 'later.md', size: 12, updatedAt: 3 }];
+      if (directory === 'plans/active')
+        return [{ path: 'plans/active/plan.md', name: 'plan.md', size: 20, updatedAt: 2 }];
+      if (directory === 'plans/completed')
+        return [{ path: 'plans/completed/plan-done.md', name: 'plan-done.md', size: 21, updatedAt: 4 }];
+      if (directory === 'reviews')
+        return [{ path: 'reviews/weekly/2026-W26.md', name: '2026-W26.md', size: 30, updatedAt: 3 }];
       return [];
     });
     const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
@@ -60,7 +71,8 @@ describe('repository workbench', () => {
 
   it('loads semantic workbench slots when binding has a workbench mapping', async () => {
     const listMarkdown = vi.fn(async (_repoPath: string, directory: string) => {
-      if (directory === '20-projects') return [{ path: '20-projects/demo/README.md', name: 'README.md', size: 42, updatedAt: 4 }];
+      if (directory === '20-projects')
+        return [{ path: '20-projects/demo/README.md', name: 'README.md', size: 42, updatedAt: 4 }];
       if (directory === '40-tools') return [{ path: '40-tools/README.md', name: 'README.md', size: 24, updatedAt: 5 }];
       return [];
     });
@@ -115,21 +127,31 @@ describe('repository workbench', () => {
       },
     });
 
-    expect(snapshot.semanticSections).toEqual(expect.arrayContaining([
-      expect.objectContaining({ key: 'current', title: '正在进行', markdown: '# 正在进行\n\n- 当前焦点' }),
-      expect.objectContaining({ key: 'next', title: '接下来', markdown: '# 接下来\n\n- 后续事项' }),
-      expect.objectContaining({ key: 'projects', title: '项目层', files: [{ path: '20-projects/demo/README.md', name: 'README.md', size: 42, updatedAt: 4 }] }),
-      expect.objectContaining({ key: 'tools', title: '工具层', files: [{ path: '40-tools/README.md', name: 'README.md', size: 24, updatedAt: 5 }] }),
-    ]));
+    expect(snapshot.semanticSections).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'current', title: '正在进行', markdown: '# 正在进行\n\n- 当前焦点' }),
+        expect.objectContaining({ key: 'next', title: '接下来', markdown: '# 接下来\n\n- 后续事项' }),
+        expect.objectContaining({
+          key: 'projects',
+          title: '项目层',
+          files: [{ path: '20-projects/demo/README.md', name: 'README.md', size: 42, updatedAt: 4 }],
+        }),
+        expect.objectContaining({
+          key: 'tools',
+          title: '工具层',
+          files: [{ path: '40-tools/README.md', name: 'README.md', size: 24, updatedAt: 5 }],
+        }),
+      ]),
+    );
     expect(readText).toHaveBeenCalledWith('/repo', '10-ops/tasks/now.md');
     expect(listMarkdown).toHaveBeenCalledWith('/repo', '20-projects');
   });
 
   it('groups semantic reviews by their review folder', async () => {
     const reviewFile = { path: 'reviews/weekly/2026-W26.md', name: '2026-W26.md', size: 30, updatedAt: 3 };
-    const listMarkdown = vi.fn(async (_repoPath: string, directory: string) => (
-      directory === 'reviews' ? [reviewFile] : []
-    ));
+    const listMarkdown = vi.fn(async (_repoPath: string, directory: string) =>
+      directory === 'reviews' ? [reviewFile] : [],
+    );
     const readText = vi.fn(async () => '');
     vi.stubGlobal('window', {
       electronAPI: {
@@ -165,12 +187,12 @@ describe('repository workbench', () => {
 
   it('loads semantic paths by path shape instead of trusting slot kind', async () => {
     const projectFile = { path: '20-projects/demo/README.md', name: 'README.md', size: 42, updatedAt: 4 };
-    const listMarkdown = vi.fn(async (_repoPath: string, directory: string) => (
-      directory === '20-projects' ? [projectFile] : []
-    ));
-    const readText = vi.fn(async (_repoPath: string, relativePath: string) => (
-      relativePath === '10-ops/tasks/now.md' ? '# 正在进行' : ''
-    ));
+    const listMarkdown = vi.fn(async (_repoPath: string, directory: string) =>
+      directory === '20-projects' ? [projectFile] : [],
+    );
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) =>
+      relativePath === '10-ops/tasks/now.md' ? '# 正在进行' : '',
+    );
     vi.stubGlobal('window', {
       electronAPI: {
         repository: { listMarkdown, readText },
@@ -204,10 +226,12 @@ describe('repository workbench', () => {
 
     expect(readText).toHaveBeenCalledWith('/repo', '10-ops/tasks/now.md');
     expect(listMarkdown).toHaveBeenCalledWith('/repo', '20-projects');
-    expect(snapshot.semanticSections).toEqual(expect.arrayContaining([
-      expect.objectContaining({ key: 'current', markdown: '# 正在进行' }),
-      expect.objectContaining({ key: 'projects', files: [projectFile] }),
-    ]));
+    expect(snapshot.semanticSections).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'current', markdown: '# 正在进行' }),
+        expect.objectContaining({ key: 'projects', files: [projectFile] }),
+      ]),
+    );
   });
 
   it('derives project entities and concrete task items from semantic workbench markdown', async () => {
@@ -225,7 +249,8 @@ describe('repository workbench', () => {
       if (relativePath === '10-ops/tasks/now.md') return '# 正在进行\n\n- [ ] 修正工作台看板\n- 暂无阻塞中的进行事项。';
       if (relativePath === '10-ops/tasks/next.md') return '# 接下来\n\n- [ ] 沉淀项目识别规则';
       if (relativePath === '10-ops/tasks/done.md') return '# 已完成\n\n- [x] 建立工作台';
-      if (relativePath === '20-projects/demo/README.md') return '# 示例项目\n\n## 项目状态\n\n- 状态：进行中\n\n这是项目摘要。';
+      if (relativePath === '20-projects/demo/README.md')
+        return '# 示例项目\n\n## 项目状态\n\n- 状态：进行中\n\n这是项目摘要。';
       if (relativePath === '20-projects/demo/plan.md') return '# 示例项目计划';
       if (relativePath === '20-projects/demo/log.md') return '# 示例项目日志';
       return '';
@@ -299,7 +324,12 @@ describe('repository workbench', () => {
         title: '接下来',
         path: '10-ops/tasks/next.md',
         items: [
-          { id: '10-ops/tasks/next.md:0', text: '沉淀项目识别规则', sourcePath: '10-ops/tasks/next.md', completed: false },
+          {
+            id: '10-ops/tasks/next.md:0',
+            text: '沉淀项目识别规则',
+            sourcePath: '10-ops/tasks/next.md',
+            completed: false,
+          },
         ],
       },
       {
@@ -320,11 +350,16 @@ describe('repository workbench', () => {
       approval: 'required',
     });
 
-    expect(groupReviewsByFolder([
-      { path: 'reviews/weekly/2026-W26.md', name: '2026-W26.md', size: 10, updatedAt: 1 },
-      { path: 'reviews/projects/openclaw.md', name: 'openclaw.md', size: 11, updatedAt: 2 },
-    ])).toEqual([
-      { group: 'projects', files: [{ path: 'reviews/projects/openclaw.md', name: 'openclaw.md', size: 11, updatedAt: 2 }] },
+    expect(
+      groupReviewsByFolder([
+        { path: 'reviews/weekly/2026-W26.md', name: '2026-W26.md', size: 10, updatedAt: 1 },
+        { path: 'reviews/projects/openclaw.md', name: 'openclaw.md', size: 11, updatedAt: 2 },
+      ]),
+    ).toEqual([
+      {
+        group: 'projects',
+        files: [{ path: 'reviews/projects/openclaw.md', name: 'openclaw.md', size: 11, updatedAt: 2 }],
+      },
       { group: 'weekly', files: [{ path: 'reviews/weekly/2026-W26.md', name: '2026-W26.md', size: 10, updatedAt: 1 }] },
     ]);
   });
@@ -379,11 +414,16 @@ describe('repository workbench', () => {
     expect(panel).toContain("panelView === 'projects'");
     expect(panel).toContain("panelView === 'tasks'");
     expect(panel).toContain("panelView === 'outputs'");
+    expect(panel).toContain('workbench-dashboard-airy');
+    expect(panel).toContain('workbench-dashboard-hero');
+    expect(panel).toContain('workbench-dashboard-metrics');
+    expect(panel).toContain('workbench-dashboard-primary');
+    expect(panel).toContain('workbench-dashboard-list-button');
+    expect(panel).toContain('workbench.dashboardHeroTitle');
+    expect(panel).toContain('workbench.dashboardHeroDesc');
+    expect(panel).toContain('workbench.dashboardContinue');
     expect(panel).toContain('workbench.dashboardFocus');
-    expect(panel).toContain('workbench.dashboardWorkStats');
-    expect(panel).toContain('workbench.dashboardCurrentTasks');
-    expect(panel).toContain('workbench.dashboardNextTasks');
-    expect(panel).toContain('workbench.dashboardAssets');
+    expect(panel).not.toContain('workbench.dashboardWorkStats');
     expect(panel).not.toContain('selectedIsProject');
     expect(panel).toContain("t('workbench.projectPreview')");
     expect(panel).toContain('workbench.projectUpdatedAt');
@@ -391,7 +431,7 @@ describe('repository workbench', () => {
     expect(panel).toContain('openProjectDocument');
     expect(panel).toContain('extractMarkdownDeliverables');
     expect(panel).toContain('repositoryTree');
-    expect(panel).toContain("path.startsWith(`${projectRoot}/outputs/`)");
+    expect(panel).toContain('path.startsWith(`${projectRoot}/outputs/`)');
     expect(panel).not.toContain('matchingArtifacts');
     expect(panel).not.toContain('dialogDeliverables');
     expect(panel).toContain("const standaloneView = panelView === 'dashboard' || panelView === 'outputs'");

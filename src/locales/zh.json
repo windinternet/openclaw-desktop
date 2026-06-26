@@ -51,8 +51,8 @@
     "searchDesc": "查找历史会话、消息和相关上下文。"
   },
   "newSessionPage": {
-    "title": "OpenClaw",
-    "subtitle": "7x24 小时，随时响应的全能电脑 AI 助手",
+    "title": "OpenClaw Desktop",
+    "subtitle": "7x24 小时，随时响应的电脑 AI 工作台",
     "quickStartTitle": "常用工作场景",
     "quickStartDesc": "选择一个真实工作起点，系统会把第一条消息整理好。",
     "scenarioReminderTitle": "设置专属定时任务",
@@ -90,6 +90,11 @@
     "activityDesc": "查看由 OpenClaw Agent 执行的动作、审批和结果。",
     "dashboard": "仪表盘",
     "dashboardDesc": "一眼查看工作台里的项目、事项、产出和执行状态。",
+    "dashboardHeroTitle": "今天先看这些",
+    "dashboardHeroDesc": "把当前事项、项目焦点和最近产出放在一个轻量入口里。",
+    "dashboardContinue": "继续推进",
+    "dashboardAssetBrief": "成果摘要",
+    "dashboardActivityBrief": "最近动态",
     "dashboardMetric": "概览",
     "dashboardFocus": "项目焦点",
     "dashboardWorkStats": "推进统计",

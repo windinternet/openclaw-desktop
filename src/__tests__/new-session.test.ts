@@ -272,6 +272,8 @@ describe('new session creation params', () => {
   it('documents that the new session page uses an airy assistant-style launch layout', () => {
     const page = readFileSync('src/pages/NewSessionPage.tsx', 'utf8');
     const css = readFileSync('src/styles/global.css', 'utf8');
+    const zh = readFileSync('src/locales/zh.json', 'utf8');
+    const en = readFileSync('src/locales/en.json', 'utf8');
 
     expect(page).toContain('new-session-hero');
     expect(page).toContain('new-session-logo-mark');
@@ -279,9 +281,12 @@ describe('new session creation params', () => {
     expect(page).toContain('new-session-bottom-composer');
     expect(page).toContain('launchCards');
     expect(page).not.toContain('new-session-workbench-panel');
+    expect(zh).toContain('"title": "OpenClaw Desktop"');
+    expect(en).toContain('"title": "OpenClaw Desktop"');
     expect(css).toContain('min-height: 100%');
     expect(css).toContain('grid-template-columns: repeat(5, minmax(0, 1fr))');
     expect(css).toContain('position: sticky');
     expect(css).toContain('backdrop-filter: blur(18px)');
+    expect(css).not.toMatch(/\.new-session-bottom-composer\s*\{[^}]*background:/s);
   });
 });
