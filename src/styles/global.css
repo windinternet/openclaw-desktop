@@ -571,7 +571,7 @@ body[theme-mode="dark"] .new-session-card-chip {
 
 .new-session-composer-card {
   width: 100%;
-  padding: 10px;
+  padding: 8px;
   border: 1px solid var(--semi-color-border);
   border-radius: 20px;
   background: var(--semi-color-bg-1);
@@ -579,6 +579,7 @@ body[theme-mode="dark"] .new-session-card-chip {
 }
 
 .new-session-composer-card .semi-aiChatInput {
+  padding: 12px 14px 14px;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
@@ -586,17 +587,27 @@ body[theme-mode="dark"] .new-session-card-chip {
   box-shadow: none;
 }
 
-.new-session-composer-card .semi-aiChatInput-footer,
-.new-session-composer-card .semi-aiChatInput-footer-configure {
+.new-session-composer-card .semi-aiChatInput-footer {
+  margin-top: 14px;
   min-width: 0;
   flex-wrap: wrap;
   row-gap: 8px;
+}
+
+.new-session-composer-card .semi-aiChatInput-footer-configure {
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 8px 6px;
 }
 
 .new-session-composer-card .semi-aiChatInput-footer-configure-select.semi-select {
   border: 0;
   background: transparent;
   box-shadow: none;
+}
+
+.new-session-composer-card .semi-select-selection {
+  margin-left: 0;
 }
 
 .new-session-composer-card .semi-aiChatInput-footer-configure-select.semi-select:hover,
