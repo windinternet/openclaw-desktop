@@ -14,12 +14,17 @@ describe('session chat drafts', () => {
 
   it('uses the shared composer shell for the session detail input without a divider line', () => {
     const source = readFileSync('src/pages/SessionChatPage.tsx', 'utf8');
+    const frame = readFileSync('src/components/ChatComposerFrame.tsx', 'utf8');
     const css = readFileSync('src/styles/global.css', 'utf8');
 
-    expect(source).toContain('className="session-chat-composer-shell"');
-    expect(source).toContain('className="session-chat-composer-card"');
+    expect(source).toContain("import ChatComposerFrame from '../components/ChatComposerFrame'");
+    expect(source).toContain('<ChatComposerFrame');
+    expect(source).toContain('variant="session-chat"');
+    expect(source).toContain('active={pageDragActive}');
+    expect(frame).toContain('chat-composer-frame--session-chat');
+    expect(frame).toContain('session-chat-composer-shell');
     expect(source).not.toContain("borderTop: '1px solid var(--semi-color-border)'");
-    expect(css).toContain('.session-chat-composer-card .semi-aiChatInput');
-    expect(css).toContain('.new-session-composer-card .semi-aiChatInput,');
+    expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput');
+    expect(css).toContain('.chat-composer-frame--session-chat');
   });
 });

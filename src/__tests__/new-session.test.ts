@@ -271,6 +271,7 @@ describe('new session creation params', () => {
 
   it('documents that the new session page uses an airy assistant-style launch layout', () => {
     const page = readFileSync('src/pages/NewSessionPage.tsx', 'utf8');
+    const frame = readFileSync('src/components/ChatComposerFrame.tsx', 'utf8');
     const css = readFileSync('src/styles/global.css', 'utf8');
     const zh = readFileSync('src/locales/zh.json', 'utf8');
     const en = readFileSync('src/locales/en.json', 'utf8');
@@ -281,9 +282,13 @@ describe('new session creation params', () => {
     expect(page).toContain('/assets/brand/openclaw-app-icon-256.png');
     expect(page).not.toContain('IconPlusCircle');
     expect(page).toContain('new-session-card-visual');
-    expect(page).toContain('new-session-bottom-composer');
+    expect(page).toContain("import ChatComposerFrame from '../components/ChatComposerFrame'");
+    expect(page).toContain('<ChatComposerFrame');
+    expect(page).toContain('variant="new-session"');
     expect(page).toContain('launchCards');
     expect(page).not.toContain('new-session-workbench-panel');
+    expect(frame).toContain("variant: 'new-session' | 'session-chat'");
+    expect(frame).toContain('chat-composer-frame__card');
     expect(zh).toContain('"title": "OpenClaw Desktop"');
     expect(zh).toContain('"subtitle": "连接 OpenClaw Gateway、工作台与知识库，让每次会话都沉淀成可追踪的工作记录。"');
     expect(zh).not.toContain('7x24 小时，随时响应的全能电脑 AI 助手');
@@ -291,6 +296,7 @@ describe('new session creation params', () => {
     expect(en).toContain('"subtitle": "Connect OpenClaw Gateway, Workbench, and Knowledge Base so every session becomes traceable work."');
     expect(css).toContain('min-height: 100%');
     expect(css).toContain('grid-template-columns: repeat(5, minmax(0, 1fr))');
+    expect(css).toContain('.chat-composer-frame--new-session');
     expect(css).toContain('position: sticky');
     expect(css).toContain('backdrop-filter: blur(18px)');
     expect(css).toContain('.new-session-logo-image');
@@ -308,16 +314,19 @@ describe('new session creation params', () => {
     expect(css).toContain('body[theme-mode="dark"] .new-session-card-icon');
     expect(css).toContain('body[theme-mode="dark"] .new-session-card-line');
     expect(css).toContain('body[theme-mode="dark"] .new-session-card-chip');
-    expect(css).toContain('.new-session-composer-card .semi-aiChatInput-footer-configure-select.semi-select');
-    expect(css).toContain('.new-session-composer-card .semi-aiChatInput-footer-configure-select.semi-select:hover');
-    expect(css).toContain('.new-session-composer-card .semi-aiChatInput,\n.session-chat-composer-card .semi-aiChatInput');
+    expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput-footer-configure-select.semi-select');
+    expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput-footer-configure-select.semi-select:hover');
+    expect(css).toContain('cursor: pointer;');
+    expect(css).toContain('color: var(--semi-color-primary);');
+    expect(css).toContain('cursor: text;');
+    expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput');
     expect(css).toContain('padding: 12px 14px 14px;');
-    expect(css).toContain('.new-session-composer-card .semi-aiChatInput-footer,\n.session-chat-composer-card .semi-aiChatInput-footer');
+    expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput-footer');
     expect(css).toContain('margin-top: 14px;');
-    expect(css).toContain('.new-session-composer-card .semi-select-selection,\n.session-chat-composer-card .semi-select-selection');
+    expect(css).toContain('.chat-composer-frame__card .semi-select-selection');
     expect(css).toContain('margin-left: 0;');
     expect(css).toContain('background: transparent;');
-    expect(css).toContain('.new-session-composer-card .semi-aiChatInput-footer-configure-select.semi-select-active');
+    expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput-footer-configure-select.semi-select-active');
     expect(css).not.toMatch(/\.new-session-bottom-composer\s*\{[^}]*background:/s);
   });
 

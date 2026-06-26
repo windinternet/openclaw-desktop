@@ -28,6 +28,7 @@ import type {
   RenderContentProps,
 } from '@douyinfe/semi-ui/lib/es/aiChatDialogue/interface';
 import { useStore } from '../lib';
+import ChatComposerFrame from '../components/ChatComposerFrame';
 import { saveArtifactFromChat } from '../lib/artifact-parser';
 import { collectChatArtifactCandidates, filterArtifactsForSessionKeys } from '../lib/session-artifacts';
 import { stripGeneratedSessionLabelSuffix } from '../lib/session-label';
@@ -2333,46 +2334,35 @@ export default function SessionChatPage() {
             style={{ paddingBottom: 8 }}
           />
         </div>
-        <div
-          className="session-chat-composer-shell"
-          style={{
-            ...(pageDragActive
-              ? {
-                  boxShadow: 'inset 0 0 0 2px var(--semi-color-primary)',
-                }
-              : {}),
-          }}
-        >
-          <div className="session-chat-composer-card">
-            <AIChatInput
-              key={activeSessionKey}
-              ref={chatInputRef as Ref<AIChatInput>}
-              placeholder={t('chat.firstMessagePlaceholder')}
-              generating={generating || switchingAgent}
-              uploadProps={{
-                action: '',
-                beforeUpload: () => ({ shouldUpload: false }),
-                defaultFileList: draftState.attachments.map((a) => ({
-                  uid: a.uid,
-                  name: a.name,
-                  size: a.size || '',
-                  status: 'success' as const,
-                })),
-              }}
-              showUploadFile
-              showUploadButton
-              showReference={false}
-              round={false}
-              defaultContent={draftState.text}
-              onContentChange={handleContentChange}
-              onUploadChange={handleUploadChange}
-              onMessageSend={handleSend}
-              onStopGenerate={handleStop}
-              renderConfigureArea={renderConfig}
-              onConfigureChange={handleConfigChange}
-            />
-          </div>
-        </div>
+        <ChatComposerFrame variant="session-chat" active={pageDragActive}>
+          <AIChatInput
+            key={activeSessionKey}
+            ref={chatInputRef as Ref<AIChatInput>}
+            placeholder={t('chat.firstMessagePlaceholder')}
+            generating={generating || switchingAgent}
+            uploadProps={{
+              action: '',
+              beforeUpload: () => ({ shouldUpload: false }),
+              defaultFileList: draftState.attachments.map((a) => ({
+                uid: a.uid,
+                name: a.name,
+                size: a.size || '',
+                status: 'success' as const,
+              })),
+            }}
+            showUploadFile
+            showUploadButton
+            showReference={false}
+            round={false}
+            defaultContent={draftState.text}
+            onContentChange={handleContentChange}
+            onUploadChange={handleUploadChange}
+            onMessageSend={handleSend}
+            onStopGenerate={handleStop}
+            renderConfigureArea={renderConfig}
+            onConfigureChange={handleConfigChange}
+          />
+        </ChatComposerFrame>
       </div>
       <SessionSidePanel
         visible={sidePanelVisible}

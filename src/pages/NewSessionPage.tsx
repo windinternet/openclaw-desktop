@@ -11,6 +11,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
 import NewSessionComposer from '../components/NewSessionComposer';
+import ChatComposerFrame from '../components/ChatComposerFrame';
 import { loadRepositoryBinding } from '../lib/agentic-repository-store';
 import { buildNewSessionWorkbenchContinuations, type NewSessionWorkbenchContinuation } from '../lib/new-session';
 import { loadWorkbenchSnapshot, type WorkbenchSnapshot } from '../lib/repository-workbench';
@@ -192,33 +193,34 @@ export default function NewSessionPage() {
           </section>
         </main>
 
-        <section className="new-session-bottom-composer">
-          {connectionStatus !== 'connected' && (
-            <div className="new-session-connection-warning">
-              {connectionStatus === 'connecting' ? t('connection.connecting') : t('connection.notConnected')}
-            </div>
-          )}
-
-          <div className="new-session-composer-card">
-            {starterLabel || workbenchLoading ? (
-              <div className="new-session-composer-hint">
-                {starterLabel
-                  ? t('newSessionPage.starterApplied', { title: starterLabel })
-                  : t('newSessionPage.loadingWorkbench')}
+        <ChatComposerFrame
+          variant="new-session"
+          before={
+            connectionStatus !== 'connected' ? (
+              <div className="new-session-connection-warning">
+                {connectionStatus === 'connecting' ? t('connection.connecting') : t('connection.notConnected')}
               </div>
-            ) : null}
-            <NewSessionComposer
-              inputKeyPrefix="new-session-page"
-              initialMessage={starterMessage}
-              initialMessageKey={starterMessageKey}
-              style={{
-                width: '100%',
-                borderRadius: 16,
-              }}
-            />
-          </div>
-          <Text className="new-session-disclaimer">{t('newSessionPage.disclaimer')}</Text>
-        </section>
+            ) : null
+          }
+          after={<Text className="new-session-disclaimer">{t('newSessionPage.disclaimer')}</Text>}
+        >
+          {starterLabel || workbenchLoading ? (
+            <div className="new-session-composer-hint">
+              {starterLabel
+                ? t('newSessionPage.starterApplied', { title: starterLabel })
+                : t('newSessionPage.loadingWorkbench')}
+            </div>
+          ) : null}
+          <NewSessionComposer
+            inputKeyPrefix="new-session-page"
+            initialMessage={starterMessage}
+            initialMessageKey={starterMessageKey}
+            style={{
+              width: '100%',
+              borderRadius: 16,
+            }}
+          />
+        </ChatComposerFrame>
       </div>
     </div>
   );
