@@ -1,4 +1,5 @@
 import type { GatewayClient } from './gateway';
+import type { RepositoryContextPayload } from './repository-context';
 
 export const DESKTOP_COMPANION_PLUGIN_ID = 'openclaw-desktop-companion' as const;
 export const DESKTOP_COMPANION_PROTOCOL_VERSION = 1;
@@ -36,6 +37,13 @@ export interface DesktopCompanionPluginManageResult {
     stdout?: string;
     stderr?: string;
   }>;
+}
+
+export interface DesktopCompanionRepositoryContextResult {
+  ok: boolean;
+  status?: 'updated' | 'unchanged' | 'cleared';
+  agentsMdHash?: string;
+  message?: string;
 }
 
 export interface DesktopCompanionApprovalRequest {
@@ -209,6 +217,20 @@ export async function uninstallDesktopCompanion(
     timeoutMs: DESKTOP_COMPANION_MANAGE_TIMEOUT_MS,
   });
   return assertDesktopCompanionManageResult(payload, 'uninstall');
+}
+
+export async function setDesktopCompanionRepositoryContext(
+  client: Pick<GatewayClient, 'request'>,
+  payload: RepositoryContextPayload,
+): Promise<DesktopCompanionRepositoryContextResult> {
+  return client.request<DesktopCompanionRepositoryContextResult>('desktopCompanion.repositoryContext.set', payload);
+}
+
+export async function clearDesktopCompanionRepositoryContext(
+  client: Pick<GatewayClient, 'request'>,
+  bindingId: string,
+): Promise<DesktopCompanionRepositoryContextResult> {
+  return client.request<DesktopCompanionRepositoryContextResult>('desktopCompanion.repositoryContext.clear', { bindingId });
 }
 
 export function extractDesktopCompanionApprovalRequestId(message: string): string | null {

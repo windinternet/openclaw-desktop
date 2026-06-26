@@ -4,13 +4,16 @@ import type { GatewayClient } from '../lib/gateway';
 import {
   approveDesktopCompanionApprovalRequest,
   buildDesktopCompanionInstallPrompt,
+  clearDesktopCompanionRepositoryContext,
   createDesktopCompanionInstallSession,
   detectDesktopCompanion,
   extractDesktopCompanionApprovalRequestId,
   fetchDesktopCompanionApprovalRequest,
   reinstallDesktopCompanion,
+  setDesktopCompanionRepositoryContext,
   uninstallDesktopCompanion,
 } from '../lib/desktop-companion';
+import type { RepositoryContextPayload } from '../lib/repository-context';
 
 function createClient(request: GatewayClient['request']): GatewayClient {
   return {
@@ -185,5 +188,43 @@ describe('desktop companion detection', () => {
     })) as GatewayClient['request']);
 
     await expect(reinstallDesktopCompanion(client)).rejects.toThrow('install failed');
+  });
+
+  it('sets repository context through the companion RPC', async () => {
+    const payload: RepositoryContextPayload = {
+      version: 1,
+      instanceId: 'gateway-1',
+      bindingId: 'binding-1',
+      repoPath: '/work/openclaw',
+      agentsMdContent: '# AGENTS.md\n',
+      agentsMdHash: 'fnv1a-12345678',
+      updatedAt: 1710000000000,
+    };
+    const result = {
+      ok: true,
+      status: 'updated' as const,
+      agentsMdHash: payload.agentsMdHash,
+      message: 'repository context updated',
+    };
+    const request = vi.fn(async () => result);
+    const client = createClient(request as GatewayClient['request']);
+
+    await expect(setDesktopCompanionRepositoryContext(client, payload)).resolves.toEqual(result);
+
+    expect(request).toHaveBeenCalledWith('desktopCompanion.repositoryContext.set', payload);
+  });
+
+  it('clears repository context through the companion RPC', async () => {
+    const result = {
+      ok: true,
+      status: 'cleared' as const,
+      message: 'repository context cleared',
+    };
+    const request = vi.fn(async () => result);
+    const client = createClient(request as GatewayClient['request']);
+
+    await expect(clearDesktopCompanionRepositoryContext(client, 'binding-1')).resolves.toEqual(result);
+
+    expect(request).toHaveBeenCalledWith('desktopCompanion.repositoryContext.clear', { bindingId: 'binding-1' });
   });
 });
