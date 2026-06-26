@@ -23,6 +23,41 @@ interface FileDropEvent {
   preventDefault: () => void;
 }
 
+const NEW_SESSION_DRAFT_KEY = 'openclaw:new-session-draft';
+
+function extractDraftText(content: unknown): string {
+  if (!content) return '';
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) return content.map(extractDraftText).join('');
+  if (typeof content === 'object') {
+    const c = content as Record<string, unknown>;
+    if (Array.isArray(c.inputContents)) return extractDraftText(c.inputContents);
+    return (c.text as string) || (c.content as string) || (c.value as string) || extractDraftText(c.children) || '';
+  }
+  return String(content);
+}
+
+function loadNewSessionDraft(): string {
+  try {
+    return localStorage.getItem(NEW_SESSION_DRAFT_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function saveNewSessionDraft(text: string): void {
+  try {
+    if (text.trim()) localStorage.setItem(NEW_SESSION_DRAFT_KEY, text);
+    else localStorage.removeItem(NEW_SESSION_DRAFT_KEY);
+  } catch {
+    // Ignore storage failures; the composer should still work normally.
+  }
+}
+
+function clearNewSessionDraft(): void {
+  saveNewSessionDraft('');
+}
+
 interface NewSessionComposerProps {
   className?: string;
   style?: CSSProperties;
@@ -56,17 +91,35 @@ export default function NewSessionComposer({
   const chatInputRef = useRef<{ uploadRef?: { current?: { insert?: (files: File[]) => void } } } | null>(null);
   const pageDragDepthRef = useRef(0);
   const modelTouchedRef = useRef(false);
+  const draftTextRef = useRef('');
+  const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const initialInputText = useMemo(
+    () => (initialMessage.trim() ? initialMessage : loadNewSessionDraft()),
+    [initialMessage, initialMessageKey],
+  );
 
   const defaultContent = useMemo(() => {
-    if (!initialMessage.trim()) return undefined;
+    if (!initialInputText.trim()) return undefined;
     return {
       type: 'doc',
-      content: initialMessage.split('\n').map((line) => ({
+      content: initialInputText.split('\n').map((line) => ({
         type: 'paragraph',
         content: line ? [{ type: 'text', text: line }] : undefined,
       })),
     };
-  }, [initialMessage]);
+  }, [initialInputText]);
+
+  useEffect(() => {
+    draftTextRef.current = initialInputText;
+  }, [initialInputText]);
+
+  useEffect(() => {
+    return () => {
+      if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+      saveNewSessionDraft(draftTextRef.current);
+    };
+  }, []);
 
   const thinkingOptions = useMemo(
     () => [
@@ -155,6 +208,8 @@ export default function NewSessionComposer({
         });
         useStore.getState().fetchSessions();
         Toast.success(t('chat.sessionCreated'));
+        draftTextRef.current = '';
+        clearNewSessionDraft();
         navigate(target.to, target.state ? { state: target.state } : undefined);
       } catch (err) {
         Toast.error(err instanceof Error ? err.message : t('chat.createFailed'));
@@ -227,6 +282,14 @@ export default function NewSessionComposer({
     },
     [],
   );
+
+  const handleContentChange = useCallback((content: unknown) => {
+    draftTextRef.current = extractDraftText(content);
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    draftSaveTimerRef.current = setTimeout(() => {
+      saveNewSessionDraft(draftTextRef.current);
+    }, 500);
+  }, []);
 
   const hasFilesInDrag = useCallback((event: FileDropEvent): boolean => {
     const dt = event.dataTransfer;
@@ -315,6 +378,7 @@ export default function NewSessionComposer({
         uploadProps={{ action: '', beforeUpload: () => ({ shouldUpload: false }) }}
         renderConfigureArea={renderConfig}
         onConfigureChange={handleConfigChange}
+        onContentChange={handleContentChange}
         onMessageSend={handleSend}
         onStopGenerate={() => setCreating(false)}
         showUploadFile

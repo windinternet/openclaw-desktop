@@ -310,9 +310,25 @@ describe('new session creation params', () => {
     expect(css).toContain('body[theme-mode="dark"] .new-session-card-chip');
     expect(css).toContain('.new-session-composer-card .semi-aiChatInput-footer-configure-select.semi-select');
     expect(css).toContain('.new-session-composer-card .semi-aiChatInput-footer-configure-select.semi-select:hover');
-    expect(css).toContain('.new-session-composer-card .semi-aiChatInput {\n  padding: 12px 14px 14px;');
-    expect(css).toContain('.new-session-composer-card .semi-aiChatInput-footer {\n  margin-top: 14px;');
-    expect(css).toContain('.new-session-composer-card .semi-select-selection {\n  margin-left: 0;');
+    expect(css).toContain('.new-session-composer-card .semi-aiChatInput,\n.session-chat-composer-card .semi-aiChatInput');
+    expect(css).toContain('padding: 12px 14px 14px;');
+    expect(css).toContain('.new-session-composer-card .semi-aiChatInput-footer,\n.session-chat-composer-card .semi-aiChatInput-footer');
+    expect(css).toContain('margin-top: 14px;');
+    expect(css).toContain('.new-session-composer-card .semi-select-selection,\n.session-chat-composer-card .semi-select-selection');
+    expect(css).toContain('margin-left: 0;');
+    expect(css).toContain('background: transparent;');
+    expect(css).toContain('.new-session-composer-card .semi-aiChatInput-footer-configure-select.semi-select-active');
     expect(css).not.toMatch(/\.new-session-bottom-composer\s*\{[^}]*background:/s);
+  });
+
+  it('documents that the new session composer restores local text drafts after navigation', () => {
+    const composer = readFileSync('src/components/NewSessionComposer.tsx', 'utf8');
+
+    expect(composer).toContain("NEW_SESSION_DRAFT_KEY = 'openclaw:new-session-draft'");
+    expect(composer).toContain('loadNewSessionDraft');
+    expect(composer).toContain('saveNewSessionDraft(draftTextRef.current)');
+    expect(composer).toContain('onContentChange={handleContentChange}');
+    expect(composer).toContain('defaultContent={defaultContent}');
+    expect(composer).toContain('clearNewSessionDraft()');
   });
 });

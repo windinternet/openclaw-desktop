@@ -2334,46 +2334,44 @@ export default function SessionChatPage() {
           />
         </div>
         <div
+          className="session-chat-composer-shell"
           style={{
-            flexShrink: 0,
-            borderTop: '1px solid var(--semi-color-border)',
-            padding: '8px 16px 12px',
-            transition: 'box-shadow 0.2s, border-color 0.2s',
             ...(pageDragActive
               ? {
                   boxShadow: 'inset 0 0 0 2px var(--semi-color-primary)',
-                  borderTopColor: 'var(--semi-color-primary)',
                 }
               : {}),
           }}
         >
-          <AIChatInput
-            key={activeSessionKey}
-            ref={chatInputRef as Ref<AIChatInput>}
-            placeholder={t('chat.firstMessagePlaceholder')}
-            generating={generating || switchingAgent}
-            uploadProps={{
-              action: '',
-              beforeUpload: () => ({ shouldUpload: false }),
-              defaultFileList: draftState.attachments.map((a) => ({
-                uid: a.uid,
-                name: a.name,
-                size: a.size || '',
-                status: 'success' as const,
-              })),
-            }}
-            showUploadFile
-            showUploadButton
-            showReference={false}
-            round={false}
-            defaultContent={draftState.text}
-            onContentChange={handleContentChange}
-            onUploadChange={handleUploadChange}
-            onMessageSend={handleSend}
-            onStopGenerate={handleStop}
-            renderConfigureArea={renderConfig}
-            onConfigureChange={handleConfigChange}
-          />
+          <div className="session-chat-composer-card">
+            <AIChatInput
+              key={activeSessionKey}
+              ref={chatInputRef as Ref<AIChatInput>}
+              placeholder={t('chat.firstMessagePlaceholder')}
+              generating={generating || switchingAgent}
+              uploadProps={{
+                action: '',
+                beforeUpload: () => ({ shouldUpload: false }),
+                defaultFileList: draftState.attachments.map((a) => ({
+                  uid: a.uid,
+                  name: a.name,
+                  size: a.size || '',
+                  status: 'success' as const,
+                })),
+              }}
+              showUploadFile
+              showUploadButton
+              showReference={false}
+              round={false}
+              defaultContent={draftState.text}
+              onContentChange={handleContentChange}
+              onUploadChange={handleUploadChange}
+              onMessageSend={handleSend}
+              onStopGenerate={handleStop}
+              renderConfigureArea={renderConfig}
+              onConfigureChange={handleConfigChange}
+            />
+          </div>
         </div>
       </div>
       <SessionSidePanel

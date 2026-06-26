@@ -569,7 +569,8 @@ body[theme-mode="dark"] .new-session-card-chip {
   backdrop-filter: blur(18px);
 }
 
-.new-session-composer-card {
+.new-session-composer-card,
+.session-chat-composer-card {
   width: 100%;
   padding: 8px;
   border: 1px solid var(--semi-color-border);
@@ -578,7 +579,8 @@ body[theme-mode="dark"] .new-session-card-chip {
   box-shadow: 0 18px 48px rgb(15 23 42 / 8%);
 }
 
-.new-session-composer-card .semi-aiChatInput {
+.new-session-composer-card .semi-aiChatInput,
+.session-chat-composer-card .semi-aiChatInput {
   padding: 12px 14px 14px;
   min-width: 0;
   max-width: 100%;
@@ -587,34 +589,54 @@ body[theme-mode="dark"] .new-session-card-chip {
   box-shadow: none;
 }
 
-.new-session-composer-card .semi-aiChatInput-footer {
+.new-session-composer-card .semi-aiChatInput-footer,
+.session-chat-composer-card .semi-aiChatInput-footer {
   margin-top: 14px;
   min-width: 0;
   flex-wrap: wrap;
   row-gap: 8px;
 }
 
-.new-session-composer-card .semi-aiChatInput-footer-configure {
+.new-session-composer-card .semi-aiChatInput-footer-configure,
+.session-chat-composer-card .semi-aiChatInput-footer-configure {
   min-width: 0;
   flex-wrap: wrap;
   gap: 8px 6px;
 }
 
-.new-session-composer-card .semi-aiChatInput-footer-configure-select.semi-select {
+.new-session-composer-card .semi-aiChatInput-footer-configure-select.semi-select,
+.session-chat-composer-card .semi-aiChatInput-footer-configure-select.semi-select {
   border: 0;
   background: transparent;
   box-shadow: none;
 }
 
-.new-session-composer-card .semi-select-selection {
+.new-session-composer-card .semi-select-selection,
+.session-chat-composer-card .semi-select-selection {
   margin-left: 0;
 }
 
 .new-session-composer-card .semi-aiChatInput-footer-configure-select.semi-select:hover,
-.new-session-composer-card .semi-aiChatInput-footer-configure-select.semi-select-focus {
+.new-session-composer-card .semi-aiChatInput-footer-configure-select.semi-select:focus,
+.new-session-composer-card .semi-aiChatInput-footer-configure-select.semi-select:active,
+.new-session-composer-card .semi-aiChatInput-footer-configure-select.semi-select-open,
+.new-session-composer-card .semi-aiChatInput-footer-configure-select.semi-select-focus,
+.new-session-composer-card .semi-aiChatInput-footer-configure-select.semi-select-active,
+.session-chat-composer-card .semi-aiChatInput-footer-configure-select.semi-select:hover,
+.session-chat-composer-card .semi-aiChatInput-footer-configure-select.semi-select:focus,
+.session-chat-composer-card .semi-aiChatInput-footer-configure-select.semi-select:active,
+.session-chat-composer-card .semi-aiChatInput-footer-configure-select.semi-select-open,
+.session-chat-composer-card .semi-aiChatInput-footer-configure-select.semi-select-focus,
+.session-chat-composer-card .semi-aiChatInput-footer-configure-select.semi-select-active {
   border: 0;
-  background: var(--semi-color-fill-0);
+  background: transparent;
   box-shadow: none;
+}
+
+.session-chat-composer-shell {
+  flex-shrink: 0;
+  padding: 8px 16px 12px;
+  transition: box-shadow 0.2s, border-color 0.2s;
 }
 
 .new-session-composer-hint {
