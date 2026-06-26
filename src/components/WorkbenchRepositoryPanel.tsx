@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Button, Card, Empty, Space, Tabs, Tag, Typography } from '@douyinfe/semi-ui';
+import { Button, Card, Checkbox, Empty, Select, Space, Tag, Typography } from '@douyinfe/semi-ui';
+import { IconBolt, IconBox, IconCheckList, IconFile } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../lib';
@@ -8,12 +9,22 @@ import { loadAiActionRuns } from '../lib/ai-action-run-store';
 import type { WorkbenchSnapshot } from '../lib/repository-workbench';
 import { loadWorkbenchSnapshot, readWorkbenchMarkdown } from '../lib/repository-workbench';
 import type { RepositoryMarkdownFile } from '../lib/repository-knowledge';
+import type { ArtifactMeta } from '../lib/artifact-types';
 import type { AiActionRun, AiActionRunStatus } from '../lib/types';
 import MarkdownView from './MarkdownView';
 
 const { Text, Title } = Typography;
 
-type WorkbenchView = 'work' | 'plans' | 'activity' | 'reviews';
+export type WorkbenchPanelView = 'dashboard' | 'projects' | 'tasks' | 'plans' | 'activity' | 'outputs' | 'reviews';
+type OutputGroupBy = 'none' | 'source' | 'type';
+
+interface ProjectDeliverable {
+  id: string;
+  title: string;
+  path: string;
+  source: 'markdown' | 'outputs';
+  kind: 'markdown' | 'file' | 'external';
+}
 
 const ACTION_STATUS_LABEL_KEYS: Record<AiActionRunStatus, string> = {
   draft: 'actions.statusDraft',
@@ -33,15 +44,108 @@ function actionStatusColor(status: AiActionRunStatus): 'blue' | 'green' | 'orang
   return 'blue';
 }
 
-export default function WorkbenchRepositoryPanel({ binding }: { binding: RepositoryBinding }) {
+function formatTimestamp(value: number): string {
+  if (!value) return '';
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(value);
+}
+
+function projectRootFromPath(path: string): string {
+  return path.split('/').slice(0, -1).join('/');
+}
+
+function isDeliverableHeading(line: string): boolean {
+  return /^#{1,6}\s+/.test(line) && /(交付|产物|成果|输出|deliverable|artifact|output)/i.test(line);
+}
+
+function resolveProjectLink(projectPath: string, href: string): string {
+  if (/^https?:\/\//i.test(href)) return href;
+  if (href.startsWith('/')) return href.replace(/^\/+/, '');
+  const baseParts = projectPath.split('/').slice(0, -1);
+  const parts = [...baseParts, ...href.split('/')];
+  const resolved: string[] = [];
+  for (const part of parts) {
+    if (!part || part === '.') continue;
+    if (part === '..') resolved.pop();
+    else resolved.push(part);
+  }
+  return resolved.join('/');
+}
+
+function deliverableKind(path: string): ProjectDeliverable['kind'] {
+  if (/^https?:\/\//i.test(path)) return 'external';
+  return path.endsWith('.md') ? 'markdown' : 'file';
+}
+
+function extractMarkdownDeliverables(projectPath: string, content: string): ProjectDeliverable[] {
+  const items: ProjectDeliverable[] = [];
+  let inDeliverableSection = false;
+
+  for (const rawLine of content.split('\n')) {
+    const line = rawLine.trim();
+    if (/^#{1,6}\s+/.test(line)) {
+      inDeliverableSection = isDeliverableHeading(line);
+      continue;
+    }
+    if (!inDeliverableSection) continue;
+
+    const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
+    let match: RegExpExecArray | null;
+    while ((match = linkPattern.exec(line)) !== null) {
+      const title = match[1].trim();
+      const path = resolveProjectLink(projectPath, match[2].trim());
+      items.push({
+        id: `markdown:${path}`,
+        title,
+        path,
+        source: 'markdown',
+        kind: deliverableKind(path),
+      });
+    }
+  }
+
+  return items;
+}
+
+function fileNameFromPath(path: string): string {
+  return path.split('/').filter(Boolean).pop() ?? path;
+}
+
+function dedupeDeliverables(items: ProjectDeliverable[]): ProjectDeliverable[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (seen.has(item.path)) return false;
+    seen.add(item.path);
+    return true;
+  });
+}
+
+export default function WorkbenchRepositoryPanel({
+  binding,
+  panelView = 'projects',
+}: {
+  binding: RepositoryBinding;
+  panelView?: WorkbenchPanelView;
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const actionRunsVersion = useStore((s) => s.actionRunsVersion);
+  const artifacts = useStore((s) => s.artifacts);
+  const fetchArtifacts = useStore((s) => s.fetchArtifacts);
+  const openArtifactWindow = useStore((s) => s.openArtifactWindow);
   const [snapshot, setSnapshot] = useState<WorkbenchSnapshot | null>(null);
   const [activityRuns, setActivityRuns] = useState<AiActionRun[]>([]);
+  const [repositoryTree, setRepositoryTree] = useState<string[]>([]);
   const [selectedPreviewPath, setSelectedPreviewPath] = useState('');
   const [selectedPreviewContent, setSelectedPreviewContent] = useState('');
-  const [activeView, setActiveView] = useState<WorkbenchView>('work');
+  const [selectedProjectDocumentPath, setSelectedProjectDocumentPath] = useState('');
+  const [outputSourceFilters, setOutputSourceFilters] = useState<string[]>([]);
+  const [outputTypeFilters, setOutputTypeFilters] = useState<string[]>([]);
+  const [outputGroupBy, setOutputGroupBy] = useState<OutputGroupBy>('none');
 
   useEffect(() => {
     let cancelled = false;
@@ -67,9 +171,67 @@ export default function WorkbenchRepositoryPanel({ binding }: { binding: Reposit
     };
   }, [binding.gatewayInstanceId, actionRunsVersion]);
 
+  useEffect(() => {
+    void fetchArtifacts();
+  }, [fetchArtifacts]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const listTree = window.electronAPI?.repository?.listTree;
+    if (!listTree) {
+      setRepositoryTree([]);
+      return () => {
+        cancelled = true;
+      };
+    }
+    listTree(binding.repoPath, 3000)
+      .then((entries) => {
+        if (!cancelled) setRepositoryTree(entries);
+      })
+      .catch(() => {
+        if (!cancelled) setRepositoryTree([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [binding.repoPath]);
+
+  useEffect(() => {
+    if (panelView !== 'projects') return;
+    const projects = snapshot?.projects ?? [];
+    if (projects.length === 0) return;
+    if (selectedPreviewPath && projects.some((project) => project.path === selectedPreviewPath)) return;
+
+    const firstProject = projects[0];
+    setSelectedPreviewPath(firstProject.path);
+    setSelectedProjectDocumentPath(firstProject.path);
+    readWorkbenchMarkdown(binding, firstProject.path).then(setSelectedPreviewContent);
+  }, [binding, panelView, selectedPreviewPath, snapshot]);
+
   const openPreview = async (file: RepositoryMarkdownFile) => {
     setSelectedPreviewPath(file.path);
     setSelectedPreviewContent(await readWorkbenchMarkdown(binding, file.path));
+  };
+
+  const openProject = async (project: { path: string; name: string }) => {
+    setSelectedPreviewPath(project.path);
+    setSelectedProjectDocumentPath(project.path);
+    setSelectedPreviewContent(await readWorkbenchMarkdown(binding, project.path));
+  };
+
+  const openProjectDocument = async (file: RepositoryMarkdownFile) => {
+    setSelectedProjectDocumentPath(file.path);
+    setSelectedPreviewContent(await readWorkbenchMarkdown(binding, file.path));
+  };
+
+  const openRepositoryFile = (relativePath: string) => {
+    if (/^https?:\/\//i.test(relativePath)) {
+      window.open(relativePath, '_blank');
+      return;
+    }
+    const repoPath = binding.repoPath.replace(/\/+$/, '');
+    const filePath = `${repoPath}/${relativePath.replace(/^\/+/, '')}`;
+    window.open(encodeURI(`file://${filePath}`), '_blank');
   };
 
   const renderFileButton = (file: RepositoryMarkdownFile) => (
@@ -107,6 +269,247 @@ export default function WorkbenchRepositoryPanel({ binding }: { binding: Reposit
     borderRadius: 8,
     padding: 12,
     minWidth: 0,
+  };
+
+  const renderDashboardView = () => {
+    const taskGroups = snapshot?.taskGroups ?? [];
+    const currentTasks = taskGroups.find((group) => group.id === 'current')?.items ?? [];
+    const totalTasks = taskGroups.reduce((total, group) => total + group.items.length, 0);
+    const nextTasks = taskGroups.find((group) => group.id === 'next')?.items ?? [];
+    const doneTasks = taskGroups.find((group) => group.id === 'done')?.items ?? [];
+    const sectionByKey = new Map((snapshot?.semanticSections ?? []).map((section) => [section.key, section]));
+    const projectOutputCount = sectionByKey.get('outputs')?.files.length ?? 0;
+    const reusableAssetCount = sectionByKey.get('tools')?.files.length ?? 0;
+    const completedPlanAssetCount = sectionByKey.get('plans.completed')?.files.length ?? 0;
+    const repositoryAssetCount = [
+      sectionByKey.get('outputs'),
+      sectionByKey.get('tools'),
+      sectionByKey.get('plans.completed'),
+    ].reduce((total, section) => total + (section?.files.length ?? 0), 0);
+    const metrics = [
+      { label: t('workbench.projects'), value: snapshot?.projects.length ?? 0, color: 'blue' as const },
+      { label: t('workbench.tasks'), value: totalTasks, color: 'orange' as const },
+      { label: t('workbench.outputs'), value: artifacts.length + repositoryAssetCount, color: 'green' as const },
+      { label: t('workbench.reviews'), value: snapshot?.reviews.length ?? 0, color: 'grey' as const },
+    ];
+    const workStats = [
+      { label: t('workbench.activeWork'), value: currentTasks.length, color: 'blue' as const },
+      { label: t('workbench.dashboardNextTasks'), value: nextTasks.length, color: 'orange' as const },
+      { label: t('workbench.completedWork'), value: doneTasks.length, color: 'green' as const },
+      { label: t('workbench.activePlans'), value: snapshot?.activePlans.length ?? 0, color: 'violet' as const },
+      { label: t('workbench.completedPlans'), value: snapshot?.completedPlans.length ?? 0, color: 'grey' as const },
+    ];
+
+    return (
+      <Space vertical align="start" spacing={14} style={{ width: '100%' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, width: '100%' }}>
+          {metrics.map((metric) => (
+            <div key={metric.label} style={sectionStyle}>
+              <Text type="tertiary" size="small">{metric.label}</Text>
+              <Title heading={3} style={{ margin: '4px 0 0' }}>{metric.value}</Title>
+              <Tag color={metric.color} size="small">{t('workbench.dashboardMetric')}</Tag>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(340px, 1.15fr) minmax(300px, 0.85fr)', gap: 12, width: '100%' }}>
+          <div style={sectionStyle}>
+            <Title heading={6} style={{ marginTop: 0 }}>{t('workbench.dashboardFocus')}</Title>
+            {(snapshot?.projects ?? []).slice(0, 4).length > 0 ? (
+              <Space vertical align="start" style={{ width: '100%' }}>
+                {(snapshot?.projects ?? []).slice(0, 4).map((project) => (
+                  <button
+                    key={project.id}
+                    type="button"
+                    onClick={() => void openPreview({ path: project.path, name: project.name, size: 0, updatedAt: 0 })}
+                    style={{
+                      width: '100%',
+                      border: selectedPreviewPath === project.path ? '1px solid var(--semi-color-primary)' : '1px solid var(--semi-color-border)',
+                      background: selectedPreviewPath === project.path ? 'var(--semi-color-primary-light-default)' : 'var(--semi-color-bg-0)',
+                      borderRadius: 6,
+                      padding: '10px 12px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <Space align="center" style={{ justifyContent: 'space-between', width: '100%' }}>
+                      <Text strong ellipsis={{ showTooltip: true }}>{project.name}</Text>
+                      <Tag color="blue">{project.status}</Tag>
+                    </Space>
+                    <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block', marginTop: 4 }}>{project.summary}</Text>
+                  </button>
+                ))}
+              </Space>
+            ) : (
+              <Empty description={t('workbench.emptyProjects')} />
+            )}
+          </div>
+
+          <div style={sectionStyle}>
+            <Title heading={6} style={{ marginTop: 0 }}>{t('workbench.dashboardWorkStats')}</Title>
+            <Space wrap>
+              {workStats.map((item) => (
+                <Tag key={item.label} color={item.color}>{item.label}: {item.value}</Tag>
+              ))}
+            </Space>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) minmax(300px, 1fr)', gap: 12, width: '100%' }}>
+          <div style={sectionStyle}>
+            <Title heading={6} style={{ marginTop: 0 }}>{t('workbench.dashboardCurrentTasks')}</Title>
+            {currentTasks.length > 0 ? (
+              <Space vertical align="start" style={{ width: '100%' }}>
+                {currentTasks.slice(0, 5).map((item) => (
+                  <Space key={item.id} align="center" style={{ width: '100%' }}>
+                    <Tag color={item.completed ? 'green' : 'blue'} size="small">{item.completed ? t('workbench.completedWork') : t('workbench.activeWork')}</Tag>
+                    <Text ellipsis={{ showTooltip: true }} style={{ display: 'block', width: '100%' }}>{item.text}</Text>
+                  </Space>
+                ))}
+              </Space>
+            ) : (
+              <Empty description={t('workbench.emptyTasks')} />
+            )}
+          </div>
+
+          <div style={sectionStyle}>
+            <Title heading={6} style={{ marginTop: 0 }}>{t('workbench.dashboardNextTasks')}</Title>
+            {nextTasks.length > 0 ? (
+              <Space vertical align="start" style={{ width: '100%' }}>
+                {nextTasks.slice(0, 5).map((item) => (
+                  <Space key={item.id} align="center" style={{ width: '100%' }}>
+                    <Tag color="orange" size="small">{t('workbench.dashboardNextTasks')}</Tag>
+                    <Text ellipsis={{ showTooltip: true }} style={{ display: 'block', width: '100%' }}>{item.text}</Text>
+                  </Space>
+                ))}
+              </Space>
+            ) : (
+              <Empty description={t('workbench.emptyTasks')} />
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr) minmax(280px, 1fr)', gap: 12, width: '100%' }}>
+          <div style={sectionStyle}>
+            <Title heading={6} style={{ marginTop: 0 }}>{t('workbench.dashboardAssets')}</Title>
+            <Space wrap>
+              <Tag color="violet">{t('workbench.dialogArtifacts')}: {artifacts.length}</Tag>
+              <Tag color="green">{t('workbench.projectOutputs')}: {projectOutputCount}</Tag>
+              <Tag color="blue">{t('workbench.reusableAssets')}: {reusableAssetCount}</Tag>
+              <Tag color="grey">{t('workbench.completedPlans')}: {completedPlanAssetCount}</Tag>
+            </Space>
+          </div>
+
+          <div style={sectionStyle}>
+            <Title heading={6} style={{ marginTop: 0 }}>{t('workbench.dashboardRecentRuns')}</Title>
+            {activityRuns.length > 0 ? (
+              <Space vertical align="start" style={{ width: '100%' }}>
+                {activityRuns.slice(0, 4).map((run) => (
+                  <Space key={run.id} align="center" wrap>
+                    <Tag color={actionStatusColor(run.status)}>{t(ACTION_STATUS_LABEL_KEYS[run.status])}</Tag>
+                    <Text ellipsis={{ showTooltip: true }}>{run.input || run.type}</Text>
+                  </Space>
+                ))}
+              </Space>
+            ) : (
+              <Empty description={t('workbench.emptyActivityRuns')} />
+            )}
+          </div>
+        </div>
+      </Space>
+    );
+  };
+
+  const renderProjectsView = () => {
+    const projects = snapshot?.projects ?? [];
+    if (projects.length === 0) {
+      const sections = snapshot?.semanticSections ?? [];
+      if (sections.length === 0) return <Empty description={t('workbench.emptyProjects')} />;
+      return (
+        <Space vertical align="start" style={{ width: '100%' }} spacing={12}>
+          {sections.map((section) => (
+            <div key={section.key} style={{ ...sectionStyle, width: '100%' }}>
+              <Space align="center" wrap style={{ justifyContent: 'space-between', width: '100%', marginBottom: 8 }}>
+                <Space align="center" wrap>
+                  <Title heading={6} style={{ margin: 0 }}>{section.title}</Title>
+                  <Tag color={section.confidence === 'high' ? 'green' : section.confidence === 'medium' ? 'blue' : 'orange'}>
+                    {section.confidence}
+                  </Tag>
+                </Space>
+                <Text type="tertiary" size="small">{section.key}</Text>
+              </Space>
+              <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 8 }}>{section.reason}</Text>
+              {section.files.length > 0 && renderFileList(section.files, t('common.noData'))}
+            </div>
+          ))}
+        </Space>
+      );
+    }
+
+    return (
+      <Space vertical align="start" spacing={10} style={{ width: '100%' }}>
+        {projects.map((project) => (
+          <button
+            key={project.id}
+            type="button"
+            onClick={() => void openProject(project)}
+            style={{
+              border: selectedPreviewPath === project.path ? '1px solid var(--semi-color-primary)' : '1px solid var(--semi-color-border)',
+              background: selectedPreviewPath === project.path ? 'var(--semi-color-primary-light-default)' : 'var(--semi-color-bg-0)',
+              width: '100%',
+              borderRadius: 8,
+              padding: '12px 14px',
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            <Space align="center" style={{ justifyContent: 'space-between', width: '100%', marginBottom: 8 }}>
+              <Text strong ellipsis={{ showTooltip: true }}>{project.name}</Text>
+              <Tag color="blue">{project.status}</Tag>
+            </Space>
+            <Text type="secondary" size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block', minHeight: 20 }}>{project.summary}</Text>
+            <Space align="center" wrap style={{ marginTop: 8 }}>
+              {project.updatedAt > 0 && (
+                <Text type="tertiary" size="small">{t('workbench.projectUpdatedAt')}: {formatTimestamp(project.updatedAt)}</Text>
+              )}
+              <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }}>{project.path}</Text>
+            </Space>
+          </button>
+        ))}
+      </Space>
+    );
+  };
+
+  const renderTasksView = () => {
+    const taskItems = snapshot?.taskGroups.flatMap((group) => (
+      group.items.map((item) => ({ ...item, groupTitle: group.title, groupId: group.id }))
+    )) ?? [];
+    if (taskItems.length === 0) return renderWorkView();
+    return (
+      <Space vertical align="start" style={{ width: '100%' }}>
+        {taskItems.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => void openPreview({ path: item.sourcePath, name: item.text, size: 0, updatedAt: 0 })}
+            style={{
+              width: '100%',
+              border: selectedPreviewPath === item.sourcePath ? '1px solid var(--semi-color-primary)' : '1px solid var(--semi-color-border)',
+              background: selectedPreviewPath === item.sourcePath ? 'var(--semi-color-primary-light-default)' : 'var(--semi-color-bg-0)',
+              borderRadius: 6,
+              padding: '10px 12px',
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            <Space align="center" style={{ justifyContent: 'space-between', width: '100%' }}>
+              <Text ellipsis={{ showTooltip: true }}>{item.text}</Text>
+              <Tag color={item.completed ? 'green' : item.groupId === 'next' ? 'orange' : 'blue'}>{item.groupTitle}</Tag>
+            </Space>
+          </button>
+        ))}
+      </Space>
+    );
   };
 
   const renderWorkView = () => (
@@ -208,6 +611,173 @@ export default function WorkbenchRepositoryPanel({ binding }: { binding: Reposit
     </div>
   );
 
+  const renderOutputsView = () => {
+    const dialogArtifacts = [...artifacts].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 12);
+    const sectionByKey = new Map((snapshot?.semanticSections ?? []).map((section) => [section.key, section]));
+    const repositoryAssetSections = [
+      { key: 'outputs', title: t('workbench.projectOutputs'), section: sectionByKey.get('outputs'), color: 'green' as const },
+      { key: 'tools', title: t('workbench.reusableAssets'), section: sectionByKey.get('tools'), color: 'blue' as const },
+      { key: 'completedPlans', title: t('workbench.completedPlans'), section: sectionByKey.get('plans.completed'), color: 'grey' as const },
+    ].filter((item) => item.section && item.section.files.length > 0);
+    const repositoryAssetCards = repositoryAssetSections.flatMap((assetSection) => (
+      assetSection.section?.files.map((file) => ({
+        id: `${assetSection.key}:${file.path}`,
+        title: file.name,
+        description: file.path,
+        sourceKey: assetSection.key,
+        sourceLabel: assetSection.title,
+        typeKey: 'repository',
+        typeLabel: t('workbench.repositoryAssets'),
+        color: assetSection.color,
+        previewPath: file.path,
+        icon: assetSection.key === 'tools' ? <IconBolt /> : assetSection.key === 'completedPlans' ? <IconCheckList /> : <IconFile />,
+        onClick: () => void openPreview(file),
+      })) ?? []
+    ));
+    const outputCards = [
+      ...dialogArtifacts.map((artifact: ArtifactMeta) => ({
+        id: artifact.id,
+        title: artifact.title,
+        description: artifact.description || artifact.url || artifact.type,
+        sourceKey: 'dialog',
+        sourceLabel: t('workbench.dialogArtifacts'),
+        typeKey: artifact.type,
+        typeLabel: artifact.type,
+        color: 'violet' as const,
+        previewPath: undefined,
+        icon: <IconBox />,
+        onClick: () => {
+          if (artifact.type === 'link' && artifact.url) window.open(artifact.url, '_blank');
+          else openArtifactWindow(artifact.id);
+        },
+      })),
+      ...repositoryAssetCards,
+    ];
+    const outputSources = Array.from(new Map(outputCards.map((item) => [item.sourceKey, item.sourceLabel])).entries());
+    const outputTypes = Array.from(new Map(outputCards.map((item) => [item.typeKey, item.typeLabel])).entries());
+    const activeSourceFilters = outputSourceFilters.length > 0 ? outputSourceFilters : outputSources.map(([key]) => key);
+    const activeTypeFilters = outputTypeFilters.length > 0 ? outputTypeFilters : outputTypes.map(([key]) => key);
+    const filteredOutputCards = outputCards.filter((item) => (
+      activeSourceFilters.includes(item.sourceKey) && activeTypeFilters.includes(item.typeKey)
+    ));
+    const groupedOutputCards = outputGroupBy === 'none'
+      ? [[t('workbench.outputs'), filteredOutputCards] as const]
+      : Array.from(filteredOutputCards.reduce((groups, item) => {
+        const groupName = outputGroupBy === 'source' ? item.sourceLabel : item.typeLabel;
+        groups.set(groupName, [...(groups.get(groupName) ?? []), item]);
+        return groups;
+      }, new Map<string, typeof filteredOutputCards>()).entries());
+    const toggleFilter = (value: string, activeValues: string[], allValues: string[], setValues: (next: string[]) => void) => {
+      const current = activeValues.length > 0 ? activeValues : allValues;
+      const next = current.includes(value) ? current.filter((item) => item !== value) : [...current, value];
+      setValues(next.length === allValues.length ? [] : next);
+    };
+
+    return (
+      <Space vertical align="start" spacing={12} style={{ width: '100%' }}>
+        {outputCards.length > 0 && (
+          <div style={{ ...sectionStyle, width: '100%', background: 'var(--semi-color-bg-0)' }}>
+            <Space vertical align="start" spacing={10} style={{ width: '100%' }}>
+              <Space align="center" wrap>
+                <Text strong>{t('workbench.outputFilterSource')}</Text>
+                {outputSources.map(([key, label]) => (
+                  <Checkbox
+                    key={key}
+                    checked={activeSourceFilters.includes(key)}
+                    onChange={() => toggleFilter(key, outputSourceFilters, outputSources.map(([sourceKey]) => sourceKey), setOutputSourceFilters)}
+                  >
+                    {label}
+                  </Checkbox>
+                ))}
+              </Space>
+              <Space align="center" wrap>
+                <Text strong>{t('workbench.outputFilterType')}</Text>
+                {outputTypes.map(([key, label]) => (
+                  <Checkbox
+                    key={key}
+                    checked={activeTypeFilters.includes(key)}
+                    onChange={() => toggleFilter(key, outputTypeFilters, outputTypes.map(([typeKey]) => typeKey), setOutputTypeFilters)}
+                  >
+                    {label}
+                  </Checkbox>
+                ))}
+                <Text strong style={{ marginLeft: 8 }}>{t('workbench.outputGroupBy')}</Text>
+                <Select value={outputGroupBy} onChange={(value) => setOutputGroupBy(value as OutputGroupBy)} size="small" style={{ width: 150 }}>
+                  <Select.Option value="none">{t('workbench.outputGroupNone')}</Select.Option>
+                  <Select.Option value="source">{t('workbench.outputGroupSource')}</Select.Option>
+                  <Select.Option value="type">{t('workbench.outputGroupType')}</Select.Option>
+                </Select>
+              </Space>
+            </Space>
+          </div>
+        )}
+
+        {filteredOutputCards.length > 0 ? (
+          <Space vertical align="start" spacing={14} style={{ width: '100%' }}>
+            {groupedOutputCards.map(([groupName, items]) => (
+              <div key={groupName} style={{ width: '100%' }}>
+                {outputGroupBy !== 'none' && (
+                  <Title heading={6} style={{ margin: '0 0 10px' }}>{groupName}</Title>
+                )}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12, width: '100%' }}>
+                  {items.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={item.onClick}
+                      style={{
+                        width: '100%',
+                        minHeight: 168,
+                        border: item.previewPath && selectedPreviewPath === item.previewPath ? '1px solid var(--semi-color-primary)' : '1px solid var(--semi-color-border)',
+                        background: 'var(--semi-color-bg-0)',
+                        borderRadius: 8,
+                        padding: 14,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <Space align="start" spacing={10} style={{ width: '100%' }}>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: 34,
+                            height: 34,
+                            borderRadius: 8,
+                            color: 'var(--semi-color-primary)',
+                            background: 'var(--semi-color-primary-light-default)',
+                            flex: '0 0 auto',
+                          }}
+                        >
+                          {item.icon}
+                        </span>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <Space align="center" wrap style={{ marginBottom: 6 }}>
+                            <Tag color={item.color}>{item.typeLabel}</Tag>
+                          </Space>
+                          <Text strong ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>{item.title}</Text>
+                          <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 8 }}>
+                            {t('workbench.outputSource')}: {item.sourceLabel}
+                          </Text>
+                          <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block', marginTop: 6 }}>
+                            {item.description}
+                          </Text>
+                        </div>
+                      </Space>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </Space>
+        ) : (
+          <Empty description={outputCards.length > 0 ? t('workbench.emptyFilteredOutputs') : t('workbench.emptyRepositoryAssets')} />
+        )}
+      </Space>
+    );
+  };
+
   const renderReviewsView = () => (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 0.9fr) minmax(280px, 1.1fr)', gap: 12, width: '100%' }}>
       <div style={sectionStyle}>
@@ -238,57 +808,144 @@ export default function WorkbenchRepositoryPanel({ binding }: { binding: Reposit
   );
 
   const renderActiveView = () => {
-    if (activeView === 'plans') return renderPlansView();
-    if (activeView === 'activity') return renderActivityView();
-    if (activeView === 'reviews') return renderReviewsView();
-    return renderWorkView();
+    if (panelView === 'dashboard') return renderDashboardView();
+    if (panelView === 'projects') return renderProjectsView();
+    if (panelView === 'tasks') return renderTasksView();
+    if (panelView === 'plans') return renderPlansView();
+    if (panelView === 'activity') return renderActivityView();
+    if (panelView === 'outputs') return renderOutputsView();
+    if (panelView === 'reviews') return renderReviewsView();
+    return renderProjectsView();
   };
 
-  const previewTitle = selectedPreviewPath || t('workbench.preview');
+  const selectedProject = snapshot?.projects.find((project) => project.path === selectedPreviewPath);
+  const previewTitle = panelView === 'projects' ? t('workbench.projectPreview') : selectedPreviewPath || t('workbench.preview');
+  const standaloneView = panelView === 'dashboard' || panelView === 'outputs';
+  const bareContentView = panelView === 'dashboard' || panelView === 'outputs' || panelView === 'projects';
+  const contentGridColumns = standaloneView
+    ? 'minmax(0, 1fr)'
+    : panelView === 'projects'
+      ? 'minmax(300px, 380px) minmax(460px, 1fr)'
+      : 'minmax(0, 1fr) minmax(320px, 420px)';
 
-  return (
-    <Space vertical align="start" spacing={16} style={{ width: '100%' }}>
-      <Space wrap>
-        <Tag color="blue">{t('workbench.activeWorkCount', { count: snapshot?.activeWork.length ?? 0 })}</Tag>
-        <Tag color="grey">{t('workbench.completedWork')}: {snapshot?.completedWork.length ?? 0}</Tag>
-        <Tag color="grey">{t('workbench.somedayWork')}: {snapshot?.somedayWork.length ?? 0}</Tag>
-        <Tag color="green">{t('workbench.activePlanCount', { count: snapshot?.activePlans.length ?? 0 })}</Tag>
-        <Tag color="grey">{t('workbench.completedPlans')}: {snapshot?.completedPlans.length ?? 0}</Tag>
-        <Tag color="orange">{t('workbench.reviewCount', { count: snapshot?.reviews.length ?? 0 })}</Tag>
-      </Space>
+  const renderPreviewContent = () => {
+    if (panelView === 'projects') {
+      if (!selectedProject) return <Empty description={t('workbench.emptyProjects')} />;
+      const projectRoot = projectRootFromPath(selectedProject.path);
+      const sectionByKey = new Map((snapshot?.semanticSections ?? []).map((section) => [section.key, section]));
+      const projectDocument = sectionByKey.get('projects')?.documents.find((document) => document.path === selectedProject.path);
+      const markdownDeliverables = extractMarkdownDeliverables(selectedProject.path, projectDocument?.content ?? selectedPreviewContent);
+      const outputFolderDeliverables = repositoryTree
+        .filter((path) => path.startsWith(`${projectRoot}/outputs/`) && !path.endsWith('/'))
+        .map((path) => ({
+          id: `outputs:${path}`,
+          title: fileNameFromPath(path),
+          path,
+          source: 'outputs' as const,
+          kind: deliverableKind(path),
+        }));
+      const projectDeliverables = dedupeDeliverables([...markdownDeliverables, ...outputFolderDeliverables]);
+      return (
+        <Space vertical align="start" spacing={12} style={{ width: '100%' }}>
+          <Space align="center" wrap style={{ justifyContent: 'space-between', width: '100%' }}>
+            <Title heading={5} style={{ margin: 0 }} ellipsis={{ showTooltip: true }}>{selectedProject.name}</Title>
+            <Tag color="blue">{selectedProject.status}</Tag>
+          </Space>
+          <Text type="secondary">{selectedProject.summary}</Text>
+          <Space vertical align="start" spacing={4} style={{ width: '100%' }}>
+            {selectedProject.updatedAt > 0 && (
+              <Text type="tertiary" size="small">{t('workbench.projectUpdatedAt')}: {formatTimestamp(selectedProject.updatedAt)}</Text>
+            )}
+            <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block', width: '100%' }}>{selectedProject.path}</Text>
+          </Space>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(320px, 420px)', gap: 16, width: '100%', alignItems: 'start' }}>
-        <Card bodyStyle={{ padding: 0 }}>
-          <Tabs
-            activeKey={activeView}
-            onChange={(key) => setActiveView(key as WorkbenchView)}
-            type="button"
-            style={{ padding: '12px 12px 0' }}
-          >
-            <Tabs.TabPane tab={t('workbench.activeWork')} itemKey="work" />
-            <Tabs.TabPane tab={t('workbench.activePlans')} itemKey="plans" />
-            <Tabs.TabPane tab={t('workbench.activityRuns')} itemKey="activity" />
-            <Tabs.TabPane tab={t('workbench.reviews')} itemKey="reviews" />
-          </Tabs>
-          <div style={{ padding: 12, minHeight: 460 }}>
-            {renderActiveView()}
+          <div style={{ ...sectionStyle, width: '100%' }}>
+            <Title heading={6} style={{ marginTop: 0 }}>{t('workbench.projectDeliverables')}</Title>
+            {projectDeliverables.length > 0 ? (
+              <Space vertical align="start" spacing={8} style={{ width: '100%' }}>
+                {projectDeliverables.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      if (item.kind === 'markdown') {
+                        void openProjectDocument({ path: item.path, name: item.title, size: 0, updatedAt: 0 });
+                      } else {
+                        openRepositoryFile(item.path);
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      border: selectedProjectDocumentPath === item.path ? '1px solid var(--semi-color-primary)' : '1px solid var(--semi-color-border)',
+                      background: selectedProjectDocumentPath === item.path ? 'var(--semi-color-primary-light-default)' : 'var(--semi-color-bg-0)',
+                      borderRadius: 6,
+                      padding: '8px 10px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <Space align="center" wrap style={{ marginBottom: 4 }}>
+                      <Tag color={item.source === 'outputs' ? 'green' : 'blue'}>
+                        {item.source === 'outputs' ? 'outputs/' : t('workbench.markdownReference')}
+                      </Tag>
+                      <Tag color="grey">{item.kind}</Tag>
+                      <Text strong ellipsis={{ showTooltip: true }}>{item.title}</Text>
+                    </Space>
+                    <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>{item.path}</Text>
+                  </button>
+                ))}
+              </Space>
+            ) : (
+              <Empty description={t('workbench.emptyProjectDeliverables')} />
+            )}
           </div>
-        </Card>
 
-        <Card
-          bodyStyle={{
-            minHeight: 460,
-            maxHeight: 'calc(100vh - 300px)',
-            overflow: 'auto',
-          }}
-        >
-          <Title heading={5} style={{ marginTop: 0 }} ellipsis={{ showTooltip: true }}>{previewTitle}</Title>
+          {selectedProjectDocumentPath && selectedProjectDocumentPath !== selectedProject.path && (
+            <Text type="tertiary" size="small">{t('workbench.projectViewing')}: {selectedProjectDocumentPath}</Text>
+          )}
           {selectedPreviewContent ? (
             <MarkdownView content={selectedPreviewContent} />
           ) : (
             <Empty description={t('workbench.previewEmpty')} />
           )}
-        </Card>
+        </Space>
+      );
+    }
+
+    return selectedPreviewContent ? (
+      <MarkdownView content={selectedPreviewContent} />
+    ) : (
+      <Empty description={t('workbench.previewEmpty')} />
+    );
+  };
+
+  return (
+    <Space vertical align="start" spacing={16} style={{ width: '100%' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: contentGridColumns, gap: 16, width: '100%', alignItems: 'start' }}>
+        {bareContentView ? (
+          <div style={{ minHeight: 460 }}>
+            {renderActiveView()}
+          </div>
+        ) : (
+          <Card>
+            <div style={{ padding: 12, minHeight: 460 }}>
+              {renderActiveView()}
+            </div>
+          </Card>
+        )}
+
+        {!standaloneView && (
+          <Card
+            bodyStyle={{
+              minHeight: 460,
+              maxHeight: 'calc(100vh - 300px)',
+              overflow: 'auto',
+            }}
+          >
+            <Title heading={5} style={{ marginTop: 0 }} ellipsis={{ showTooltip: true }}>{previewTitle}</Title>
+            {renderPreviewContent()}
+          </Card>
+        )}
       </div>
     </Space>
   );

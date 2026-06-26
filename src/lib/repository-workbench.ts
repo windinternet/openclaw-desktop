@@ -1,5 +1,46 @@
-import type { RepositoryBinding } from './agentic-repository';
+import type { RepositoryBinding, SemanticSlot } from './agentic-repository';
 import type { RepositoryMarkdownFile } from './repository-knowledge';
+
+export interface WorkbenchSemanticSection {
+  key: string;
+  title: string;
+  confidence: 'low' | 'medium' | 'high';
+  reason: string;
+  paths: string[];
+  files: RepositoryMarkdownFile[];
+  documents: WorkbenchSemanticDocument[];
+  markdown: string;
+}
+
+export interface WorkbenchSemanticDocument {
+  path: string;
+  title: string;
+  content: string;
+  file: RepositoryMarkdownFile;
+}
+
+export interface WorkbenchProject {
+  id: string;
+  name: string;
+  path: string;
+  status: string;
+  summary: string;
+  updatedAt: number;
+}
+
+export interface WorkbenchTaskItem {
+  id: string;
+  text: string;
+  sourcePath: string;
+  completed: boolean;
+}
+
+export interface WorkbenchTaskGroup {
+  id: 'current' | 'next' | 'done';
+  title: string;
+  path: string;
+  items: WorkbenchTaskItem[];
+}
 
 export interface WorkbenchSnapshot {
   inboxMarkdown: string;
@@ -13,6 +54,9 @@ export interface WorkbenchSnapshot {
   reviews: RepositoryMarkdownFile[];
   planMetadata: RepositoryPlanMetadata[];
   reviewGroups: RepositoryReviewGroup[];
+  semanticSections: WorkbenchSemanticSection[];
+  projects: WorkbenchProject[];
+  taskGroups: WorkbenchTaskGroup[];
 }
 
 export interface RepositoryPlanMetadata {
@@ -27,6 +71,10 @@ export interface RepositoryReviewGroup {
 }
 
 export async function loadWorkbenchSnapshot(binding: RepositoryBinding): Promise<WorkbenchSnapshot> {
+  if (binding.workbench?.isWorkbenchRepository) {
+    return loadSemanticWorkbenchSnapshot(binding);
+  }
+
   const repository = getWorkbenchReadApi();
   const [
     inboxMarkdown,
@@ -68,6 +116,104 @@ export async function loadWorkbenchSnapshot(binding: RepositoryBinding): Promise
     reviews,
     planMetadata: planMetadata.filter((item) => item.status || item.approval),
     reviewGroups: groupReviewsByFolder(reviews),
+    semanticSections: [],
+    projects: [],
+    taskGroups: [],
+  };
+}
+
+async function loadSemanticWorkbenchSnapshot(binding: RepositoryBinding): Promise<WorkbenchSnapshot> {
+  const semanticSections = await loadSemanticSections(binding);
+  const sectionByKey = new Map(semanticSections.map((section) => [section.key, section]));
+  const reviews = semanticSections.find((section) => section.key === 'reviews')?.files ?? [];
+  return {
+    inboxMarkdown: sectionByKey.get('inbox')?.markdown ?? '',
+    activeWork: sectionByKey.get('current')?.files ?? [],
+    completedWork: sectionByKey.get('done')?.files ?? [],
+    somedayWork: sectionByKey.get('next')?.files ?? [],
+    activePlans: sectionByKey.get('plans.active')?.files ?? [],
+    completedPlans: sectionByKey.get('plans.completed')?.files ?? [],
+    runsMarkdown: sectionByKey.get('runs')?.markdown ?? '',
+    outputsMarkdown: sectionByKey.get('outputs')?.markdown ?? '',
+    reviews,
+    planMetadata: [],
+    reviewGroups: groupReviewsByFolder(reviews),
+    semanticSections,
+    projects: deriveProjects(sectionByKey.get('projects')),
+    taskGroups: [
+      deriveTaskGroup('current', sectionByKey.get('current')),
+      deriveTaskGroup('next', sectionByKey.get('next')),
+      deriveTaskGroup('done', sectionByKey.get('done')),
+    ].filter((group): group is WorkbenchTaskGroup => Boolean(group)),
+  };
+}
+
+async function loadSemanticSections(binding: RepositoryBinding): Promise<WorkbenchSemanticSection[]> {
+  const slots = binding.workbench?.slots;
+  if (!slots) return [];
+  const entries: Array<[string, SemanticSlot | undefined]> = [
+    ['inbox', slots.inbox],
+    ['current', slots.current],
+    ['next', slots.next],
+    ['done', slots.done],
+    ['projects', slots.projects],
+    ['plans.active', slots.plans?.active],
+    ['plans.completed', slots.plans?.completed],
+    ['runs', slots.runs],
+    ['outputs', slots.outputs],
+    ['reviews', slots.reviews],
+    ['tools', slots.tools],
+    ['logs', slots.logs],
+  ];
+  const sections = await Promise.all(entries.map(async ([key, slot]) => (
+    slot ? loadSemanticSection(binding, key, slot) : null
+  )));
+  return sections.filter((section): section is WorkbenchSemanticSection => Boolean(section));
+}
+
+async function loadSemanticSection(
+  binding: RepositoryBinding,
+  key: string,
+  slot: SemanticSlot,
+): Promise<WorkbenchSemanticSection> {
+  const repository = getWorkbenchReadApi();
+  const files: RepositoryMarkdownFile[] = [];
+  const documents: WorkbenchSemanticDocument[] = [];
+  const markdownParts: string[] = [];
+
+  const addDocument = async (path: string, file?: RepositoryMarkdownFile) => {
+    const content = await repository.readText(binding.repoPath, path);
+    const nextFile = file ?? { path, name: path.split('/').pop() ?? path, size: content.length, updatedAt: 0 };
+    files.push(nextFile);
+    documents.push({
+      path,
+      title: extractTitle(content) || nextFile.name,
+      content,
+      file: nextFile,
+    });
+    markdownParts.push(content);
+  };
+
+  for (const path of slot.paths) {
+    if (path.endsWith('.md')) {
+      await addDocument(path);
+    } else {
+      const listedFiles = await repository.listMarkdown(binding.repoPath, path);
+      for (const file of listedFiles) {
+        await addDocument(file.path, file);
+      }
+    }
+  }
+
+  return {
+    key,
+    title: slot.label,
+    confidence: slot.confidence,
+    reason: slot.reason,
+    paths: slot.paths,
+    files,
+    documents,
+    markdown: markdownParts.filter(Boolean).join('\n\n---\n\n'),
   };
 }
 
@@ -86,6 +232,90 @@ export function parsePlanMetadata(path: string, markdown: string): RepositoryPla
     if (key === 'approval') metadata.approval = value;
   }
   return metadata;
+}
+
+export function deriveProjects(section?: WorkbenchSemanticSection): WorkbenchProject[] {
+  if (!section) return [];
+  return section.documents
+    .filter((document) => isProjectEntryDocument(document.path))
+    .map((document) => ({
+      id: document.path,
+      name: extractTitle(document.content) || projectNameFromPath(document.path),
+      path: document.path,
+      status: extractStatus(document.content),
+      summary: extractSummary(document.content),
+      updatedAt: document.file.updatedAt,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+}
+
+export function deriveTaskGroup(id: WorkbenchTaskGroup['id'], section?: WorkbenchSemanticSection): WorkbenchTaskGroup | null {
+  if (!section) return null;
+  const items = section.documents.flatMap((document) => extractTaskItems(document.content, id, document.path));
+  return {
+    id,
+    title: section.title || taskGroupFallbackTitle(id),
+    path: section.paths[0] ?? '',
+    items,
+  };
+}
+
+function extractTitle(content: string): string {
+  return content.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? '';
+}
+
+function extractStatus(content: string): string {
+  return content.match(/状态[：:]\s*([^\n]+)/)?.[1]?.trim() ?? '未标记';
+}
+
+function extractSummary(content: string): string {
+  const line = content
+    .split('\n')
+    .map((item) => item.trim())
+    .find((item) => item && !item.startsWith('#') && !item.startsWith('|') && !item.startsWith('-'));
+  return line ?? '暂无摘要';
+}
+
+function extractTaskItems(content: string, groupId: WorkbenchTaskGroup['id'], sourcePath: string): WorkbenchTaskItem[] {
+  const items = content
+    .split('\n')
+    .map((line) => line.trim())
+    .map((line) => {
+      const match = /^-\s+(?:\[([ xX])\]\s+)?(.+)$/.exec(line);
+      if (!match) return null;
+      const text = match[2]?.trim();
+      if (!text || text.startsWith('暂无')) return null;
+      const checked = match[1]?.toLowerCase() === 'x';
+      if (groupId === 'done' && !checked) return null;
+      return {
+        text,
+        completed: groupId === 'done' || checked,
+      };
+    })
+    .filter((item): item is { text: string; completed: boolean } => Boolean(item));
+
+  return items.map((item, index) => ({
+    id: `${sourcePath}:${index}`,
+    text: item.text,
+    sourcePath,
+    completed: item.completed,
+  }));
+}
+
+function isProjectEntryDocument(path: string): boolean {
+  return path.split('/').length >= 3 && /(^|\/)(README|brief|PRD)\.md$/i.test(path);
+}
+
+function projectNameFromPath(path: string): string {
+  const parts = path.split('/');
+  if (parts.length >= 2) return parts[parts.length - 2] || path;
+  return path.replace(/\.md$/i, '');
+}
+
+function taskGroupFallbackTitle(id: WorkbenchTaskGroup['id']): string {
+  if (id === 'current') return '正在进行';
+  if (id === 'next') return '接下来';
+  return '已完成';
 }
 
 export function groupReviewsByFolder(reviews: RepositoryMarkdownFile[]): RepositoryReviewGroup[] {
