@@ -29,6 +29,33 @@ body,
   pointer-events: none;
 }
 
+/* ── Electron Cursor Fallbacks ─────────────────────────────────── */
+:where(button, a[href], [role="button"], .semi-button, .semi-navigation-item, .semi-select, .semi-tabs-tab, .semi-checkbox, .semi-radio, .semi-switch, .semi-upload-add),
+:where(button, a[href], [role="button"], .semi-button, .semi-navigation-item, .semi-select, .semi-tabs-tab, .semi-checkbox, .semi-radio, .semi-switch, .semi-upload-add) *,
+:where(input, textarea, select, [contenteditable="true"], .ProseMirror, .semi-input, .semi-input-textarea, .semi-aiChatInput-editor-content),
+:where(input, textarea, select, [contenteditable="true"], .ProseMirror, .semi-input, .semi-input-textarea, .semi-aiChatInput-editor-content) *,
+:where(.semi-dropdown-item, .semi-page-item, .semi-tree-option, .semi-cascader-option, .semi-tag-closable, .semi-slider-handle),
+:where(.semi-dropdown-item, .semi-page-item, .semi-tree-option, .semi-cascader-option, .semi-tag-closable, .semi-slider-handle) * {
+  -webkit-app-region: no-drag;
+}
+
+:where(button, a[href], [role="button"], .semi-button, .semi-navigation-item, .semi-select, .semi-tabs-tab, .semi-checkbox, .semi-radio, .semi-switch, .semi-upload-add),
+:where(button, a[href], [role="button"], .semi-button, .semi-navigation-item, .semi-select, .semi-tabs-tab, .semi-checkbox, .semi-radio, .semi-switch, .semi-upload-add) *,
+:where(.semi-dropdown-item, .semi-page-item, .semi-tree-option, .semi-cascader-option, .semi-tag-closable, .semi-slider-handle),
+:where(.semi-dropdown-item, .semi-page-item, .semi-tree-option, .semi-cascader-option, .semi-tag-closable, .semi-slider-handle) * {
+  cursor: pointer !important;
+}
+
+:where(button:disabled, [aria-disabled="true"], .semi-button-disabled, .semi-select-disabled, .semi-page-item-disabled),
+:where(button:disabled, [aria-disabled="true"], .semi-button-disabled, .semi-select-disabled, .semi-page-item-disabled) * {
+  cursor: not-allowed !important;
+}
+
+:where(input, textarea, [contenteditable="true"], .ProseMirror, .semi-input, .semi-input-textarea, .semi-aiChatInput-editor-content),
+:where(input, textarea, [contenteditable="true"], .ProseMirror, .semi-input, .semi-input-textarea, .semi-aiChatInput-editor-content) * {
+  cursor: text !important;
+}
+
 /* ── Nav: Primary List Spacing ──────────────────────────────────── */
 .semi-navigation-list {
   padding: 0;

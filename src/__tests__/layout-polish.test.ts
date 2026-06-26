@@ -55,6 +55,19 @@ describe('chat configuration selects', () => {
     expect(css).toContain('.sidebar-resize-handle');
     expect(css).toContain('cursor: col-resize;');
   });
+
+  it('provides global cursor fallbacks for Electron interactive regions', () => {
+    const css = readFileSync('src/styles/global.css', 'utf8');
+
+    expect(css).toContain('/* ── Electron Cursor Fallbacks');
+    expect(css).toContain(':where(button, a[href], [role="button"], .semi-button, .semi-navigation-item, .semi-select, .semi-tabs-tab, .semi-checkbox, .semi-radio, .semi-switch, .semi-upload-add)');
+    expect(css).toContain(':where(button, a[href], [role="button"], .semi-button, .semi-navigation-item, .semi-select, .semi-tabs-tab, .semi-checkbox, .semi-radio, .semi-switch, .semi-upload-add) *');
+    expect(css).toContain(':where(input, textarea, select, [contenteditable="true"], .ProseMirror, .semi-input, .semi-input-textarea, .semi-aiChatInput-editor-content) *');
+    expect(css).toContain('-webkit-app-region: no-drag;');
+    expect(css).toContain('cursor: pointer !important;');
+    expect(css).toContain(':where(input, textarea, [contenteditable="true"], .ProseMirror, .semi-input, .semi-input-textarea, .semi-aiChatInput-editor-content)');
+    expect(css).toContain('cursor: text !important;');
+  });
 });
 
 describe('3D office layout', () => {
