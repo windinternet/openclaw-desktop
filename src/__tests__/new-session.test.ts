@@ -277,16 +277,24 @@ describe('new session creation params', () => {
 
     expect(page).toContain('new-session-hero');
     expect(page).toContain('new-session-logo-mark');
+    expect(page).toContain('new-session-logo-image');
+    expect(page).toContain('/assets/brand/openclaw-app-icon-256.png');
+    expect(page).not.toContain('IconPlusCircle');
     expect(page).toContain('new-session-card-visual');
     expect(page).toContain('new-session-bottom-composer');
     expect(page).toContain('launchCards');
     expect(page).not.toContain('new-session-workbench-panel');
     expect(zh).toContain('"title": "OpenClaw Desktop"');
+    expect(zh).toContain('"subtitle": "连接 OpenClaw Gateway、工作台与知识库，让每次会话都沉淀成可追踪的工作记录。"');
+    expect(zh).not.toContain('7x24 小时，随时响应的全能电脑 AI 助手');
     expect(en).toContain('"title": "OpenClaw Desktop"');
+    expect(en).toContain('"subtitle": "Connect OpenClaw Gateway, Workbench, and Knowledge Base so every session becomes traceable work."');
     expect(css).toContain('min-height: 100%');
     expect(css).toContain('grid-template-columns: repeat(5, minmax(0, 1fr))');
     expect(css).toContain('position: sticky');
     expect(css).toContain('backdrop-filter: blur(18px)');
+    expect(css).toContain('.new-session-logo-image');
+    expect(css).toContain('body[theme-mode="dark"] .new-session-logo-mark');
     expect(css).not.toMatch(/\.new-session-bottom-composer\s*\{[^}]*background:/s);
   });
 });

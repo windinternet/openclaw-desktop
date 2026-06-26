@@ -264,23 +264,32 @@ body,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #ef5b4d;
-  background: var(--semi-color-bg-1);
-  box-shadow: 0 16px 40px rgb(15 23 42 / 8%);
+  padding: 8px;
+  background: color-mix(in srgb, var(--semi-color-bg-1) 88%, #fff);
+  box-shadow:
+    0 16px 40px rgb(15 23 42 / 8%),
+    inset 0 1px 0 rgb(255 255 255 / 72%);
 }
 
-.new-session-logo-mark svg {
-  width: 42px;
-  height: 42px;
+.new-session-logo-image {
+  width: 56px;
+  height: 56px;
+  display: block;
+  object-fit: contain;
+  border-radius: 16px;
+  filter: drop-shadow(0 8px 16px rgb(239 91 77 / 12%));
 }
 
-.new-session-logo-spark {
-  position: absolute;
-  top: 10px;
-  left: 16px;
-  color: #ffc247;
-  font-size: 20px;
-  line-height: 1;
+body[theme-mode="dark"] .new-session-logo-mark {
+  border-color: color-mix(in srgb, var(--semi-color-border) 72%, #ef5b4d);
+  background: color-mix(in srgb, var(--semi-color-bg-2) 86%, #ef5b4d);
+  box-shadow:
+    0 18px 44px rgb(0 0 0 / 32%),
+    inset 0 1px 0 rgb(255 255 255 / 9%);
+}
+
+body[theme-mode="dark"] .new-session-logo-image {
+  filter: drop-shadow(0 10px 22px rgb(239 91 77 / 22%));
 }
 
 .new-session-brand-title.semi-typography {

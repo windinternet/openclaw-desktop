@@ -7,7 +7,6 @@ import {
   IconClock,
   IconFile,
   IconFolderOpen,
-  IconPlusCircle,
 } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
@@ -173,8 +172,14 @@ export default function NewSessionPage() {
         <main className="new-session-launch">
           <section className="new-session-hero">
             <div className="new-session-logo-mark">
-              <IconPlusCircle size="extra-large" />
-              <span className="new-session-logo-spark">✦</span>
+              <img
+                src="/assets/brand/openclaw-app-icon-256.png"
+                alt=""
+                aria-hidden="true"
+                width={56}
+                height={56}
+                className="new-session-logo-image"
+              />
             </div>
             <Title heading={1} className="new-session-brand-title">
               {t('newSessionPage.title')}
