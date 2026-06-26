@@ -785,6 +785,7 @@
     "nHoursAgo": "{{count}}小时前",
     "nDaysAgo": "{{count}}天前",
     "resizeHandle": "调整侧边栏宽度",
+    "sessionHistory": "会话历史",
     "labelSaveFailed": "标签保存失败: {{error}}"
   },
   "session": {

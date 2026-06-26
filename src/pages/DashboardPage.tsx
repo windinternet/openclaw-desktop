@@ -14,7 +14,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useStore, type AiActionRun, type SessionInfo } from '../lib';
-import { ActivityTrendChart, ModelUsageBarChart, ProviderQuotaBarChart, StatusDistributionChart, TokenCompositionChart } from '../components/charts/DashboardVisualCharts';
+import { ActivityTrendChart, ModelUsageBarChart, StatusDistributionChart, TokenCompositionChart } from '../components/charts/DashboardVisualCharts';
 import UsageTrendChart from '../components/charts/UsageTrendChart';
 import type { ArtifactMeta } from '../lib/artifact-types';
 import { loadAiActionRuns } from '../lib/ai-action-run-store';
@@ -46,11 +46,6 @@ function formatCost(value?: number): string {
   return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
 }
 
-function formatPercent(value?: number): string {
-  if (value === undefined) return '-';
-  return `${Math.max(0, Math.min(100, value)).toFixed(0)}%`;
-}
-
 function dayKey(value?: number): string | null {
   if (!value) return null;
   return new Date(value).toISOString().slice(0, 10);
@@ -66,13 +61,6 @@ function buildLastSevenDays(now = new Date()): string[] {
     date.setUTCDate(date.getUTCDate() - (6 - index));
     return date.toISOString().slice(0, 10);
   });
-}
-
-function quotaCategory(percentLeft?: number): string {
-  if (percentLeft === undefined) return 'unknown';
-  if (percentLeft >= 50) return 'healthy';
-  if (percentLeft >= 20) return 'watch';
-  return 'critical';
 }
 
 function getSessionTime(session: SessionInfo): number {
@@ -326,18 +314,6 @@ export default function DashboardPage() {
     ].filter((item) => item.value > 0);
   }, [t, usageDashboard]);
 
-  const providerQuotaChartData = useMemo(
-    () => (usageDashboard?.providerQuotas ?? [])
-      .filter((quota) => quota.percentLeft !== undefined)
-      .slice(0, 6)
-      .map((quota) => ({
-        label: quota.label,
-        value: Math.max(0, Math.min(100, quota.percentLeft ?? 0)),
-        category: quotaCategory(quota.percentLeft),
-      })),
-    [usageDashboard],
-  );
-
   const activityTrendData = useMemo(() => {
     const days = buildLastSevenDays();
     const categories = [
@@ -459,56 +435,6 @@ export default function DashboardPage() {
             </div>
             <ModelUsageBarChart data={modelUsageChartData} emptyText={t('dashboard.noChartData')} />
           </div>
-        </div>
-
-        <div className="dashboard-usage-panel dashboard-model-usage-list">
-          <div className="dashboard-usage-panel-title">
-            <Text style={{ fontWeight: 700 }}>{t('dashboard.modelUsage')}</Text>
-            <Tag size="small" color="blue">{models.length}</Tag>
-          </div>
-          {usageDashboard?.modelRows.length ? usageDashboard.modelRows.slice(0, 6).map((row) => (
-            <div key={row.model} className="dashboard-model-usage-row">
-              <div className="dashboard-model-usage-main">
-                <span
-                  className="dashboard-model-usage-label"
-                  title={row.label}
-                  style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}
-                >
-                  {row.label}
-                </span>
-                <Text type="tertiary" size="small">
-                  {formatNumber(row.totalTokens)} tokens · {row.sessionCount} sessions
-                </Text>
-              </div>
-              <div className="dashboard-model-tags">
-                {row.thinking ? <Tag size="small" color="purple">thinking</Tag> : null}
-                {row.vision ? <Tag size="small" color="cyan">vision</Tag> : null}
-                {row.contextWindow ? <Tag size="small" color="grey">{formatNumber(row.contextWindow)}</Tag> : null}
-              </div>
-            </div>
-          )) : <Text type="tertiary" size="small">{t('dashboard.realUsageUnavailable')}</Text>}
-        </div>
-
-        <div className="dashboard-usage-panel dashboard-provider-quota-list">
-          <div className="dashboard-usage-panel-title">
-            <Text style={{ fontWeight: 700 }}>{t('dashboard.providerQuota')}</Text>
-            <Tag size="small" color="green">{usageDashboard?.providerQuotas.length ?? 0}</Tag>
-          </div>
-          <ProviderQuotaBarChart data={providerQuotaChartData} emptyText={t('dashboard.noChartData')} />
-          {usageDashboard?.providerQuotas.length ? usageDashboard.providerQuotas.slice(0, 6).map((quota) => (
-            <div key={quota.provider} className="dashboard-provider-quota-row">
-              <div>
-                <Text style={{ fontWeight: 600 }}>{quota.label}</Text>
-                <Text type="tertiary" size="small" style={{ display: 'block' }}>
-                  {quota.summary || t('dashboard.providerQuotaWindow')}
-                </Text>
-              </div>
-              <div className="dashboard-quota-meter">
-                <span style={{ width: `${Math.max(4, Math.min(100, quota.percentLeft ?? 0))}%` }} />
-              </div>
-              <Text size="small" style={{ fontWeight: 700 }}>{formatPercent(quota.percentLeft)}</Text>
-            </div>
-          )) : <Text type="tertiary" size="small">{t('dashboard.providerQuotaUnavailable')}</Text>}
         </div>
 
         <div className="dashboard-usage-panel dashboard-usage-trend">

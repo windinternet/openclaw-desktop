@@ -785,6 +785,7 @@
     "nHoursAgo": "{{count}}h ago",
     "nDaysAgo": "{{count}}d ago",
     "resizeHandle": "Resize sidebar",
+    "sessionHistory": "Session History",
     "labelSaveFailed": "Failed to save label: {{error}}"
   },
   "session": {

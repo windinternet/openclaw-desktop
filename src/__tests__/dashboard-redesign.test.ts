@@ -56,9 +56,9 @@ describe('dashboard redesign', () => {
     const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 
     expect(dashboard).toContain('dashboard-usage-layout');
-    expect(dashboard).toContain('dashboard-model-usage-list');
+    expect(dashboard).not.toContain('dashboard-model-usage-list');
     expect(dashboard).toContain('dashboard-usage-trend');
-    expect(dashboard).toContain('dashboard-provider-quota-list');
+    expect(dashboard).not.toContain('dashboard-provider-quota-list');
     expect(dashboard).toContain("import UsageTrendChart from '../components/charts/UsageTrendChart'");
     expect(dashboard).toContain('<UsageTrendChart trend={usageDashboard.trend} />');
     expect(chart).toContain("import { Column } from '@ant-design/charts'");
@@ -72,7 +72,7 @@ describe('dashboard redesign', () => {
     expect(pkg.dependencies['@ant-design/charts']).toBeTruthy();
     expect(dashboard).toContain("t('dashboard.totalTokens')");
     expect(dashboard).toContain("t('dashboard.modelUsage')");
-    expect(dashboard).toContain("t('dashboard.providerQuota')");
+    expect(dashboard).not.toContain("t('dashboard.providerQuota')");
     expect(dashboard).toContain("t('dashboard.usageTrend')");
     expect(dashboard).not.toContain('dashboard-usage-bar');
     expect(dashboard).not.toContain("label={t('dashboard.messageCount')}");
@@ -85,16 +85,16 @@ describe('dashboard redesign', () => {
     const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
     const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
 
-    expect(dashboard).toContain("import { ActivityTrendChart, ModelUsageBarChart, ProviderQuotaBarChart, StatusDistributionChart, TokenCompositionChart } from '../components/charts/DashboardVisualCharts'");
+    expect(dashboard).toContain("import { ActivityTrendChart, ModelUsageBarChart, StatusDistributionChart, TokenCompositionChart } from '../components/charts/DashboardVisualCharts'");
     expect(dashboard).toContain('modelUsageChartData');
     expect(dashboard).toContain('tokenCompositionData');
-    expect(dashboard).toContain('providerQuotaChartData');
+    expect(dashboard).not.toContain('providerQuotaChartData');
     expect(dashboard).toContain('activityTrendData');
     expect(dashboard).toContain('actionRunStatusData');
     expect(dashboard).toContain('artifactTypeData');
     expect(dashboard).toContain("<ModelUsageBarChart data={modelUsageChartData} emptyText={t('dashboard.noChartData')} />");
     expect(dashboard).toContain("<TokenCompositionChart data={tokenCompositionData} emptyText={t('dashboard.noChartData')} />");
-    expect(dashboard).toContain("<ProviderQuotaBarChart data={providerQuotaChartData} emptyText={t('dashboard.noChartData')} />");
+    expect(dashboard).not.toContain('ProviderQuotaBarChart');
     expect(dashboard).toContain("<ActivityTrendChart data={activityTrendData} emptyText={t('dashboard.noChartData')} />");
     expect(dashboard).toContain("<StatusDistributionChart data={actionRunStatusData} emptyText={t('dashboard.noChartData')} />");
     expect(dashboard).toContain("<StatusDistributionChart data={artifactTypeData} emptyText={t('dashboard.noChartData')} />");
@@ -151,7 +151,6 @@ describe('dashboard redesign', () => {
       'dashboard.cacheTokens',
       'dashboard.estimatedCost',
       'dashboard.modelUsage',
-      'dashboard.providerQuota',
       'dashboard.usageTrend',
       'dashboard.recentHighUsageSessions',
       'dashboard.repositoryUnavailable',
@@ -171,7 +170,7 @@ describe('dashboard redesign', () => {
 
     expect(dashboard).toContain('className="dashboard-asset-title"');
     expect(dashboard).toContain('className="dashboard-asset-meta"');
-    expect(dashboard).toContain('className="dashboard-model-usage-label"');
+    expect(dashboard).not.toContain('className="dashboard-model-usage-label"');
     expect(dashboard).not.toContain('<Text ellipsis={{ showTooltip: true }} style={{ fontWeight: 600 }}>{title}</Text>');
     expect(dashboard).not.toContain('<Text type="tertiary" size="small" ellipsis={{ showTooltip: true }}>{meta}</Text>');
     expect(dashboard).not.toContain('<Text ellipsis={{ showTooltip: true }} style={{ fontWeight: 600 }}>{row.label}</Text>');

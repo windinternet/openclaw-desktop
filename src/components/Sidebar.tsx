@@ -485,84 +485,107 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
     ? decodeSessionKeyParam(location.pathname.replace('/chat/', ''))
     : null;
 
+  const sessionHistoryHeader = (
+    <div
+      className="sidebar-session-history-title"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
+        padding: '8px 12px 6px',
+        color: 'var(--semi-color-text-2)',
+        fontSize: 11,
+        fontWeight: 700,
+        lineHeight: '16px',
+      }}
+    >
+      <span>{t('sidebar.sessionHistory')}</span>
+      <span style={{ fontWeight: 600 }}>{visibleSessions.length}</span>
+    </div>
+  );
+
   const footer = (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {visibleSessions.length > 0 ? (
-        <div style={{ flex: 1, borderTop: '1px solid var(--semi-color-border)' }}>
-          <InfiniteLoaderView isRowLoaded={({ index }) => index < visibleSessions.length} loadMoreRows={() => Promise.resolve()} rowCount={visibleSessions.length}>
-            {({ onRowsRendered, registerChild }) => (
-              <AutoSizerView>
-                {({ width, height }) => (
-                  <VListView ref={registerChild} className="semi-light-scrollbar" height={height} onRowsRendered={onRowsRendered}
-                    rowCount={visibleSessions.length} rowHeight={44} width={width}
-                    rowRenderer={({ index, key, style }) => {
-                      const s = visibleSessions[index];
-                      if (!s) return null;
-                      const isCurrent = s.key === currentSessionKey;
-                      const isEditing = editingKey === s.key;
-                      return (
-                        <div key={key} style={{ ...style, padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                          backgroundColor: isCurrent ? 'var(--semi-color-primary-light-default)' : 'transparent',
-                          borderLeft: isCurrent ? '3px solid var(--semi-color-primary)' : '3px solid transparent',
-                          boxShadow: isCurrent ? 'inset 0 0 0 1px var(--semi-color-primary-light-active)' : 'none',
-                        }}
-                          onClick={() => { if (!isEditing) { clearSessionActivityState(s.key); navigate(`/chat/${encodeURIComponent(s.key)}`); } }}
-                          onDoubleClick={(e) => { e.stopPropagation(); startEditing(s); }}>
-                          {isEditing ? (
-                            <Input
-                              ref={(inst) => { inputInstanceRef.current = inst as typeof inputInstanceRef.current; }}
-                              size="small"
-                              value={editingValue}
-                              onChange={(val) => { setEditingValue(val); editingValueRef.current = val; }}
-                              onEnterPress={commitEdit}
-                              onBlur={commitEdit}
-                              onKeyDown={(e: ReactKeyboardEvent) => { if (e.key === 'Escape') cancelEdit(); }}
-                              style={{ flex: 1, minWidth: 0 }}
-                              maxLength={512}
-                            />
-                          ) : (
-                            <Tooltip content={formatSessionName(s)} mouseEnterDelay={0.6}>
-                              <span className="sidebar-session-title" style={{ flex: 1, fontSize: 14, fontWeight: isCurrent ? 700 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isCurrent ? 'var(--semi-color-primary)' : 'var(--semi-color-text-0)' }}>
-                                {formatSessionName(s)}
+      <div style={{ flex: 1, minHeight: 0, borderTop: '1px solid var(--semi-color-border)', display: 'flex', flexDirection: 'column' }}>
+        {sessionHistoryHeader}
+        {visibleSessions.length > 0 ? (
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <InfiniteLoaderView isRowLoaded={({ index }) => index < visibleSessions.length} loadMoreRows={() => Promise.resolve()} rowCount={visibleSessions.length}>
+              {({ onRowsRendered, registerChild }) => (
+                <AutoSizerView>
+                  {({ width, height }) => (
+                    <VListView ref={registerChild} className="semi-light-scrollbar" height={height} onRowsRendered={onRowsRendered}
+                      rowCount={visibleSessions.length} rowHeight={44} width={width}
+                      rowRenderer={({ index, key, style }) => {
+                        const s = visibleSessions[index];
+                        if (!s) return null;
+                        const isCurrent = s.key === currentSessionKey;
+                        const isEditing = editingKey === s.key;
+                        return (
+                          <div key={key} style={{ ...style, padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                            backgroundColor: isCurrent ? 'var(--semi-color-primary-light-default)' : 'transparent',
+                            borderLeft: isCurrent ? '3px solid var(--semi-color-primary)' : '3px solid transparent',
+                            boxShadow: isCurrent ? 'inset 0 0 0 1px var(--semi-color-primary-light-active)' : 'none',
+                          }}
+                            onClick={() => { if (!isEditing) { clearSessionActivityState(s.key); navigate(`/chat/${encodeURIComponent(s.key)}`); } }}
+                            onDoubleClick={(e) => { e.stopPropagation(); startEditing(s); }}>
+                            {isEditing ? (
+                              <Input
+                                ref={(inst) => { inputInstanceRef.current = inst as typeof inputInstanceRef.current; }}
+                                size="small"
+                                value={editingValue}
+                                onChange={(val) => { setEditingValue(val); editingValueRef.current = val; }}
+                                onEnterPress={commitEdit}
+                                onBlur={commitEdit}
+                                onKeyDown={(e: ReactKeyboardEvent) => { if (e.key === 'Escape') cancelEdit(); }}
+                                style={{ flex: 1, minWidth: 0 }}
+                                maxLength={512}
+                              />
+                            ) : (
+                              <Tooltip content={formatSessionName(s)} mouseEnterDelay={0.6}>
+                                <span className="sidebar-session-title" style={{ flex: 1, fontSize: 14, fontWeight: isCurrent ? 700 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isCurrent ? 'var(--semi-color-primary)' : 'var(--semi-color-text-0)' }}>
+                                  {formatSessionName(s)}
+                                </span>
+                              </Tooltip>
+                            )}
+                            {!isEditing && (() => {
+                              const actState = runtimeSessionActivityStates[s.key] || sessionActivityStatesRead[s.key];
+                              if (actState === 'generating') {
+                                return <span className="session-spinner" style={{ width: 10, height: 10, borderRadius: '50%', border: '1.5px solid var(--semi-color-primary)', borderBottomColor: 'transparent', display: 'inline-block', flexShrink: 0 }} />;
+                              }
+                              const actColor =
+                                actState === 'completed' ? 'var(--semi-color-success' :
+                                actState === 'error' ? 'var(--semi-color-danger' :
+                                null;
+                              if (!actColor) return null;
+                              return (
+                                <span style={{
+                                  width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                                  backgroundColor: actColor,
+                                }} />
+                              );
+                            })()}
+                            {!isEditing && s.updatedAt && (
+                              <span style={{ fontSize: 10, color: 'var(--semi-color-text-2)', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                                {formatRelativeTime(s.updatedAt)}
                               </span>
-                            </Tooltip>
-                          )}
-                          {!isEditing && (() => {
-                            const actState = runtimeSessionActivityStates[s.key] || sessionActivityStatesRead[s.key];
-                            if (actState === 'generating') {
-                              return <span className="session-spinner" style={{ width: 10, height: 10, borderRadius: '50%', border: '1.5px solid var(--semi-color-primary)', borderBottomColor: 'transparent', display: 'inline-block', flexShrink: 0 }} />;
-                            }
-                            const actColor =
-                              actState === 'completed' ? 'var(--semi-color-success' :
-                              actState === 'error' ? 'var(--semi-color-danger' :
-                              null;
-                            if (!actColor) return null;
-                            return (
-                              <span style={{
-                                width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                                backgroundColor: actColor,
-                              }} />
-                            );
-                          })()}
-                          {!isEditing && s.updatedAt && (
-                            <span style={{ fontSize: 10, color: 'var(--semi-color-text-2)', flexShrink: 0, whiteSpace: 'nowrap' }}>
-                              {formatRelativeTime(s.updatedAt)}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    }}
-                  />
-                )}
-              </AutoSizerView>
-            )}
-          </InfiniteLoaderView>
+                            )}
+                          </div>
+                        );
+                      }}
+                    />
+                  )}
+                </AutoSizerView>
+              )}
+            </InfiniteLoaderView>
+          </div>
+        ) : (
+          <div style={{ padding: '12px 24px', textAlign: 'center', flex: '1 1 auto' }}>
+            <Text type="tertiary" size="small">{t('nav.sessions')}</Text>
+          </div>
+        )}
         </div>
-      ) : (
-        <div style={{ padding: '12px 24px', borderTop: '1px solid var(--semi-color-border)', textAlign: 'center', flex: '1 1 auto' }}>
-          <Text type="tertiary" size="small">{t('nav.sessions')}</Text>
-        </div>
-      )}
       <div style={{ width: '100%', borderTop: '1px solid var(--semi-color-border)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', padding: '6px 0 0 0', gap: 8 }}>
           <Avatar size="extra-small" src={currentInstance?.avatarUrl || undefined}

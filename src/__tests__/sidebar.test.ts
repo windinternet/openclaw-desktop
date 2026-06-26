@@ -22,6 +22,17 @@ describe('Sidebar session list', () => {
     expect(source).toContain("color: isCurrent ? 'var(--semi-color-primary)' : 'var(--semi-color-text-0)'");
   });
 
+  it('labels the sidebar session history list', () => {
+    const source = readFileSync('src/components/Sidebar.tsx', 'utf8');
+    const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
+    const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
+
+    expect(source).toContain('className="sidebar-session-history-title"');
+    expect(source).toContain("t('sidebar.sessionHistory')");
+    expect(zh.sidebar.sessionHistory).toBe('会话历史');
+    expect(en.sidebar.sessionHistory).toBe('Session History');
+  });
+
   it('hides generated dashboard session label suffixes in display names', () => {
     const source = readFileSync('src/components/Sidebar.tsx', 'utf8');
 
