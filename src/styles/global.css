@@ -593,6 +593,19 @@ body[theme-mode="dark"] .new-session-card-chip {
   row-gap: 8px;
 }
 
+.new-session-composer-card .semi-aiChatInput-footer-configure-select.semi-select {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.new-session-composer-card .semi-aiChatInput-footer-configure-select.semi-select:hover,
+.new-session-composer-card .semi-aiChatInput-footer-configure-select.semi-select-focus {
+  border: 0;
+  background: var(--semi-color-fill-0);
+  box-shadow: none;
+}
+
 .new-session-composer-hint {
   padding: 0 4px 8px;
   color: var(--semi-color-text-2);

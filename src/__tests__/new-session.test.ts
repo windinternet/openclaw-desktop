@@ -308,6 +308,8 @@ describe('new session creation params', () => {
     expect(css).toContain('body[theme-mode="dark"] .new-session-card-icon');
     expect(css).toContain('body[theme-mode="dark"] .new-session-card-line');
     expect(css).toContain('body[theme-mode="dark"] .new-session-card-chip');
+    expect(css).toContain('.new-session-composer-card .semi-aiChatInput-footer-configure-select.semi-select');
+    expect(css).toContain('.new-session-composer-card .semi-aiChatInput-footer-configure-select.semi-select:hover');
     expect(css).not.toMatch(/\.new-session-bottom-composer\s*\{[^}]*background:/s);
   });
 });
