@@ -554,6 +554,52 @@ describe('agentic repository storage and templates', () => {
     expect(workbenchHandler).toContain('Toast.success(t(\'repositoryGate.workbenchMappingSaved\'))');
   });
 
+  it('wires startup repository context sync and manual fallback sync UI', () => {
+    const store = readFileSync('src/lib/store.ts', 'utf8');
+    const mainPage = readFileSync('src/pages/MainPage.tsx', 'utf8');
+    const gate = readFileSync('src/components/RepositoryGate.tsx', 'utf8');
+    const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
+    const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
+    const connectedStatusIndex = store.lastIndexOf("connectionStatus: 'connected'");
+    const connectedBranch = store.slice(
+      connectedStatusIndex,
+      store.indexOf('recoverInterruptedAiActionRuns', connectedStatusIndex),
+    );
+    const detectionThen = mainPage.slice(
+      mainPage.indexOf('detectDesktopCompanionForInstance(currentId).then'),
+      mainPage.indexOf('return () => {', mainPage.indexOf('detectDesktopCompanionForInstance(currentId).then')),
+    );
+    const readyLine = gate.match(/const ready = .*/)?.[0] ?? '';
+
+    expect(store).toContain('syncRepositoryContextForInstance');
+    expect(store).toContain('syncRepositoryContextWithCompanion(target.client, target.instanceId)');
+    expect(store).toContain('syncRepositoryContextForInstance(instance.id)');
+    expect(connectedBranch).toContain('syncRepositoryContextForInstance(instance.id)');
+    expect(store).toContain('console.warn(\'[syncRepositoryContextForInstance]\'');
+    expect(mainPage).toContain('syncRepositoryContextForInstance(currentId)');
+    expect(detectionThen).toContain("if (info.status === 'ready')");
+    expect(detectionThen).toContain('syncRepositoryContextForInstance(currentId)');
+    expect(detectionThen).toContain("info.status === 'missing' || info.status === 'disabled'");
+    expect(gate).toContain('syncRepositoryContextToAgentFiles');
+    expect(gate).toContain('repositoryGate.syncRepositoryRules');
+    expect(gate).toContain('binding.gatewayInstanceId === currentInstanceId');
+    expect(gate).toContain('bindingMatchesCurrentInstance');
+    expect(gate).toContain('disabled={!activeClient || !bindingMatchesCurrentInstance}');
+    expect(readyLine).toContain('bindingMatchesCurrentInstance');
+    expect(gate).toMatch(/agentsMdContent\.trim\(\)\s*\?\s*agentsMdContent/);
+    expect(gate).toContain('Toast.error(t(\'repositoryGate.syncRepositoryRulesFailed\'))');
+    expect(zh.repositoryGate.syncRepositoryRules).toBeTruthy();
+    expect(zh.repositoryGate.syncRepositoryRules).toContain('Agent 工作区');
+    expect(zh.repositoryGate.syncRepositoryRulesDone).toBeTruthy();
+    expect(zh.repositoryGate.syncRepositoryRulesPartial).toBeTruthy();
+    expect(zh.repositoryGate.syncRepositoryRulesFailed).toBeTruthy();
+    expect(en.repositoryGate.syncRepositoryRules).toBeTruthy();
+    expect(en.repositoryGate.syncRepositoryRules.toLowerCase()).toContain('agent workspace');
+    expect(en.repositoryGate.syncRepositoryRulesDone).toBeTruthy();
+    expect(en.repositoryGate.syncRepositoryRulesPartial).toBeTruthy();
+    expect(en.repositoryGate.syncRepositoryRulesFailed).toBeTruthy();
+  });
+
   it('keeps the temporary any-thing layout detection as LLM Wiki fallback only', () => {
     const handlers = readFileSync('electron/repository-handlers.ts', 'utf8');
 

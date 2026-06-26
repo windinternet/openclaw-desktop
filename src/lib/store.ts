@@ -57,6 +57,7 @@ import {
 import { recoverInterruptedAiActionRuns, syncAiActionRunsWithGateway } from './ai-action-run-store';
 import { writeArtifactSkill } from './artifact-skill';
 import { loadAppSnapshot, removePersistedInstance, saveCurrentInstanceId, saveInstances } from './local-persistence';
+import { syncRepositoryContextWithCompanion } from './repository-context-sync';
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
@@ -215,6 +216,7 @@ interface StoreState {
   fetchAgentIdentity: (agentId?: string, instanceId?: string) => Promise<void>;
   fetchAssistantInfo: (instanceId?: string) => Promise<void>;
   detectDesktopCompanionForInstance: (instanceId?: string) => Promise<DesktopCompanionInfo | null>;
+  syncRepositoryContextForInstance: (instanceId?: string) => Promise<void>;
   createDesktopCompanionInstallSessionForInstance: (
     instanceId?: string,
   ) => Promise<DesktopCompanionInstallSessionResult>;
@@ -625,6 +627,7 @@ export const useStore = create<StoreState>((set, get) => ({
             }),
           );
           get().refreshAll(instance.id);
+          void get().syncRepositoryContextForInstance(instance.id);
           void recoverInterruptedAiActionRuns(instance.id, client).catch(() => {});
           void writeArtifactSkill(client).catch(() => {});
           void connectDesktopBridgeToGateway(instance)
@@ -794,6 +797,23 @@ export const useStore = create<StoreState>((set, get) => ({
       };
       set((state) => withInstanceRuntime(state, instanceId, { companionInfo: info, companionChecking: false }));
       return info;
+    }
+  },
+
+  syncRepositoryContextForInstance: async (requestedInstanceId) => {
+    const target = getInstanceClient(get(), requestedInstanceId);
+    if (!target) return;
+    try {
+      const result = await syncRepositoryContextWithCompanion(target.client, target.instanceId);
+      if (result.status === 'failed') {
+        console.warn('[syncRepositoryContextForInstance]', result.message);
+      } else if (result.status === 'repository_api_unavailable' || result.status === 'fallback_available') {
+        console.info('[syncRepositoryContextForInstance]', result);
+      } else if (result.status === 'synced' && result.warning) {
+        console.warn('[syncRepositoryContextForInstance]', result.warning);
+      }
+    } catch (err) {
+      console.error('[syncRepositoryContextForInstance]', err);
     }
   },
 

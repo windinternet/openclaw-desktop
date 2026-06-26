@@ -128,7 +128,10 @@ export default function MainPage() {
             if (cancelled) return;
             if (!info) return;
 
-            if (info.status === 'ready') return;
+            if (info.status === 'ready') {
+                void useStore.getState().syncRepositoryContextForInstance(currentId);
+                return;
+            }
             if (info.status === 'missing' || info.status === 'disabled') {
                 const handleInstallSession = () => {
                     void useStore.getState().createDesktopCompanionInstallSessionForInstance(currentId).then((result) => {

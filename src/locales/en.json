@@ -253,6 +253,10 @@
     "bootstrap": "Initialize Template",
     "saved": "Repository binding saved",
     "bootstrapDone": "Repository template initialized",
+    "syncRepositoryRules": "Sync Repository Rules to Agent Workspace",
+    "syncRepositoryRulesDone": "Repository rules synced: {{updated}} updated, {{unchanged}} unchanged.",
+    "syncRepositoryRulesPartial": "Repository rules partially synced: {{updated}} updated, {{failed}} failed.",
+    "syncRepositoryRulesFailed": "Failed to sync repository rules",
     "status": {
       "repo_ready": "Ready",
       "repo_unbound": "Unbound",

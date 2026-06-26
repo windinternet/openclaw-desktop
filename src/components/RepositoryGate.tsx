@@ -29,6 +29,8 @@ import {
   sanitizeWorkbenchSemanticMapping,
   type WorkbenchStructureSignal,
 } from '../lib/repository-workbench-mapping';
+import { buildRepositoryContextPayload } from '../lib/repository-context';
+import { syncRepositoryContextToAgentFiles } from '../lib/repository-context-fallback';
 
 const { Text, Title } = Typography;
 
@@ -85,6 +87,7 @@ export default function RepositoryGate({
   const [status, setStatus] = useState<RepositoryStatus>('repo_unbound');
   const [loading, setLoading] = useState(false);
   const [mappingLoading, setMappingLoading] = useState(false);
+  const [fallbackSyncing, setFallbackSyncing] = useState(false);
   const [advancedManualPath, setAdvancedManualPath] = useState(false);
 
   const inspect = useCallback(async (nextBinding: RepositoryBinding) => {
@@ -230,6 +233,39 @@ export default function RepositoryGate({
       Toast.success(t('repositoryGate.bootstrapDone'));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSyncRepositoryRulesFallback = async () => {
+    if (!activeClient || !binding || binding.gatewayInstanceId !== currentInstanceId) return;
+    setFallbackSyncing(true);
+    try {
+      let agentsMdContent = '';
+      try {
+        agentsMdContent = await window.electronAPI?.repository?.readText?.(binding.repoPath, 'AGENTS.md') ?? '';
+      } catch {
+        agentsMdContent = '';
+      }
+      const payload = buildRepositoryContextPayload({
+        binding,
+        agentsMdContent: agentsMdContent.trim() ? agentsMdContent : '仓库根目录 AGENTS.md 暂不可读。',
+      });
+      const result = await syncRepositoryContextToAgentFiles(activeClient, payload);
+      if (result.failed.length > 0) {
+        Toast.warning(t('repositoryGate.syncRepositoryRulesPartial', {
+          updated: result.updated,
+          failed: result.failed.length,
+        }));
+        return;
+      }
+      Toast.success(t('repositoryGate.syncRepositoryRulesDone', {
+        updated: result.updated,
+        unchanged: result.unchanged,
+      }));
+    } catch {
+      Toast.error(t('repositoryGate.syncRepositoryRulesFailed'));
+    } finally {
+      setFallbackSyncing(false);
     }
   };
 
@@ -476,7 +512,8 @@ export default function RepositoryGate({
   const knowledgeMappingReady = Boolean(binding?.knowledge && binding.knowledge.mappingSource !== 'default');
   const workbenchMappingReady = Boolean(binding?.workbench?.isWorkbenchRepository);
   const semanticMappingReady = canUseSemanticMappingForStatus(status) && ((area === 'knowledge' && knowledgeMappingReady) || (area === 'workbench' && workbenchMappingReady));
-  const ready = status === 'repo_ready' || semanticMappingReady;
+  const bindingMatchesCurrentInstance = Boolean(binding && binding.gatewayInstanceId === currentInstanceId);
+  const ready = bindingMatchesCurrentInstance && (status === 'repo_ready' || semanticMappingReady);
   const displayStatus = ready ? 'repo_ready' : status;
   const showDesktopActions = location === 'desktop-local';
   const canRefresh = Boolean(binding);
@@ -542,6 +579,14 @@ export default function RepositoryGate({
                   </Button>
                   <Button loading={loading} disabled={!binding || ready} onClick={handleBootstrap}>
                     {t('repositoryGate.bootstrap')}
+                  </Button>
+                  <Button
+                    icon={<IconCloud />}
+                    loading={fallbackSyncing}
+                    disabled={!activeClient || !bindingMatchesCurrentInstance}
+                    onClick={() => void handleSyncRepositoryRulesFallback()}
+                  >
+                    {t('repositoryGate.syncRepositoryRules')}
                   </Button>
                   {area === 'knowledge' && (
                     <Button loading={mappingLoading} disabled={!currentInstanceId || !repoPath.trim()} onClick={() => void handleSemanticKnowledgeMapping()}>

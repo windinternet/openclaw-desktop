@@ -253,6 +253,10 @@
     "bootstrap": "初始化模板",
     "saved": "仓库绑定已保存",
     "bootstrapDone": "仓库模板已初始化",
+    "syncRepositoryRules": "同步仓库规则到 Agent 工作区",
+    "syncRepositoryRulesDone": "仓库规则已同步：更新 {{updated}} 个，未变化 {{unchanged}} 个。",
+    "syncRepositoryRulesPartial": "仓库规则已部分同步：更新 {{updated}} 个，失败 {{failed}} 个。",
+    "syncRepositoryRulesFailed": "仓库规则同步失败",
     "status": {
       "repo_ready": "已就绪",
       "repo_unbound": "未绑定",
