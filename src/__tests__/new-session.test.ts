@@ -7,6 +7,7 @@ import {
   getChatRoute,
   resolveCreatedSessionKey,
 } from '../lib/new-session';
+import { extractDraftText } from '../lib/new-session-draft';
 
 describe('new session creation params', () => {
   afterEach(() => {
@@ -318,8 +319,11 @@ describe('new session creation params', () => {
     expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput-footer-configure-select.semi-select:hover');
     expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput-footer-configure-select.semi-select,');
     expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput-footer-configure-select.semi-select *');
+    expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput-footer-configure,');
+    expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput-footer-configure *');
     expect(css).toContain('cursor: pointer !important;');
     expect(css).toContain('color: var(--semi-color-primary);');
+    expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput {');
     expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput-editor-content *');
     expect(css).toContain('cursor: text !important;');
     expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput');
@@ -342,5 +346,24 @@ describe('new session creation params', () => {
     expect(composer).toContain('onContentChange={handleContentChange}');
     expect(composer).toContain('defaultContent={defaultContent}');
     expect(composer).toContain('clearNewSessionDraft()');
+  });
+
+  it('preserves paragraph breaks when saving new session text drafts', () => {
+    expect(
+      extractDraftText({
+        type: 'doc',
+        content: [
+          { type: 'paragraph', content: [{ type: 'text', text: '第一行' }] },
+          { type: 'paragraph', content: [{ type: 'text', text: '第二行' }] },
+        ],
+      }),
+    ).toBe('第一行\n第二行');
+    expect(
+      extractDraftText({
+        inputContents: [
+          { type: 'paragraph', content: [{ type: 'text', text: 'A' }, { type: 'hardBreak' }, { type: 'text', text: 'B' }] },
+        ],
+      }),
+    ).toBe('A\nB');
   });
 });

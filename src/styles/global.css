@@ -595,6 +595,7 @@ body[theme-mode="dark"] .new-session-card-chip {
   overflow: hidden;
   border: 0;
   box-shadow: none;
+  cursor: text !important;
 }
 
 .chat-composer-frame__card .semi-aiChatInput-editor-content,
@@ -625,6 +626,8 @@ body[theme-mode="dark"] .new-session-card-chip {
 }
 
 .chat-composer-frame__card .semi-aiChatInput-footer-configure-select.semi-select,
+.chat-composer-frame__card .semi-aiChatInput-footer-configure,
+.chat-composer-frame__card .semi-aiChatInput-footer-configure *,
 .chat-composer-frame__card .semi-aiChatInput-footer-configure-select.semi-select * {
   cursor: pointer !important;
 }

@@ -10,6 +10,7 @@ import {
   resolveCreatedSessionKey,
 } from '../lib/new-session';
 import { buildModelOptions, fetchGatewayDefaultModel, resolvePreferredModel } from '../lib/model-selection';
+import { extractDraftText } from '../lib/new-session-draft';
 import AgentSelectOption from './AgentSelectOption';
 
 const { Configure } = AIChatInput;
@@ -24,18 +25,6 @@ interface FileDropEvent {
 }
 
 const NEW_SESSION_DRAFT_KEY = 'openclaw:new-session-draft';
-
-function extractDraftText(content: unknown): string {
-  if (!content) return '';
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) return content.map(extractDraftText).join('');
-  if (typeof content === 'object') {
-    const c = content as Record<string, unknown>;
-    if (Array.isArray(c.inputContents)) return extractDraftText(c.inputContents);
-    return (c.text as string) || (c.content as string) || (c.value as string) || extractDraftText(c.children) || '';
-  }
-  return String(content);
-}
 
 function loadNewSessionDraft(): string {
   try {
