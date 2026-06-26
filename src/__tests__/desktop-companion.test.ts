@@ -47,16 +47,16 @@ describe('desktop companion detection', () => {
       ok: true,
       pluginId: 'openclaw-desktop-companion',
       version: '0.1.0',
-      protocolVersion: 1,
-      capabilities: ['artifacts'],
+      protocolVersion: 2,
+      capabilities: ['artifacts', 'outputs', 'repository', 'repository-context'],
     })) as GatewayClient['request']);
 
     await expect(detectDesktopCompanion(client)).resolves.toEqual({
       status: 'ready',
       pluginId: 'openclaw-desktop-companion',
       version: '0.1.0',
-      protocolVersion: 1,
-      capabilities: ['artifacts'],
+      protocolVersion: 2,
+      capabilities: ['artifacts', 'outputs', 'repository', 'repository-context'],
     });
   });
 

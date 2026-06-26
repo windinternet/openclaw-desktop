@@ -2,7 +2,7 @@ import type { GatewayClient } from './gateway';
 import type { RepositoryContextPayload } from './repository-context';
 
 export const DESKTOP_COMPANION_PLUGIN_ID = 'openclaw-desktop-companion' as const;
-export const DESKTOP_COMPANION_PROTOCOL_VERSION = 1;
+export const DESKTOP_COMPANION_PROTOCOL_VERSION = 2;
 export const DESKTOP_COMPANION_INSTALL_SPEC = 'git:github.com/windinternet/openclaw-desktop-companion@main';
 
 export type DesktopCompanionStatus = 'missing' | 'disabled' | 'incompatible' | 'ready' | 'degraded' | 'approval_required';
