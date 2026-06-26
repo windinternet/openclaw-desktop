@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import {
   buildNewSessionNavigationTarget,
   buildNewSessionCreateParams,
+  buildNewSessionWorkbenchContinuations,
   getChatRoute,
   resolveCreatedSessionKey,
 } from '../lib/new-session';
@@ -45,9 +46,7 @@ describe('new session creation params', () => {
   });
 
   it('falls back to the requested session key when the create response omits a key', () => {
-    expect(resolveCreatedSessionKey({}, 'agent:main:dashboard:fallback')).toBe(
-      'agent:main:dashboard:fallback',
-    );
+    expect(resolveCreatedSessionKey({}, 'agent:main:dashboard:fallback')).toBe('agent:main:dashboard:fallback');
   });
 
   it('carries the first message to the destination chat page instead of sending before navigation', () => {
@@ -132,12 +131,12 @@ describe('new session creation params', () => {
     expect(page).toContain("import NewSessionComposer from '../components/NewSessionComposer'");
     expect(page).toContain('<NewSessionComposer');
     expect(page).not.toContain('<AIChatInput');
-    expect(page).not.toContain("activeClient.request<{ key?: string; sessionKey?: string }>");
+    expect(page).not.toContain('activeClient.request<{ key?: string; sessionKey?: string }>');
     expect(composer).toContain("const [selectedAgentId, setSelectedAgentId] = useState<string>('')");
     expect(composer).toContain('field="agent"');
     expect(composer).toContain('<AgentSelectOption agent={agent} />');
     expect(composer).toContain("agentId: selectedAgentId || agent?.id || 'main'");
-    expect(composer).toContain("activeClient.request<{ key?: string; sessionKey?: string }>");
+    expect(composer).toContain('activeClient.request<{ key?: string; sessionKey?: string }>');
   });
 
   it('renders agent select labels with native ellipsis to avoid Semi ResizeObserver findDOMNode warnings', () => {
@@ -156,5 +155,116 @@ describe('new session creation params', () => {
     expect(source).toContain("window.addEventListener('drop', handlePageDrop)");
     expect(source).toContain('showUploadFile');
     expect(source).toContain('showUploadButton');
+  });
+
+  it('turns workbench task groups into continuation prompts for the new session page', () => {
+    const continuations = buildNewSessionWorkbenchContinuations({
+      inboxMarkdown: '',
+      activeWork: [],
+      completedWork: [],
+      somedayWork: [],
+      activePlans: [],
+      completedPlans: [],
+      runsMarkdown: '',
+      outputsMarkdown: '',
+      reviews: [],
+      planMetadata: [],
+      reviewGroups: [],
+      semanticSections: [],
+      projects: [],
+      taskGroups: [
+        {
+          id: 'current',
+          title: '正在推进',
+          path: 'work/current',
+          items: [
+            {
+              id: 'task-1',
+              text: '补齐新会话入口的工作台联动',
+              sourcePath: 'work/current/new-session.md',
+              completed: false,
+            },
+            {
+              id: 'task-2',
+              text: '已经完成的事项不会出现在快捷继续里',
+              sourcePath: 'work/current/new-session.md',
+              completed: true,
+            },
+            {
+              id: 'task-3',
+              text: '同一份工作台文档里的第二个未完成事项',
+              sourcePath: 'work/current/new-session.md',
+              completed: false,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(continuations).toHaveLength(2);
+    expect(continuations[0]).toMatchObject({
+      id: 'task:task-1',
+      title: '补齐新会话入口的工作台联动',
+      meta: '正在推进',
+      sourcePath: 'work/current/new-session.md',
+      kind: 'task',
+    });
+    expect(continuations[0].message).toContain('继续推进工作台事项「补齐新会话入口的工作台联动」');
+    expect(continuations[0].message).toContain('参考来源：work/current/new-session.md');
+    expect(continuations[1].title).toBe('同一份工作台文档里的第二个未完成事项');
+  });
+
+  it('uses active work and plans as fallback continuation prompts when task groups are empty', () => {
+    const continuations = buildNewSessionWorkbenchContinuations({
+      inboxMarkdown: '',
+      activeWork: [
+        {
+          name: 'release-checklist.md',
+          path: 'work/active/release-checklist.md',
+          size: 1200,
+          updatedAt: 20,
+        },
+      ],
+      completedWork: [],
+      somedayWork: [],
+      activePlans: [
+        {
+          name: 'new-session-page.md',
+          path: 'plans/active/new-session-page.md',
+          size: 1800,
+          updatedAt: 30,
+        },
+      ],
+      completedPlans: [],
+      runsMarkdown: '',
+      outputsMarkdown: '',
+      reviews: [],
+      planMetadata: [],
+      reviewGroups: [],
+      semanticSections: [],
+      projects: [],
+      taskGroups: [],
+    });
+
+    expect(continuations.map((item) => item.title)).toEqual(['new-session-page', 'release-checklist']);
+    expect(continuations[0].message).toContain('继续处理工作台文档「new-session-page」');
+    expect(continuations[0].message).toContain('参考来源：plans/active/new-session-page.md');
+  });
+
+  it('documents that the new session page links workbench continuations into the composer', () => {
+    const page = readFileSync('src/pages/NewSessionPage.tsx', 'utf8');
+    const composer = readFileSync('src/components/NewSessionComposer.tsx', 'utf8');
+    const zh = readFileSync('src/locales/zh.json', 'utf8');
+    const en = readFileSync('src/locales/en.json', 'utf8');
+
+    expect(page).toContain('loadWorkbenchSnapshot');
+    expect(page).toContain('buildNewSessionWorkbenchContinuations');
+    expect(page).toContain('setStarterMessage');
+    expect(page).toContain('newSessionPage.workbenchContinuations');
+    expect(page).toContain('initialMessage={starterMessage}');
+    expect(composer).toContain('initialMessage?: string');
+    expect(composer).toContain('defaultContent={defaultContent}');
+    expect(zh).toContain('"newSessionPage"');
+    expect(en).toContain('"newSessionPage"');
   });
 });

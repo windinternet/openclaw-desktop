@@ -28,6 +28,8 @@ interface NewSessionComposerProps {
   style?: CSSProperties;
   inputKeyPrefix?: string;
   dragOverlay?: boolean;
+  initialMessage?: string;
+  initialMessageKey?: string | number;
 }
 
 export default function NewSessionComposer({
@@ -35,6 +37,8 @@ export default function NewSessionComposer({
   style,
   inputKeyPrefix = 'new-session-composer',
   dragOverlay = true,
+  initialMessage = '',
+  initialMessageKey = 0,
 }: NewSessionComposerProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -53,19 +57,39 @@ export default function NewSessionComposer({
   const pageDragDepthRef = useRef(0);
   const modelTouchedRef = useRef(false);
 
-  const thinkingOptions = useMemo(() => [
-    { value: 'off', label: t('chat.thinkingOff') },
-    { value: 'minimal', label: t('chat.thinkingMinimal') },
-    { value: 'low', label: t('chat.thinkingLow') },
-    { value: 'medium', label: t('chat.thinkingMedium') },
-    { value: 'high', label: t('chat.thinkingHigh') },
-  ], [t]);
+  const defaultContent = useMemo(() => {
+    if (!initialMessage.trim()) return undefined;
+    return {
+      type: 'doc',
+      content: initialMessage.split('\n').map((line) => ({
+        type: 'paragraph',
+        content: line ? [{ type: 'text', text: line }] : undefined,
+      })),
+    };
+  }, [initialMessage]);
+
+  const thinkingOptions = useMemo(
+    () => [
+      { value: 'off', label: t('chat.thinkingOff') },
+      { value: 'minimal', label: t('chat.thinkingMinimal') },
+      { value: 'low', label: t('chat.thinkingLow') },
+      { value: 'medium', label: t('chat.thinkingMedium') },
+      { value: 'high', label: t('chat.thinkingHigh') },
+    ],
+    [t],
+  );
 
   const modelOptions = useMemo(() => buildModelOptions(models), [models]);
-  const agentOptions = useMemo(() => agents.filter((agent) => agent.id).map((agent) => ({
-    value: agent.id,
-    label: <AgentSelectOption agent={agent} />,
-  })), [agents]);
+  const agentOptions = useMemo(
+    () =>
+      agents
+        .filter((agent) => agent.id)
+        .map((agent) => ({
+          value: agent.id,
+          label: <AgentSelectOption agent={agent} />,
+        })),
+    [agents],
+  );
 
   const resolvedDefaultModel = resolvePreferredModel({
     models,
@@ -97,83 +121,112 @@ export default function NewSessionComposer({
     setSelectedAgentId((agents.find((agent) => agent.default) ?? agents[0]).id);
   }, [agents, selectedAgentId]);
 
-  const handleSend = useCallback(async (content: unknown) => {
-    if (!activeClient || connectionStatus !== 'connected') {
-      Toast.error(t('errors.notConnected'));
-      return;
-    }
-    if (!selectedModel && models.length > 0) {
-      Toast.warning(t('chat.selectModel'));
-      return;
-    }
+  const handleSend = useCallback(
+    async (content: unknown) => {
+      if (!activeClient || connectionStatus !== 'connected') {
+        Toast.error(t('errors.notConnected'));
+        return;
+      }
+      if (!selectedModel && models.length > 0) {
+        Toast.warning(t('chat.selectModel'));
+        return;
+      }
 
-    const agent = agents.find((a) => a.default) ?? agents[0];
-    const createParams = buildNewSessionCreateParams({
-      agentId: selectedAgentId || agent?.id || 'main',
-      model: selectedModel || resolvedDefaultModel,
-      thinking: thinkingLevel,
-      content,
-    });
-
-    setCreating(true);
-    try {
-      const result = await activeClient.request<{ key?: string; sessionKey?: string }>(
-        'sessions.create',
-        createParams.request,
-      );
-      const sessionKey = resolveCreatedSessionKey(result, createParams.key);
-      const target = buildNewSessionNavigationTarget({
-        sessionKey,
-        content,
+      const agent = agents.find((a) => a.default) ?? agents[0];
+      const createParams = buildNewSessionCreateParams({
+        agentId: selectedAgentId || agent?.id || 'main',
         model: selectedModel || resolvedDefaultModel,
         thinking: thinkingLevel,
+        content,
       });
-      useStore.getState().fetchSessions();
-      Toast.success(t('chat.sessionCreated'));
-      navigate(target.to, target.state ? { state: target.state } : undefined);
-    } catch (err) {
-      Toast.error(err instanceof Error ? err.message : t('chat.createFailed'));
-    } finally {
-      setCreating(false);
-    }
-  }, [activeClient, connectionStatus, models, agents, selectedAgentId, selectedModel, resolvedDefaultModel, thinkingLevel, navigate, t]);
 
-  const renderConfig = useCallback(() => (
-    <>
-      <Configure.Select
-        {...configureSelectProps}
-        field="agent"
-        label={t('chat.agent')}
-        optionList={agentOptions}
-        initValue={selectedAgentId || agentOptions[0]?.value}
-      />
-      <Configure.Select
-        {...configureSelectProps}
-        field="model"
-        optionList={modelOptions}
-        initValue={selectedModel || resolvedDefaultModel}
-      />
-      <Configure.Select
-        {...configureSelectProps}
-        field="thinking"
-        optionList={thinkingOptions}
-        initValue={thinkingLevel}
-      />
-    </>
-  ), [agentOptions, modelOptions, selectedAgentId, selectedModel, resolvedDefaultModel, thinkingLevel, thinkingOptions, t]);
+      setCreating(true);
+      try {
+        const result = await activeClient.request<{ key?: string; sessionKey?: string }>(
+          'sessions.create',
+          createParams.request,
+        );
+        const sessionKey = resolveCreatedSessionKey(result, createParams.key);
+        const target = buildNewSessionNavigationTarget({
+          sessionKey,
+          content,
+          model: selectedModel || resolvedDefaultModel,
+          thinking: thinkingLevel,
+        });
+        useStore.getState().fetchSessions();
+        Toast.success(t('chat.sessionCreated'));
+        navigate(target.to, target.state ? { state: target.state } : undefined);
+      } catch (err) {
+        Toast.error(err instanceof Error ? err.message : t('chat.createFailed'));
+      } finally {
+        setCreating(false);
+      }
+    },
+    [
+      activeClient,
+      connectionStatus,
+      models,
+      agents,
+      selectedAgentId,
+      selectedModel,
+      resolvedDefaultModel,
+      thinkingLevel,
+      navigate,
+      t,
+    ],
+  );
 
-  const handleConfigChange = useCallback((_value: Record<string, unknown> | undefined, changed: Record<string, unknown> | undefined) => {
-    if (!changed) return;
-    if ('agent' in changed) {
-      modelTouchedRef.current = false;
-      setSelectedAgentId(changed.agent as string);
-    }
-    if ('model' in changed) {
-      modelTouchedRef.current = true;
-      setSelectedModel(changed.model as string);
-    }
-    if ('thinking' in changed) setThinkingLevel(changed.thinking as string);
-  }, []);
+  const renderConfig = useCallback(
+    () => (
+      <>
+        <Configure.Select
+          {...configureSelectProps}
+          field="agent"
+          label={t('chat.agent')}
+          optionList={agentOptions}
+          initValue={selectedAgentId || agentOptions[0]?.value}
+        />
+        <Configure.Select
+          {...configureSelectProps}
+          field="model"
+          optionList={modelOptions}
+          initValue={selectedModel || resolvedDefaultModel}
+        />
+        <Configure.Select
+          {...configureSelectProps}
+          field="thinking"
+          optionList={thinkingOptions}
+          initValue={thinkingLevel}
+        />
+      </>
+    ),
+    [
+      agentOptions,
+      modelOptions,
+      selectedAgentId,
+      selectedModel,
+      resolvedDefaultModel,
+      thinkingLevel,
+      thinkingOptions,
+      t,
+    ],
+  );
+
+  const handleConfigChange = useCallback(
+    (_value: Record<string, unknown> | undefined, changed: Record<string, unknown> | undefined) => {
+      if (!changed) return;
+      if ('agent' in changed) {
+        modelTouchedRef.current = false;
+        setSelectedAgentId(changed.agent as string);
+      }
+      if ('model' in changed) {
+        modelTouchedRef.current = true;
+        setSelectedModel(changed.model as string);
+      }
+      if ('thinking' in changed) setThinkingLevel(changed.thinking as string);
+    },
+    [],
+  );
 
   const hasFilesInDrag = useCallback((event: FileDropEvent): boolean => {
     const dt = event.dataTransfer;
@@ -185,38 +238,50 @@ export default function NewSessionComposer({
     return Array.from(event.dataTransfer?.files ?? []).filter((file) => file.size > 0);
   }, []);
 
-  const handlePageDragEnter = useCallback((event: FileDropEvent) => {
-    if (!dragOverlay || !hasFilesInDrag(event)) return;
-    event.preventDefault();
-    pageDragDepthRef.current += 1;
-    setPageDragActive(true);
-  }, [dragOverlay, hasFilesInDrag]);
+  const handlePageDragEnter = useCallback(
+    (event: FileDropEvent) => {
+      if (!dragOverlay || !hasFilesInDrag(event)) return;
+      event.preventDefault();
+      pageDragDepthRef.current += 1;
+      setPageDragActive(true);
+    },
+    [dragOverlay, hasFilesInDrag],
+  );
 
-  const handlePageDragOver = useCallback((event: FileDropEvent) => {
-    if (!dragOverlay || !hasFilesInDrag(event)) return;
-    event.preventDefault();
-    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
-    setPageDragActive(true);
-  }, [dragOverlay, hasFilesInDrag]);
+  const handlePageDragOver = useCallback(
+    (event: FileDropEvent) => {
+      if (!dragOverlay || !hasFilesInDrag(event)) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+      setPageDragActive(true);
+    },
+    [dragOverlay, hasFilesInDrag],
+  );
 
-  const handlePageDragLeave = useCallback((event: FileDropEvent) => {
-    if (!dragOverlay || !hasFilesInDrag(event)) return;
-    event.preventDefault();
-    pageDragDepthRef.current = Math.max(0, pageDragDepthRef.current - 1);
-    if (pageDragDepthRef.current === 0) setPageDragActive(false);
-  }, [dragOverlay, hasFilesInDrag]);
+  const handlePageDragLeave = useCallback(
+    (event: FileDropEvent) => {
+      if (!dragOverlay || !hasFilesInDrag(event)) return;
+      event.preventDefault();
+      pageDragDepthRef.current = Math.max(0, pageDragDepthRef.current - 1);
+      if (pageDragDepthRef.current === 0) setPageDragActive(false);
+    },
+    [dragOverlay, hasFilesInDrag],
+  );
 
-  const handlePageDrop = useCallback((event: FileDropEvent) => {
-    const files = getPageDropFiles(event);
-    if (files.length === 0) return;
-    event.preventDefault();
-    pageDragDepthRef.current = 0;
-    setPageDragActive(false);
-    chatInputRef.current?.uploadRef?.current?.insert?.(files);
-    requestAnimationFrame(() => {
-      Toast.success(t('chat.attachmentsAdded', { count: files.length }));
-    });
-  }, [getPageDropFiles, t]);
+  const handlePageDrop = useCallback(
+    (event: FileDropEvent) => {
+      const files = getPageDropFiles(event);
+      if (files.length === 0) return;
+      event.preventDefault();
+      pageDragDepthRef.current = 0;
+      setPageDragActive(false);
+      chatInputRef.current?.uploadRef?.current?.insert?.(files);
+      requestAnimationFrame(() => {
+        Toast.success(t('chat.attachmentsAdded', { count: files.length }));
+      });
+    },
+    [getPageDropFiles, t],
+  );
 
   useEffect(() => {
     window.addEventListener('dragenter', handlePageDragEnter);
@@ -237,15 +302,14 @@ export default function NewSessionComposer({
       style={{
         position: 'relative',
         transition: 'box-shadow 0.2s, border-color 0.2s',
-        ...(pageDragActive
-          ? { boxShadow: 'inset 0 0 0 2px var(--semi-color-primary)' }
-          : {}),
+        ...(pageDragActive ? { boxShadow: 'inset 0 0 0 2px var(--semi-color-primary)' } : {}),
         ...style,
       }}
     >
       <AIChatInput
         ref={chatInputRef as Ref<AIChatInput>}
-        key={`${inputKeyPrefix}:${agentOptions.length}:${modelOptions.length}:${selectedAgentId}:${selectedModel || resolvedDefaultModel}`}
+        key={`${inputKeyPrefix}:${initialMessageKey}:${agentOptions.length}:${modelOptions.length}:${selectedAgentId}:${selectedModel || resolvedDefaultModel}`}
+        defaultContent={defaultContent}
         placeholder={t('chat.firstMessagePlaceholder')}
         generating={creating}
         uploadProps={{ action: '', beforeUpload: () => ({ shouldUpload: false }) }}
