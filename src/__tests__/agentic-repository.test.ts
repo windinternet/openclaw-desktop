@@ -87,6 +87,100 @@ describe('agentic repository model', () => {
     expect(binding?.schemaProfile).toBe('default');
   });
 
+  it('normalizes stored workbench semantic mappings', () => {
+    const binding = normalizeRepositoryBinding({
+      id: 'repo_inst-1',
+      name: 'Repo',
+      location: 'desktop-local',
+      repoPath: '/repo',
+      gatewayInstanceId: 'inst-1',
+      status: 'repo_ready',
+      workbench: {
+        isWorkbenchRepository: true,
+        confidence: 'high',
+        reason: 'This repository has a work system.',
+        mappingSource: 'agent',
+        slots: {
+          current: {
+            label: 'Current',
+            paths: ['10-ops/tasks/now.md'],
+            kind: 'document',
+            confidence: 'high',
+            reason: 'Current work file.',
+          },
+          projects: {
+            label: 'Projects',
+            paths: ['20-projects'],
+            kind: 'directory',
+            confidence: 'medium',
+            reason: 'Project directory.',
+          },
+          plans: {
+            active: {
+              label: 'Active plans',
+              paths: ['20-projects/demo/plan.md'],
+              kind: 'document',
+              confidence: 'medium',
+              reason: 'Project plan file.',
+            },
+          },
+        },
+      },
+    });
+
+    expect(binding?.workbench).toMatchObject({
+      isWorkbenchRepository: true,
+      confidence: 'high',
+      mappingSource: 'agent',
+      slots: {
+        current: {
+          label: 'Current',
+          paths: ['10-ops/tasks/now.md'],
+          kind: 'document',
+          confidence: 'high',
+        },
+        projects: {
+          label: 'Projects',
+          paths: ['20-projects'],
+          kind: 'directory',
+          confidence: 'medium',
+        },
+        plans: {
+          active: {
+            label: 'Active plans',
+            paths: ['20-projects/demo/plan.md'],
+            kind: 'document',
+            confidence: 'medium',
+          },
+        },
+      },
+    });
+  });
+
+  it('drops unsafe stored workbench paths during normalization', () => {
+    const binding = normalizeRepositoryBinding({
+      id: 'repo_inst-1',
+      repoPath: '/repo',
+      gatewayInstanceId: 'inst-1',
+      status: 'repo_ready',
+      workbench: {
+        isWorkbenchRepository: true,
+        mappingSource: 'agent',
+        slots: {
+          current: {
+            label: 'Current',
+            paths: ['/tmp/now.md', '../secret.md', 'safe/now.md'],
+            kind: 'document',
+            confidence: 'high',
+            reason: 'Mixed paths.',
+          },
+        },
+      },
+    });
+
+    expect(binding?.workbench?.slots.current?.paths).toEqual(['safe/now.md']);
+  });
+
   it('classifies repository gate states without mixing OpenClaw runtime tasks into workbench state', () => {
     expect(getRepositoryGateStatus({ binding: null, gitAvailable: true })).toBe('repo_unbound');
     expect(getRepositoryGateStatus({ binding: createBinding(), gitAvailable: false })).toBe('git_missing');
@@ -196,6 +290,11 @@ describe('agentic repository storage and templates', () => {
     expect(preload).toContain('repository:gitCommit');
     expect(handlers).toContain('function listTree');
     expect(handlers).toContain('function gitLog');
+    expect(handlers).toContain("ls-files");
+    expect(handlers).toContain("--exclude-standard");
+    expect(handlers).toContain('resolveSafeExistingRepoPath');
+    expect(handlers).toContain('resolveSafeWritableRepoPath');
+    expect(handlers).toContain('isSymbolicLink');
     expect(handlers).toContain('showOpenDialog');
     expect(handlers).toContain("app.getPath('home')");
     expect(main).toContain('registerRepositoryIpcHandlers');
@@ -381,6 +480,78 @@ describe('agentic repository storage and templates', () => {
     expect(zh.repositoryGate.gatewayInitializeHome).toContain('主目录');
     expect(en.repositoryGate.desktopChooseFolder.toLowerCase()).toContain('choose');
     expect(en.repositoryGate.gatewayClone.toLowerCase()).toContain('clone');
+  });
+
+  it('exposes a Workbench semantic mapping flow next to knowledge mapping', () => {
+    const source = readFileSync('src/components/RepositoryGate.tsx', 'utf8');
+
+    expect(source).toContain('buildWorkbenchSemanticMappingPrompt');
+    expect(source).toContain('parseWorkbenchSemanticMappingResponse');
+    expect(source).toContain('sanitizeWorkbenchSemanticMapping');
+    expect(source).toContain('handleSemanticWorkbenchMapping');
+    expect(source).toContain('workbenchMappingReady');
+    expect(source).toContain('repositoryGate.workbenchMappingActionTitle');
+  });
+
+  it('passes only Workbench structure signals to semantic mapping', () => {
+    const source = readFileSync('src/components/RepositoryGate.tsx', 'utf8');
+    const signalBuilder = source.slice(source.indexOf('const buildWorkbenchStructureSignals'), source.indexOf('const isSafeMapping'));
+
+    expect(source).toContain('buildWorkbenchStructureSignals');
+    expect(source).toContain('current-work');
+    expect(source).toContain('next-work');
+    expect(source).toContain('done-work');
+    expect(source).toContain('project-system');
+    expect(source).toContain('initiative|initiatives|client|clients');
+    expect(source).toContain('reusable-tool');
+    expect(source).toContain('structureSignals');
+    expect(signalBuilder).not.toContain("filter((entry) => !entry.endsWith('/'))");
+    expect(source).not.toContain('readWorkbenchMappingExcerpts');
+  });
+
+  it('shows Workbench mapping metadata in the gate header', () => {
+    const source = readFileSync('src/components/RepositoryGate.tsx', 'utf8');
+
+    expect(source).toContain('workbenchMappingReady');
+    expect(source).toContain('binding.workbench.mappingSource');
+    expect(source).toContain('binding.workbench.confidence');
+  });
+
+  it('only lets semantic mappings bypass template bootstrap status', () => {
+    const source = readFileSync('src/components/RepositoryGate.tsx', 'utf8');
+
+    expect(source).toContain('canUseSemanticMappingForStatus');
+    expect(source).toMatch(/repo_needs_bootstrap[\s\S]*return true/);
+    expect(source).toMatch(/repo_path_missing[\s\S]*return false/);
+    expect(source).toContain('canUseSemanticMappingForStatus(status)');
+  });
+
+  it('inspects the freshly saved semantic mapping binding', () => {
+    const source = readFileSync('src/components/RepositoryGate.tsx', 'utf8');
+
+    expect(source).toMatch(/const saveWorkbenchMapping[\s\S]*return next/);
+    expect(source).toMatch(/const next = await saveWorkbenchMapping\(base, sanitized\)/);
+    expect(source).toContain('await inspect(next)');
+  });
+
+  it('uses a Workbench-specific saved message after Workbench mapping', () => {
+    const source = readFileSync('src/components/RepositoryGate.tsx', 'utf8');
+    const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
+    const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
+
+    expect(source).toContain('repositoryGate.workbenchMappingSaved');
+    expect(zh.repositoryGate.workbenchMappingSaved).toContain('工作台');
+    expect(en.repositoryGate.workbenchMappingSaved.toLowerCase()).toContain('workbench');
+  });
+
+  it('saves Workbench semantic mappings without a manual confirmation step', () => {
+    const source = readFileSync('src/components/RepositoryGate.tsx', 'utf8');
+    const workbenchHandler = source.slice(source.indexOf('const handleSemanticWorkbenchMapping'), source.indexOf('const knowledgeMappingReady'));
+
+    expect(workbenchHandler).not.toContain('Modal.confirm');
+    expect(workbenchHandler).toContain('const next = await saveWorkbenchMapping(base, sanitized)');
+    expect(workbenchHandler).toContain('await inspect(next)');
+    expect(workbenchHandler).toContain('Toast.success(t(\'repositoryGate.workbenchMappingSaved\'))');
   });
 
   it('keeps the temporary any-thing layout detection as LLM Wiki fallback only', () => {

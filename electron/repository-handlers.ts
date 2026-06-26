@@ -3,6 +3,11 @@ import path from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { access, cp, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
+import {
+  resolveRepoPath,
+  resolveSafeExistingRepoPath,
+  resolveSafeWritableRepoPath,
+} from '../src/lib/repository-path-safety'
 
 const execFileAsync = promisify(execFile)
 
@@ -92,7 +97,7 @@ async function chooseDirectory(): Promise<string | null> {
 
 async function pathExists(repoPath: string, relativePath: string): Promise<boolean> {
   try {
-    await access(path.join(repoPath, relativePath))
+    await access(await resolveSafeExistingRepoPath(repoPath, relativePath))
     return true
   } catch {
     return false
@@ -218,23 +223,59 @@ async function initRepository(repoPath: string): Promise<RepositoryInspectResult
   return bootstrapRepository(repoPath)
 }
 
-function resolveRepoPath(repoPath: string, relativePath: string): string {
-  const root = path.resolve(repoPath)
-  const target = path.resolve(root, relativePath)
-  if (target !== root && !target.startsWith(root + path.sep)) {
-    throw new Error('path-outside-repository')
+async function listGitVisibleTree(repoPath: string, maxEntries: number): Promise<string[] | null> {
+  const root = await resolveSafeExistingRepoPath(repoPath, '.').catch(() => null)
+  if (!root) return []
+  try {
+    const result = await execFileAsync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], {
+      cwd: root,
+      timeout: 10000,
+      maxBuffer: 1024 * 1024,
+    })
+    const files = result.stdout
+      .split('\0')
+      .filter((item) => item.length > 0)
+      .filter((item) => !shouldSkipTreePath(item))
+      .sort((a, b) => a.localeCompare(b))
+    const entries = new Set<string>()
+    for (const file of files) {
+      for (const parent of parentTreeEntries(file)) {
+        entries.add(parent)
+        if (entries.size >= maxEntries) return [...entries]
+      }
+      entries.add(file)
+      if (entries.size >= maxEntries) return [...entries]
+    }
+    return [...entries]
+  } catch {
+    return null
   }
-  return target
+}
+
+function parentTreeEntries(filePath: string): string[] {
+  const parts = filePath.split('/').filter(Boolean)
+  const parents: string[] = []
+  for (let index = 1; index < parts.length; index += 1) {
+    parents.push(`${parts.slice(0, index).join('/')}/`)
+  }
+  return parents
+}
+
+function shouldSkipTreePath(filePath: string): boolean {
+  const parts = filePath.split('/').filter(Boolean)
+  return parts.some((part) => part === '.git' || part === 'node_modules' || part === '.DS_Store')
 }
 
 async function listMarkdown(repoPath: string, directory: string): Promise<RepositoryMarkdownFile[]> {
-  const root = resolveRepoPath(repoPath, directory)
+  const root = await resolveSafeExistingRepoPath(repoPath, directory).catch(() => null)
+  if (!root) return []
   const files: RepositoryMarkdownFile[] = []
 
   async function visit(currentPath: string): Promise<void> {
     const entries = await readdir(currentPath, { withFileTypes: true }).catch(() => [])
     for (const entry of entries) {
       if (entry.name === '.git') continue
+      if (entry.isSymbolicLink()) continue
       const fullPath = path.join(currentPath, entry.name)
       if (entry.isDirectory()) {
         await visit(fullPath)
@@ -256,7 +297,10 @@ async function listMarkdown(repoPath: string, directory: string): Promise<Reposi
 }
 
 async function listTree(repoPath: string, maxEntries = 300): Promise<string[]> {
-  const root = path.resolve(repoPath)
+  const gitTree = await listGitVisibleTree(repoPath, maxEntries)
+  if (gitTree) return gitTree
+  const root = await resolveSafeExistingRepoPath(repoPath, '.').catch(() => null)
+  if (!root) return []
   const entries: string[] = []
 
   async function visit(currentPath: string, depth: number): Promise<void> {
@@ -265,6 +309,7 @@ async function listTree(repoPath: string, maxEntries = 300): Promise<string[]> {
     for (const item of items.sort((a, b) => a.name.localeCompare(b.name))) {
       if (entries.length >= maxEntries) return
       if (item.name === '.git' || item.name === 'node_modules' || item.name === '.DS_Store') continue
+      if (item.isSymbolicLink()) continue
       const fullPath = path.join(currentPath, item.name)
       const relativePath = path.relative(root, fullPath).split(path.sep).join('/')
       entries.push(item.isDirectory() ? `${relativePath}/` : relativePath)
@@ -277,11 +322,15 @@ async function listTree(repoPath: string, maxEntries = 300): Promise<string[]> {
 }
 
 async function readText(repoPath: string, relativePath: string): Promise<string> {
-  return readFile(resolveRepoPath(repoPath, relativePath), 'utf-8').catch(() => '')
+  try {
+    return await readFile(await resolveSafeExistingRepoPath(repoPath, relativePath), 'utf-8')
+  } catch {
+    return ''
+  }
 }
 
 async function writeText(repoPath: string, relativePath: string, content: string): Promise<void> {
-  const target = resolveRepoPath(repoPath, relativePath)
+  const target = await resolveSafeWritableRepoPath(repoPath, relativePath)
   await mkdir(path.dirname(target), { recursive: true })
   await writeFile(target, content, 'utf-8')
 }

@@ -1,4 +1,6 @@
+import knowledgeSemanticMappingTemplate from '../prompts/repository/knowledge-semantic-mapping.md?raw';
 import type { KnowledgeRepositoryMapping, RepositoryBinding } from './agentic-repository';
+import { renderPromptTemplate } from './prompt-template';
 
 export interface RepositoryMarkdownFile {
   path: string;
@@ -252,36 +254,14 @@ export function buildKnowledgeRepositoryMappingPrompt(options: {
   tree: string[];
   excerpts: Array<{ path: string; content: string }>;
 }): string {
-  return [
-    '你是 OpenClaw Desktop 的知识库绑定助手。请基于 Karpathy LLM Wiki 思想，对用户选择的仓库做一次语义识别。',
-    '',
-    '判断标准不是固定目录名，而是仓库是否存在：',
-    '- raw sources：原始资料/事实源，默认只读不改写。',
-    '- wiki：LLM/Agent 维护的 Markdown 知识层。',
-    '- index：知识导航入口。',
-    '- log：追加式维护日志。',
-    '- schema/rules：AGENTS.md、README 或类似 Agent 维护规则。',
-    '',
-    '只输出知识库 mapping，不要输出 work/plans/runs/outputs；工作台映射是独立流程。',
-    '',
-    `仓库路径：${options.repoPath}`,
-    '',
-    '目录树采样：',
-    options.tree.map((item) => `- ${item}`).join('\n') || '- （空）',
-    '',
-    '文件摘录：',
-    options.excerpts.map((item) => [
+  return renderPromptTemplate(knowledgeSemanticMappingTemplate, {
+    repoPath: options.repoPath,
+    tree: options.tree.map((item) => `- ${item}`).join('\n') || '- （空）',
+    excerpts: options.excerpts.map((item) => [
       `--- ${item.path} ---`,
       item.content.slice(0, 4000),
     ].join('\n')).join('\n\n') || '（无）',
-    '',
-    '请严格输出 ai-action JSON：',
-    '```ai-action',
-    '{"version":1,"kind":"completed","summary":"已识别知识库映射","result":{"isKnowledgeRepository":true,"confidence":"low|medium|high","mapping":{"sourceRoot":"...","wikiRoot":"...","indexPath":"...","logPath":"...","schemaPath":"...","mapsRoot":"..."}}}',
-    '```',
-    '',
-    '如果不符合 LLM Wiki 思维，请设置 isKnowledgeRepository=false，并说明原因。',
-  ].join('\n');
+  });
 }
 
 export function parseKnowledgeRepositoryMappingResponse(text: string): KnowledgeRepositoryMappingResponse | null {

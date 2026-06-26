@@ -36,6 +36,42 @@ export interface KnowledgeRepositoryMapping {
   mappingSource: 'default' | 'agent' | 'manual' | 'fallback';
 }
 
+export type SemanticSlotKind = 'document' | 'directory' | 'mixed';
+export type SemanticConfidence = 'low' | 'medium' | 'high';
+
+export interface SemanticSlot {
+  label: string;
+  paths: string[];
+  kind: SemanticSlotKind;
+  confidence: SemanticConfidence;
+  reason: string;
+}
+
+export interface WorkbenchSemanticSlots {
+  inbox?: SemanticSlot;
+  current?: SemanticSlot;
+  next?: SemanticSlot;
+  done?: SemanticSlot;
+  projects?: SemanticSlot;
+  plans?: {
+    active?: SemanticSlot;
+    completed?: SemanticSlot;
+  };
+  runs?: SemanticSlot;
+  outputs?: SemanticSlot;
+  reviews?: SemanticSlot;
+  tools?: SemanticSlot;
+  logs?: SemanticSlot;
+}
+
+export interface WorkbenchSemanticMapping {
+  isWorkbenchRepository: boolean;
+  confidence?: SemanticConfidence;
+  reason?: string;
+  mappingSource: 'agent';
+  slots: WorkbenchSemanticSlots;
+}
+
 export interface RepositoryBinding {
   id: string;
   name: string;
@@ -46,6 +82,7 @@ export interface RepositoryBinding {
   schemaProfile: string;
   paths: RepositoryPaths;
   knowledge: KnowledgeRepositoryMapping;
+  workbench?: WorkbenchSemanticMapping;
   status: RepositoryStatus;
 }
 
@@ -130,6 +167,7 @@ export function normalizeRepositoryBinding(value: unknown): RepositoryBinding | 
     schemaProfile: typeof value.schemaProfile === 'string' ? value.schemaProfile : 'default',
     paths: normalizedPaths,
     knowledge: normalizeKnowledgeRepositoryMapping(value.knowledge, normalizedPaths),
+    workbench: normalizeWorkbenchSemanticMapping(value.workbench),
     status,
   };
 }
@@ -179,6 +217,66 @@ function normalizeKnowledgeRepositoryMapping(value: unknown, paths: RepositoryPa
         ? value.mappingSource
         : 'manual',
   };
+}
+
+function normalizeWorkbenchSemanticMapping(value: unknown): WorkbenchSemanticMapping | undefined {
+  if (!isRecord(value) || value.isWorkbenchRepository !== true) return undefined;
+  if (value.mappingSource !== 'agent' || !isRecord(value.slots)) return undefined;
+  const slots = normalizeWorkbenchSemanticSlots(value.slots);
+  if (Object.keys(slots).length === 0) return undefined;
+  return {
+    isWorkbenchRepository: true,
+    confidence: normalizeSemanticConfidence(value.confidence),
+    reason: optionalString(value.reason),
+    mappingSource: 'agent',
+    slots,
+  };
+}
+
+function normalizeWorkbenchSemanticSlots(value: Record<string, unknown>): WorkbenchSemanticSlots {
+  const plans = isRecord(value.plans) ? {
+    active: normalizeSemanticSlot(value.plans.active),
+    completed: normalizeSemanticSlot(value.plans.completed),
+  } : undefined;
+  const normalized: WorkbenchSemanticSlots = {
+    inbox: normalizeSemanticSlot(value.inbox),
+    current: normalizeSemanticSlot(value.current),
+    next: normalizeSemanticSlot(value.next),
+    done: normalizeSemanticSlot(value.done),
+    projects: normalizeSemanticSlot(value.projects),
+    plans: plans && (plans.active || plans.completed) ? plans : undefined,
+    runs: normalizeSemanticSlot(value.runs),
+    outputs: normalizeSemanticSlot(value.outputs),
+    reviews: normalizeSemanticSlot(value.reviews),
+    tools: normalizeSemanticSlot(value.tools),
+    logs: normalizeSemanticSlot(value.logs),
+  };
+  return Object.fromEntries(Object.entries(normalized).filter(([, slot]) => Boolean(slot))) as WorkbenchSemanticSlots;
+}
+
+function normalizeSemanticSlot(value: unknown): SemanticSlot | undefined {
+  if (!isRecord(value)) return undefined;
+  const paths = Array.isArray(value.paths)
+    ? value.paths.filter((item): item is string => typeof item === 'string' && isSafeRelativeRepositoryPath(item))
+    : [];
+  if (paths.length === 0) return undefined;
+  const kind = value.kind === 'document' || value.kind === 'directory' || value.kind === 'mixed' ? value.kind : 'mixed';
+  return {
+    label: typeof value.label === 'string' && value.label.trim() ? value.label.trim().slice(0, 80) : 'Workbench section',
+    paths: paths.slice(0, 20),
+    kind,
+    confidence: normalizeSemanticConfidence(value.confidence) ?? 'medium',
+    reason: typeof value.reason === 'string' && value.reason.trim() ? value.reason.trim().slice(0, 240) : 'Agent semantic mapping.',
+  };
+}
+
+function normalizeSemanticConfidence(value: unknown): SemanticConfidence | undefined {
+  return value === 'low' || value === 'medium' || value === 'high' ? value : undefined;
+}
+
+function isSafeRelativeRepositoryPath(value: string): boolean {
+  const trimmed = value.trim();
+  return trimmed.length > 0 && !trimmed.startsWith('/') && !trimmed.includes('..');
 }
 
 function knowledgeMappingFromRepositoryPaths(paths: RepositoryPaths): KnowledgeRepositoryMapping {

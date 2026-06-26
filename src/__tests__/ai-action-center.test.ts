@@ -350,6 +350,26 @@ describe('AI Action Center session rules', () => {
     expect(updated.resultSummary).toBe('索引和日志已经同步，本次无需写入。');
   });
 
+  it('treats completed json fenced replies as completed when models ignore the ai-action fence label', () => {
+    const run = createAiActionRun({
+      type: 'workbench_repository_map',
+      sourcePage: 'workbench',
+      instanceId: 'instance-1',
+      input: '映射工作台',
+    });
+    const responseText = [
+      '识别完成。',
+      '```json',
+      '{"version":1,"kind":"completed","summary":"已识别工作台语义映射","result":{"isWorkbenchRepository":true}}',
+      '```',
+    ].join('\n');
+
+    const updated = applyAiActionAssistantResponse(run, responseText);
+
+    expect(updated.status).toBe('done');
+    expect(updated.resultSummary).toBe('已识别工作台语义映射');
+  });
+
   it('resyncs a stuck run when the same saved assistant response becomes parseable', async () => {
     const run = createAiActionRun({
       type: 'knowledge_rewrite',

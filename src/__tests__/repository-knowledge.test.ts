@@ -224,6 +224,8 @@ describe('repository knowledge', () => {
   });
 
   it('builds a binding-time semantic mapping prompt for LLM Wiki repositories', () => {
+    const template = readFileSync('src/prompts/repository/knowledge-semantic-mapping.md', 'utf8');
+    const source = readFileSync('src/lib/repository-knowledge.ts', 'utf8');
     const prompt = buildKnowledgeRepositoryMappingPrompt({
       repoPath: '/repo',
       tree: ['AGENTS.md', 'README.md', '30-knowledge/index.md', '30-knowledge/wiki/topic.md', '30-knowledge/sources/raw.md'],
@@ -232,7 +234,16 @@ describe('repository knowledge', () => {
       ],
     });
 
-    expect(prompt).toContain('Karpathy LLM Wiki');
+    expect(template).toContain('{{tree}}');
+    expect(template).toContain('{{excerpts}}');
+    expect(source).toContain("knowledge-semantic-mapping.md?raw");
+    expect(source).toContain('renderPromptTemplate');
+    expect(prompt).toContain('LLM 维护的持久 Wiki 知识库');
+    expect(prompt).toContain('Raw sources');
+    expect(prompt).toContain('Schema / rules');
+    expect(prompt).toContain('Ingest workflow');
+    expect(prompt).toContain('Lint / health-check workflow');
+    expect(prompt).not.toContain('Karpathy LLM Wiki');
     expect(prompt).toContain('sourceRoot');
     expect(prompt).toContain('wikiRoot');
     expect(prompt).toContain('indexPath');

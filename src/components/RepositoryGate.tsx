@@ -5,7 +5,13 @@ import { IconBranch, IconCloud, IconFolderOpen, IconRefresh, IconTickCircle } fr
 import { useTranslation } from 'react-i18next';
 import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway, useStore } from '../lib';
 import { upsertAiActionRun } from '../lib/ai-action-run-store';
-import type { KnowledgeRepositoryMapping, RepositoryBinding, RepositoryLocation, RepositoryStatus } from '../lib/agentic-repository';
+import type {
+  KnowledgeRepositoryMapping,
+  RepositoryBinding,
+  RepositoryLocation,
+  RepositoryStatus,
+  WorkbenchSemanticMapping,
+} from '../lib/agentic-repository';
 import {
   bootstrapRepositoryBinding,
   createAndSaveRepositoryBinding,
@@ -17,6 +23,12 @@ import {
   buildKnowledgeRepositoryMappingPrompt,
   parseKnowledgeRepositoryMappingResponse,
 } from '../lib/repository-knowledge';
+import {
+  buildWorkbenchSemanticMappingPrompt,
+  parseWorkbenchSemanticMappingResponse,
+  sanitizeWorkbenchSemanticMapping,
+  type WorkbenchStructureSignal,
+} from '../lib/repository-workbench-mapping';
 
 const { Text, Title } = Typography;
 
@@ -31,6 +43,24 @@ const STATUS_COLOR: Record<RepositoryStatus, 'green' | 'orange' | 'red' | 'blue'
   repo_remote_unreachable: 'red',
   repo_permission_denied: 'red',
 };
+
+function canUseSemanticMappingForStatus(value: RepositoryStatus): boolean {
+  switch (value) {
+    case 'repo_needs_bootstrap':
+      return true;
+    case 'git_missing':
+    case 'repo_path_missing':
+    case 'repo_permission_denied':
+    case 'repo_remote_unreachable':
+    case 'repo_unbound':
+    case 'repo_not_git':
+    case 'repo_empty':
+    case 'repo_ready':
+      return false;
+    default:
+      return false;
+  }
+}
 
 export default function RepositoryGate({
   area,
@@ -216,6 +246,31 @@ export default function RepositoryGate({
     return excerpts.filter((item) => item.content.trim().length > 0);
   };
 
+  const buildWorkbenchStructureSignals = (tree: string[]): WorkbenchStructureSignal[] => {
+    const signals = tree
+      .map((path) => ({ path, hints: inferWorkbenchPathHints(path) }))
+      .filter((item) => item.hints.length > 0);
+    return signals.slice(0, 120);
+  };
+
+  const inferWorkbenchPathHints = (path: string): string[] => {
+    const normalized = path.toLowerCase();
+    const hints: string[] = [];
+    if (/(^|\/)(inbox|capture|captures|input|inputs)(\/|\.md$)/.test(normalized)) hints.push('inbox');
+    if (/(^|\/)(now|current|active)\.md$/.test(normalized) || /(^|\/)(current|active)(\/|$)/.test(normalized)) hints.push('current-work');
+    if (/(^|\/)(next|todo|backlog|someday)\.md$/.test(normalized) || /(^|\/)(next|todo|backlog|someday)(\/|$)/.test(normalized)) hints.push('next-work');
+    if (/(^|\/)(done|completed|archive)\.md$/.test(normalized) || /(^|\/)(done|completed)(\/|$)/.test(normalized)) hints.push('done-work');
+    if (/(^|\/)(project|projects|initiative|initiatives|client|clients)(\/|$)/.test(normalized) || /(^|\/)(readme|brief|prd)\.md$/.test(normalized)) hints.push('project-system');
+    if (/(^|\/)(plan|roadmap|milestone|timeline)\.md$/.test(normalized) || /(^|\/)(plans)(\/|$)/.test(normalized)) hints.push('planning');
+    if (/(^|\/)(run|runs|log|logs|journal)(\/|\.md$)/.test(normalized)) hints.push('execution-record');
+    if (/(^|\/)(output|outputs|deliverable|deliverables|artifact|artifacts)(\/|$)/.test(normalized)) hints.push('output');
+    if (/(^|\/)(review|reviews|retro|retrospective)(\/|\.md$)/.test(normalized)) hints.push('review');
+    if (/(^|\/)(tool|tools|script|scripts|template|templates|sop|prompts?)(\/|\.md$)/.test(normalized)) hints.push('reusable-tool');
+    if (/(^|\/)(knowledge|wiki|source|sources|map|maps)(\/|$)/.test(normalized)) hints.push('knowledge-system');
+    if (/(^|\/)(agent|agents|agentic|workflow|workflows)(\/|\.md$)/.test(normalized)) hints.push('agent-workflow');
+    return hints;
+  };
+
   const isSafeMapping = (mapping: KnowledgeRepositoryMapping): boolean => {
     const paths = [
       mapping.sourceRoot,
@@ -238,6 +293,19 @@ export default function RepositoryGate({
     setBinding(next);
     setRepoPath(next.repoPath);
     await saveRepositoryBinding(next);
+    return next;
+  };
+
+  const saveWorkbenchMapping = async (base: RepositoryBinding, mapping: WorkbenchSemanticMapping) => {
+    const next: RepositoryBinding = {
+      ...base,
+      schemaProfile: base.schemaProfile === 'default' ? 'semantic-workbench' : base.schemaProfile,
+      workbench: mapping,
+    };
+    setBinding(next);
+    setRepoPath(next.repoPath);
+    await saveRepositoryBinding(next);
+    return next;
   };
 
   const handleSemanticKnowledgeMapping = async () => {
@@ -318,8 +386,8 @@ export default function RepositoryGate({
         okText: t('common.save'),
         cancelText: t('common.cancel'),
         onOk: async () => {
-          await saveKnowledgeMapping(base, parsed.mapping!);
-          await inspect({ ...base, knowledge: parsed.mapping! });
+          const next = await saveKnowledgeMapping(base, parsed.mapping!);
+          await inspect(next);
           Toast.success(t('repositoryGate.mappingSaved'));
         },
       });
@@ -330,8 +398,85 @@ export default function RepositoryGate({
     }
   };
 
+  const handleSemanticWorkbenchMapping = async () => {
+    if (!currentInstanceId) return;
+    if (!activeClient) {
+      Toast.error(t('repositoryGate.mappingNotConnected'));
+      return;
+    }
+    const agent = agents[0];
+    if (!agent) {
+      Toast.error(t('repositoryGate.mappingNoAgent'));
+      return;
+    }
+    const path = repoPath.trim() || binding?.repoPath;
+    if (!path) {
+      Toast.warning(t('repositoryGate.noFolderSelected'));
+      return;
+    }
+    const repository = window.electronAPI?.repository;
+    if (!repository?.listTree) {
+      Toast.error(t('repositoryGate.localRepositoryUnavailable'));
+      return;
+    }
+
+    setMappingLoading(true);
+    try {
+      const base = binding ?? await createAndSaveRepositoryBinding({
+        gatewayInstanceId: currentInstanceId,
+        repoPath: path,
+        location,
+      });
+      const tree = await repository.listTree(path, 400);
+      const structureSignals = buildWorkbenchStructureSignals(tree);
+      const run = createAiActionRun({
+        type: 'workbench_repository_map',
+        sourcePage: 'workbench',
+        instanceId: currentInstanceId,
+        agentId: agent.id,
+        executionMode: 'isolated-session',
+        input: t('repositoryGate.workbenchMappingActionInput', { path }),
+      });
+      await upsertAiActionRun(currentInstanceId, { ...run, status: 'planning', updatedAt: Date.now() });
+      const running = await executeAiActionRunWithGateway(activeClient, run, {
+        title: t('repositoryGate.workbenchMappingActionTitle'),
+        prompt: buildWorkbenchSemanticMappingPrompt({ repoPath: path, tree, structureSignals }),
+      });
+      await upsertAiActionRun(currentInstanceId, running);
+
+      let latest = running;
+      for (let index = 0; index < 10; index += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        latest = await syncAiActionRunWithGateway(activeClient, latest);
+        await upsertAiActionRun(currentInstanceId, latest);
+        if (latest.status === 'done' || latest.status === 'failed' || latest.status === 'cancelled') break;
+      }
+
+      const parsed = parseWorkbenchSemanticMappingResponse(latest.lastAssistantResponse ?? '');
+      if (!parsed?.isWorkbenchRepository || !parsed.mapping) {
+        Toast.error(parsed?.reason || t('repositoryGate.workbenchMappingFailed'));
+        return;
+      }
+      const sanitized = sanitizeWorkbenchSemanticMapping({ mapping: parsed.mapping, tree });
+      if (!sanitized) {
+        Toast.error(t('repositoryGate.mappingUnsafe'));
+        return;
+      }
+
+      const next = await saveWorkbenchMapping(base, sanitized);
+      await inspect(next);
+      Toast.success(t('repositoryGate.workbenchMappingSaved'));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('repositoryGate.workbenchMappingFailed'));
+    } finally {
+      setMappingLoading(false);
+    }
+  };
+
   const knowledgeMappingReady = Boolean(binding?.knowledge && binding.knowledge.mappingSource !== 'default');
-  const ready = status === 'repo_ready' || (area === 'knowledge' && knowledgeMappingReady);
+  const workbenchMappingReady = Boolean(binding?.workbench?.isWorkbenchRepository);
+  const semanticMappingReady = canUseSemanticMappingForStatus(status) && ((area === 'knowledge' && knowledgeMappingReady) || (area === 'workbench' && workbenchMappingReady));
+  const ready = status === 'repo_ready' || semanticMappingReady;
   const displayStatus = ready ? 'repo_ready' : status;
   const showDesktopActions = location === 'desktop-local';
   const canRefresh = Boolean(binding);
@@ -351,6 +496,12 @@ export default function RepositoryGate({
               {t(`repositoryGate.${area}Title`)}
             </Title>
             <Tag color={STATUS_COLOR[displayStatus]}>{t(`repositoryGate.status.${displayStatus}`)}</Tag>
+            {area === 'workbench' && binding?.workbench && (
+              <>
+                <Tag color="blue">{binding.workbench.mappingSource}</Tag>
+                {binding.workbench.confidence && <Tag color="grey">{binding.workbench.confidence}</Tag>}
+              </>
+            )}
           </Space>
           <Text type="tertiary">{t(`repositoryGate.${area}Desc`)}</Text>
           <Space wrap style={{ width: '100%' }}>
@@ -395,6 +546,16 @@ export default function RepositoryGate({
                   {area === 'knowledge' && (
                     <Button loading={mappingLoading} disabled={!currentInstanceId || !repoPath.trim()} onClick={() => void handleSemanticKnowledgeMapping()}>
                       {t('repositoryGate.semanticMapKnowledge')}
+                    </Button>
+                  )}
+                  {area === 'workbench' && (
+                    <Button
+                      icon={<IconBranch />}
+                      loading={mappingLoading}
+                      disabled={location !== 'desktop-local'}
+                      onClick={() => void handleSemanticWorkbenchMapping()}
+                    >
+                      {t('repositoryGate.mapWorkbenchSemantically')}
                     </Button>
                   )}
                 </Space>

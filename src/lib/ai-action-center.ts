@@ -1,6 +1,7 @@
 import type { AiActionExecutionMode, AiActionRun, ChatSendResult, SessionInfo } from './types';
 import { buildApprovalDecisionPrompt } from './ai-action-prompts';
 import { extractSessionMessageText } from './session-content';
+import { parseModelJsonObjects } from './model-json';
 
 export const AI_ACTION_RUNS_STORAGE_KEY = 'ai-action-runs';
 export const DESKTOP_ACTION_PEER_PREFIX = 'desktop-action';
@@ -172,15 +173,10 @@ function normalizeStructuredResponse(value: unknown): AiActionAssistantResponse 
 }
 
 export function parseAiActionAssistantResponse(text: string): AiActionAssistantResponse | null {
-  const blocks = Array.from(text.matchAll(/```ai-action\s*([\s\S]*?)```/gi));
-  for (let index = blocks.length - 1; index >= 0; index -= 1) {
-    try {
-      const parsed = JSON.parse(blocks[index][1].trim());
-      const normalized = normalizeStructuredResponse(parsed);
-      if (normalized) return normalized;
-    } catch {
-      // Continue to the legacy fallback for malformed model output.
-    }
+  const objects = parseModelJsonObjects(text);
+  for (let index = objects.length - 1; index >= 0; index -= 1) {
+    const normalized = normalizeStructuredResponse(objects[index]);
+    if (normalized) return normalized;
   }
 
   if (/(需要你确认|需要确认|是否\s*OK|确认后.*执行|是否需要执行|是否执行)/i.test(text)) {
