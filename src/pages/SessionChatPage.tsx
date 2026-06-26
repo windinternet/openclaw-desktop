@@ -7,13 +7,22 @@ import {
   Button,
   Empty,
   Progress,
-  SideSheet,
   Tabs,
   Tag,
+  Tooltip,
   Toast,
   Typography,
 } from '@douyinfe/semi-ui';
-import { IconAppCenter, IconClose, IconInfoCircle, IconList, IconPlay, IconWrench } from '@douyinfe/semi-icons';
+import {
+  IconAppCenter,
+  IconClose,
+  IconIndentLeft,
+  IconIndentRight,
+  IconList,
+  IconPlay,
+  IconSidebar,
+  IconWrench,
+} from '@douyinfe/semi-icons';
 import type {
   DialogueContentItemRendererMap,
   RenderContentProps,
@@ -21,6 +30,7 @@ import type {
 import { useStore } from '../lib';
 import { saveArtifactFromChat } from '../lib/artifact-parser';
 import { collectChatArtifactCandidates, filterArtifactsForSessionKeys } from '../lib/session-artifacts';
+import { stripGeneratedSessionLabelSuffix } from '../lib/session-label';
 import type { ArtifactMeta } from '../lib/artifact-types';
 import type { EventFrame } from '../lib/types';
 import {
@@ -38,6 +48,7 @@ import {
   mergeVisibleHistoryWithLiveChats,
   mergeRealtimeToolChatIntoRun,
   parseSessionContextSnapshot,
+  summarizeToolResultForDisplay,
 } from '../lib/session-content';
 import type { ChatContentItem, SessionContextSnapshot, SessionMessageDisplaySettings } from '../lib/session-content';
 import { isAssistantCompletionEvent } from '../lib/assistant-completion-notifier';
@@ -390,6 +401,34 @@ function toolStatusColor(status?: string): 'green' | 'orange' | 'red' | 'blue' |
   return 'blue';
 }
 
+function contextUsageColor(ratio?: number): string {
+  if (ratio === undefined || !Number.isFinite(ratio)) return 'var(--semi-color-tertiary)';
+  if (ratio > 0.8) return 'var(--semi-color-warning)';
+  if (ratio > 0.6) return 'var(--semi-color-primary)';
+  return 'var(--semi-color-tertiary)';
+}
+
+function PinIcon({ pinned }: { pinned: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ transform: pinned ? 'rotate(0deg)' : 'rotate(-35deg)' }}
+    >
+      <path d="M15 4l5 5" />
+      <path d="M14 5l-3 3-4 1-2 2 8 8 2-2 1-4 3-3-5-5z" />
+      <path d="M9 15l-5 5" />
+    </svg>
+  );
+}
+
 function DetailCodeBlock({ value, t }: { value: unknown; t?: TFunc }) {
   return (
     <pre
@@ -429,15 +468,125 @@ function PendingDialogueLoading() {
   );
 }
 
+function SessionHeader({
+  title,
+  agentName,
+  modelName,
+  insight,
+  artifactsCount,
+  busy,
+  dashboardOpen,
+  onOpenDashboard,
+}: {
+  title: string;
+  agentName: string;
+  modelName: string;
+  insight: ReturnType<typeof deriveSessionInsight>;
+  artifactsCount: number;
+  busy: boolean;
+  dashboardOpen: boolean;
+  onOpenDashboard: () => void;
+}) {
+  const { t } = useTranslation();
+  const contextPercent = insight.contextUsageRatio !== undefined ? Math.round(insight.contextUsageRatio * 100) : 0;
+  const dashboardLabel = dashboardOpen ? t('chat.collapseSessionDetails') : t('chat.expandSessionDetails');
+
+  return (
+    <div
+      className="session-detail-header"
+      style={{
+        flexShrink: 0,
+        background: 'var(--semi-color-bg-0)',
+        borderBottom: '1px solid var(--semi-color-border)',
+      }}
+    >
+      <div
+        style={{
+          minHeight: 56,
+          padding: '10px 16px 8px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}
+      >
+        <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <Text strong ellipsis={{ showTooltip: true }} style={{ fontSize: 14, maxWidth: 'min(520px, 48vw)' }}>
+              {title || t('chat.header.unknownSession')}
+            </Text>
+            {busy ? (
+              <Tag color="orange" size="small" style={{ flex: '0 0 auto' }}>
+                {t('chat.header.running')}
+              </Tag>
+            ) : null}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <Text type="tertiary" size="small">
+              {agentName}
+            </Text>
+            <Text type="tertiary" size="small">
+              {modelName}
+            </Text>
+            <Text type="tertiary" size="small">
+              {t('chat.header.messageCount', { count: insight.messageCount })}
+            </Text>
+            <Text type="tertiary" size="small">
+              {t('chat.header.toolCount', { count: insight.toolCallCount })}
+            </Text>
+            <Text type="tertiary" size="small">
+              {t('chat.header.artifactCount', { count: artifactsCount })}
+            </Text>
+          </div>
+        </div>
+        <Tooltip content={dashboardLabel}>
+          <Button
+            aria-label={dashboardLabel}
+            icon={dashboardOpen ? <IconIndentRight size="large" /> : <IconIndentLeft size="large" />}
+            size="default"
+            theme="borderless"
+            type={dashboardOpen ? 'primary' : 'tertiary'}
+            onClick={onOpenDashboard}
+          />
+        </Tooltip>
+      </div>
+      {insight.contextUsageRatio !== undefined ? (
+        <Tooltip
+          content={t('chat.insight.tokensUsed', {
+            used: formatNumber(insight.usedContextTokens, t),
+            limit: formatNumber(insight.contextLimit, t),
+            percent: formatPercent(insight.contextUsageRatio, t),
+          })}
+        >
+          <div className="session-detail-context-progress" style={{ height: 4, background: 'var(--semi-color-fill-0)' }}>
+            <div
+              style={{
+                height: '100%',
+                width: `${contextPercent}%`,
+                minWidth: contextPercent > 0 ? 8 : 0,
+                background: contextUsageColor(insight.contextUsageRatio),
+                borderRadius: '0 2px 2px 0',
+                transition: 'width 0.4s ease',
+              }}
+            />
+          </div>
+        </Tooltip>
+      ) : null}
+    </div>
+  );
+}
+
 function SessionSidePanel({
   visible,
   activeKey,
   insight,
   selectedTool,
   artifacts,
+  pinned,
   onTabChange,
   onClearTool,
   onOpenArtifact,
+  onTogglePinned,
   onClose,
 }: {
   visible: boolean;
@@ -445,30 +594,51 @@ function SessionSidePanel({
   insight: ReturnType<typeof deriveSessionInsight>;
   selectedTool: SelectedToolCall | null;
   artifacts: ArtifactMeta[];
+  pinned: boolean;
   onTabChange: (key: string) => void;
   onClearTool: () => void;
   onOpenArtifact: (artifact: ArtifactMeta) => void;
+  onTogglePinned: () => void;
   onClose?: () => void;
 }) {
   const { t } = useTranslation();
   const contextPercent = insight.contextUsageRatio !== undefined ? Math.round(insight.contextUsageRatio * 100) : 0;
+  const pinLabel = pinned ? t('chat.unpinDashboard') : t('chat.pinDashboard');
 
-  return (
-    <SideSheet
-      visible={visible}
-      onCancel={onClose}
-      width={400}
-      disableScroll={false}
-      maskStyle={{ background: 'rgba(0,0,0,0.15)' }}
-      headerStyle={{ borderBottom: '1px solid var(--semi-color-border)' }}
-      title={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <IconInfoCircle size="small" />
-          <Text strong>{t('chat.sidePanel.title')}</Text>
-        </div>
-      }
-      bodyStyle={{ padding: 0 }}
-    >
+  const titleNode = (
+    <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+        <IconSidebar size="small" style={{ flex: '0 0 auto' }} />
+        <Text strong ellipsis={{ showTooltip: true }}>
+          {t('chat.sidePanel.title')}
+        </Text>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: '0 0 auto' }}>
+        <Tooltip content={pinLabel}>
+          <Button
+            aria-label={pinLabel}
+            icon={<PinIcon pinned={pinned} />}
+            size="small"
+            theme="borderless"
+            type={pinned ? 'primary' : 'tertiary'}
+            onClick={onTogglePinned}
+          />
+        </Tooltip>
+        {onClose ? (
+          <Button
+            aria-label={t('chat.collapseSessionDetails')}
+            icon={<IconClose size="small" />}
+            size="small"
+            theme="borderless"
+            type="tertiary"
+            onClick={onClose}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+
+  const contentNode = (
       <Tabs
         activeKey={activeKey}
         onChange={(key) => onTabChange(String(key))}
@@ -656,7 +826,84 @@ function SessionSidePanel({
           </div>
         </Tabs.TabPane>
       </Tabs>
-    </SideSheet>
+  );
+
+  if (!visible) return null;
+
+  if (pinned) {
+    return (
+      <aside
+        className="session-detail-pinned-panel"
+        style={{
+          width: 400,
+          flex: '0 0 400px',
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          borderLeft: '1px solid var(--semi-color-border)',
+          background: 'var(--semi-color-bg-0)',
+        }}
+      >
+        <div
+          style={{
+            minHeight: 56,
+            padding: '0 16px',
+            display: 'flex',
+            alignItems: 'center',
+            borderBottom: '1px solid var(--semi-color-border)',
+          }}
+        >
+          {titleNode}
+        </div>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>{contentNode}</div>
+      </aside>
+    );
+  }
+
+  return (
+    <div
+      className="session-detail-floating-panel"
+      role="presentation"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose?.();
+      }}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 20,
+        display: 'flex',
+        justifyContent: 'flex-end',
+        background: 'rgba(0,0,0,0.15)',
+      }}
+    >
+      <aside
+        role="dialog"
+        aria-label={t('chat.sidePanel.title')}
+        style={{
+          width: 400,
+          maxWidth: 'min(400px, 100%)',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          background: 'var(--semi-color-bg-0)',
+          borderLeft: '1px solid var(--semi-color-border)',
+          boxShadow: 'var(--semi-shadow-elevated)',
+        }}
+      >
+        <div
+          style={{
+            minHeight: 56,
+            padding: '0 16px',
+            display: 'flex',
+            alignItems: 'center',
+            borderBottom: '1px solid var(--semi-color-border)',
+          }}
+        >
+          {titleNode}
+        </div>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>{contentNode}</div>
+      </aside>
+    </div>
   );
 }
 
@@ -742,6 +989,7 @@ export default function SessionChatPage() {
   const [selectedToolCall, setSelectedToolCall] = useState<SelectedToolCall | null>(null);
   const [sidePanelTab, setSidePanelTab] = useState('overview');
   const [sidePanelVisible, setSidePanelVisible] = useState(false);
+  const [sidePanelPinned, setSidePanelPinned] = useState(false);
   const [sessionContextSnapshot, setSessionContextSnapshot] = useState<SessionContextSnapshot | null>(null);
   const [pageDragActive, setPageDragActive] = useState(false);
 
@@ -874,18 +1122,19 @@ export default function SessionChatPage() {
     [getDraftKey],
   );
 
-  const [draftState, setDraftState] = useState<{
-    text: string;
-    attachments: Array<{ uid: string; name: string; size: string }>;
-  }>({ text: '', attachments: [] });
+  const draftTextRef = useRef('');
+  const draftAttachmentsRef = useRef<Array<{ uid: string; name: string; size: string }>>([]);
 
-  // 切换会话时加载草稿
+  const draftState = useMemo(
+    () => (activeSessionKey ? loadDraft(activeSessionKey) : { text: '', attachments: [] }),
+    [activeSessionKey, loadDraft],
+  );
+
   useEffect(() => {
-    if (!activeSessionKey) return;
-    const draft = loadDraft(activeSessionKey);
-    draftKeyRef.current = activeSessionKey;
-    setDraftState(draft);
-  }, [activeSessionKey, loadDraft]);
+    draftKeyRef.current = activeSessionKey || null;
+    draftTextRef.current = draftState.text;
+    draftAttachmentsRef.current = draftState.attachments;
+  }, [activeSessionKey, draftState.attachments, draftState.text]);
 
   // 组件卸载时清理定时器
   useEffect(() => {
@@ -896,15 +1145,14 @@ export default function SessionChatPage() {
     };
   }, []);
 
-  const draftAttachmentsRef = useRef<Array<{ uid: string; name: string; size: string }>>([]);
-
   const handleContentChange = useCallback(
     (_content: unknown) => {
       if (!activeSessionKey) return;
       const text = extractMessageText(_content);
+      draftTextRef.current = text;
       if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
       draftSaveTimerRef.current = setTimeout(() => {
-        saveDraft(activeSessionKey, text, draftAttachmentsRef.current);
+        saveDraft(activeSessionKey, draftTextRef.current, draftAttachmentsRef.current);
       }, 500);
     },
     [activeSessionKey, saveDraft],
@@ -917,9 +1165,7 @@ export default function SessionChatPage() {
       draftAttachmentsRef.current = attachments;
       if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
       draftSaveTimerRef.current = setTimeout(() => {
-        const editor = document.querySelector('.semi-ai-chat-input .ProseMirror') as HTMLElement | null;
-        const currentText = editor?.textContent || '';
-        saveDraft(activeSessionKey, currentText, attachments);
+        saveDraft(activeSessionKey, draftTextRef.current, attachments);
       }, 500);
     },
     [activeSessionKey, saveDraft],
@@ -1904,6 +2150,17 @@ export default function SessionChatPage() {
   );
 
   const currentModel = useMemo(() => models.find((model) => model.id === chatModel) ?? models[0], [chatModel, models]);
+  const activeSession = useMemo(
+    () => sessions.find((session) => getSessionKey(session) === activeSessionKey),
+    [activeSessionKey, sessions],
+  );
+  const activeAgent = useMemo(() => agents.find((agent) => agent.id === activeAgentId), [activeAgentId, agents]);
+  const sessionHeaderTitle = useMemo(() => {
+    const rawTitle = activeSession?.label || activeSession?.title || activeSessionKey || '';
+    return stripGeneratedSessionLabelSuffix(rawTitle, activeSessionKey);
+  }, [activeSession, activeSessionKey]);
+  const sessionHeaderModelName =
+    currentModel?.alias || currentModel?.name || currentModel?.id || chatModel || defaultChatModel || t('common.unknown');
 
   const sessionInsight = useMemo(
     () => deriveSessionInsight(chats, currentModel, sessionContextSnapshot),
@@ -1917,53 +2174,84 @@ export default function SessionChatPage() {
 
   const displayChats = useMemo(() => groupAdjacentToolCallChats(chats), [chats]);
 
+  const handleToggleDashboard = useCallback(() => {
+    if (!sidePanelVisible) setSidePanelTab('overview');
+    setSidePanelVisible((visible) => !visible);
+  }, [sidePanelVisible]);
+
+  const handleToggleSidePanelPinned = useCallback(() => {
+    setSidePanelVisible(true);
+    setSidePanelPinned((pinned) => !pinned);
+  }, []);
+
   const renderDialogueContentItem = useMemo<DialogueContentItemRendererMap>(
     () => ({
-      function_call: (item: SelectedToolCall['item'], message?: { id?: string; sourceSessionKey?: string }) => (
-        <button
-          type="button"
-          className="semi-ai-chat-dialogue-content-tool-call"
-          onClick={() => {
-            setSelectedToolCall({
-              item,
-              messageId: message?.id,
-              sourceSessionKey: message?.sourceSessionKey,
-            });
-            setSidePanelTab('tool');
-            setSidePanelVisible(true);
-          }}
-          style={{
-            border: 0,
-            cursor: 'pointer',
-            width: 'clamp(180px, calc(100vw - 560px), 560px)',
-            maxWidth: '100%',
-            justifyContent: 'flex-start',
-            font: 'inherit',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            overflow: 'hidden',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          <IconWrench style={{ flex: '0 0 auto' }} />
-          <span style={{ flex: '0 0 auto' }}>{item.name}</span>
-          {item.arguments ? (
-            <span
-              style={{
-                minWidth: 0,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {item.arguments}
-            </span>
-          ) : null}
-        </button>
-      ),
+      function_call: (item: SelectedToolCall['item'], message?: { id?: string; sourceSessionKey?: string }) => {
+        const resultSummary = summarizeToolResultForDisplay(item.toolResult);
+        return (
+          <button
+            type="button"
+            className="semi-ai-chat-dialogue-content-tool-call"
+            onClick={() => {
+              setSelectedToolCall({
+                item,
+                messageId: message?.id,
+                sourceSessionKey: message?.sourceSessionKey,
+              });
+              setSidePanelTab('tool');
+              setSidePanelVisible(true);
+            }}
+            style={{
+              border: 0,
+              cursor: 'pointer',
+              width: 'clamp(180px, calc(100vw - 560px), 560px)',
+              maxWidth: '100%',
+              justifyContent: 'flex-start',
+              font: 'inherit',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <IconWrench style={{ flex: '0 0 auto' }} />
+            <span style={{ flex: '0 0 auto' }}>{item.name}</span>
+            {item.status ? (
+              <Tag color={toolStatusColor(item.status)} size="small" style={{ flex: '0 0 auto' }}>
+                {item.status}
+              </Tag>
+            ) : null}
+            {item.arguments ? (
+              <span
+                style={{
+                  minWidth: resultSummary ? 80 : 0,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {item.arguments}
+              </span>
+            ) : null}
+            {resultSummary ? (
+              <span
+                style={{
+                  minWidth: 0,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  color: 'var(--semi-color-text-2)',
+                }}
+              >
+                {t('chat.tool.resultSummaryPrefix')} {resultSummary}
+              </span>
+            ) : null}
+          </button>
+        );
+      },
     }),
-    [],
+    [t],
   );
 
   if (!activeSessionKey) {
@@ -1985,7 +2273,17 @@ export default function SessionChatPage() {
   return (
     <div style={{ height: '100%', display: 'flex', overflow: 'hidden', position: 'relative' }}>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div ref={chatContainerRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: '16px 16px 0' }}>
+        <SessionHeader
+          title={sessionHeaderTitle}
+          agentName={getAgentDisplayName(activeAgent)}
+          modelName={sessionHeaderModelName}
+          insight={sessionInsight}
+          artifactsCount={sessionArtifacts.length}
+          busy={generating || switchingAgent}
+          dashboardOpen={sidePanelVisible}
+          onOpenDashboard={handleToggleDashboard}
+        />
+        <div ref={chatContainerRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: '12px 16px 0' }}>
           <AIChatDialogue
             chats={displayChats}
             roleConfig={roleConfig}
@@ -2084,7 +2382,9 @@ export default function SessionChatPage() {
         insight={sessionInsight}
         selectedTool={selectedToolCall}
         artifacts={sessionArtifacts}
+        pinned={sidePanelPinned}
         onTabChange={setSidePanelTab}
+        onTogglePinned={handleToggleSidePanelPinned}
         onClose={() => {
           setSidePanelVisible(false);
           setSidePanelTab('overview');
@@ -2097,62 +2397,6 @@ export default function SessionChatPage() {
           void openArtifactWindow(artifact.id, artifact.currentVersion);
         }}
       />
-      {sessionInsight.contextUsageRatio !== undefined ? (
-        <div
-          style={{
-            position: 'absolute',
-            right: 12,
-            top: 42,
-            zIndex: 10,
-            borderRadius: 8,
-            overflow: 'hidden',
-            border: '1px solid var(--semi-color-border)',
-            background: 'var(--semi-color-bg-1)',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-          }}
-        >
-          <Button
-            size="small"
-            theme="light"
-            style={{ border: 'none', borderRadius: 0, boxShadow: 'none' }}
-            onClick={() => setSidePanelVisible(!sidePanelVisible)}
-          >
-            {sidePanelVisible ? t('chat.collapseDashboard') : t('chat.expandDashboard')}
-          </Button>
-          <div style={{ height: 4, background: 'var(--semi-color-fill-0)' }}>
-            <div
-              style={{
-                height: '100%',
-                width: `${Math.round(sessionInsight.contextUsageRatio * 100)}%`,
-                minWidth: 8,
-                background:
-                  sessionInsight.contextUsageRatio > 0.8
-                    ? 'var(--semi-color-warning)'
-                    : sessionInsight.contextUsageRatio > 0.6
-                      ? 'var(--semi-color-primary)'
-                      : 'var(--semi-color-tertiary)',
-                borderRadius: '0 2px 2px 0',
-                transition: 'width 0.4s ease',
-              }}
-            />
-          </div>
-        </div>
-      ) : (
-        <Button
-          size="small"
-          theme="light"
-          style={{
-            position: 'absolute',
-            right: 12,
-            top: 42,
-            zIndex: 10,
-            borderRadius: 8,
-          }}
-          onClick={() => setSidePanelVisible(!sidePanelVisible)}
-        >
-          {sidePanelVisible ? t('chat.collapseDashboard') : t('chat.expandDashboard')}
-        </Button>
-      )}
       {pageDragActive ? (
         <div
           style={{

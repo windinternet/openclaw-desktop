@@ -522,7 +522,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
                             />
                           ) : (
                             <Tooltip content={formatSessionName(s)} mouseEnterDelay={0.6}>
-                              <span style={{ flex: 1, fontSize: 12, fontWeight: isCurrent ? 700 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isCurrent ? 'var(--semi-color-primary)' : 'var(--semi-color-text-0)' }}>
+                              <span className="sidebar-session-title" style={{ flex: 1, fontSize: 14, fontWeight: isCurrent ? 700 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isCurrent ? 'var(--semi-color-primary)' : 'var(--semi-color-text-0)' }}>
                                 {formatSessionName(s)}
                               </span>
                             </Tooltip>

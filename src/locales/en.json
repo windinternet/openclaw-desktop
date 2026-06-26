@@ -345,6 +345,17 @@
     "toggleDashboard": "Toggle Dashboard",
     "collapseDashboard": "Collapse Dashboard",
     "expandDashboard": "Expand Dashboard",
+    "collapseSessionDetails": "Collapse Session Details",
+    "expandSessionDetails": "Expand Session Details",
+    "pinDashboard": "Pin Session Details",
+    "unpinDashboard": "Unpin",
+    "header": {
+      "unknownSession": "Current Session",
+      "running": "Running",
+      "messageCount": "{{count}} messages",
+      "toolCount": "{{count}} tool calls",
+      "artifactCount": "{{count}} artifacts"
+    },
     "sidePanel": {
       "title": "Session Details",
       "overview": "Overview",
@@ -356,6 +367,7 @@
     "tool": {
       "arguments": "Arguments",
       "result": "Result",
+      "resultSummaryPrefix": "Result:",
       "rawStructure": "Raw Structure",
       "clickToView": "Click a tool call in the chat to view details",
       "toolCallWithStatus": "Tool Call: {{name}} ({{status}})"
@@ -722,6 +734,7 @@
     "nMinutesAgo": "{{count}}min ago",
     "nHoursAgo": "{{count}}h ago",
     "nDaysAgo": "{{count}}d ago",
+    "resizeHandle": "Resize sidebar",
     "labelSaveFailed": "Failed to save label: {{error}}"
   },
   "session": {

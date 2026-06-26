@@ -16,6 +16,7 @@ import {
   parseContextualUserMessage,
   parseSessionContextSnapshot,
   deriveSessionInsight,
+  summarizeToolResultForDisplay,
 } from '../lib/session-content';
 import { buildGatewayChatSendPayload, normalizeChatInputAttachments } from '../lib/chat-attachments';
 import type { SessionTimelineChat } from '../lib/session-content';
@@ -391,6 +392,12 @@ describe('session content helpers', () => {
         status: 'completed',
       }),
     );
+  });
+
+  it('summarizes tool results with readable fields instead of raw JSON shape names', () => {
+    expect(summarizeToolResultForDisplay('{"result":{"products":[{"title":"亚甲基蓝"}]}}')).toBe('亚甲基蓝');
+    expect(summarizeToolResultForDisplay('第一行输出\n第二行输出')).toBe('第一行输出');
+    expect(summarizeToolResultForDisplay('x'.repeat(120))).toBe(`${'x'.repeat(80)}...`);
   });
 
   it('uses the message index in history IDs when preserving OpenClaw message boundaries', () => {

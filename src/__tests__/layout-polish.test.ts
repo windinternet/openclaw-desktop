@@ -12,6 +12,49 @@ describe('chat configuration selects', () => {
       expect(source).toContain('{...configureSelectProps}');
     }
   });
+
+  it('moves the session dashboard control into a detail page header', () => {
+    const chat = readFileSync('src/pages/SessionChatPage.tsx', 'utf8');
+
+    expect(chat).toContain('function SessionHeader');
+    expect(chat).toContain('session-detail-header');
+    expect(chat).toContain('session-detail-context-progress');
+    expect(chat).toContain('onOpenDashboard');
+    expect(chat).toContain('chat.header');
+    expect(chat).not.toContain("position: 'absolute',\n            right: 12,\n            top: 42");
+  });
+
+  it('supports a clearer session detail entry and pinned detail panel mode', () => {
+    const chat = readFileSync('src/pages/SessionChatPage.tsx', 'utf8');
+
+    expect(chat).toContain('IconIndentLeft');
+    expect(chat).toContain('IconIndentRight');
+    expect(chat).toContain('function PinIcon');
+    expect(chat).toContain('theme="borderless"');
+    expect(chat).not.toContain("theme={dashboardOpen ? 'solid' : 'light'}");
+    expect(chat).not.toContain("theme={pinned ? 'solid' : 'borderless'}");
+    expect(chat).toContain('session-detail-pinned-panel');
+    expect(chat).toContain('sidePanelPinned');
+    expect(chat).toContain('onTogglePinned');
+    expect(chat).toContain('chat.pinDashboard');
+    expect(chat).toContain('chat.unpinDashboard');
+    expect(chat).toContain('chat.expandSessionDetails');
+  });
+
+  it('restores 14px session list labels and supports resizing the left sidebar', () => {
+    const sidebar = readFileSync('src/components/Sidebar.tsx', 'utf8');
+    const main = readFileSync('src/pages/MainPage.tsx', 'utf8');
+    const css = readFileSync('src/styles/global.css', 'utf8');
+
+    expect(sidebar).toContain('className="sidebar-session-title"');
+    expect(sidebar).toContain('fontSize: 14');
+    expect(main).toContain('SIDEBAR_DEFAULT_WIDTH = 300');
+    expect(main).toContain('sidebarWidth');
+    expect(main).toContain('handleSidebarResizeStart');
+    expect(main).toContain('className="sidebar-resize-handle"');
+    expect(css).toContain('.sidebar-resize-handle');
+    expect(css).toContain('cursor: col-resize;');
+  });
 });
 
 describe('3D office layout', () => {

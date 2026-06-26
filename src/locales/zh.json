@@ -345,6 +345,17 @@
     "toggleDashboard": "切换仪表盘",
     "collapseDashboard": "收起仪表盘",
     "expandDashboard": "展开会话仪表盘",
+    "collapseSessionDetails": "收起会话详情",
+    "expandSessionDetails": "展开会话详情",
+    "pinDashboard": "钉住会话详情",
+    "unpinDashboard": "取消钉住",
+    "header": {
+      "unknownSession": "当前会话",
+      "running": "进行中",
+      "messageCount": "{{count}} 条消息",
+      "toolCount": "{{count}} 个工具调用",
+      "artifactCount": "{{count}} 个产物"
+    },
     "sidePanel": {
       "title": "会话详情",
       "overview": "概况",
@@ -356,6 +367,7 @@
     "tool": {
       "arguments": "参数",
       "result": "结果",
+      "resultSummaryPrefix": "结果：",
       "rawStructure": "原始结构",
       "clickToView": "点击聊天中的工具调用查看详情",
       "toolCallWithStatus": "工具调用：{{name}}（{{status}}）"
@@ -722,6 +734,7 @@
     "nMinutesAgo": "{{count}}分钟前",
     "nHoursAgo": "{{count}}小时前",
     "nDaysAgo": "{{count}}天前",
+    "resizeHandle": "调整侧边栏宽度",
     "labelSaveFailed": "标签保存失败: {{error}}"
   },
   "session": {

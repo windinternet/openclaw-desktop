@@ -1,4 +1,5 @@
-import {useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
+import type {MouseEvent as ReactMouseEvent} from 'react';
 import {Button, Checkbox, Layout, Modal, Space, Tag, Toast, Typography} from '@douyinfe/semi-ui';
 import {Outlet} from 'react-router-dom';
 import {useTranslation} from 'react-i18next';
@@ -16,6 +17,20 @@ import ContentBackground from '../components/ContentBackground';
 const {Sider, Content} = Layout;
 const {Text} = Typography;
 const TOAST_DURATION_SECONDS = 5;
+const SIDEBAR_DEFAULT_WIDTH = 300;
+const SIDEBAR_MIN_WIDTH = 240;
+const SIDEBAR_MAX_WIDTH = 520;
+const SIDEBAR_WIDTH_STORAGE_KEY = 'openclaw-sidebar-width';
+
+function clampSidebarWidth(width: number): number {
+    return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(width)));
+}
+
+function loadSidebarWidth(): number {
+    const raw = localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
+    const parsed = raw ? Number(raw) : NaN;
+    return Number.isFinite(parsed) ? clampSidebarWidth(parsed) : SIDEBAR_DEFAULT_WIDTH;
+}
 
 export default function MainPage() {
     const {t} = useTranslation();
@@ -31,15 +46,21 @@ export default function MainPage() {
     const companionApprovalApproving = useStore((s) => s.companionApprovalApproving);
     const [addModalVisible, setAddModalVisible] = useState(false);
     const [drawerVisible, setDrawerVisible] = useState(false);
+    const [sidebarWidth, setSidebarWidth] = useState(loadSidebarWidth);
     const connectingRef = useRef(new Set<string>());
     const startupConnectionsStartedRef = useRef(false);
     const prevStatusRef = useRef<string | null>(null);
     const prevRetryAttemptRef = useRef(0);
     const lastErrorToastRef = useRef(0);
+    const sidebarResizeWidthRef = useRef(sidebarWidth);
     const companionCheckedRef = useRef(new Set<string>());
     const companionInstallDismissedRef = useRef(
         localStorage.getItem('openclaw-companion-install-dismissed') === '1'
     );
+
+    useEffect(() => {
+        sidebarResizeWidthRef.current = sidebarWidth;
+    }, [sidebarWidth]);
 
     useEffect(() => {
         if (!currentId && instances.length > 0) {
@@ -179,23 +200,66 @@ export default function MainPage() {
         });
     };
 
+    const handleSidebarResizeStart = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        const startX = event.clientX;
+        const startWidth = sidebarResizeWidthRef.current;
+        const previousCursor = document.body.style.cursor;
+        const previousUserSelect = document.body.style.userSelect;
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+
+        const handleMove = (moveEvent: MouseEvent) => {
+            const nextWidth = clampSidebarWidth(startWidth + moveEvent.clientX - startX);
+            sidebarResizeWidthRef.current = nextWidth;
+            setSidebarWidth(nextWidth);
+        };
+
+        const handleEnd = () => {
+            document.body.style.cursor = previousCursor;
+            document.body.style.userSelect = previousUserSelect;
+            window.removeEventListener('mousemove', handleMove);
+            localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarResizeWidthRef.current));
+        };
+
+        window.addEventListener('mousemove', handleMove);
+        window.addEventListener('mouseup', handleEnd, { once: true });
+    }, []);
+
+    const handleSidebarResizeReset = useCallback(() => {
+        sidebarResizeWidthRef.current = SIDEBAR_DEFAULT_WIDTH;
+        setSidebarWidth(SIDEBAR_DEFAULT_WIDTH);
+        localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(SIDEBAR_DEFAULT_WIDTH));
+    }, []);
+
     return (
         <Layout style={{height: '100vh', boxSizing: 'border-box'}}>
             <Sider
                 style={{
-                    flex: '0 0 300px',
-                    width: 300,
+                    flex: `0 0 ${sidebarWidth}px`,
+                    width: sidebarWidth,
+                    minWidth: SIDEBAR_MIN_WIDTH,
+                    maxWidth: SIDEBAR_MAX_WIDTH,
                     overflow: 'hidden',
                     backgroundColor: 'var(--semi-color-bg-1)',
                     display: 'flex',
                     flexDirection: 'column',
                     height: '100%',
                     flexShrink: 0,
+                    position: 'relative',
                 }}
             >
                 <Sidebar
                     onAddInstance={() => setAddModalVisible(true)}
                     onOpenDrawer={() => setDrawerVisible(true)}
+                />
+                <div
+                    aria-label={t('sidebar.resizeHandle')}
+                    aria-orientation="vertical"
+                    className="sidebar-resize-handle"
+                    role="separator"
+                    onDoubleClick={handleSidebarResizeReset}
+                    onMouseDown={handleSidebarResizeStart}
                 />
             </Sider>
             <Content

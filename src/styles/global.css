@@ -147,6 +147,34 @@ body,
   display: flex;
 }
 
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 30;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  -webkit-app-region: no-drag;
+}
+
+.sidebar-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 1px;
+  height: 100%;
+  background: transparent;
+  transition: background-color 0.16s ease, width 0.16s ease;
+}
+
+.sidebar-resize-handle:hover::after,
+.sidebar-resize-handle:active::after {
+  width: 2px;
+  background: var(--semi-color-primary);
+}
+
 .semi-navigation-vertical .semi-navigation-header-list-outer {
   height: unset !important;
 }

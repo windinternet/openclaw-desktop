@@ -387,6 +387,54 @@ function toolStatusLabel(status: unknown): string {
   return normalized || '进行中';
 }
 
+function firstReadableValue(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (!isRecord(value) && !Array.isArray(value)) return '';
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const text = firstReadableValue(item);
+      if (text) return text;
+    }
+    return '';
+  }
+
+  const priorityKeys = ['title', 'summary', 'message', 'text', 'content', 'stdout', 'stderr', 'output', 'result'];
+  for (const key of priorityKeys) {
+    if (key in value) {
+      const text = firstReadableValue(value[key]);
+      if (text) return text;
+    }
+  }
+
+  for (const item of Object.values(value)) {
+    const text = firstReadableValue(item);
+    if (text) return text;
+  }
+  return '';
+}
+
+export function summarizeToolResultForDisplay(toolResult: unknown, maxLength = 80): string {
+  const rawText = typeof toolResult === 'string' ? toolResult : firstReadableValue(toolResult);
+  if (!rawText) return '';
+
+  let text = rawText;
+  try {
+    text = firstReadableValue(JSON.parse(rawText)) || rawText;
+  } catch {
+    // Plain text output is already useful.
+  }
+
+  const singleLine = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean) ?? '';
+  const normalized = singleLine.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength)}...`;
+}
+
 function visibleToolCallContent(toolCall: ChatToolCallContent): ChatToolCallContent {
   return {
     ...toolCall,
