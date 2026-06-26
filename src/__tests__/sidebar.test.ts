@@ -22,6 +22,13 @@ describe('Sidebar session list', () => {
     expect(source).toContain("color: isCurrent ? 'var(--semi-color-primary)' : 'var(--semi-color-text-0)'");
   });
 
+  it('hides generated dashboard session label suffixes in display names', () => {
+    const source = readFileSync('src/components/Sidebar.tsx', 'utf8');
+
+    expect(source).toContain('stripGeneratedSessionLabelSuffix');
+    expect(source).toContain('const sessionKey = s.key || s.sessionKey ||');
+  });
+
   it('anchors the user info popover bottom near the mouse', () => {
     const source = readFileSync('src/components/Sidebar.tsx', 'utf8');
 

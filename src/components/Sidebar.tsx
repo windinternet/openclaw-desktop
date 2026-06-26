@@ -25,6 +25,7 @@ import { useStore } from '../lib';
 import { useSettingsStore } from '../lib/settings-store';
 import { decodeSessionKeyParam } from '../lib/session-content';
 import { filterUserVisibleSessions } from '../lib/ai-action-center';
+import { stripGeneratedSessionLabelSuffix } from '../lib/session-label';
 import {
   getActiveNavKey,
   NAV_GROUPS,
@@ -398,8 +399,9 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
   }, []);
 
   const formatSessionName = (s: typeof sessions[0]): string => {
-    if (s.label) return s.label;
-    if (s.title) return s.title;
+    const sessionKey = s.key || s.sessionKey || '';
+    if (s.label) return stripGeneratedSessionLabelSuffix(s.label, sessionKey);
+    if (s.title) return stripGeneratedSessionLabelSuffix(s.title, sessionKey);
     const key = s.key || '';
     // 主会话
     if (key === 'agent:main:main') return t('session.mainSession');
