@@ -596,6 +596,14 @@ describe('agentic repository storage and templates', () => {
       mainPage.indexOf('detectDesktopCompanionForInstance(currentId).then'),
       mainPage.indexOf('return () => {', mainPage.indexOf('detectDesktopCompanionForInstance(currentId).then')),
     );
+    const beforeDetection = mainPage.slice(
+      mainPage.indexOf('if (companionCheckedRef.current.has(currentId)) return;'),
+      mainPage.indexOf('detectDesktopCompanionForInstance(currentId).then'),
+    );
+    const missingCompanionBranch = detectionThen.slice(
+      detectionThen.indexOf("if (info.status === 'missing' || info.status === 'disabled')"),
+      detectionThen.indexOf('const detail = info.message'),
+    );
     const readyLine = gate.match(/const ready = .*/)?.[0] ?? '';
 
     expect(store).toContain('syncRepositoryContextForInstance');
@@ -604,9 +612,11 @@ describe('agentic repository storage and templates', () => {
     expect(connectedBranch).toContain('syncRepositoryContextForInstance(instance.id)');
     expect(store).toContain('console.warn(\'[syncRepositoryContextForInstance]\'');
     expect(mainPage).toContain('syncRepositoryContextForInstance(currentId)');
+    expect(beforeDetection).not.toContain('companionInstallDismissedRef.current');
     expect(detectionThen).toContain("if (info.status === 'ready')");
     expect(detectionThen).toContain('syncRepositoryContextForInstance(currentId)');
     expect(detectionThen).toContain("info.status === 'missing' || info.status === 'disabled'");
+    expect(missingCompanionBranch).toContain('if (companionInstallDismissedRef.current) return;');
     expect(gate).toContain('syncRepositoryContextToAgentFiles');
     expect(gate).toContain('repositoryGate.syncRepositoryRules');
     expect(gate).toContain('binding.gatewayInstanceId === currentInstanceId');

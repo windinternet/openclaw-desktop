@@ -120,7 +120,6 @@ export default function MainPage() {
             return;
         }
         if (companionCheckedRef.current.has(currentId)) return;
-        if (companionInstallDismissedRef.current) return;
 
         companionCheckedRef.current.add(currentId);
         let cancelled = false;
@@ -133,6 +132,8 @@ export default function MainPage() {
                 return;
             }
             if (info.status === 'missing' || info.status === 'disabled') {
+                if (companionInstallDismissedRef.current) return;
+
                 const handleInstallSession = () => {
                     void useStore.getState().createDesktopCompanionInstallSessionForInstance(currentId).then((result) => {
                         Toast.success(`已创建安装会话：${result.sessionKey}`);
