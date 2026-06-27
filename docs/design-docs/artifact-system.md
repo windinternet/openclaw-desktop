@@ -18,6 +18,7 @@
 - AI 魔法创建保存产物时会以 `action_run` 作为来源，并把产物 ID 回写到对应 ActionRun。
 - ActionRun 仓库摘要会尽量解析本次运行生成的 Artifact meta，列出产物标题、类型、Artifact 引用和 Repository output / preview 路径；读取不到 meta 时退回产物 ID。
 - HTML 产物生成和追加时会记录 `htmlAudit`，标记自包含状态、审批需求和检查项。
+- HTML 产物运行时授权决策会回写到 Artifact meta 的 `authEvents`，记录能力、目标、授权结果、授权级别和请求/决策时间。
 - Repository output markdown 会沉淀 HTML 审计摘要，Artifacts UI 会显示非自包含和需审批提示。
 - 文件、图片、音频、视频等非 HTML 产物可记录 `filePath` 或 `url`，打开时交给系统文件处理器或外部 URL 处理器。
 - 手动创建文件型产物时，填写本地 `filePath` 会复制一份到 Artifact storage，并记录 `originalFilePath`。
@@ -25,7 +26,7 @@
 仍需继续收口：
 
 - 继续扩展非 AI 魔法创建入口的 ActionRun 产物自动关联。
-- 继续补齐 HTML 产物运行时审批闭环，让 `htmlAudit` 与实际 Desktop Bridge 授权记录互相印证。
+- 继续补齐 HTML 产物 Desktop Bridge 实际执行能力，让授权记录进一步连接到具体调用结果。
 - 补 Office 文件型产物的缩略图/摘要预览和更细的来源记录。
 - 把可复用资产、模板、工具、脚本提升为一等管理对象。
 
@@ -97,6 +98,7 @@ HTML 产物约束：
 - 默认不依赖外部 CDN。
 - 需要本地能力、网络、文件读写或命令执行时必须走 Desktop Bridge 和审批。
 - Desktop 会记录 `htmlAudit`，用于标记非自包含资源和需要审批的运行能力。
+- Desktop 会记录 `authEvents`，用于保存运行时 Desktop Bridge 授权或拒绝记录。
 - 可以镜像到 Repository `outputs/html/`。
 
 ## 4. 与 Repository outputs 的关系

@@ -311,6 +311,34 @@ export default function ArtifactDetailPage() {
                   )}
                 </div>
               )}
+              {meta.authEvents && meta.authEvents.length > 0 && (
+                <div>
+                  <Text type="tertiary">{t('artifact.runtimeAuth')}: </Text>
+                  <Tag
+                    size="small"
+                    color={meta.authEvents[meta.authEvents.length - 1].granted ? 'green' : 'red'}
+                    type="light"
+                  >
+                    {meta.authEvents[meta.authEvents.length - 1].granted
+                      ? t('artifact.runtimeAuthGranted')
+                      : t('artifact.runtimeAuthDenied')}
+                  </Tag>
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <Text type="tertiary" size="small">
+                      {t('artifact.runtimeAuthCount', { count: meta.authEvents.length })}
+                    </Text>
+                    {meta.authEvents
+                      .slice(-3)
+                      .reverse()
+                      .map((event) => (
+                        <Text key={event.id} size="small" type="secondary">
+                          {event.capability} · {event.level}
+                          {event.detail ? ` · ${event.detail}` : ''}
+                        </Text>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </Card>

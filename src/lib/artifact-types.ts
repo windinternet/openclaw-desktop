@@ -53,6 +53,18 @@ export interface ArtifactHtmlAudit {
   checkedAt: number;
 }
 
+export type AuthLevel = 'once' | 'session' | 'artifact' | 'global';
+
+export interface ArtifactRuntimeAuthEvent {
+  id: string;
+  capability: string;
+  detail: string;
+  granted: boolean;
+  level: AuthLevel | string;
+  requestedAt: number;
+  decidedAt: number;
+}
+
 export interface ArtifactMeta {
   id: string;
   title: string;
@@ -78,6 +90,7 @@ export interface ArtifactMeta {
   repositoryOutputPath?: string;
   repositoryPreviewPath?: string;
   htmlAudit?: ArtifactHtmlAudit;
+  authEvents?: ArtifactRuntimeAuthEvent[];
 }
 
 export interface VersionEntry {
@@ -87,8 +100,6 @@ export interface VersionEntry {
   sourceStep?: string;
   createdAt: number;
 }
-
-export type AuthLevel = 'once' | 'session' | 'artifact' | 'global';
 
 export interface ArtifactAuth {
   grants: Record<string, AuthLevel>;

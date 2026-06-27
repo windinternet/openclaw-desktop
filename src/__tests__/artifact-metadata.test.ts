@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ArtifactSource } from '../lib/artifact-types';
+import type { ArtifactMeta, ArtifactSource } from '../lib/artifact-types';
 import { saveArtifactFromChat } from '../lib/artifact-parser';
 import { buildOutputMarkdown } from '../lib/repository-outputs';
 import { artifactService } from '../lib/artifact-service';
@@ -106,6 +106,39 @@ describe('artifact metadata', () => {
     expect(markdown).toContain('htmlSelfContained: false');
     expect(markdown).toContain('htmlRequiresApproval: true');
     expect(markdown).toContain('htmlIssueCount: 1');
+  });
+
+  it('serializes HTML runtime authorization records into repository output markdown', () => {
+    const artifact: ArtifactMeta = {
+      id: 'art_1',
+      title: '交互报告',
+      icon: '📊',
+      type: 'report',
+      source: { type: 'action_run', id: 'run_1' },
+      tags: [],
+      currentVersion: 1,
+      status: 'draft',
+      createdAt: 1,
+      updatedAt: 2,
+      authEvents: [
+        {
+          id: 'auth_1',
+          capability: 'readFile',
+          detail: '/Users/deepin/report.csv',
+          granted: true,
+          level: 'artifact',
+          requestedAt: 1,
+          decidedAt: 2,
+        },
+      ],
+    };
+
+    const markdown = buildOutputMarkdown(artifact);
+
+    expect(markdown).toContain('runtimeAuthCount: 1');
+    expect(markdown).toContain('runtimeAuthLastCapability: readFile');
+    expect(markdown).toContain('runtimeAuthLastGranted: true');
+    expect(markdown).toContain('runtimeAuthLastLevel: artifact');
   });
 
   it('serializes imported file metadata into repository output markdown', () => {

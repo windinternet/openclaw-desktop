@@ -28,6 +28,9 @@ const TYPE_DIR: Record<string, string> = {
 };
 
 export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string): string {
+  const runtimeAuthEvents = artifact.authEvents ?? [];
+  const lastRuntimeAuth = runtimeAuthEvents[runtimeAuthEvents.length - 1];
+
   return [
     `# ${artifact.title}`,
     '',
@@ -42,6 +45,11 @@ export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string
     artifact.htmlAudit ? `htmlSelfContained: ${artifact.htmlAudit.selfContained}` : undefined,
     artifact.htmlAudit ? `htmlRequiresApproval: ${artifact.htmlAudit.requiresApproval}` : undefined,
     artifact.htmlAudit ? `htmlIssueCount: ${artifact.htmlAudit.issues.length}` : undefined,
+    runtimeAuthEvents.length > 0 ? `runtimeAuthCount: ${runtimeAuthEvents.length}` : undefined,
+    lastRuntimeAuth ? `runtimeAuthLastCapability: ${lastRuntimeAuth.capability}` : undefined,
+    lastRuntimeAuth ? `runtimeAuthLastGranted: ${lastRuntimeAuth.granted}` : undefined,
+    lastRuntimeAuth ? `runtimeAuthLastLevel: ${lastRuntimeAuth.level}` : undefined,
+    lastRuntimeAuth ? `runtimeAuthLastAt: ${new Date(lastRuntimeAuth.decidedAt).toISOString()}` : undefined,
     artifact.fileName ? `fileName: ${artifact.fileName}` : undefined,
     artifact.filePath ? `filePath: ${artifact.filePath}` : undefined,
     artifact.originalFilePath ? `originalFilePath: ${artifact.originalFilePath}` : undefined,

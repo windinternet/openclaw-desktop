@@ -4,6 +4,7 @@ import { readFileSync, existsSync, mkdirSync, writeFileSync, copyFileSync, statS
 import os from 'node:os'
 import { ARTIFACT_IPC } from '../src/lib/artifact-ipc'
 import { decideArtifactOpenTarget } from '../src/lib/artifact-open-target'
+import { recordArtifactAuthDecision } from '../src/lib/artifact-runtime-auth'
 import type { ArtifactMeta } from '../src/lib/artifact-types'
 
 function artifactsRoot(): string {
@@ -75,6 +76,29 @@ function readMeta(artifactId: string): ArtifactMeta | null {
   const fp = metaPath(artifactId)
   if (!existsSync(fp)) return null
   return JSON.parse(readFileSync(fp, 'utf-8'))
+}
+
+function writeMeta(artifactId: string, meta: ArtifactMeta): void {
+  const dir = artifactDir(artifactId)
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+  writeFileSync(metaPath(artifactId), JSON.stringify(meta, null, 2))
+}
+
+function readIndex(): ArtifactMeta[] {
+  const fp = indexPath()
+  if (!existsSync(fp)) return []
+  const value = JSON.parse(readFileSync(fp, 'utf-8'))
+  return Array.isArray(value) ? value : []
+}
+
+function writeIndexEntry(meta: ArtifactMeta): void {
+  const root = artifactsRoot()
+  if (!existsSync(root)) mkdirSync(root, { recursive: true })
+  const index = readIndex()
+  const existingIndex = index.findIndex((item) => item.id === meta.id)
+  if (existingIndex >= 0) index[existingIndex] = meta
+  else index.push(meta)
+  writeFileSync(indexPath(), JSON.stringify(index, null, 2))
 }
 
 function sanitizeFileName(fileName: string): string {
@@ -163,9 +187,7 @@ export function registerArtifactIpcHandlers(): void {
   })
 
   ipcMain.handle(ARTIFACT_IPC.SAVE_META, async (_event, artifactId: string, meta: ArtifactMeta) => {
-    const dir = artifactDir(artifactId)
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    writeFileSync(metaPath(artifactId), JSON.stringify(meta, null, 2))
+    writeMeta(artifactId, meta)
   })
 
   ipcMain.handle(ARTIFACT_IPC.SAVE_HTML, async (_event, artifactId: string, version: number, html: string) => {
@@ -209,21 +231,45 @@ export function registerArtifactIpcHandlers(): void {
   })
 
   ipcMain.handle(ARTIFACT_IPC.REQUEST_AUTH, async (_event, artifactId: string, capability: string, detail: string) => {
+    const requestedAt = Date.now()
+    const recordDecision = (result: { granted: boolean; level: string }) => {
+      const decidedAt = Date.now()
+      const meta = readMeta(artifactId)
+      if (meta) {
+        const updatedMeta = recordArtifactAuthDecision(meta, {
+          capability,
+          detail,
+          granted: result.granted,
+          level: result.level,
+          requestedAt,
+          decidedAt,
+        })
+        writeMeta(artifactId, updatedMeta)
+        writeIndexEntry(updatedMeta)
+      }
+      return result
+    }
+
     const allWindows = BrowserWindow.getAllWindows()
     const mainWindow = allWindows[0]
-    if (!mainWindow) return { granted: false, level: 'once' }
+    if (!mainWindow) return recordDecision({ granted: false, level: 'once' })
 
     return new Promise<{ granted: boolean; level: string }>((resolve) => {
-      const handler = (_e: unknown, result: { granted: boolean; level: string }) => {
+      let settled = false
+      let timeout: ReturnType<typeof setTimeout> | undefined
+      const settle = (result: { granted: boolean; level: string }) => {
+        if (settled) return
+        settled = true
+        if (timeout) clearTimeout(timeout)
         ipcMain.removeListener(ARTIFACT_IPC.GRANT_AUTH, handler)
-        resolve(result)
+        resolve(recordDecision(result))
+      }
+      const handler = (_e: unknown, result: { granted: boolean; level: string }) => {
+        settle(result)
       }
       ipcMain.on(ARTIFACT_IPC.GRANT_AUTH, handler)
       mainWindow.webContents.send(ARTIFACT_IPC.REQUEST_AUTH, artifactId, capability, detail)
-      setTimeout(() => {
-        ipcMain.removeListener(ARTIFACT_IPC.GRANT_AUTH, handler)
-        resolve({ granted: false, level: 'once' })
-      }, 60000)
+      timeout = setTimeout(() => settle({ granted: false, level: 'once' }), 60000)
     })
   })
 }
