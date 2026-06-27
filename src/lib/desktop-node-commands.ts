@@ -1,6 +1,7 @@
 import type { ArtifactType } from './artifact-types';
 import { artifactService } from './artifact-service';
 import { artifactPersistence } from './artifact-persistence';
+import { buildArtifactReuseReference } from './artifact-reference';
 import { createDefaultRepositoryBinding, getRepositoryGateStatus } from './agentic-repository';
 import {
   buildArtifactRepositoryOutputUpdates,
@@ -427,6 +428,32 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
     if (!htmlChunk) return invalidParams('htmlChunk is required');
     await artifactService.append(artifactId, htmlChunk);
     return { ok: true, artifactId };
+  }
+
+  if (command === 'desktop.artifacts.describe') {
+    const artifactId = stringValue(params.artifactId);
+    if (!artifactId) return invalidParams('artifactId is required');
+    const artifact = await artifactPersistence.loadMeta(artifactId);
+    if (!artifact) return { ok: false, error: 'not-found', artifactId };
+    const reference = buildArtifactReuseReference(artifact);
+    return {
+      ok: true,
+      artifact: {
+        id: artifact.id,
+        title: artifact.title,
+        type: artifact.type,
+        uri: reference.uri,
+        currentVersion: artifact.currentVersion,
+        status: artifact.status,
+        externalFormat: artifact.externalFormat,
+        contentSummary: artifact.contentSummary,
+        repositoryOutputPath: artifact.repositoryOutputPath,
+        repositoryPreviewPath: artifact.repositoryPreviewPath,
+        fileName: artifact.fileName,
+        url: artifact.url,
+      },
+      reference: reference.markdown,
+    };
   }
 
   if (command === 'desktop.artifacts.update') {

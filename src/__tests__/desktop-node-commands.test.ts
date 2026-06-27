@@ -210,6 +210,41 @@ describe('desktop node commands', () => {
     expect(mockedArtifactPersistence.openWindow).toHaveBeenCalledWith('art_2', 3);
   });
 
+  it('describes an artifact with a reusable reference for Gateway chats', async () => {
+    mockedArtifactPersistence.loadMeta.mockResolvedValue({
+      id: 'art_2',
+      title: '成果',
+      icon: '📊',
+      type: 'report',
+      source: { type: 'action_run', id: 'action-1', name: 'weekly_review' },
+      tags: [],
+      currentVersion: 1,
+      status: 'draft',
+      createdAt: 1,
+      updatedAt: 1,
+      contentSummary: 'HTML · 交互式报告',
+      repositoryOutputPath: 'outputs/reports/art_2.md',
+      repositoryPreviewPath: 'outputs/html/art_2.html',
+    });
+
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.describe', {
+        artifactId: 'art_2',
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      artifact: expect.objectContaining({
+        id: 'art_2',
+        title: '成果',
+        type: 'report',
+        uri: 'artifact://art_2',
+        repositoryOutputPath: 'outputs/reports/art_2.md',
+        repositoryPreviewPath: 'outputs/html/art_2.html',
+      }),
+      reference: expect.stringContaining('[成果](artifact://art_2)'),
+    });
+  });
+
   it('updates and mirrors a repository output through artifact compatibility', async () => {
     const artifact = {
       id: 'art_2',

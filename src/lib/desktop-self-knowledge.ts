@@ -67,6 +67,8 @@ export function buildDesktopSelfKnowledgeSkillContent(): string {
     '',
     'When an ActionRun produces a file-like Artifact block, its JSON header may include `filePath`, `fileName`, `fileSize`, `mimeType`, `externalFormat`, `contentSummary`, and `importFile`. Use `importFile: true` only when the ActionRun is allowed to import that local file. If a repository binding is ready, Desktop mirrors the resulting file Artifact metadata into `outputs/files/` and links it from the ActionRun summary.',
     '',
+    'Use `artifact://<artifactId>` as the stable reference for an existing Artifact. Desktop can copy a reusable Markdown reference from the Artifact detail page, and Gateway can call `desktop.artifacts.describe` to retrieve the same reference with title, type, value summary, source, repository output / preview paths, and file or URL clues.',
+    '',
     'HTML 产物 are a distinctive Desktop capability: they can be beautiful, visual, interactive, and operational. HTML Artifacts should be 完整自包含, use inline CSS and necessary JavaScript, avoid external CDNs by default, and request approval before using local files, network, commands, or Desktop Bridge.',
     '',
     'Desktop records an `htmlAudit` summary for saved HTML Artifacts. It marks whether the HTML is self-contained, whether runtime approval is required, and which external resources or Desktop Bridge capabilities were detected. Desktop also writes runtime authorization records and runtime bridge call records back to Artifact metadata when a user grants, denies, or runs Desktop Bridge access.',

@@ -30,6 +30,9 @@ describe('artifact UI metadata', () => {
     expect(detailPage).toContain("t('artifact.contentSummary')");
     expect(detailPage).toContain('externalFormat');
     expect(detailPage).toContain("t('artifact.externalFormat')");
+    expect(detailPage).toContain('buildArtifactReuseReference');
+    expect(detailPage).toContain("t('artifact.copyReference')");
+    expect(detailPage).toContain("t('artifact.referenceCopied')");
     expect(zh.artifact.repositoryOutput).toBeTruthy();
     expect(zh.artifact.repositoryPreview).toBeTruthy();
     expect(zh.artifact.htmlAudit).toBeTruthy();
@@ -40,6 +43,8 @@ describe('artifact UI metadata', () => {
     expect(zh.artifact.runtimeBridge).toBeTruthy();
     expect(zh.artifact.contentSummary).toBeTruthy();
     expect(zh.artifact.externalFormat).toBeTruthy();
+    expect(zh.artifact.copyReference).toBeTruthy();
+    expect(zh.artifact.referenceCopied).toBeTruthy();
     expect(en.artifact.repositoryOutput).toBeTruthy();
     expect(en.artifact.repositoryPreview).toBeTruthy();
     expect(en.artifact.htmlAudit).toBeTruthy();
@@ -50,5 +55,7 @@ describe('artifact UI metadata', () => {
     expect(en.artifact.runtimeBridge).toBeTruthy();
     expect(en.artifact.contentSummary).toBeTruthy();
     expect(en.artifact.externalFormat).toBeTruthy();
+    expect(en.artifact.copyReference).toBeTruthy();
+    expect(en.artifact.referenceCopied).toBeTruthy();
   });
 });

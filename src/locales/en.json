@@ -753,6 +753,8 @@
     "current": "Current",
     "noVersions": "No versions",
     "actions": "Actions",
+    "copyReference": "Copy reference",
+    "referenceCopied": "Artifact reference copied",
     "delete": "Delete artifact",
     "deleteConfirm": "Delete this artifact?",
     "regen": "Regenerate from this",

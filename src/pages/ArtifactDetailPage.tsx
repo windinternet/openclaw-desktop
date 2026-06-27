@@ -5,6 +5,7 @@ import { IconArrowLeft, IconPlay, IconDeleteStroked, IconRefresh } from '@douyin
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
 import type { ArtifactMeta } from '../lib/artifact-types';
+import { buildArtifactReuseReference } from '../lib/artifact-reference';
 
 const { Text, Title } = Typography;
 
@@ -59,6 +60,11 @@ export default function ArtifactDetailPage() {
     await deleteArtifact(artifactId);
     navigate('/artifacts');
     Toast.success(t('artifact.deleted'));
+  };
+
+  const handleCopyReference = async () => {
+    await navigator.clipboard.writeText(buildArtifactReuseReference(meta).markdown);
+    Toast.success(t('artifact.referenceCopied'));
   };
 
   return (
@@ -391,6 +397,7 @@ export default function ArtifactDetailPage() {
       <div style={{ marginTop: 24 }}>
         <Card title={t('artifact.actions')}>
           <div style={{ display: 'flex', gap: 12 }}>
+            <Button onClick={handleCopyReference}>{t('artifact.copyReference')}</Button>
             <Button icon={<IconRefresh />} onClick={() => Toast.info(t('artifact.regenNotImplemented'))}>
               {t('artifact.regen')}
             </Button>

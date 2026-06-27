@@ -753,6 +753,8 @@
     "current": "当前",
     "noVersions": "暂无版本",
     "actions": "操作",
+    "copyReference": "复制引用",
+    "referenceCopied": "产物引用已复制",
     "delete": "删除产物",
     "deleteConfirm": "确认删除产物？",
     "regen": "基于此重新生成",

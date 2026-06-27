@@ -336,23 +336,10 @@ desktopCompanion.plugin.uninstall
 
 ```text
 desktop.artifacts.create
+desktop.artifacts.describe
 desktop.artifacts.open
 desktop.artifacts.update
 desktop.artifacts.append
-desktop.notify
-```
-
-未来应扩展能力组：
-
-```text
-repository
-outputs
-desktop-files
-```
-
-建议新增窄命令：
-
-```text
 desktop.repository.status
 desktop.repository.init
 desktop.repository.read
@@ -360,12 +347,21 @@ desktop.repository.write
 desktop.repository.search
 desktop.repository.git.status
 desktop.repository.git.diff
+desktop.repository.git.log
 desktop.repository.git.commit
-
+desktop.repository.session-summary.write
 desktop.outputs.create
 desktop.outputs.open
 desktop.outputs.update
 desktop.outputs.append
+desktop.notify
+```
+
+当前能力组：
+
+```text
+repository
+outputs
 ```
 
 不得提供泛化 shell；所有命令必须结构化、可审计、可审批。
