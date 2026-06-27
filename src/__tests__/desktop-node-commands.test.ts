@@ -76,6 +76,68 @@ describe('desktop node commands', () => {
     );
   });
 
+  it('creates a non-HTML artifact from a node command with reusable value metadata', async () => {
+    mockedArtifactService.generate.mockResolvedValue({
+      id: 'art_file',
+      title: '路线图 PPT',
+      icon: '📎',
+      type: 'file',
+      source: { type: 'mcp_tool' },
+      tags: ['roadmap'],
+      currentVersion: 1,
+      status: 'draft',
+      createdAt: 1,
+      updatedAt: 1,
+      filePath: '/artifact-storage/art_file/files/roadmap.pptx',
+      originalFilePath: '/Users/deepin/Documents/roadmap.pptx',
+      fileName: 'roadmap.pptx',
+      fileSize: 4096,
+      mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      externalFormat: 'powerpoint',
+      contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+    });
+
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.create', {
+        title: '路线图 PPT',
+        type: 'file',
+        description: '季度路线图',
+        tags: ['roadmap'],
+        filePath: '/Users/deepin/Documents/roadmap.pptx',
+        fileName: 'roadmap.pptx',
+        fileSize: 4096,
+        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        externalFormat: 'powerpoint',
+        contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+        importFile: true,
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      artifact: {
+        id: 'art_file',
+        title: '路线图 PPT',
+        currentVersion: 1,
+      },
+    });
+
+    expect(mockedArtifactService.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: '路线图 PPT',
+        type: 'file',
+        description: '季度路线图',
+        tags: ['roadmap'],
+        filePath: '/Users/deepin/Documents/roadmap.pptx',
+        fileName: 'roadmap.pptx',
+        fileSize: 4096,
+        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        externalFormat: 'powerpoint',
+        contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+        importFile: true,
+        source: { type: 'mcp_tool', name: 'desktop.artifacts.create' },
+      }),
+    );
+  });
+
   it('mirrors legacy artifact creation into repository outputs when repoPath is provided', async () => {
     mockedArtifactService.generate.mockResolvedValue({
       id: 'art_legacy',
@@ -180,6 +242,85 @@ describe('desktop node commands', () => {
     expect(mockedArtifactService.update).toHaveBeenCalledWith('art_2', {
       repositoryOutputPath: 'outputs/reports/art_2.md',
       repositoryPreviewPath: 'outputs/html/art_2.html',
+    });
+  });
+
+  it('creates a file repository output from a node command with file metadata', async () => {
+    mockedArtifactService.generate.mockResolvedValue({
+      id: 'art_file',
+      title: '路线图 PPT',
+      icon: '📎',
+      type: 'file',
+      source: { type: 'mcp_tool' },
+      tags: ['roadmap'],
+      currentVersion: 1,
+      status: 'draft',
+      createdAt: 1,
+      updatedAt: 1,
+      filePath: '/artifact-storage/art_file/files/roadmap.pptx',
+      originalFilePath: '/Users/deepin/Documents/roadmap.pptx',
+      fileName: 'roadmap.pptx',
+      fileSize: 4096,
+      mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      externalFormat: 'powerpoint',
+      contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+    });
+    mockedCreateRepositoryOutput.mockResolvedValue({
+      outputId: 'art_file',
+      outputPath: 'outputs/files/art_file.md',
+    });
+
+    await expect(
+      handleDesktopNodeCommand('desktop.outputs.create', {
+        repoPath: '/repo',
+        gatewayInstanceId: 'inst-1',
+        title: '路线图 PPT',
+        type: 'file',
+        filePath: '/Users/deepin/Documents/roadmap.pptx',
+        fileName: 'roadmap.pptx',
+        fileSize: 4096,
+        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        importFile: true,
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      artifact: {
+        id: 'art_file',
+        title: '路线图 PPT',
+        currentVersion: 1,
+      },
+      output: {
+        outputId: 'art_file',
+        path: 'outputs/files/art_file.md',
+        previewPath: undefined,
+      },
+    });
+
+    expect(mockedArtifactService.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'file',
+        filePath: '/Users/deepin/Documents/roadmap.pptx',
+        fileName: 'roadmap.pptx',
+        fileSize: 4096,
+        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        importFile: true,
+        source: { type: 'mcp_tool', name: 'desktop.outputs.create' },
+      }),
+    );
+    expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(
+      expect.objectContaining({
+        artifact: expect.objectContaining({
+          id: 'art_file',
+          filePath: '/artifact-storage/art_file/files/roadmap.pptx',
+          contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+        }),
+        html: undefined,
+        binding: expect.objectContaining({ repoPath: '/repo', gatewayInstanceId: 'inst-1' }),
+      }),
+    );
+    expect(mockedArtifactService.update).toHaveBeenCalledWith('art_file', {
+      repositoryOutputPath: 'outputs/files/art_file.md',
+      repositoryPreviewPath: undefined,
     });
   });
 

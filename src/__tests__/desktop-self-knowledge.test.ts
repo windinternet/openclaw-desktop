@@ -37,6 +37,8 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('outputs/files/');
     expect(skillContent).toContain('artifact://<artifactId>');
     expect(skillContent).toContain('desktop.artifacts.describe');
+    expect(skillContent).toContain('desktop.outputs.create');
+    expect(skillContent).toContain('externalFormat');
     expect(skillContent).toContain('system file handler');
     expect(skillContent).toContain('imported into Artifact storage');
     expect(skillContent).toContain('contentSummary');

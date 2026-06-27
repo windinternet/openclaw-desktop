@@ -1,5 +1,5 @@
-import type { ArtifactType } from './artifact-types';
-import { artifactService } from './artifact-service';
+import type { ArtifactExternalFormat, ArtifactType } from './artifact-types';
+import { artifactService, type GenerateParams } from './artifact-service';
 import { artifactPersistence } from './artifact-persistence';
 import { buildArtifactReuseReference } from './artifact-reference';
 import { createDefaultRepositoryBinding, getRepositoryGateStatus } from './agentic-repository';
@@ -25,6 +25,35 @@ const ARTIFACT_TYPES = new Set<ArtifactType>([
   'audio',
   'image',
   'video',
+]);
+
+const ARTIFACT_EXTERNAL_FORMATS = new Set<ArtifactExternalFormat>([
+  'html',
+  'link',
+  'app',
+  'word',
+  'excel',
+  'powerpoint',
+  'pdf',
+  'image',
+  'audio',
+  'video',
+  'text',
+  'code',
+  'file',
+  'unknown',
+]);
+
+const HTML_ARTIFACT_TYPES = new Set<ArtifactType>([
+  'report',
+  'dashboard',
+  'analysis',
+  'checklist',
+  'code',
+  'document',
+  'slide',
+  'form',
+  'other',
 ]);
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -54,6 +83,20 @@ function stringArrayValue(value: unknown): string[] {
 
 function artifactTypeValue(value: unknown): ArtifactType {
   return typeof value === 'string' && ARTIFACT_TYPES.has(value as ArtifactType) ? (value as ArtifactType) : 'other';
+}
+
+function artifactExternalFormatValue(value: unknown): ArtifactExternalFormat | undefined {
+  return typeof value === 'string' && ARTIFACT_EXTERNAL_FORMATS.has(value as ArtifactExternalFormat)
+    ? (value as ArtifactExternalFormat)
+    : undefined;
+}
+
+function booleanValue(value: unknown): boolean | undefined {
+  if (typeof value === 'boolean') return value;
+  if (typeof value !== 'string') return undefined;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return undefined;
 }
 
 function invalidParams(message: string): { ok: false; error: 'invalid-params'; message: string } {
@@ -128,6 +171,27 @@ async function recordRepositoryOutput(artifactId: string, output: RepositoryOutp
   await artifactService.update(artifactId, buildArtifactRepositoryOutputUpdates(output));
 }
 
+function buildArtifactGenerateParams(params: Record<string, unknown>, command: string): GenerateParams {
+  return {
+    title: stringValue(params.title) ?? '',
+    html: stringValue(params.html),
+    type: artifactTypeValue(params.type),
+    icon: stringValue(params.icon),
+    description: stringValue(params.description),
+    tags: tagsValue(params.tags),
+    url: stringValue(params.url),
+    command: stringValue(params.command),
+    filePath: stringValue(params.filePath),
+    fileName: stringValue(params.fileName),
+    fileSize: numberValue(params.fileSize),
+    mimeType: stringValue(params.mimeType),
+    externalFormat: artifactExternalFormatValue(params.externalFormat),
+    contentSummary: stringValue(params.contentSummary),
+    importFile: booleanValue(params.importFile),
+    source: { type: 'mcp_tool', name: command },
+  };
+}
+
 export async function handleDesktopNodeCommand(command: string, params: unknown): Promise<unknown> {
   if (!isObject(params)) {
     return invalidParams('params must be an object');
@@ -135,22 +199,11 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
 
   if (command === 'desktop.artifacts.create') {
     const repoPath = stringValue(params.repoPath);
-    const title = stringValue(params.title);
-    const html = stringValue(params.html);
-    const type = artifactTypeValue(params.type);
-    if (!title) return invalidParams('title is required');
-    const htmlTypes = ['report', 'dashboard', 'analysis', 'checklist', 'code', 'document', 'slide', 'form', 'other'];
-    if (htmlTypes.includes(type) && !html) return invalidParams('html is required');
+    const generateParams = buildArtifactGenerateParams(params, command);
+    if (!generateParams.title) return invalidParams('title is required');
+    if (HTML_ARTIFACT_TYPES.has(generateParams.type) && !generateParams.html) return invalidParams('html is required');
 
-    const artifact = await artifactService.generate({
-      title,
-      html,
-      type,
-      icon: stringValue(params.icon),
-      description: stringValue(params.description),
-      tags: tagsValue(params.tags),
-      source: { type: 'mcp_tool', name: command },
-    });
+    const artifact = await artifactService.generate(generateParams);
 
     const result: {
       ok: true;
@@ -171,7 +224,7 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
           repoPath,
         }),
         artifact,
-        html,
+        html: generateParams.html,
       });
       await recordRepositoryOutput(artifact.id, output);
       result.output = {
@@ -185,30 +238,19 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
 
   if (command === 'desktop.outputs.create') {
     const repoPath = stringValue(params.repoPath);
-    const title = stringValue(params.title);
-    const html = stringValue(params.html);
-    const type = artifactTypeValue(params.type);
+    const generateParams = buildArtifactGenerateParams(params, command);
     if (!repoPath) return invalidParams('repoPath is required');
-    if (!title) return invalidParams('title is required');
-    const htmlTypes = ['report', 'dashboard', 'analysis', 'checklist', 'code', 'document', 'slide', 'form', 'other'];
-    if (htmlTypes.includes(type) && !html) return invalidParams('html is required');
+    if (!generateParams.title) return invalidParams('title is required');
+    if (HTML_ARTIFACT_TYPES.has(generateParams.type) && !generateParams.html) return invalidParams('html is required');
 
-    const artifact = await artifactService.generate({
-      title,
-      html,
-      type,
-      icon: stringValue(params.icon),
-      description: stringValue(params.description),
-      tags: tagsValue(params.tags),
-      source: { type: 'mcp_tool', name: command },
-    });
+    const artifact = await artifactService.generate(generateParams);
     const output = await createRepositoryOutput({
       binding: createDefaultRepositoryBinding({
         gatewayInstanceId: stringValue(params.gatewayInstanceId) ?? 'desktop-node',
         repoPath,
       }),
       artifact,
-      html,
+      html: generateParams.html,
     });
     await recordRepositoryOutput(artifact.id, output);
 
