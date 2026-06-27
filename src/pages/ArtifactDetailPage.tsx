@@ -249,6 +249,22 @@ export default function ArtifactDetailPage() {
                   <Text copyable>{meta.filePath}</Text>
                 </div>
               )}
+              {meta.repositoryOutputPath && (
+                <div>
+                  <Text type="tertiary">{t('artifact.repositoryOutput')}: </Text>
+                  <Text copyable code>
+                    {meta.repositoryOutputPath}
+                  </Text>
+                </div>
+              )}
+              {meta.repositoryPreviewPath && (
+                <div>
+                  <Text type="tertiary">{t('artifact.repositoryPreview')}: </Text>
+                  <Text copyable code>
+                    {meta.repositoryPreviewPath}
+                  </Text>
+                </div>
+              )}
             </div>
           )}
         </Card>

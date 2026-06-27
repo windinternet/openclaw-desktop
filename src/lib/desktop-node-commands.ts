@@ -2,7 +2,11 @@ import type { ArtifactType } from './artifact-types';
 import { artifactService } from './artifact-service';
 import { artifactPersistence } from './artifact-persistence';
 import { createDefaultRepositoryBinding, getRepositoryGateStatus } from './agentic-repository';
-import { createRepositoryOutput } from './repository-outputs';
+import {
+  buildArtifactRepositoryOutputUpdates,
+  createRepositoryOutput,
+  type RepositoryOutputResult,
+} from './repository-outputs';
 
 const ARTIFACT_TYPES = new Set<ArtifactType>([
   'report',
@@ -107,7 +111,7 @@ async function mirrorRepositoryOutput(params: { repoPath: string; gatewayInstanc
   const artifact = await artifactPersistence.loadMeta(params.artifactId);
   if (!artifact) return null;
   const html = await artifactPersistence.loadHtml(params.artifactId, artifact.currentVersion);
-  return createRepositoryOutput({
+  const output = await createRepositoryOutput({
     binding: createDefaultRepositoryBinding({
       gatewayInstanceId: params.gatewayInstanceId ?? 'desktop-node',
       repoPath: params.repoPath,
@@ -115,6 +119,12 @@ async function mirrorRepositoryOutput(params: { repoPath: string; gatewayInstanc
     artifact,
     html: html ?? undefined,
   });
+  await recordRepositoryOutput(params.artifactId, output);
+  return output;
+}
+
+async function recordRepositoryOutput(artifactId: string, output: RepositoryOutputResult): Promise<void> {
+  await artifactService.update(artifactId, buildArtifactRepositoryOutputUpdates(output));
 }
 
 export async function handleDesktopNodeCommand(command: string, params: unknown): Promise<unknown> {
@@ -162,6 +172,7 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
         artifact,
         html,
       });
+      await recordRepositoryOutput(artifact.id, output);
       result.output = {
         outputId: output.outputId,
         path: output.outputPath,
@@ -198,6 +209,7 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
       artifact,
       html,
     });
+    await recordRepositoryOutput(artifact.id, output);
 
     return {
       ok: true,

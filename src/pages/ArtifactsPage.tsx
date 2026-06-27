@@ -216,9 +216,15 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
                 <div style={{ fontSize: 12, color: 'var(--semi-color-text-2)', marginBottom: 8 }}>
                   v{a.currentVersion} · {formatTime(a.updatedAt)}
                 </div>
+                {a.repositoryOutputPath && (
+                  <Tag size="small" color="green" type="light">
+                    {t('artifact.repositoryOutput')}
+                  </Tag>
+                )}
                 {a.description && (
                   <div
                     style={{
+                      marginTop: a.repositoryOutputPath ? 8 : 0,
                       fontSize: 13,
                       color: 'var(--semi-color-text-1)',
                       lineHeight: 1.5,
@@ -280,6 +286,11 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
               <Tag size="small" color="blue" type="light">
                 {a.type}
               </Tag>
+              {a.repositoryOutputPath && (
+                <Tag size="small" color="green" type="light">
+                  {t('artifact.repositoryOutput')}
+                </Tag>
+              )}
               <Text type="tertiary" size="small">
                 v{a.currentVersion}
               </Text>

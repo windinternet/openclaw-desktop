@@ -16,7 +16,7 @@ export type ArtifactType =
   | 'video';
 
 export interface ArtifactSource {
-  type: 'chat' | 'workflow' | 'agent_team' | 'manual' | 'mcp_tool';
+  type: 'chat' | 'workflow' | 'agent_team' | 'manual' | 'mcp_tool' | 'action_run';
   id?: string;
   name?: string;
 }
@@ -42,6 +42,8 @@ export interface ArtifactMeta {
   fileName?: string;
   fileSize?: number;
   mimeType?: string;
+  repositoryOutputPath?: string;
+  repositoryPreviewPath?: string;
 }
 
 export interface VersionEntry {

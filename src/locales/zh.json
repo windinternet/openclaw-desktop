@@ -731,6 +731,8 @@
     "type": "类型",
     "desc": "描述",
     "source": "来源",
+    "repositoryOutput": "仓库输出",
+    "repositoryPreview": "仓库预览",
     "versions": "版本历史",
     "current": "当前",
     "noVersions": "暂无版本",

@@ -1,0 +1,21 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+
+describe('artifact UI metadata', () => {
+  it('surfaces repository output metadata in artifact list and detail pages', () => {
+    const listPage = readFileSync('src/pages/ArtifactsPage.tsx', 'utf8');
+    const detailPage = readFileSync('src/pages/ArtifactDetailPage.tsx', 'utf8');
+    const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
+    const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
+
+    expect(listPage).toContain('repositoryOutputPath');
+    expect(listPage).toContain("t('artifact.repositoryOutput')");
+    expect(detailPage).toContain('repositoryOutputPath');
+    expect(detailPage).toContain('repositoryPreviewPath');
+    expect(detailPage).toContain("t('artifact.repositoryPreview')");
+    expect(zh.artifact.repositoryOutput).toBeTruthy();
+    expect(zh.artifact.repositoryPreview).toBeTruthy();
+    expect(en.artifact.repositoryOutput).toBeTruthy();
+    expect(en.artifact.repositoryPreview).toBeTruthy();
+  });
+});

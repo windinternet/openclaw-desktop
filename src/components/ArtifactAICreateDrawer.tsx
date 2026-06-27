@@ -33,6 +33,7 @@ export function ArtifactAICreateDrawer({ visible, onClose }: Props) {
   const [input, setInput] = useState('');
   const [generating, setGenerating] = useState(false);
   const [preview, setPreview] = useState<ParsedArtifactResult | null>(null);
+  const [previewRun, setPreviewRun] = useState<AiActionRun | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isGeneratingRef = useRef(false);
 
@@ -64,6 +65,7 @@ export function ArtifactAICreateDrawer({ visible, onClose }: Props) {
     isGeneratingRef.current = true;
     setGenerating(true);
     setPreview(null);
+    setPreviewRun(null);
     setError(null);
 
     const defaultAgent = agents?.[0];
@@ -123,6 +125,7 @@ export function ArtifactAICreateDrawer({ visible, onClose }: Props) {
         }
         if (parsed) {
           setPreview(parsed);
+          setPreviewRun(latestRun);
         } else {
           setError('AI 未能生成有效的产物结构，请尝试更具体的描述');
         }
@@ -143,7 +146,7 @@ export function ArtifactAICreateDrawer({ visible, onClose }: Props) {
     if (!preview) return;
     try {
       const { getDefaultIcon } = await import('../lib/artifact-service');
-      await generateArtifact({
+      const artifact = await generateArtifact({
         title: preview.title,
         type: preview.type as ArtifactType,
         description: preview.description,
@@ -152,21 +155,30 @@ export function ArtifactAICreateDrawer({ visible, onClose }: Props) {
         url: preview.url,
         command: preview.command,
         fileName: preview.fileName,
-        source: { type: 'manual', name: 'AI 魔法创建' },
+        source: { type: 'action_run', id: previewRun?.id, name: 'AI 魔法创建' },
       });
+      if (currentInstanceId && previewRun) {
+        await upsertAiActionRun(currentInstanceId, {
+          ...previewRun,
+          artifactIds: Array.from(new Set([...(previewRun.artifactIds ?? []), artifact.id])),
+          updatedAt: Date.now(),
+        });
+      }
       Toast.success('产物已创建');
       setInput('');
       setPreview(null);
+      setPreviewRun(null);
       onClose();
     } catch (e) {
       Toast.error(String(e));
     }
-  }, [preview, generateArtifact, onClose]);
+  }, [currentInstanceId, preview, previewRun, generateArtifact, onClose]);
 
   const handleClose = () => {
     if (!generating) {
       setInput('');
       setPreview(null);
+      setPreviewRun(null);
       setError(null);
     }
     onClose();

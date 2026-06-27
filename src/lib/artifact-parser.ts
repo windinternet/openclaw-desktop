@@ -1,4 +1,4 @@
-import type { ArtifactType, ArtifactMeta } from './artifact-types';
+import type { ArtifactType, ArtifactMeta, ArtifactSource } from './artifact-types';
 import { artifactService, getDefaultIcon } from './artifact-service';
 
 interface ParsedArtifact {
@@ -41,7 +41,7 @@ export function parseArtifactFromText(text: string): ParsedArtifact | null {
 
 export async function saveArtifactFromChat(
   parsed: ParsedArtifact,
-  sourceType: 'chat' | 'mcp_tool' = 'chat',
+  sourceType: ArtifactSource['type'] = 'chat',
   sourceId?: string,
   sourceName?: string,
 ): Promise<ArtifactMeta> {

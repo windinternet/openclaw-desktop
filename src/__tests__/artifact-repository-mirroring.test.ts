@@ -7,6 +7,7 @@ import { mirrorArtifactToReadyRepositoryOutput } from '../lib/repository-outputs
 vi.mock('../lib/artifact-service', () => ({
   artifactService: {
     generate: vi.fn(),
+    update: vi.fn(),
     list: vi.fn(),
   },
 }));
@@ -18,6 +19,10 @@ vi.mock('../lib/artifact-persistence', () => ({
 }));
 
 vi.mock('../lib/repository-outputs', () => ({
+  buildArtifactRepositoryOutputUpdates: (output: { outputPath: string; previewPath?: string }) => ({
+    repositoryOutputPath: output.outputPath,
+    repositoryPreviewPath: output.previewPath,
+  }),
   mirrorArtifactToReadyRepositoryOutput: vi.fn(),
 }));
 
@@ -70,9 +75,19 @@ describe('artifact repository mirroring', () => {
         type: 'report',
         html: '<html>ok</html>',
       }),
-    ).resolves.toEqual(artifact);
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: 'art_1',
+        repositoryOutputPath: 'outputs/reports/art_1.md',
+        repositoryPreviewPath: 'outputs/html/art_1.html',
+      }),
+    );
 
     expect(mockedMirrorArtifactToReadyRepositoryOutput).toHaveBeenCalledWith('inst-1', artifact, '<html>ok</html>');
+    expect(mockedArtifactService.update).toHaveBeenCalledWith('art_1', {
+      repositoryOutputPath: 'outputs/reports/art_1.md',
+      repositoryPreviewPath: 'outputs/html/art_1.html',
+    });
   });
 });
 

@@ -65,6 +65,13 @@ export function buildAiActionRunMarkdown(run: AiActionRun): string {
   if (run.resultSummary) {
     lines.push('## Result', '', run.resultSummary, '');
   }
+  if (run.artifactIds && run.artifactIds.length > 0) {
+    lines.push('## Artifacts', '');
+    for (const artifactId of run.artifactIds) {
+      lines.push(`- ${artifactId}`);
+    }
+    lines.push('');
+  }
   if (run.error) {
     lines.push('## Error', '', run.error, '');
   }

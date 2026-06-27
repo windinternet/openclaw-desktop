@@ -4,6 +4,27 @@
 > 来源资料：`docs/references/product-goal-conversation-2026-06-28.md`
 > 相关实现：`src/lib/artifact-types.ts`, `src/lib/artifact-service.ts`, `src/lib/repository-outputs.ts`
 
+## 0. 当前实现事实
+
+截至 2026-06-28，产物系统已有以下 P0 基础能力：
+
+- Desktop 本地 `ArtifactMeta` 可记录来源、类型、版本、状态、文件/链接/命令信息。
+- `ArtifactSource` 已覆盖 `chat / workflow / agent_team / manual / mcp_tool / action_run`。
+- HTML 类产物可保存版本并通过独立窗口预览。
+- UI 创建和 Desktop node 创建的产物在仓库绑定就绪时可镜像到 Repository `outputs/`。
+- 镜像完成后，本地 Artifact meta 会记录 `repositoryOutputPath` 和 `repositoryPreviewPath`。
+- Repository output markdown 会记录 artifactId、类型、状态、版本、更新时间、来源和预览路径。
+- Artifacts 页面和详情页会展示仓库输出状态与路径。
+- AI 魔法创建保存产物时会以 `action_run` 作为来源，并把产物 ID 回写到对应 ActionRun。
+- ActionRun 仓库摘要会列出本次运行生成的产物 ID。
+
+仍需继续收口：
+
+- 继续扩展非 AI 魔法创建入口的 ActionRun 产物自动关联，并在 ActionRun 摘要中补充仓库输出路径。
+- 为 HTML 产物补更严格的安全/自包含检查。
+- 补 Office 文件型产物的导入、预览和来源记录。
+- 把可复用资产、模板、工具、脚本提升为一等管理对象。
+
 ## 1. 定位
 
 产物系统是 OpenClaw Desktop 的 P0 价值沉淀层。
@@ -152,4 +173,3 @@ Artifact 应记录：
 - 不在 P0 强制实现所有 Office 文件的原生编辑。
 - 不在 P0 做完整模板市场。
 - 不在 P0 默认允许 HTML 产物静默执行本地能力。
-

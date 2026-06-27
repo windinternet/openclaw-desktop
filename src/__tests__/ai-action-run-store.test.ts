@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createEmptyAgentTeamProfile, createInstruction, upsertAgentProfile } from '../lib/agent-team';
-import { reconcileGatewayAgentCreationRun, upsertAiActionRun } from '../lib/ai-action-run-store';
+import {
+  buildAiActionRunMarkdown,
+  reconcileGatewayAgentCreationRun,
+  upsertAiActionRun,
+} from '../lib/ai-action-run-store';
 import { AI_ACTION_RUNS_STORAGE_KEY } from '../lib/ai-action-center';
 import { AGENTIC_REPOSITORY_STORAGE_KEY } from '../lib/agentic-repository';
 import type { AgentTeamProfile, AiActionRun } from '../lib/types';
@@ -162,5 +166,22 @@ describe('AI ActionRun repository summaries', () => {
       'runs/action-runs/index.md',
       expect.stringContaining('runs/action-runs/action-42.md'),
     );
+  });
+
+  it('includes produced artifact ids in ActionRun repository summaries', () => {
+    const markdown = buildAiActionRunMarkdown(
+      createRun({
+        id: 'action-99',
+        type: 'artifact_create',
+        status: 'done',
+        input: '生成报告',
+        resultSummary: '报告已生成',
+        artifactIds: ['art_1', 'art_2'],
+      }),
+    );
+
+    expect(markdown).toContain('## Artifacts');
+    expect(markdown).toContain('- art_1');
+    expect(markdown).toContain('- art_2');
   });
 });

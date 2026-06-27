@@ -731,6 +731,8 @@
     "type": "Type",
     "desc": "Description",
     "source": "Source",
+    "repositoryOutput": "Repository output",
+    "repositoryPreview": "Repository preview",
     "versions": "Versions",
     "current": "Current",
     "noVersions": "No versions",

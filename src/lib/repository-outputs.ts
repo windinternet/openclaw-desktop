@@ -14,6 +14,8 @@ export interface RepositoryOutputResult {
   previewPath?: string;
 }
 
+export type ArtifactRepositoryOutputUpdates = Pick<ArtifactMeta, 'repositoryOutputPath' | 'repositoryPreviewPath'>;
+
 const TYPE_DIR: Record<string, string> = {
   report: 'reports',
   dashboard: 'dashboards',
@@ -34,6 +36,9 @@ export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string
     `status: ${artifact.status}`,
     `version: ${artifact.currentVersion}`,
     `updatedAt: ${new Date(artifact.updatedAt).toISOString()}`,
+    `sourceType: ${artifact.source.type}`,
+    artifact.source.id ? `sourceId: ${artifact.source.id}` : undefined,
+    artifact.source.name ? `sourceName: ${artifact.source.name}` : undefined,
     previewPath ? `preview: ${previewPath}` : undefined,
     artifact.description ? `description: ${artifact.description}` : undefined,
     artifact.tags.length > 0 ? `tags: ${artifact.tags.join(', ')}` : undefined,
@@ -62,6 +67,13 @@ export async function createRepositoryOutput(params: CreateRepositoryOutputParam
   await repository.writeText(params.binding.repoPath, indexPath, nextIndex);
 
   return { outputId: params.artifact.id, outputPath, previewPath };
+}
+
+export function buildArtifactRepositoryOutputUpdates(output: RepositoryOutputResult): ArtifactRepositoryOutputUpdates {
+  return {
+    repositoryOutputPath: output.outputPath,
+    repositoryPreviewPath: output.previewPath,
+  };
 }
 
 export async function mirrorArtifactToReadyRepositoryOutput(

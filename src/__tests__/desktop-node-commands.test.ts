@@ -21,6 +21,10 @@ vi.mock('../lib/artifact-persistence', () => ({
 }));
 
 vi.mock('../lib/repository-outputs', () => ({
+  buildArtifactRepositoryOutputUpdates: (output: { outputPath: string; previewPath?: string }) => ({
+    repositoryOutputPath: output.outputPath,
+    repositoryPreviewPath: output.previewPath,
+  }),
   createRepositoryOutput: vi.fn(),
 }));
 
@@ -120,6 +124,10 @@ describe('desktop node commands', () => {
         binding: expect.objectContaining({ repoPath: '/repo', gatewayInstanceId: 'inst-1' }),
       }),
     );
+    expect(mockedArtifactService.update).toHaveBeenCalledWith('art_legacy', {
+      repositoryOutputPath: 'outputs/reports/art_legacy.md',
+      repositoryPreviewPath: 'outputs/html/art_legacy.html',
+    });
   });
 
   it('creates a repository output while preserving artifact compatibility', async () => {
@@ -169,6 +177,10 @@ describe('desktop node commands', () => {
         binding: expect.objectContaining({ repoPath: '/repo' }),
       }),
     );
+    expect(mockedArtifactService.update).toHaveBeenCalledWith('art_2', {
+      repositoryOutputPath: 'outputs/reports/art_2.md',
+      repositoryPreviewPath: 'outputs/html/art_2.html',
+    });
   });
 
   it('opens a repository output through the compatible artifact window', async () => {
@@ -250,6 +262,10 @@ describe('desktop node commands', () => {
         binding: expect.objectContaining({ repoPath: '/repo' }),
       }),
     );
+    expect(mockedArtifactService.update).toHaveBeenCalledWith('art_2', {
+      repositoryOutputPath: 'outputs/reports/art_2.md',
+      repositoryPreviewPath: 'outputs/html/art_2.html',
+    });
   });
 
   it('appends and mirrors a repository output through artifact compatibility', async () => {
@@ -297,6 +313,10 @@ describe('desktop node commands', () => {
         binding: expect.objectContaining({ repoPath: '/repo' }),
       }),
     );
+    expect(mockedArtifactService.update).toHaveBeenCalledWith('art_2', {
+      repositoryOutputPath: 'outputs/reports/art_2.md',
+      repositoryPreviewPath: 'outputs/html/art_2.html',
+    });
   });
 
   it('handles structured repository read and search commands', async () => {
