@@ -37,7 +37,7 @@ HTML 产物要求：
 - 完整自包含。
 - 内联 CSS 和必要 JavaScript。
 - 默认不依赖外部 CDN。
-- 需要本地能力、网络、文件读写或命令执行时，必须走 Desktop Bridge 和审批。
+- 需要本地能力、网络、文件读写、导出或命令执行时，必须走 Desktop Bridge 和审批。
 
 Desktop 保存或追加 HTML 产物时会记录 `htmlAudit`：
 
@@ -50,6 +50,8 @@ Desktop 保存或追加 HTML 产物时会记录 `htmlAudit`：
 当 HTML 产物运行时请求 Desktop Bridge 能力，用户的授权或拒绝会写回 Artifact metadata 的 `authEvents`。该记录包含 capability、detail、granted、level、requestedAt 和 decidedAt，用于把静态 `htmlAudit` 与真实运行时授权事实对齐。
 
 Desktop Bridge 的实际调用结果会写入 `bridgeEvents`。该记录包含 method、detail、status、resultSummary、error、startedAt 和 endedAt，用于把“已审批”继续连接到“执行了什么、成功还是失败、结果摘要是什么”。当前 HTML 预览窗口通过专用 preload 暴露受控 `window.artifactBridge`，主进程只接受来自 Artifact preview window 的调用。
+
+HTML 产物可以通过 `artifactBridge.exportAs(typeOrOptions, content, fileName)` 请求导出 HTML、文本、Markdown 或 JSON。Desktop 会先请求 `export` 授权，再打开系统保存对话框；用户确认路径后才写入文件，并把成功、取消或失败记录到 `bridgeEvents`。该能力用于交付和保存副本，不允许 HTML 产物静默写入任意文件。
 
 ## Artifact block
 

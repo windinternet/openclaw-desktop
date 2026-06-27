@@ -20,4 +20,15 @@ describe('artifact runtime authorization recording', () => {
     expect(source).toContain('resultSummary');
     expect(source).toContain('writeIndexEntry');
   });
+
+  it('implements exportAs through authorization, save dialog, file write, and bridge records', () => {
+    const source = readFileSync('electron/artifact-handlers.ts', 'utf8');
+
+    expect(source).toContain("case 'exportAs'");
+    expect(source).toContain('resolveArtifactExportRequest');
+    expect(source).toContain("requireArtifactBridgeAuthorization(context.artifactId, 'export'");
+    expect(source).toContain('dialog.showSaveDialog');
+    expect(source).toContain('writeFileSync(result.filePath, exportRequest.content');
+    expect(source).toContain('resultSummary: `exported ${exportRequest.bytes} bytes`');
+  });
 });

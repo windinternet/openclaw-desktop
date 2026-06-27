@@ -32,6 +32,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('htmlAudit');
     expect(skillContent).toContain('runtime authorization records');
     expect(skillContent).toContain('runtime bridge call records');
+    expect(skillContent).toContain('artifactBridge.exportAs');
+    expect(skillContent).toContain('requires `export` approval');
+    expect(skillContent).toContain('must not be used for silent file writes');
     expect(skillContent).toContain('filePath');
     expect(skillContent).toContain('importFile');
     expect(skillContent).toContain('outputs/files/');

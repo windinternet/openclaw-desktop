@@ -25,4 +25,11 @@ describe('artifact Desktop Bridge runtime', () => {
     expect(preload).toContain("ipcRenderer.invoke('artifact:bridgeCall'");
     expect(preload).not.toContain('electronAPI');
   });
+
+  it('injects an export helper that can pass content and a preferred file name', () => {
+    const handler = readFileSync('electron/artifact-handlers.ts', 'utf8');
+
+    expect(handler).toContain('exportAs:function(t,c,n)');
+    expect(handler).toContain('typeof t==="object"?t:{type:t,content:c,fileName:n}');
+  });
 });

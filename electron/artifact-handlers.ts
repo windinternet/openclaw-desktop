@@ -1,9 +1,10 @@
-import { app, BrowserWindow, ipcMain, Notification, protocol, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Notification, protocol, shell } from 'electron'
 import path from 'node:path'
 import { readFileSync, existsSync, mkdirSync, writeFileSync, copyFileSync, statSync } from 'node:fs'
 import os from 'node:os'
 import { ARTIFACT_IPC } from '../src/lib/artifact-ipc'
 import { decideArtifactOpenTarget } from '../src/lib/artifact-open-target'
+import { resolveArtifactExportRequest } from '../src/lib/artifact-export'
 import { recordArtifactAuthDecision, recordArtifactBridgeCallResult } from '../src/lib/artifact-runtime-auth'
 import type { ArtifactBridgeCallStatus, ArtifactMeta } from '../src/lib/artifact-types'
 
@@ -43,7 +44,7 @@ const CSP_HEADER = [
   "media-src 'self'",
 ].join('; ')
 
-const BRIDGE_SCRIPT = `(function(){function s(m,a){var b=window.openclawArtifactBridge;if(!b||typeof b.invoke!=="function")return Promise.reject(new Error("Artifact bridge unavailable"));return b.invoke(m,a||{})}window.artifactBridge={getMeta:function(){return s("getMeta")},getHtml:function(v){return s("getHtml",{version:v})},fetch:function(u,i){return s("fetch",{url:u,init:i})},readFile:function(p){return s("readFile",{path:p})},writeFile:function(p,c){return s("writeFile",{path:p,content:c})},exportAs:function(t){return s("exportAs",{type:t})},notify:function(t,b){return s("notify",{title:t,body:b})},exec:function(c){return s("exec",{cmd:c})}}})();`
+const BRIDGE_SCRIPT = `(function(){function s(m,a){var b=window.openclawArtifactBridge;if(!b||typeof b.invoke!=="function")return Promise.reject(new Error("Artifact bridge unavailable"));return b.invoke(m,a||{})}window.artifactBridge={getMeta:function(){return s("getMeta")},getHtml:function(v){return s("getHtml",{version:v})},fetch:function(u,i){return s("fetch",{url:u,init:i})},readFile:function(p){return s("readFile",{path:p})},writeFile:function(p,c){return s("writeFile",{path:p,content:c})},exportAs:function(t,c,n){return s("exportAs",typeof t==="object"?t:{type:t,content:c,fileName:n})},notify:function(t,b){return s("notify",{title:t,body:b})},exec:function(c){return s("exec",{cmd:c})}}})();`
 
 interface ArtifactPreviewWindowContext {
   artifactId: string
@@ -240,6 +241,7 @@ function describeBridgeCall(method: string, params: Record<string, unknown>): st
     case 'writeFile':
       return typeof params.path === 'string' ? params.path : undefined
     case 'exportAs':
+      if (typeof params.fileName === 'string') return params.fileName
       return typeof params.type === 'string' ? params.type : undefined
     case 'notify':
       return typeof params.title === 'string' ? params.title : undefined
@@ -371,8 +373,40 @@ async function executeArtifactBridgeCall(
         resultSummary: supported ? 'notification shown' : 'notification unsupported',
       }
     }
+    case 'exportAs': {
+      const meta = readMeta(context.artifactId)
+      if (!meta) throw new Error('Artifact not found')
+      const fp = htmlPath(context.artifactId, context.version)
+      const currentHtml = existsSync(fp) ? readFileSync(fp, 'utf-8') : null
+      const exportRequest = resolveArtifactExportRequest(params, meta, currentHtml)
+      await requireArtifactBridgeAuthorization(context.artifactId, 'export', detail ?? exportRequest.fileName)
+      const saveOptions = {
+        defaultPath: exportRequest.fileName,
+        filters: exportRequest.filters,
+      }
+      const mainWindow = getBridgeMainWindow()
+      const result = mainWindow
+        ? await dialog.showSaveDialog(mainWindow, saveOptions)
+        : await dialog.showSaveDialog(saveOptions)
+      if (result.canceled || !result.filePath) {
+        return {
+          result: { ok: false, canceled: true },
+          resultSummary: 'export cancelled',
+        }
+      }
+      writeFileSync(result.filePath, exportRequest.content, 'utf-8')
+      return {
+        result: {
+          ok: true,
+          filePath: result.filePath,
+          bytes: exportRequest.bytes,
+          mimeType: exportRequest.mimeType,
+          type: exportRequest.type,
+        },
+        resultSummary: `exported ${exportRequest.bytes} bytes`,
+      }
+    }
     case 'fetch':
-    case 'exportAs':
     case 'exec':
       throw new ArtifactBridgeUnsupportedError(`Artifact bridge method ${method} is not implemented yet`)
     default:
