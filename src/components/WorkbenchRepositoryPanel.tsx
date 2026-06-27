@@ -10,6 +10,7 @@ import type { WorkbenchSnapshot } from '../lib/repository-workbench';
 import { loadWorkbenchSnapshot, readWorkbenchMarkdown } from '../lib/repository-workbench';
 import type { RepositoryMarkdownFile } from '../lib/repository-knowledge';
 import type { ArtifactMeta } from '../lib/artifact-types';
+import { buildArtifactOutputDescription } from '../lib/artifact-display';
 import type { AiActionRun, AiActionRunStatus } from '../lib/types';
 import MarkdownView from './MarkdownView';
 
@@ -784,11 +785,11 @@ export default function WorkbenchRepositoryPanel({
       ...dialogArtifacts.map((artifact: ArtifactMeta) => ({
         id: artifact.id,
         title: artifact.title,
-        description: artifact.description || artifact.url || artifact.type,
+        description: buildArtifactOutputDescription(artifact),
         sourceKey: 'dialog',
         sourceLabel: t('workbench.dialogArtifacts'),
-        typeKey: artifact.type,
-        typeLabel: artifact.type,
+        typeKey: artifact.externalFormat ?? artifact.type,
+        typeLabel: artifact.externalFormat ?? artifact.type,
         color: 'violet' as const,
         previewPath: undefined,
         icon: <IconBox />,

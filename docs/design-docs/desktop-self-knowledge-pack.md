@@ -102,6 +102,7 @@ Skill 应包含：
 - ActionRun 文件型 `<artifact>` header 可以携带 `filePath / fileName / fileSize / mimeType / externalFormat / contentSummary / importFile`；`importFile: true` 表示允许导入本地文件，仓库绑定就绪时会镜像到 `outputs/files/`。
 - 既有产物可用稳定引用 `artifact://<artifactId>` 继续复用；Gateway 可调用 `desktop.artifacts.describe` 获取标题、类型、摘要、来源、仓库 output / preview 和文件或 URL 线索。
 - Gateway 可通过 `desktop.artifacts.create` 或 `desktop.outputs.create` 创建非 HTML 产物，并传入 `url / command / filePath / fileName / fileSize / mimeType / externalFormat / contentSummary / importFile`；需要同时沉淀到 Repository `outputs/` 时使用 `desktop.outputs.create`。
+- Dashboard 最近产物和 Workbench outputs 会展示价值摘要、`externalFormat`、来源、更新时间以及 Repository output / preview 线索，检查系统状态时应把这些作为关键成果入口。
 - 终态 ActionRun 的 `lastAssistantResponse` 如果包含 `<artifact>` 块，Desktop 会自动保存为 `source: action_run` 的 Artifact，并把 Artifact id 回写到 ActionRun。
 - ActionRun 产生产物后，仓库 run 摘要会尽量写入产物标题、类型、Artifact 引用和 Repository output / preview 路径。
 

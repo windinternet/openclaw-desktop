@@ -35,6 +35,7 @@ describe('dashboard redesign', () => {
     const dashboard = readFileSync('src/pages/DashboardPage.tsx', 'utf8');
     const usage = readFileSync('src/lib/gateway-usage.ts', 'utf8');
 
+    expect(dashboard).toContain('buildArtifactDisplayLine');
     expect(dashboard).toContain('loadRepositoryBinding');
     expect(dashboard).toContain('loadWorkbenchSnapshot');
     expect(dashboard).toContain('loadKnowledgeSnapshot');
@@ -45,6 +46,7 @@ describe('dashboard redesign', () => {
     expect(usage).toContain('sessions.usage');
     expect(dashboard).toContain('fetchArtifacts');
     expect(dashboard).toContain('artifacts');
+    expect(dashboard).toContain('buildArtifactDisplayLine(artifact, formatDate(artifact.updatedAt))');
     expect(dashboard).toContain("t('dashboard.realUsageUnavailable')");
     expect(dashboard).toContain("t('dashboard.repositoryUnavailable')");
     expect(dashboard).not.toContain('Math.random');

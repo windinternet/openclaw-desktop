@@ -22,6 +22,8 @@ Artifacts 是 OpenClaw Desktop 的 P0 价值沉淀层。只要一个结果对用
 
 Gateway 通过 Desktop node command `desktop.artifacts.create` 或 `desktop.outputs.create` 创建产物时，也可以提供 `url`、`command`、`filePath`、`fileName`、`fileSize`、`mimeType`、`externalFormat`、`contentSummary` 和 `importFile`。这两条入口会把这些字段传入 Artifact storage；`desktop.outputs.create` 还会把产物镜像到 Repository `outputs/`。
 
+Dashboard 最近产物会展示价值摘要、Repository output / preview 线索、来源和更新时间。Workbench 的 outputs 视图会优先用 `externalFormat` 与价值摘要展示对话产物，所以 PPT、PDF、链接、应用和媒体等结果能作为关键成果被用户快速识别，而不是只作为泛化文件路径存在。
+
 ## HTML 特色能力
 
 HTML 产物是 Desktop 的特色能力。HTML 可以同时具备可视化、交互性和可操作性，适合报告、仪表盘、清单、表单、演示页、项目页和数据探索页。

@@ -39,6 +39,8 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('desktop.artifacts.describe');
     expect(skillContent).toContain('desktop.outputs.create');
     expect(skillContent).toContain('externalFormat');
+    expect(skillContent).toContain('Dashboard recent Artifacts and Workbench outputs surface value summaries');
+    expect(skillContent).toContain('Repository output / preview clues');
     expect(skillContent).toContain('system file handler');
     expect(skillContent).toContain('imported into Artifact storage');
     expect(skillContent).toContain('contentSummary');

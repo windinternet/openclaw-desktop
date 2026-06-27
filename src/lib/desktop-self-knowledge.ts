@@ -71,6 +71,8 @@ export function buildDesktopSelfKnowledgeSkillContent(): string {
     '',
     'Gateway can create non-HTML Artifacts through `desktop.artifacts.create` or `desktop.outputs.create` by passing `url`, `command`, `filePath`, `fileName`, `fileSize`, `mimeType`, `externalFormat`, `contentSummary`, and `importFile`. Use `desktop.outputs.create` when the result should also be mirrored into Repository `outputs/`.',
     '',
+    'Dashboard recent Artifacts and Workbench outputs surface value summaries, `externalFormat`, source, update time, and Repository output / preview clues so users can identify key results rather than only generic files.',
+    '',
     'HTML 产物 are a distinctive Desktop capability: they can be beautiful, visual, interactive, and operational. HTML Artifacts should be 完整自包含, use inline CSS and necessary JavaScript, avoid external CDNs by default, and request approval before using local files, network, commands, or Desktop Bridge.',
     '',
     'Desktop records an `htmlAudit` summary for saved HTML Artifacts. It marks whether the HTML is self-contained, whether runtime approval is required, and which external resources or Desktop Bridge capabilities were detected. Desktop also writes runtime authorization records and runtime bridge call records back to Artifact metadata when a user grants, denies, or runs Desktop Bridge access.',

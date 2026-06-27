@@ -22,6 +22,7 @@ import {
 } from '../components/charts/DashboardVisualCharts';
 import UsageTrendChart from '../components/charts/UsageTrendChart';
 import type { ArtifactMeta } from '../lib/artifact-types';
+import { buildArtifactDisplayLine } from '../lib/artifact-display';
 import { loadAiActionRuns } from '../lib/ai-action-run-store';
 import { loadRepositoryBinding } from '../lib/agentic-repository-store';
 import { normalizeDashboardGatewaySummary } from '../lib/dashboard-gateway-summary';
@@ -683,7 +684,7 @@ export default function DashboardPage() {
                 key={artifact.id}
                 icon={<span aria-hidden="true">{artifact.icon}</span>}
                 title={artifact.title}
-                meta={`${artifact.type} · ${formatDate(artifact.updatedAt)}`}
+                meta={buildArtifactDisplayLine(artifact, formatDate(artifact.updatedAt))}
                 tag={
                   <Tag
                     size="small"
