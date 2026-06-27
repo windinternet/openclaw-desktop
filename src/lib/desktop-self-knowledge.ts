@@ -63,6 +63,8 @@ export function buildDesktopSelfKnowledgeSkillContent(): string {
     '',
     'Artifact forms include reports, dashboards, analyses, checklists, code, documents, slides, forms, links, apps, files, audio, images, videos, Word, Excel, PPT, HTML, tools, scripts, templates, and workflows.',
     '',
+    'File-like Artifacts may carry `filePath` or `url`. Local file Artifacts open through the system file handler; URL-backed media or file Artifacts open through the external URL handler. Word, Excel, and PPT are first-class file Artifacts even before native in-app preview exists.',
+    '',
     'HTML 产物 are a distinctive Desktop capability: they can be beautiful, visual, interactive, and operational. HTML Artifacts should be 完整自包含, use inline CSS and necessary JavaScript, avoid external CDNs by default, and request approval before using local files, network, commands, or Desktop Bridge.',
     '',
     'Desktop records an `htmlAudit` summary for saved HTML Artifacts. It marks whether the HTML is self-contained, whether runtime approval is required, and which external resources or Desktop Bridge capabilities were detected.',

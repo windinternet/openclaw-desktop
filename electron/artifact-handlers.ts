@@ -1,8 +1,9 @@
-import { app, BrowserWindow, ipcMain, protocol } from 'electron'
+import { app, BrowserWindow, ipcMain, protocol, shell } from 'electron'
 import path from 'node:path'
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import { ARTIFACT_IPC } from '../src/lib/artifact-ipc'
+import { decideArtifactOpenTarget } from '../src/lib/artifact-open-target'
 import type { ArtifactMeta } from '../src/lib/artifact-types'
 
 function artifactsRoot(): string {
@@ -75,18 +76,35 @@ function readMeta(artifactId: string): ArtifactMeta | null {
 export function registerArtifactIpcHandlers(): void {
   ipcMain.handle(ARTIFACT_IPC.OPEN, async (_event, artifactId: string, version: number) => {
     const meta = readMeta(artifactId)
-    const win = new BrowserWindow({
-      width: 1200,
-      height: 900,
-      title: meta?.title ?? '产物',
-      webPreferences: {
-        contextIsolation: true,
-        nodeIntegration: false,
-      },
-    })
-    if (meta?.title) win.setTitle(meta.title)
-    win.loadURL(`artifact://${artifactId}.v${version}`)
-    return win.id
+    const target = decideArtifactOpenTarget(meta, version)
+
+    switch (target.kind) {
+      case 'html-preview': {
+        const win = new BrowserWindow({
+          width: 1200,
+          height: 900,
+          title: meta?.title ?? '产物',
+          webPreferences: {
+            contextIsolation: true,
+            nodeIntegration: false,
+          },
+        })
+        if (meta?.title) win.setTitle(meta.title)
+        win.loadURL(`artifact://${target.artifactId}.v${target.version}`)
+        return win.id
+      }
+      case 'local-file': {
+        const error = await shell.openPath(target.path)
+        if (error) throw new Error(error)
+        return 0
+      }
+      case 'external-url': {
+        await shell.openExternal(target.url)
+        return 0
+      }
+      case 'unavailable':
+        throw new Error(target.reason === 'missing-meta' ? 'Artifact not found' : 'Artifact has no file path or URL')
+    }
   })
 
   ipcMain.handle(ARTIFACT_IPC.GET_META, async (_event, artifactId: string) => {
