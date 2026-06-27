@@ -214,6 +214,18 @@ export default function ArtifactDetailPage() {
                   <Text>{meta.description}</Text>
                 </div>
               )}
+              {meta.contentSummary && (
+                <div>
+                  <Text type="tertiary">{t('artifact.contentSummary')}: </Text>
+                  <Text>{meta.contentSummary}</Text>
+                </div>
+              )}
+              {meta.externalFormat && (
+                <div>
+                  <Text type="tertiary">{t('artifact.externalFormat')}: </Text>
+                  <Tag size="small">{meta.externalFormat}</Tag>
+                </div>
+              )}
               {meta.tags.length > 0 && (
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                   {meta.tags.map((tag) => (

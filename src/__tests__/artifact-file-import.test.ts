@@ -50,6 +50,8 @@ describe('artifact file import', () => {
         fileName: 'roadmap.pptx',
         fileSize: 4096,
         mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        externalFormat: 'powerpoint',
+        contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
       }),
     );
     expect(mockedPersistence.saveMeta).toHaveBeenCalledWith(
@@ -57,6 +59,8 @@ describe('artifact file import', () => {
       expect.objectContaining({
         filePath: '/user-data/storage/artifacts/art_1/files/roadmap.pptx',
         originalFilePath: '/Users/deepin/Documents/roadmap.pptx',
+        externalFormat: 'powerpoint',
+        contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
       }),
     );
   });
@@ -72,5 +76,7 @@ describe('artifact file import', () => {
     expect(mockedPersistence.importFile).not.toHaveBeenCalled();
     expect(artifact.filePath).toBe('/Users/deepin/Documents/reference.xlsx');
     expect(artifact.originalFilePath).toBeUndefined();
+    expect(artifact.externalFormat).toBe('excel');
+    expect(artifact.contentSummary).toBe('Excel · reference.xlsx');
   });
 });

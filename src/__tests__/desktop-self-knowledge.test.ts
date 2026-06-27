@@ -34,6 +34,8 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('filePath');
     expect(skillContent).toContain('system file handler');
     expect(skillContent).toContain('imported into Artifact storage');
+    expect(skillContent).toContain('contentSummary');
+    expect(skillContent).toContain('externalFormat');
     expect(skillContent).not.toContain(OPENCLAW_REPOSITORY_CONTEXT_START);
     expect(skillContent).not.toContain(OPENCLAW_REPOSITORY_CONTEXT_END);
   });

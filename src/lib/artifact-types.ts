@@ -15,6 +15,22 @@ export type ArtifactType =
   | 'image'
   | 'video';
 
+export type ArtifactExternalFormat =
+  | 'html'
+  | 'link'
+  | 'app'
+  | 'word'
+  | 'excel'
+  | 'powerpoint'
+  | 'pdf'
+  | 'image'
+  | 'audio'
+  | 'video'
+  | 'text'
+  | 'code'
+  | 'file'
+  | 'unknown';
+
 export interface ArtifactSource {
   type: 'chat' | 'workflow' | 'agent_team' | 'manual' | 'mcp_tool' | 'action_run';
   id?: string;
@@ -100,6 +116,8 @@ export interface ArtifactMeta {
   fileName?: string;
   fileSize?: number;
   mimeType?: string;
+  externalFormat?: ArtifactExternalFormat;
+  contentSummary?: string;
   repositoryOutputPath?: string;
   repositoryPreviewPath?: string;
   htmlAudit?: ArtifactHtmlAudit;

@@ -24,6 +24,12 @@ describe('artifact UI metadata', () => {
     expect(detailPage).toContain("t('artifact.runtimeAuth')");
     expect(detailPage).toContain('bridgeEvents');
     expect(detailPage).toContain("t('artifact.runtimeBridge')");
+    expect(listPage).toContain('contentSummary');
+    expect(listPage).toContain('externalFormat');
+    expect(detailPage).toContain('contentSummary');
+    expect(detailPage).toContain("t('artifact.contentSummary')");
+    expect(detailPage).toContain('externalFormat');
+    expect(detailPage).toContain("t('artifact.externalFormat')");
     expect(zh.artifact.repositoryOutput).toBeTruthy();
     expect(zh.artifact.repositoryPreview).toBeTruthy();
     expect(zh.artifact.htmlAudit).toBeTruthy();
@@ -32,6 +38,8 @@ describe('artifact UI metadata', () => {
     expect(zh.artifact.fileSize).toBeTruthy();
     expect(zh.artifact.runtimeAuth).toBeTruthy();
     expect(zh.artifact.runtimeBridge).toBeTruthy();
+    expect(zh.artifact.contentSummary).toBeTruthy();
+    expect(zh.artifact.externalFormat).toBeTruthy();
     expect(en.artifact.repositoryOutput).toBeTruthy();
     expect(en.artifact.repositoryPreview).toBeTruthy();
     expect(en.artifact.htmlAudit).toBeTruthy();
@@ -40,5 +48,7 @@ describe('artifact UI metadata', () => {
     expect(en.artifact.fileSize).toBeTruthy();
     expect(en.artifact.runtimeAuth).toBeTruthy();
     expect(en.artifact.runtimeBridge).toBeTruthy();
+    expect(en.artifact.contentSummary).toBeTruthy();
+    expect(en.artifact.externalFormat).toBeTruthy();
   });
 });

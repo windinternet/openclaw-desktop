@@ -1,6 +1,7 @@
 import type { ArtifactMeta, ArtifactType, ArtifactSource } from './artifact-types';
 import { artifactPersistence } from './artifact-persistence';
 import { auditArtifactHtml } from './artifact-html-audit';
+import { buildArtifactValueSummary, inferArtifactExternalFormat } from './artifact-value-summary';
 
 let _idCounter = 0;
 
@@ -55,6 +56,8 @@ export interface GenerateParams {
   fileName?: string;
   fileSize?: number;
   mimeType?: string;
+  externalFormat?: ArtifactMeta['externalFormat'];
+  contentSummary?: string;
   importFile?: boolean;
 }
 
@@ -90,6 +93,33 @@ export const artifactService = {
       params.importFile && params.filePath
         ? await artifactPersistence.importFile(id, params.filePath, params.fileName)
         : undefined;
+    const filePath = importedFile?.filePath ?? params.filePath;
+    const fileName = importedFile?.fileName ?? params.fileName ?? fileNameFromPath(filePath);
+    const fileSize = importedFile?.fileSize ?? params.fileSize;
+    const mimeType = importedFile?.mimeType ?? params.mimeType;
+    const externalFormat =
+      params.externalFormat ??
+      inferArtifactExternalFormat({
+        type: params.type,
+        url: params.url,
+        command: params.command,
+        filePath,
+        fileName,
+        fileSize,
+        mimeType,
+      });
+    const contentSummary =
+      params.contentSummary ??
+      buildArtifactValueSummary({
+        type: params.type,
+        url: params.url,
+        command: params.command,
+        filePath,
+        fileName,
+        fileSize,
+        mimeType,
+        externalFormat,
+      });
 
     const now = Date.now();
     const meta: ArtifactMeta = {
@@ -107,11 +137,13 @@ export const artifactService = {
       updatedAt: now,
       url: params.url,
       command: params.command,
-      filePath: importedFile?.filePath ?? params.filePath,
+      filePath,
       originalFilePath: importedFile ? params.filePath : undefined,
-      fileName: importedFile?.fileName ?? params.fileName,
-      fileSize: importedFile?.fileSize ?? params.fileSize,
-      mimeType: importedFile?.mimeType ?? params.mimeType,
+      fileName,
+      fileSize,
+      mimeType,
+      externalFormat,
+      contentSummary,
       htmlAudit: html === null ? undefined : auditArtifactHtml(html),
     };
 
@@ -167,6 +199,13 @@ async function loadTemplateContent(templateId: string): Promise<string> {
   const html = templates[templateId];
   if (!html) throw new Error(`模板不存在: ${templateId}`);
   return html;
+}
+
+function fileNameFromPath(value?: string): string | undefined {
+  if (!value) return undefined;
+  const normalized = value.replace(/\\/g, '/');
+  const parts = normalized.split('/').filter(Boolean);
+  return parts[parts.length - 1] || undefined;
 }
 
 async function updateIndexEntry(meta: ArtifactMeta): Promise<void> {

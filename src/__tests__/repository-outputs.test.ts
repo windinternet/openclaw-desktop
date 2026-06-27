@@ -20,6 +20,17 @@ describe('repository outputs', () => {
     );
   });
 
+  it('includes artifact value summaries and external formats in repository output markdown', () => {
+    const markdown = buildOutputMarkdown({
+      ...createArtifact(),
+      externalFormat: 'excel',
+      contentSummary: 'Excel · budget.xlsx · 12 KB',
+    });
+
+    expect(markdown).toContain('externalFormat: excel');
+    expect(markdown).toContain('contentSummary: Excel · budget.xlsx · 12 KB');
+  });
+
   it('includes Desktop Bridge call summaries in repository output markdown', () => {
     const markdown = buildOutputMarkdown({
       ...createArtifact(),

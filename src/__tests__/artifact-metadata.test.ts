@@ -158,9 +158,13 @@ describe('artifact metadata', () => {
       originalFilePath: '/Users/deepin/Documents/roadmap.pptx',
       fileSize: 4096,
       mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      externalFormat: 'powerpoint',
+      contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
     });
 
     expect(markdown).toContain('fileName: roadmap.pptx');
+    expect(markdown).toContain('externalFormat: powerpoint');
+    expect(markdown).toContain('contentSummary: PowerPoint · roadmap.pptx · 4 KB');
     expect(markdown).toContain('filePath: /user-data/storage/artifacts/art_file/files/roadmap.pptx');
     expect(markdown).toContain('originalFilePath: /Users/deepin/Documents/roadmap.pptx');
     expect(markdown).toContain('fileSize: 4096');

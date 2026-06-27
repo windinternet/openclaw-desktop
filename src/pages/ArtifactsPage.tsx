@@ -68,6 +68,8 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
         (a) =>
           a.title.toLowerCase().includes(q) ||
           (a.description ?? '').toLowerCase().includes(q) ||
+          (a.contentSummary ?? '').toLowerCase().includes(q) ||
+          (a.externalFormat ?? '').toLowerCase().includes(q) ||
           (a.url ?? '').toLowerCase().includes(q) ||
           (a.command ?? '').toLowerCase().includes(q) ||
           (a.fileName ?? '').toLowerCase().includes(q),
@@ -96,6 +98,7 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
   };
 
   const getSubInfo = (a: ArtifactMeta): string | null => {
+    if (a.contentSummary) return a.contentSummary;
     if (a.type === 'link' && a.url) {
       try {
         return new URL(a.url).hostname;
@@ -216,8 +219,16 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
                 <div style={{ fontSize: 12, color: 'var(--semi-color-text-2)', marginBottom: 8 }}>
                   v{a.currentVersion} · {formatTime(a.updatedAt)}
                 </div>
-                {(a.repositoryOutputPath || a.htmlAudit?.selfContained === false || a.htmlAudit?.requiresApproval) && (
+                {(a.externalFormat ||
+                  a.repositoryOutputPath ||
+                  a.htmlAudit?.selfContained === false ||
+                  a.htmlAudit?.requiresApproval) && (
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: a.description ? 8 : 0 }}>
+                    {a.externalFormat && (
+                      <Tag size="small" color="blue" type="light">
+                        {a.externalFormat}
+                      </Tag>
+                    )}
                     {a.repositoryOutputPath && (
                       <Tag size="small" color="green" type="light">
                         {t('artifact.repositoryOutput')}
@@ -299,6 +310,11 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
               <Tag size="small" color="blue" type="light">
                 {a.type}
               </Tag>
+              {a.externalFormat && (
+                <Tag size="small" color="cyan" type="light">
+                  {a.externalFormat}
+                </Tag>
+              )}
               {a.repositoryOutputPath && (
                 <Tag size="small" color="green" type="light">
                   {t('artifact.repositoryOutput')}

@@ -25,6 +25,7 @@
 - Repository output markdown 会沉淀 HTML 审计摘要，Artifacts UI 会显示非自包含和需审批提示。
 - 文件、图片、音频、视频等非 HTML 产物可记录 `filePath` 或 `url`，打开时交给系统文件处理器或外部 URL 处理器。
 - 手动创建文件型产物时，填写本地 `filePath` 会复制一份到 Artifact storage，并记录 `originalFilePath`。
+- 非 HTML 产物会记录 `externalFormat` 和 `contentSummary`，用于把 Word、Excel、PPT、PDF、链接、应用入口和媒体文件从“路径”提升为可搜索、可复用、可沉淀的价值对象。
 
 仍需继续收口：
 
@@ -74,6 +75,7 @@ link / app / file / audio / image / video
 - `filePath` 指向本地文件时，Desktop 交给操作系统默认应用打开。
 - `url` 指向外部媒体或文件时，Desktop 交给外部链接处理器打开。
 - 手动创建文件型产物时，Desktop 可以把本地文件复制到 Artifact storage，`filePath` 指向副本，`originalFilePath` 保留原始位置。
+- Desktop 会自动识别常见外部格式并写入 `externalFormat`，同时生成 `contentSummary` 用于列表、详情页和 Repository output。
 - Word / Excel / PPT 等 Office 成果先作为 `file` 产物记录，后续再补摘要、缩略图和原生预览。
 
 ## 3. HTML 特色能力

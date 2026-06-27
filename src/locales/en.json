@@ -731,6 +731,8 @@
     "type": "Type",
     "desc": "Description",
     "source": "Source",
+    "contentSummary": "Value summary",
+    "externalFormat": "External format",
     "repositoryOutput": "Repository output",
     "repositoryPreview": "Repository preview",
     "htmlAudit": "HTML audit",
