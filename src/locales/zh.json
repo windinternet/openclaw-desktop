@@ -733,6 +733,7 @@
     "source": "来源",
     "contentSummary": "价值摘要",
     "externalFormat": "外部格式",
+    "reuseKind": "复用分类",
     "repositoryOutput": "仓库输出",
     "repositoryPreview": "仓库预览",
     "htmlAudit": "HTML 检查",

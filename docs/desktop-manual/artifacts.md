@@ -26,7 +26,7 @@ Artifact 会记录版本历史。新建产物会产生 v1，HTML 追加会产生
 
 Gateway 通过 Desktop node command `desktop.artifacts.create` 或 `desktop.outputs.create` 创建产物时，也可以提供 `url`、`command`、`filePath`、`fileName`、`fileSize`、`mimeType`、`externalFormat`、`contentSummary`、`reuseKind` 和 `importFile`。这两条入口会把这些字段传入 Artifact storage；`desktop.outputs.create` 还会把产物镜像到 Repository `outputs/`。
 
-Dashboard 最近产物会展示价值摘要、Repository output / preview 线索、来源和更新时间。Workbench 的 outputs 视图会优先用 `externalFormat` 与价值摘要展示对话产物，所以 PPT、PDF、链接、应用和媒体等结果能作为关键成果被用户快速识别，而不是只作为泛化文件路径存在。
+Artifacts 列表、Dashboard 最近产物和 Workbench outputs 会展示价值摘要、Repository output / preview 线索、来源、更新时间和 `reuseKind`。Artifacts 列表搜索会覆盖标题、描述、标签、价值摘要、外部格式、复用分类、来源和仓库路径，所以 PPT、PDF、链接、应用和媒体等结果能作为关键成果被用户快速识别，而不是只作为泛化文件路径存在。
 
 当一个产物可被复用为资产、模板、工具、脚本或工作流时，可以设置 `reuseKind` 为 `asset`、`template`、`tool`、`script` 或 `workflow`。`reuseKind` 会进入 Artifact metadata、Repository output markdown、`artifact://` 复用引用、Desktop node command 描述结果和 Workbench outputs 分类，用于把可复用成果从普通文件中区分出来。
 

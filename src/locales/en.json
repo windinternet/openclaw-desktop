@@ -733,6 +733,7 @@
     "source": "Source",
     "contentSummary": "Value summary",
     "externalFormat": "External format",
+    "reuseKind": "Reuse kind",
     "repositoryOutput": "Repository output",
     "repositoryPreview": "Repository preview",
     "htmlAudit": "HTML audit",

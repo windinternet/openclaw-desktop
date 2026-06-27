@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ArtifactMeta } from '../lib/artifact-types';
-import { buildArtifactDisplayLine, buildArtifactOutputDescription } from '../lib/artifact-display';
+import { buildArtifactDisplayLine, buildArtifactOutputDescription, buildArtifactSearchText } from '../lib/artifact-display';
 
 function createArtifact(overrides: Partial<ArtifactMeta> = {}): ArtifactMeta {
   return {
@@ -29,6 +29,28 @@ describe('artifact display helpers', () => {
     expect(line).toBe(
       'PowerPoint · roadmap.pptx · 4 KB · template · outputs/files/art_file.md · action_run/run-1 · 2026-06-28',
     );
+  });
+
+  it('builds searchable text from value, reuse, source, tags, and repository clues', () => {
+    const text = buildArtifactSearchText(
+      createArtifact({
+        title: '季度路线图',
+        description: '产品规划模板',
+        source: { type: 'chat', id: 'chat-1', name: '产品会' },
+        reuseKind: 'template',
+        repositoryPreviewPath: 'outputs/html/art_file.html',
+      }),
+    );
+
+    expect(text).toContain('季度路线图');
+    expect(text).toContain('产品规划模板');
+    expect(text).toContain('roadmap');
+    expect(text).toContain('template');
+    expect(text).toContain('chat');
+    expect(text).toContain('chat-1');
+    expect(text).toContain('产品会');
+    expect(text).toContain('outputs/files/art_file.md');
+    expect(text).toContain('outputs/html/art_file.html');
   });
 
   it('prefers reusable value clues over generic artifact type descriptions', () => {

@@ -49,7 +49,33 @@ export function buildArtifactDisplayLine(artifact: ArtifactMeta, dateLabel?: str
   return dedupe(parts.filter((part): part is string => Boolean(part))).join(' · ');
 }
 
-function formatArtifactSource(artifact: ArtifactMeta): string {
+export function buildArtifactSearchText(artifact: ArtifactMeta): string {
+  const fields = [
+    artifact.id,
+    artifact.title,
+    artifact.description,
+    artifact.type,
+    artifact.status,
+    artifact.tags.join(' '),
+    buildArtifactOutputDescription(artifact),
+    artifact.externalFormat,
+    artifact.contentSummary,
+    artifact.reuseKind,
+    artifact.repositoryOutputPath,
+    artifact.repositoryPreviewPath,
+    artifact.fileName,
+    artifact.filePath,
+    artifact.originalFilePath,
+    artifact.mimeType,
+    artifact.url,
+    artifact.command,
+    formatArtifactSource(artifact),
+  ];
+
+  return dedupe(fields.filter((field): field is string => Boolean(field?.trim()))).join('\n').toLowerCase();
+}
+
+export function formatArtifactSource(artifact: ArtifactMeta): string {
   const id = artifact.source.id ? `/${artifact.source.id}` : '';
   const name = artifact.source.name ? ` ${artifact.source.name}` : '';
   return `${artifact.source.type}${id}${name}`;

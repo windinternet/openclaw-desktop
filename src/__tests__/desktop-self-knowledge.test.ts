@@ -56,7 +56,7 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('desktop.artifacts.reuse.record');
     expect(skillContent).toContain('records reuse/audit facts only');
     expect(skillContent).toContain('does not execute tools, open files, or grant permissions');
-    expect(skillContent).toContain('Dashboard recent Artifacts and Workbench outputs surface value summaries');
+    expect(skillContent).toContain('Artifacts list search, Dashboard recent Artifacts, and Workbench outputs surface value summaries');
     expect(skillContent).toContain('Repository output / preview clues');
     expect(skillContent).toContain('system file handler');
     expect(skillContent).toContain('imported into Artifact storage');

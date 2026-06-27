@@ -109,7 +109,7 @@ Skill 应包含：
 - 复用既有产物后，Gateway、ActionRun 或 MCP 工具应调用 `desktop.artifacts.reuse.record` 写入 `context / status / purpose / resultSummary / sourceId / sourceName / usedAt`；这是复用事实和审计记录，不执行脚本、不打开文件、不授予额外权限。
 - Gateway 可通过 `desktop.artifacts.create` 或 `desktop.outputs.create` 创建非 HTML 产物，并传入 `url / command / filePath / fileName / fileSize / mimeType / externalFormat / contentSummary / reuseKind / importFile`；需要同时沉淀到 Repository `outputs/` 时使用 `desktop.outputs.create`。
 - Repository `outputs/index.md` 是可扫读的 Artifact 目录；条目会暴露 `artifact://` 引用、来源、更新时间、预览、格式、摘要、复用分类和标签，详细审计以单个产物 markdown 为准。
-- Dashboard 最近产物和 Workbench outputs 会展示价值摘要、`externalFormat`、来源、更新时间以及 Repository output / preview 线索，检查系统状态时应把这些作为关键成果入口。
+- Artifacts 列表搜索、Dashboard 最近产物和 Workbench outputs 会展示价值摘要、`externalFormat`、`reuseKind`、来源、更新时间、标签以及 Repository output / preview 线索，检查系统状态时应把这些作为关键成果入口。
 - 终态 ActionRun 的 `lastAssistantResponse` 如果包含 `<artifact>` 块，Desktop 会自动保存为 `source: action_run` 的 Artifact，并把 Artifact id 回写到 ActionRun。
 - ActionRun 产生产物后，仓库 run 摘要会尽量写入产物标题、类型、Artifact 引用和 Repository output / preview 路径。
 

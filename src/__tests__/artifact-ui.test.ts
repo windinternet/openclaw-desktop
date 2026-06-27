@@ -30,6 +30,12 @@ describe('artifact UI metadata', () => {
     expect(detailPage).toContain("t('artifact.currentVersion')");
     expect(listPage).toContain('contentSummary');
     expect(listPage).toContain('externalFormat');
+    expect(listPage).toContain('buildArtifactDisplayLine');
+    expect(listPage).toContain('buildArtifactSearchText');
+    expect(listPage).toContain('formatArtifactSource');
+    expect(listPage).toContain('a.reuseKind');
+    expect(detailPage).toContain('meta.reuseKind');
+    expect(detailPage).toContain("t('artifact.reuseKind')");
     expect(detailPage).toContain('contentSummary');
     expect(detailPage).toContain("t('artifact.contentSummary')");
     expect(detailPage).toContain('externalFormat');
@@ -50,6 +56,7 @@ describe('artifact UI metadata', () => {
     expect(zh.artifact.currentVersion).toBeTruthy();
     expect(zh.artifact.contentSummary).toBeTruthy();
     expect(zh.artifact.externalFormat).toBeTruthy();
+    expect(zh.artifact.reuseKind).toBeTruthy();
     expect(zh.artifact.copyReference).toBeTruthy();
     expect(zh.artifact.referenceCopied).toBeTruthy();
     expect(en.artifact.repositoryOutput).toBeTruthy();
@@ -65,6 +72,7 @@ describe('artifact UI metadata', () => {
     expect(en.artifact.currentVersion).toBeTruthy();
     expect(en.artifact.contentSummary).toBeTruthy();
     expect(en.artifact.externalFormat).toBeTruthy();
+    expect(en.artifact.reuseKind).toBeTruthy();
     expect(en.artifact.copyReference).toBeTruthy();
     expect(en.artifact.referenceCopied).toBeTruthy();
   });

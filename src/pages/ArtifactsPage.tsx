@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../lib';
 import type { ArtifactMeta } from '../lib/artifact-types';
+import { buildArtifactDisplayLine, buildArtifactSearchText, formatArtifactSource } from '../lib/artifact-display';
 import { ArtifactCreateDialog } from '../components/ArtifactCreateDialog';
 import { ArtifactAICreateDrawer } from '../components/ArtifactAICreateDrawer';
 
@@ -64,16 +65,7 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
     if (typeFilter !== 'all') list = list.filter((a) => a.type === typeFilter);
     if (search) {
       const q = search.toLowerCase();
-      list = list.filter(
-        (a) =>
-          a.title.toLowerCase().includes(q) ||
-          (a.description ?? '').toLowerCase().includes(q) ||
-          (a.contentSummary ?? '').toLowerCase().includes(q) ||
-          (a.externalFormat ?? '').toLowerCase().includes(q) ||
-          (a.url ?? '').toLowerCase().includes(q) ||
-          (a.command ?? '').toLowerCase().includes(q) ||
-          (a.fileName ?? '').toLowerCase().includes(q),
-      );
+      list = list.filter((a) => buildArtifactSearchText(a).includes(q));
     }
     return list.sort((a, b) => b.updatedAt - a.updatedAt);
   }, [artifacts, typeFilter, search]);
@@ -97,20 +89,6 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
     }
   };
 
-  const getSubInfo = (a: ArtifactMeta): string | null => {
-    if (a.contentSummary) return a.contentSummary;
-    if (a.type === 'link' && a.url) {
-      try {
-        return new URL(a.url).hostname;
-      } catch {
-        return a.url.slice(0, 40);
-      }
-    }
-    if (a.type === 'app' && a.command) return a.command.slice(0, 40);
-    if (['file', 'audio', 'image', 'video'].includes(a.type) && a.fileName) return a.fileName;
-    return null;
-  };
-
   const statusText = (status: string) => {
     if (status === 'draft') return t('artifact.statusDraft');
     if (status === 'published') return t('artifact.statusPublished');
@@ -118,7 +96,6 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
   };
 
   const formatTime = (ts: number) => {
-    // eslint-disable-next-line react-hooks/purity
     const diff = Date.now() - ts;
     if (diff < 60000) return t('artifact.justNow');
     if (diff < 3600000) return t('artifact.minAgo', { count: Math.floor(diff / 60000) });
@@ -220,6 +197,7 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
                   v{a.currentVersion} · {formatTime(a.updatedAt)}
                 </div>
                 {(a.externalFormat ||
+                  a.reuseKind ||
                   a.repositoryOutputPath ||
                   a.htmlAudit?.selfContained === false ||
                   a.htmlAudit?.requiresApproval) && (
@@ -227,6 +205,11 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
                     {a.externalFormat && (
                       <Tag size="small" color="blue" type="light">
                         {a.externalFormat}
+                      </Tag>
+                    )}
+                    {a.reuseKind && (
+                      <Tag size="small" color="violet" type="light">
+                        {a.reuseKind}
                       </Tag>
                     )}
                     {a.repositoryOutputPath && (
@@ -261,22 +244,33 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
                     {a.description}
                   </div>
                 )}
-                {getSubInfo(a) && (
+                <div
+                  title={a.contentSummary ?? buildArtifactDisplayLine(a)}
+                  style={{
+                    fontSize: 12,
+                    color: 'var(--semi-color-text-2)',
+                    marginBottom: 4,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {buildArtifactDisplayLine(a)}
+                </div>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+                  <Tag size="small" color="grey" type="light">
+                    {formatArtifactSource(a)}
+                  </Tag>
+                </div>
+                {a.tags.length > 0 && (
                   <div
                     style={{
-                      fontSize: 12,
-                      color: 'var(--semi-color-text-2)',
-                      marginBottom: 4,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
+                      marginTop: 8,
+                      display: 'flex',
+                      gap: 4,
+                      flexWrap: 'wrap',
                     }}
                   >
-                    {getSubInfo(a)}
-                  </div>
-                )}
-                {a.tags.length > 0 && (
-                  <div style={{ marginTop: 8, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                     {a.tags.map((tag) => (
                       <Tag key={tag} size="small" color="blue" type="light">
                         {tag}
@@ -306,7 +300,20 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
               }}
             >
               <span style={{ fontSize: 20 }}>{a.icon}</span>
-              <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{a.title}</span>
+              <span style={{ flex: 1, minWidth: 0 }} title={a.contentSummary ?? buildArtifactDisplayLine(a)}>
+                <div style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {a.title}
+                </div>
+                <Text
+                  type="tertiary"
+                  size="small"
+                  ellipsis={{
+                    showTooltip: true,
+                  }}
+                >
+                  {buildArtifactDisplayLine(a)}
+                </Text>
+              </span>
               <Tag size="small" color="blue" type="light">
                 {a.type}
               </Tag>
@@ -315,6 +322,14 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
                   {a.externalFormat}
                 </Tag>
               )}
+              {a.reuseKind && (
+                <Tag size="small" color="violet" type="light">
+                  {a.reuseKind}
+                </Tag>
+              )}
+              <Tag size="small" color="grey" type="light">
+                {formatArtifactSource(a)}
+              </Tag>
               {a.repositoryOutputPath && (
                 <Tag size="small" color="green" type="light">
                   {t('artifact.repositoryOutput')}

@@ -8,6 +8,7 @@ import type {
 } from './artifact-types';
 import { artifactService, type GenerateParams } from './artifact-service';
 import { artifactPersistence } from './artifact-persistence';
+import { buildArtifactSearchText } from './artifact-display';
 import { buildArtifactReuseReference } from './artifact-reference';
 import { recordArtifactReuseEvent } from './artifact-reuse-record';
 import { buildArtifactVersionHistory } from './artifact-version-history';
@@ -233,34 +234,6 @@ async function mirrorRepositoryOutput(params: { repoPath: string; gatewayInstanc
 
 async function recordRepositoryOutput(artifactId: string, output: RepositoryOutputResult): Promise<void> {
   await artifactService.update(artifactId, buildArtifactRepositoryOutputUpdates(output));
-}
-
-function buildArtifactSearchText(artifact: ArtifactMeta): string {
-  return [
-    artifact.id,
-    artifact.title,
-    artifact.description,
-    artifact.type,
-    artifact.status,
-    artifact.tags.join(' '),
-    artifact.externalFormat,
-    artifact.contentSummary,
-    artifact.reuseKind,
-    artifact.repositoryOutputPath,
-    artifact.repositoryPreviewPath,
-    artifact.fileName,
-    artifact.filePath,
-    artifact.originalFilePath,
-    artifact.mimeType,
-    artifact.url,
-    artifact.command,
-    artifact.source.type,
-    artifact.source.id,
-    artifact.source.name,
-  ]
-    .filter((item): item is string => typeof item === 'string' && item.length > 0)
-    .join('\n')
-    .toLowerCase();
 }
 
 function buildArtifactSearchResult(artifact: ArtifactMeta) {

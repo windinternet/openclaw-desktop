@@ -36,7 +36,7 @@
 - 当 Gateway 或 ActionRun 不知道具体 `artifactId` 时，可先调用 Desktop node command `desktop.artifacts.search`，按 `query / type / externalFormat / reuseKind / sourceType / status / limit` 搜索已有产物；返回项包含 `artifact://` URI、价值摘要、来源、仓库 output / preview、文件或 URL 线索和可复用 Markdown 引用。搜索只读索引，不打开文件、不执行命令、不授予权限。
 - Artifact 详情页会展示版本历史；Desktop node command `desktop.artifacts.describe` 和 Repository output markdown 会暴露版本数量、最新版本标签、创建者和创建时间。
 - Desktop node command `desktop.artifacts.create` 和 `desktop.outputs.create` 已支持非 HTML 产物字段，包括 `url / command / filePath / fileName / fileSize / mimeType / externalFormat / contentSummary / importFile`；Gateway 普通聊天创建文件、链接、应用和媒体产物时也能进入同一套价值摘要、文件导入和 outputs 镜像链路。
-- Dashboard 最近产物会展示价值摘要、Repository output / preview 线索、来源和更新时间；Workbench outputs 视图会优先用 `externalFormat` 与价值摘要展示对话产物，让 PPT、PDF、链接、应用和媒体不再只显示为泛化 `file`。
+- Artifacts 列表、Dashboard 最近产物和 Workbench outputs 会展示价值摘要、`reuseKind`、Repository output / preview 线索、来源和更新时间；Artifacts 列表搜索会覆盖标题、描述、标签、价值摘要、外部格式、复用分类、来源和仓库路径，让 PPT、PDF、链接、应用和媒体不再只显示为泛化 `file`。
 - Artifact meta 已支持 `reuseKind: asset / template / tool / script / workflow`，用于把可复用资产、模板、工具、脚本和工作流从普通文件或 HTML 产物中稳定标记出来；该字段会进入 `<artifact>` block 解析、Desktop node 创建/描述、Repository output markdown、`artifact://` 复用引用和 Workbench outputs 分类。
 - Artifact meta 已支持 `reuseEvents`，用于记录某个产物被聊天、ActionRun、工作流、团队、仓库或 MCP 工具复用的事实、状态、用途、结果摘要和当时版本；Desktop node command `desktop.artifacts.reuse.record` 可写入该记录，并可在 `repoPath` 就绪时重新镜像 Repository output markdown。
 

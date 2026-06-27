@@ -234,6 +234,14 @@ export default function ArtifactDetailPage() {
                   <Tag size="small">{meta.externalFormat}</Tag>
                 </div>
               )}
+              {meta.reuseKind && (
+                <div>
+                  <Text type="tertiary">{t('artifact.reuseKind')}: </Text>
+                  <Tag size="small" color="violet" type="light">
+                    {meta.reuseKind}
+                  </Tag>
+                </div>
+              )}
               {meta.tags.length > 0 && (
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                   {meta.tags.map((tag) => (
