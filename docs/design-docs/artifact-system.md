@@ -14,6 +14,7 @@
 - UI 创建和 Desktop node 创建的产物在仓库绑定就绪时可镜像到 Repository `outputs/`。
 - 镜像完成后，本地 Artifact meta 会记录 `repositoryOutputPath` 和 `repositoryPreviewPath`。
 - Repository output markdown 会记录 artifactId、类型、状态、版本、更新时间、来源和预览路径。
+- Repository `outputs/index.md` 会写入可扫读的富条目，包含 Artifact 链接、`artifact://` 引用、来源、更新时间、预览、格式、摘要、复用分类和标签；同一路径再次镜像时会刷新旧条目。
 - Artifacts 页面和详情页会展示仓库输出状态与路径。
 - AI 魔法创建保存产物时会以 `action_run` 作为来源，并把产物 ID 回写到对应 ActionRun。
 - ActionRun 仓库摘要会尽量解析本次运行生成的 Artifact meta，列出产物标题、类型、Artifact 引用和 Repository output / preview 路径；读取不到 meta 时退回产物 ID。
@@ -145,6 +146,8 @@ Repository 中至少保存：
 - 标签。
 - 与 work / plan / run 的关联。
 
+`outputs/index.md` 用作快速目录，不替代单个产物的 markdown 审计记录。目录条目应尽量暴露 `artifact://` 引用、来源、更新时间、预览路径、外部格式、价值摘要、复用分类和标签，让 Agent 不必逐个打开文件也能识别关键成果。
+
 ## 5. 与 ActionRun 的关系
 
 ActionRun 可以产生产物，但产物不依赖 ActionRun。
@@ -211,6 +214,7 @@ Artifact 应记录：
 8. Artifact 复用事实能通过 `reuseEvents` 被记录、描述、在详情页展示，并进入 Repository output markdown。
 9. Artifact 版本历史能在创建和追加时记录，并在详情页、Desktop node 描述和 Repository output markdown 中可见。
 10. 普通聊天里一个或多个 `<artifact>` block 都能进入 Artifact storage，并在仓库就绪时镜像到 Repository outputs。
+11. Repository `outputs/index.md` 能作为可扫读目录展示 Artifact 价值线索，并在重新镜像同一产物时刷新旧条目。
 
 ## 8. 非目标
 

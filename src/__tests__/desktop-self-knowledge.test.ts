@@ -45,6 +45,8 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('artifact://<artifactId>');
     expect(skillContent).toContain('desktop.artifacts.describe');
     expect(skillContent).toContain('desktop.outputs.create');
+    expect(skillContent).toContain('Repository `outputs/index.md`');
+    expect(skillContent).toContain('artifact URI, source, updated time, preview, format, summary, reuse kind, and tags');
     expect(skillContent).toContain('externalFormat');
     expect(skillContent).toContain('reuseKind');
     expect(skillContent).toContain('asset`, `template`, `tool`, `script`, or `workflow`');

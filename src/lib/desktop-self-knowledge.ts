@@ -79,6 +79,8 @@ export function buildDesktopSelfKnowledgeSkillContent(): string {
     '',
     'Gateway can create non-HTML Artifacts through `desktop.artifacts.create` or `desktop.outputs.create` by passing `url`, `command`, `filePath`, `fileName`, `fileSize`, `mimeType`, `externalFormat`, `contentSummary`, `reuseKind`, and `importFile`. Use `desktop.outputs.create` when the result should also be mirrored into Repository `outputs/`.',
     '',
+    'Repository `outputs/index.md` is a skim-readable Artifact directory. Each Artifact entry should expose the artifact URI, source, updated time, preview, format, summary, reuse kind, and tags when available, while detailed audit facts stay in the per-Artifact output markdown.',
+    '',
     'Dashboard recent Artifacts and Workbench outputs surface value summaries, `externalFormat`, source, update time, and Repository output / preview clues so users can identify key results rather than only generic files.',
     '',
     'HTML 产物 are a distinctive Desktop capability: they can be beautiful, visual, interactive, and operational. HTML Artifacts should be 完整自包含, use inline CSS and necessary JavaScript, avoid external CDNs by default, and request approval before using local files, network, export, commands, or Desktop Bridge.',

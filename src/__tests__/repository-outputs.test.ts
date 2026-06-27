@@ -129,6 +129,57 @@ describe('repository outputs', () => {
       'outputs/index.md',
       expect.stringContaining('outputs/reports/art_1.md'),
     );
+
+    const indexWrite = writeText.mock.calls.find((call) => call[1] === 'outputs/index.md')?.[2] as string;
+    expect(indexWrite).toContain('- [Quarterly Report](outputs/reports/art_1.md) (`art_1`, report, draft)');
+    expect(indexWrite).toContain('  - artifact: artifact://art_1');
+    expect(indexWrite).toContain('  - source: mcp_tool');
+    expect(indexWrite).toContain('  - updatedAt: 1970-01-01T00:00:00.002Z');
+    expect(indexWrite).toContain('  - preview: outputs/html/art_1.html');
+    expect(indexWrite).toContain('  - tags: finance');
+  });
+
+  it('refreshes existing output index entries with value metadata', async () => {
+    const writeText = vi.fn();
+    const readText = vi.fn(async () =>
+      [
+        '# Outputs',
+        '- [Roadmap Deck](outputs/files/art_file.md)',
+        '- [Other](outputs/reports/art_other.md)',
+        '',
+      ].join('\n'),
+    );
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: {
+          writeText,
+          readText,
+        },
+      },
+    });
+
+    await createRepositoryOutput({
+      binding: createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      artifact: createArtifact({
+        id: 'art_file',
+        title: 'Roadmap Deck',
+        type: 'file',
+        source: { type: 'chat', id: 'agent:main:demo', name: 'msg-1' },
+        externalFormat: 'powerpoint',
+        contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+        reuseKind: 'template',
+      }),
+    });
+
+    const indexWrite = writeText.mock.calls.find((call) => call[1] === 'outputs/index.md')?.[2] as string;
+    expect(indexWrite).not.toContain('- [Roadmap Deck](outputs/files/art_file.md)\n- [Other]');
+    expect(indexWrite).toContain('- [Roadmap Deck](outputs/files/art_file.md) (`art_file`, file, draft)');
+    expect(indexWrite).toContain('  - artifact: artifact://art_file');
+    expect(indexWrite).toContain('  - source: chat / agent:main:demo / msg-1');
+    expect(indexWrite).toContain('  - format: powerpoint');
+    expect(indexWrite).toContain('  - summary: PowerPoint · roadmap.pptx · 4 KB');
+    expect(indexWrite).toContain('  - reuseKind: template');
+    expect(indexWrite).toContain('- [Other](outputs/reports/art_other.md)');
   });
 
   it('writes file artifacts into the repository files output bucket', async () => {

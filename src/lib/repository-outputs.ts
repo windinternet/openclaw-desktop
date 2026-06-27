@@ -114,8 +114,11 @@ export async function createRepositoryOutput(params: CreateRepositoryOutputParam
 
   const indexPath = `${params.binding.paths.outputs}/index.md`;
   const existingIndex = await repository.readText(params.binding.repoPath, indexPath);
-  const indexEntry = `- [${params.artifact.title}](${outputPath})`;
-  const nextIndex = existingIndex.includes(outputPath) ? existingIndex : `${existingIndex.trimEnd()}\n${indexEntry}\n`;
+  const nextIndex = upsertOutputIndexEntry(
+    existingIndex,
+    outputPath,
+    buildOutputIndexEntry(params.artifact, outputPath, previewPath),
+  );
   await repository.writeText(params.binding.repoPath, indexPath, nextIndex);
 
   return { outputId: params.artifact.id, outputPath, previewPath };
@@ -141,6 +144,42 @@ export async function mirrorArtifactToReadyRepositoryOutput(
     artifact,
     html,
   });
+}
+
+function buildOutputIndexEntry(artifact: ArtifactMeta, outputPath: string, previewPath?: string): string {
+  return [
+    `- [${artifact.title}](${outputPath}) (\`${artifact.id}\`, ${artifact.type}, ${artifact.status})`,
+    `  - artifact: artifact://${artifact.id}`,
+    `  - source: ${formatArtifactSource(artifact)}`,
+    `  - updatedAt: ${new Date(artifact.updatedAt).toISOString()}`,
+    previewPath ? `  - preview: ${previewPath}` : undefined,
+    artifact.externalFormat ? `  - format: ${artifact.externalFormat}` : undefined,
+    artifact.contentSummary ? `  - summary: ${artifact.contentSummary}` : undefined,
+    artifact.reuseKind ? `  - reuseKind: ${artifact.reuseKind}` : undefined,
+    artifact.tags.length > 0 ? `  - tags: ${artifact.tags.join(', ')}` : undefined,
+  ]
+    .filter((line): line is string => typeof line === 'string')
+    .join('\n');
+}
+
+function upsertOutputIndexEntry(existingIndex: string, outputPath: string, indexEntry: string): string {
+  const lines = existingIndex.trimEnd().split('\n');
+  const start = lines.findIndex((line) => line.includes(outputPath));
+  if (start === -1) {
+    const base = existingIndex.trimEnd();
+    return base ? `${base}\n${indexEntry}\n` : `${indexEntry}\n`;
+  }
+
+  let end = start + 1;
+  while (end < lines.length && lines[end].startsWith('  - ')) end += 1;
+
+  return [...lines.slice(0, start), ...indexEntry.split('\n'), ...lines.slice(end)].join('\n').trimEnd() + '\n';
+}
+
+function formatArtifactSource(artifact: ArtifactMeta): string {
+  return [artifact.source.type, artifact.source.id, artifact.source.name]
+    .filter((part): part is string => typeof part === 'string' && part.length > 0)
+    .join(' / ');
 }
 
 function getRepositoryWriteApi() {
