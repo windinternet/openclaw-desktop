@@ -9,6 +9,7 @@ import { artifactService, type GenerateParams } from './artifact-service';
 import { artifactPersistence } from './artifact-persistence';
 import { buildArtifactReuseReference } from './artifact-reference';
 import { recordArtifactReuseEvent } from './artifact-reuse-record';
+import { buildArtifactVersionHistory } from './artifact-version-history';
 import { createDefaultRepositoryBinding, getRepositoryGateStatus } from './agentic-repository';
 import {
   buildArtifactRepositoryOutputUpdates,
@@ -517,6 +518,8 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
     if (!artifact) return { ok: false, error: 'not-found', artifactId };
     const reference = buildArtifactReuseReference(artifact);
     const lastReuseEvent = artifact.reuseEvents?.[artifact.reuseEvents.length - 1];
+    const versions = buildArtifactVersionHistory(artifact);
+    const latestVersion = versions[versions.length - 1];
     return {
       ok: true,
       artifact: {
@@ -525,6 +528,8 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
         type: artifact.type,
         uri: reference.uri,
         currentVersion: artifact.currentVersion,
+        versionCount: versions.length,
+        latestVersion,
         status: artifact.status,
         externalFormat: artifact.externalFormat,
         contentSummary: artifact.contentSummary,

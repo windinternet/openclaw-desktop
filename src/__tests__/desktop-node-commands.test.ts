@@ -367,6 +367,10 @@ describe('desktop node commands', () => {
       createdAt: 1,
       updatedAt: 1,
       contentSummary: 'HTML · 交互式报告',
+      versions: [
+        { version: 1, label: 'Initial version', createdBy: 'ai', createdAt: 1 },
+        { version: 2, label: 'Refined report', createdBy: 'ai', createdAt: 2 },
+      ],
       reuseKind: 'workflow',
       reuseEvents: [
         {
@@ -395,6 +399,8 @@ describe('desktop node commands', () => {
         type: 'report',
         uri: 'artifact://art_2',
         reuseKind: 'workflow',
+        versionCount: 2,
+        latestVersion: expect.objectContaining({ version: 2, label: 'Refined report' }),
         reuseEventCount: 1,
         lastReuseEvent: expect.objectContaining({ context: 'action_run', status: 'succeeded' }),
         repositoryOutputPath: 'outputs/reports/art_2.md',

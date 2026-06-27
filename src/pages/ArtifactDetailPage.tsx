@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
 import type { ArtifactMeta } from '../lib/artifact-types';
 import { buildArtifactReuseReference } from '../lib/artifact-reference';
+import { buildArtifactVersionHistory } from '../lib/artifact-version-history';
 
 const { Text, Title } = Typography;
 
@@ -66,6 +67,7 @@ export default function ArtifactDetailPage() {
     await navigator.clipboard.writeText(buildArtifactReuseReference(meta).markdown);
     Toast.success(t('artifact.referenceCopied'));
   };
+  const versions = buildArtifactVersionHistory(meta).slice().reverse();
 
   return (
     <div style={{ padding: 24, height: '100%', overflow: 'auto' }}>
@@ -418,7 +420,39 @@ export default function ArtifactDetailPage() {
         </Card>
 
         <Card title={t('artifact.versions')}>
-          <Empty title={t('artifact.noVersions')} />
+          {versions.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {versions.map((version) => (
+                <div
+                  key={version.version}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '8px 0',
+                    borderBottom: '1px solid var(--semi-color-border)',
+                  }}
+                >
+                  <Text strong={version.version === meta.currentVersion} style={{ flex: 1 }}>
+                    v{version.version} · {version.label}
+                  </Text>
+                  {version.version === meta.currentVersion && (
+                    <Tag size="small" color="green" type="light">
+                      {t('artifact.currentVersion')}
+                    </Tag>
+                  )}
+                  <Tag size="small" type="light">
+                    {version.createdBy}
+                  </Tag>
+                  <Text type="tertiary" size="small">
+                    {new Date(version.createdAt).toLocaleString()}
+                  </Text>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <Empty title={t('artifact.noVersions')} />
+          )}
         </Card>
       </div>
 

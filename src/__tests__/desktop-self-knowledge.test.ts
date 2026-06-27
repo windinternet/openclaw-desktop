@@ -38,6 +38,8 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('filePath');
     expect(skillContent).toContain('importFile');
     expect(skillContent).toContain('outputs/files/');
+    expect(skillContent).toContain('Artifacts keep version history');
+    expect(skillContent).toContain('version count and latest version metadata');
     expect(skillContent).toContain('artifact://<artifactId>');
     expect(skillContent).toContain('desktop.artifacts.describe');
     expect(skillContent).toContain('desktop.outputs.create');

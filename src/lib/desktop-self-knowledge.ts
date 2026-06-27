@@ -65,6 +65,8 @@ export function buildDesktopSelfKnowledgeSkillContent(): string {
     '',
     'File-like Artifacts may carry `filePath` or `url`. Local file Artifacts can be imported into Artifact storage; imported copies keep `originalFilePath` for traceability and open through the system file handler. URL-backed media or file Artifacts open through the external URL handler. Word, Excel, PPT, PDF, links, apps, and other external results should carry `externalFormat` and `contentSummary` so they remain searchable, reusable, and understandable even before native in-app preview exists.',
     '',
+    'Artifacts keep version history. New Artifacts start as v1, HTML appends create new versions, and `desktop.artifacts.describe` plus Repository output markdown expose the version count and latest version metadata. This is audit history, not a full diff or restore system.',
+    '',
     'When an ActionRun produces a file-like Artifact block, its JSON header may include `filePath`, `fileName`, `fileSize`, `mimeType`, `externalFormat`, `contentSummary`, `reuseKind`, and `importFile`. Use `importFile: true` only when the ActionRun is allowed to import that local file. If a repository binding is ready, Desktop mirrors the resulting file Artifact metadata into `outputs/files/` and links it from the ActionRun summary.',
     '',
     'When an Artifact should be reusable, set `reuseKind` to `asset`, `template`, `tool`, `script`, or `workflow`. Desktop preserves this in Artifact metadata, Repository output markdown, `artifact://` references, Desktop node descriptions, and Workbench outputs grouping. This is classification and traceability; permissions and execution still require explicit Desktop capabilities and approval.',

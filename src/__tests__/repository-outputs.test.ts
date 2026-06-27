@@ -81,6 +81,22 @@ describe('repository outputs', () => {
     expect(markdown).toContain('reuseLastArtifactVersion: 3');
   });
 
+  it('includes artifact version history summaries in repository output markdown', () => {
+    const markdown = buildOutputMarkdown({
+      ...createArtifact(),
+      currentVersion: 2,
+      versions: [
+        { version: 1, label: 'Initial version', createdBy: 'ai', createdAt: 10 },
+        { version: 2, label: 'Appended HTML update', createdBy: 'ai', createdAt: 20 },
+      ],
+    });
+
+    expect(markdown).toContain('versionCount: 2');
+    expect(markdown).toContain('latestVersionLabel: Appended HTML update');
+    expect(markdown).toContain('latestVersionCreatedBy: ai');
+    expect(markdown).toContain('latestVersionAt: 1970-01-01T00:00:00.020Z');
+  });
+
   it('writes output markdown, html preview, and updates outputs index', async () => {
     const writeText = vi.fn();
     const readText = vi.fn(async () => '# Outputs\n');

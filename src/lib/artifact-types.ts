@@ -121,6 +121,7 @@ export interface ArtifactMeta {
   tags: string[];
   templateId?: string;
   currentVersion: number;
+  versions?: VersionEntry[];
   thumbnail?: string;
   status: 'draft' | 'published' | 'archived';
   createdBy?: { agent?: string; model?: string };

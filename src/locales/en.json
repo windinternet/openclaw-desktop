@@ -753,6 +753,7 @@
     "fileSize": "File size",
     "versions": "Versions",
     "current": "Current",
+    "currentVersion": "Current version",
     "noVersions": "No versions",
     "actions": "Actions",
     "copyReference": "Copy reference",

@@ -18,6 +18,7 @@
 - AI 魔法创建保存产物时会以 `action_run` 作为来源，并把产物 ID 回写到对应 ActionRun。
 - ActionRun 仓库摘要会尽量解析本次运行生成的 Artifact meta，列出产物标题、类型、Artifact 引用和 Repository output / preview 路径；读取不到 meta 时退回产物 ID。
 - 终态 ActionRun 的 `lastAssistantResponse` 如果包含 `<artifact>` block，Desktop 会自动保存为 `source: action_run` 的 Artifact，并把 Artifact id 回写到 ActionRun。
+- Artifact meta 已支持 `versions` 版本历史；生成产物会记录 v1，HTML 追加会记录新版本，旧数据会按 `currentVersion` 生成兼容历史用于展示和输出。
 - HTML 产物生成和追加时会记录 `htmlAudit`，标记自包含状态、审批需求和检查项。
 - HTML 产物运行时授权决策会回写到 Artifact meta 的 `authEvents`，记录能力、目标、授权结果、授权级别和请求/决策时间。
 - HTML 产物预览窗口通过专用 preload 暴露受控 `window.artifactBridge`，Bridge 调用会进入主进程执行链路。
@@ -30,6 +31,7 @@
 - ActionRun 生成文件型 `<artifact>` block 时，可以通过 `filePath / fileName / mimeType / fileSize / externalFormat / contentSummary / importFile` 传递非 HTML 产物元数据；`importFile: true` 会把本地文件复制到 Artifact storage。
 - ActionRun 自动保存的新产物会在仓库绑定就绪时尝试镜像到 Repository `outputs/`；文件型产物的 markdown 记录写入 `outputs/files/`，并回写 `repositoryOutputPath` 供 ActionRun 摘要引用。
 - Artifact 详情页可以复制稳定复用引用 `artifact://<artifactId>`；Desktop node command `desktop.artifacts.describe` 可返回同一份引用摘要，供 Gateway 普通聊天或 ActionRun 继续使用已有产物。
+- Artifact 详情页会展示版本历史；Desktop node command `desktop.artifacts.describe` 和 Repository output markdown 会暴露版本数量、最新版本标签、创建者和创建时间。
 - Desktop node command `desktop.artifacts.create` 和 `desktop.outputs.create` 已支持非 HTML 产物字段，包括 `url / command / filePath / fileName / fileSize / mimeType / externalFormat / contentSummary / importFile`；Gateway 普通聊天创建文件、链接、应用和媒体产物时也能进入同一套价值摘要、文件导入和 outputs 镜像链路。
 - Dashboard 最近产物会展示价值摘要、Repository output / preview 线索、来源和更新时间；Workbench outputs 视图会优先用 `externalFormat` 与价值摘要展示对话产物，让 PPT、PDF、链接、应用和媒体不再只显示为泛化 `file`。
 - Artifact meta 已支持 `reuseKind: asset / template / tool / script / workflow`，用于把可复用资产、模板、工具、脚本和工作流从普通文件或 HTML 产物中稳定标记出来；该字段会进入 `<artifact>` block 解析、Desktop node 创建/描述、Repository output markdown、`artifact://` 复用引用和 Workbench outputs 分类。
@@ -171,6 +173,7 @@ Artifact 应记录：
 - 来源 ID。
 - 创建 Agent / Model。
 - 当前版本。
+- 版本历史：版本号、标签、创建者、创建时间。
 - Repository 输出路径。
 
 ## 6. 与可复用资产的关系
@@ -205,6 +208,7 @@ Artifact 应记录：
 6. 用户能从 Dashboard / Workbench 看到最近产物和关键成果，并能读到价值摘要、来源和 Repository output / preview 线索。
 7. 可复用资产、模板、工具、脚本和工作流能通过 `reuseKind` 被保存、镜像、描述、引用和分类展示。
 8. Artifact 复用事实能通过 `reuseEvents` 被记录、描述、在详情页展示，并进入 Repository output markdown。
+9. Artifact 版本历史能在创建和追加时记录，并在详情页、Desktop node 描述和 Repository output markdown 中可见。
 
 ## 8. 非目标
 

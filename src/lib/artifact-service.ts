@@ -2,6 +2,11 @@ import type { ArtifactMeta, ArtifactType, ArtifactSource } from './artifact-type
 import { artifactPersistence } from './artifact-persistence';
 import { auditArtifactHtml } from './artifact-html-audit';
 import { buildArtifactValueSummary, inferArtifactExternalFormat } from './artifact-value-summary';
+import {
+  artifactVersionCreator,
+  createInitialArtifactVersion,
+  nextArtifactVersionHistory,
+} from './artifact-version-history';
 
 let _idCounter = 0;
 
@@ -148,6 +153,7 @@ export const artifactService = {
       reuseKind: params.reuseKind,
       htmlAudit: html === null ? undefined : auditArtifactHtml(html),
     };
+    meta.versions = [createInitialArtifactVersion(meta)];
 
     await artifactPersistence.saveMeta(id, meta);
     if (html !== null) {
@@ -171,9 +177,16 @@ export const artifactService = {
 
     await artifactPersistence.saveHtml(artifactId, newVersion, newHtml);
 
+    const now = Date.now();
     meta.currentVersion = newVersion;
+    meta.versions = nextArtifactVersionHistory(meta, {
+      version: newVersion,
+      label: 'Appended HTML update',
+      createdBy: artifactVersionCreator(meta),
+      createdAt: now,
+    });
     meta.htmlAudit = auditArtifactHtml(newHtml);
-    meta.updatedAt = Date.now();
+    meta.updatedAt = now;
     await artifactPersistence.saveMeta(artifactId, meta);
 
     await updateIndexEntry(meta);

@@ -1,6 +1,7 @@
 import type { ArtifactMeta } from './artifact-types';
 import type { RepositoryBinding } from './agentic-repository';
 import { loadRepositoryBinding } from './agentic-repository-store';
+import { buildArtifactVersionHistory } from './artifact-version-history';
 
 export interface CreateRepositoryOutputParams {
   binding: RepositoryBinding;
@@ -41,6 +42,8 @@ export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string
   const lastRuntimeBridge = runtimeBridgeEvents[runtimeBridgeEvents.length - 1];
   const reuseEvents = artifact.reuseEvents ?? [];
   const lastReuseEvent = reuseEvents[reuseEvents.length - 1];
+  const versions = buildArtifactVersionHistory(artifact);
+  const latestVersion = versions[versions.length - 1];
 
   return [
     `# ${artifact.title}`,
@@ -49,6 +52,10 @@ export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string
     `type: ${artifact.type}`,
     `status: ${artifact.status}`,
     `version: ${artifact.currentVersion}`,
+    versions.length > 0 ? `versionCount: ${versions.length}` : undefined,
+    latestVersion ? `latestVersionLabel: ${latestVersion.label}` : undefined,
+    latestVersion ? `latestVersionCreatedBy: ${latestVersion.createdBy}` : undefined,
+    latestVersion ? `latestVersionAt: ${new Date(latestVersion.createdAt).toISOString()}` : undefined,
     `updatedAt: ${new Date(artifact.updatedAt).toISOString()}`,
     `sourceType: ${artifact.source.type}`,
     artifact.source.id ? `sourceId: ${artifact.source.id}` : undefined,

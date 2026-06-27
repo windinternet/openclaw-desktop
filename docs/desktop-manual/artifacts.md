@@ -18,6 +18,8 @@ Artifacts 是 OpenClaw Desktop 的 P0 价值沉淀层。只要一个结果对用
 
 为了让非 HTML 产物不只是路径，Desktop 会为链接、应用入口、Office 文件、PDF、媒体和普通文件记录 `externalFormat` 与 `contentSummary`。这些字段会进入 Artifact UI 和 Repository output markdown，用于搜索、识别、复用和长期审计。
 
+Artifact 会记录版本历史。新建产物会产生 v1，HTML 追加会产生新版本；详情页、Desktop node command `desktop.artifacts.describe` 和 Repository output markdown 会展示版本数量和最新版本信息。旧产物如果只有 `currentVersion`，Desktop 会生成兼容历史用于展示，不会丢失原有记录。
+
 每个 Artifact 都有稳定引用 `artifact://<artifactId>`。详情页可以复制一段可复用 Markdown 引用，包含标题、类型、价值摘要、来源、仓库 output / preview 路径以及文件或 URL 线索。Gateway 也可以通过 Desktop node command `desktop.artifacts.describe` 读取同一份引用，用于在普通聊天或 ActionRun 中继续使用已有产物。
 
 Gateway 通过 Desktop node command `desktop.artifacts.create` 或 `desktop.outputs.create` 创建产物时，也可以提供 `url`、`command`、`filePath`、`fileName`、`fileSize`、`mimeType`、`externalFormat`、`contentSummary`、`reuseKind` 和 `importFile`。这两条入口会把这些字段传入 Artifact storage；`desktop.outputs.create` 还会把产物镜像到 Repository `outputs/`。
@@ -81,4 +83,4 @@ HTML 产物可以通过 `artifactBridge.exportAs(typeOrOptions, content, fileNam
 
 仓库绑定就绪时，Desktop 可以把产物镜像到 `outputs/`。Markdown 元数据适合审计和 Agent 阅读；HTML 文件适合用户预览和交付。
 
-如果产物来自 ActionRun，ActionRun 的仓库摘要会尽量反向列出这些产物的标题、类型、Artifact 引用、Repository output 路径和 HTML preview 路径，让“非聊天式 AI 操作 -> 结果 -> 产物 -> 仓库沉淀”形成可追踪链路。文件型产物会镜像为 `outputs/files/<artifactId>.md`，其中包含来源、格式、摘要、可复用资产分类、复用记录摘要和文件路径审计信息。
+如果产物来自 ActionRun，ActionRun 的仓库摘要会尽量反向列出这些产物的标题、类型、Artifact 引用、Repository output 路径和 HTML preview 路径，让“非聊天式 AI 操作 -> 结果 -> 产物 -> 仓库沉淀”形成可追踪链路。文件型产物会镜像为 `outputs/files/<artifactId>.md`，其中包含来源、格式、摘要、版本历史摘要、可复用资产分类、复用记录摘要和文件路径审计信息。
