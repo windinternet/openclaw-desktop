@@ -152,6 +152,11 @@ interface Window {
         fileSize: number;
         mimeType?: string;
       }>;
+      readImportedText: (artifactId: string) => Promise<{
+        text: string;
+        bytesRead: number;
+        truncated: boolean;
+      }>;
       list: () => Promise<unknown[]>;
       updateIndex: (entries: unknown) => Promise<void>;
       requestAuth: (

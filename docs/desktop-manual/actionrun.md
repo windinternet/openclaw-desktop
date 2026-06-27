@@ -56,6 +56,8 @@ ActionRun 的结果可以是：
 
 当 ActionRun 生成或复用文件型、Office、PDF、媒体、链接、应用入口或命令型产物后，可以调用 `desktop.artifacts.inspect` 写入 `fileInspection`，把格式、来源、打开方式、预览状态、路径和当前限制同步到 Artifact metadata 与 Repository output。该命令不读取文件内容、不渲染 Office，也不执行命令。
 
+当 ActionRun 生成或复用已导入的文本、代码或 HTML 文件副本后，可以调用 `desktop.artifacts.content.extract` 写入 `contentExtract`，把读取字节数、文本长度、截断状态和抽取片段同步到 Artifact metadata 与 Repository output。该命令只读取 Artifact storage 中的导入副本，不读取任意本地路径，不解析 Office/PDF/媒体文件，也不执行命令。
+
 当 ActionRun 复用已有产物时，可以调用 `desktop.artifacts.reuse.record` 写入上下文、用途、状态、结果摘要和来源信息；仓库路径就绪时可同时刷新对应 Repository output。该记录用于追踪“用了哪个既有成果做了什么”，不代表 Desktop 直接执行该产物。
 
 当 ActionRun 准备把 `tool`、`script` 或 `workflow` 类产物交给外部 runner 前，应调用 `desktop.artifacts.execution.prepare` 记录 `approval_required` 执行意图，并把返回的 pending approval 载荷作为审批展示依据。该命令只建立审批锚点，不执行命令，也不代表用户已经批准。

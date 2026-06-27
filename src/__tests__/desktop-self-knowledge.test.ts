@@ -51,11 +51,13 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('Search existing Artifacts before asking the user for an artifact id');
     expect(skillContent).toContain('desktop.artifacts.inspect');
     expect(skillContent).toContain('records file inspection facts only');
+    expect(skillContent).toContain('desktop.artifacts.content.extract');
+    expect(skillContent).toContain('reads only imported text/code Artifact copies');
     expect(skillContent).toContain('desktop.artifacts.describe');
     expect(skillContent).toContain('desktop.outputs.create');
     expect(skillContent).toContain('Repository `outputs/index.md`');
     expect(skillContent).toContain(
-      'artifact URI, source, updated time, preview, format, summary, preview card, reuse kind, and tags',
+      'artifact URI, source, updated time, preview, format, summary, content extraction status, preview card, reuse kind, and tags',
     );
     expect(skillContent).toContain('externalFormat');
     expect(skillContent).toContain('reuseKind');

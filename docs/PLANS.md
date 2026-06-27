@@ -10,7 +10,7 @@
 | 质量门禁收口 | P0 | 🔄 进行中 | 让 lint / format / stylelint / typecheck / test / build / doc validation 与当前代码事实一致 |
 | 文档事实校准 | P0 | 🔄 进行中 | 按当前代码更新 ARCHITECTURE、FRONTEND、QUALITY_SCORE、产品规格和计划文档 |
 | Desktop Self-Knowledge Pack | P0 | ✅ 第一版完成，持续打磨 | 已编写 Desktop 操作手册，生成 `openclaw-desktop-operator` Skill，并支持 Companion 优先、Agent workspace 降级同步 |
-| 产物系统收口 | P0 | 🔄 第一轮收口中 | Artifact 来源追踪、仓库 outputs 路径回写、HTML `htmlAudit` 审计摘要、运行时授权记录、文件型产物导入复制/系统打开与 UI 提示、ActionRun 产物摘要增强已落地；继续强化 HTML Bridge 执行和 Office 摘要/预览 |
+| 产物系统收口 | P0 | 🔄 第一轮收口中 | Artifact 来源追踪、仓库 outputs 路径回写、HTML `htmlAudit` 审计摘要、运行时授权记录、文件型产物导入复制/系统打开与 UI 提示、已导入文本/代码/HTML 副本 `contentExtract`、ActionRun 产物摘要增强已落地；继续强化 HTML Bridge 执行和 Office/PDF 摘要/预览 |
 | ActionRun 定位统一 | P0 | ⏳ 待计划 | 明确 ActionRun 是 Desktop 非聊天式 AI 操作通道，统一计划、审批、执行和结果沉淀 |
 | Knowledge 导入/消化/健康检查 | P0 | ⏳ 待计划 | 补资料导入、未消化队列、Wiki 消化、索引日志更新和仓库健康检查 |
 | 开始一件事闭环 | P0 | ⏳ 专题讨论 | 用户一句话到事项、计划、执行、产物和复盘的金线路径，后续单独设计 |

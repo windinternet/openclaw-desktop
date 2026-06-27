@@ -17,6 +17,7 @@ vi.mock('../lib/artifact-persistence', () => ({
     list: vi.fn(),
     loadMeta: vi.fn(),
     loadHtml: vi.fn(),
+    readImportedText: vi.fn(),
     openWindow: vi.fn(),
   },
 }));
@@ -582,6 +583,121 @@ describe('desktop node commands', () => {
         binding: expect.objectContaining({ repoPath: '/repo', gatewayInstanceId: 'inst-1' }),
       }),
     );
+  });
+
+  it('extracts imported text artifact content into durable metadata and mirrors the updated output', async () => {
+    const artifact = {
+      id: 'art_text',
+      title: '推进计划',
+      icon: '📎',
+      type: 'file' as const,
+      source: { type: 'manual' as const },
+      tags: ['plan'],
+      currentVersion: 1,
+      status: 'draft' as const,
+      createdAt: 1,
+      updatedAt: 2,
+      fileName: 'plan.md',
+      filePath: '/artifact-storage/art_text/files/plan.md',
+      originalFilePath: '/Users/deepin/Documents/plan.md',
+      fileSize: 72,
+      mimeType: 'text/markdown',
+      externalFormat: 'text' as const,
+      contentSummary: 'Text · plan.md · 72 B',
+    };
+    mockedArtifactPersistence.loadMeta.mockResolvedValue(artifact);
+    mockedArtifactPersistence.loadHtml.mockResolvedValue(null);
+    mockedArtifactPersistence.readImportedText.mockResolvedValue({
+      text: '# 推进计划\n\nShip the content extraction slice.',
+      bytesRead: 58,
+      truncated: false,
+    });
+    mockedCreateRepositoryOutput.mockResolvedValue({
+      outputId: 'art_text',
+      outputPath: 'outputs/files/art_text.md',
+    });
+
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.content.extract', {
+        repoPath: '/repo',
+        gatewayInstanceId: 'inst-1',
+        artifactId: 'art_text',
+        extractedAt: 80,
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      artifactId: 'art_text',
+      extract: expect.objectContaining({
+        extractedAt: 80,
+        status: 'extracted',
+        format: 'text',
+        sourceKind: 'imported_file',
+        fileName: 'plan.md',
+        bytesRead: 58,
+        truncated: false,
+        snippet: '# 推进计划\n\nShip the content extraction slice.',
+      }),
+      output: {
+        outputId: 'art_text',
+        path: 'outputs/files/art_text.md',
+        previewPath: undefined,
+      },
+    });
+
+    expect(mockedArtifactPersistence.readImportedText).toHaveBeenCalledWith('art_text');
+    expect(mockedArtifactService.update).toHaveBeenCalledWith('art_text', {
+      contentExtract: expect.objectContaining({
+        status: 'extracted',
+        sourceKind: 'imported_file',
+        snippet: '# 推进计划\n\nShip the content extraction slice.',
+      }),
+    });
+    expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(
+      expect.objectContaining({
+        artifact: expect.objectContaining({
+          id: 'art_text',
+          contentExtract: expect.objectContaining({ status: 'extracted' }),
+        }),
+        binding: expect.objectContaining({ repoPath: '/repo', gatewayInstanceId: 'inst-1' }),
+      }),
+    );
+  });
+
+  it('does not read content from unsupported artifact formats', async () => {
+    mockedArtifactPersistence.loadMeta.mockResolvedValue({
+      id: 'art_file',
+      title: '路线图 PPT',
+      icon: '📎',
+      type: 'file',
+      source: { type: 'manual' },
+      tags: ['roadmap'],
+      currentVersion: 1,
+      status: 'draft',
+      createdAt: 1,
+      updatedAt: 2,
+      fileName: 'roadmap.pptx',
+      filePath: '/artifact-storage/art_file/files/roadmap.pptx',
+      originalFilePath: '/Users/deepin/Documents/roadmap.pptx',
+      fileSize: 4096,
+      mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      externalFormat: 'powerpoint',
+      contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+    });
+
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.content.extract', {
+        artifactId: 'art_file',
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      error: 'content-extract-unavailable',
+      artifactId: 'art_file',
+      format: 'powerpoint',
+      reason: 'unsupported-format',
+    });
+
+    expect(mockedArtifactPersistence.readImportedText).not.toHaveBeenCalled();
+    expect(mockedArtifactService.update).not.toHaveBeenCalled();
   });
 
   it('does not write file inspection records for pure HTML artifacts', async () => {

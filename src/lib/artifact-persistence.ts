@@ -1,4 +1,5 @@
 import type { ArtifactMeta } from './artifact-types';
+import type { ArtifactContentReadResult } from './artifact-content-extract';
 
 interface ArtifactApi {
   open: (artifactId: string, version: number) => Promise<number>;
@@ -11,6 +12,7 @@ interface ArtifactApi {
     sourcePath: string,
     preferredFileName?: string,
   ) => Promise<Pick<ArtifactMeta, 'filePath' | 'fileName' | 'fileSize' | 'mimeType'>>;
+  readImportedText: (artifactId: string) => Promise<ArtifactContentReadResult>;
   list: () => Promise<ArtifactMeta[]>;
   updateIndex: (entries: ArtifactMeta[]) => Promise<void>;
 }
@@ -44,6 +46,10 @@ export const artifactPersistence = {
     preferredFileName?: string,
   ): Promise<Pick<ArtifactMeta, 'filePath' | 'fileName' | 'fileSize' | 'mimeType'>> {
     return getApi().importFile(artifactId, sourcePath, preferredFileName);
+  },
+
+  async readImportedText(artifactId: string): Promise<ArtifactContentReadResult> {
+    return getApi().readImportedText(artifactId);
   },
 
   async loadHtml(artifactId: string, version?: number): Promise<string | null> {

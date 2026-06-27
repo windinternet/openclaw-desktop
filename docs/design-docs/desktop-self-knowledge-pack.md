@@ -105,6 +105,7 @@ Skill 应包含：
 - 文件型产物可以通过 `filePath` 或 `url` 表示；本地文件可复制导入 Artifact storage，并交给系统文件处理器打开。
 - 非 HTML / Office / 文件 / 链接 / 应用入口产物会生成预览卡片，包含 format label、thumbnail label、summary、location、primary action 和 safety note；Artifacts UI、`desktop.artifacts.search`、`desktop.artifacts.describe` 和 Repository output markdown 会暴露同一份线索。
 - 文件型、Office、PDF、媒体、链接、应用入口和命令型产物可通过 `desktop.artifacts.inspect` 写入 `fileInspection`，记录格式、来源类型、打开方式、预览状态、摘要、路径和限制；这是文件检查事实，不读取内容、不渲染 Office、不执行命令、不授予权限。
+- 已导入文本、代码和 HTML 文件副本可通过 `desktop.artifacts.content.extract` 写入 `contentExtract`，记录读取字节数、文本长度、截断状态和抽取片段；该能力只读取 Artifact storage 副本，不读取任意本地路径，不解析 Office/PDF/媒体文件，不执行命令、不授予权限。
 - ActionRun 文件型 `<artifact>` header 可以携带 `filePath / fileName / fileSize / mimeType / externalFormat / contentSummary / reuseKind / importFile`；`importFile: true` 表示允许导入本地文件，仓库绑定就绪时会镜像到 `outputs/files/`。
 - 可复用资产、模板、工具、脚本和工作流应通过 `reuseKind: asset / template / tool / script / workflow` 标记；该字段用于分类和追踪，不代表可以绕过审批直接执行。
 - 既有产物可用稳定引用 `artifact://<artifactId>` 继续复用；Gateway 可调用 `desktop.artifacts.describe` 获取标题、类型、摘要、预览卡片、来源、仓库 output / preview 和文件或 URL 线索。
@@ -113,7 +114,7 @@ Skill 应包含：
 - 执行型复用产物（`tool / script / workflow`）交给外部 runner 前，应先调用 `desktop.artifacts.execution.prepare` 写入 `approval_required` 执行意图并取得 pending approval 载荷；这是审批锚点，不执行命令、不授予执行权限。
 - 执行型复用产物（`tool / script / workflow`）有审批、运行或结果需要归档时，Gateway、ActionRun 或 MCP 工具应调用 `desktop.artifacts.execution.record` 写入 `status`、审批信息、runner、命令文本、结果摘要、输出 Artifact 和 Repository output 线索；这是执行事实记录，不执行命令、不授予执行权限。
 - Gateway 可通过 `desktop.artifacts.create` 或 `desktop.outputs.create` 创建非 HTML 产物，并传入 `url / command / filePath / fileName / fileSize / mimeType / externalFormat / contentSummary / reuseKind / importFile`；需要同时沉淀到 Repository `outputs/` 时使用 `desktop.outputs.create`。
-- Repository `outputs/index.md` 是可扫读的 Artifact 目录；条目会暴露 `artifact://` 引用、来源、更新时间、预览、格式、摘要、预览卡片、复用分类和标签，详细审计以单个产物 markdown 为准。
+- Repository `outputs/index.md` 是可扫读的 Artifact 目录；条目会暴露 `artifact://` 引用、来源、更新时间、预览、格式、摘要、预览卡片、内容抽取状态、复用分类和标签，详细审计以单个产物 markdown 为准。
 - Artifacts 列表搜索、Dashboard 最近产物和 Workbench outputs 会展示价值摘要、`externalFormat`、`reuseKind`、来源、更新时间、标签以及 Repository output / preview 线索，检查系统状态时应把这些作为关键成果入口。
 - 终态 ActionRun 的 `lastAssistantResponse` 如果包含 `<artifact>` 块，Desktop 会自动保存为 `source: action_run` 的 Artifact，并把 Artifact id 回写到 ActionRun。
 - ActionRun 产生产物后，仓库 run 摘要会尽量写入产物标题、类型、Artifact 引用和 Repository output / preview 路径。

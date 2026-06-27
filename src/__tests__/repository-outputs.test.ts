@@ -53,6 +53,36 @@ describe('repository outputs', () => {
     expect(markdown).toContain('previewCardAction: open_file');
   });
 
+  it('includes extracted artifact text snippets in repository output markdown', () => {
+    const markdown = buildOutputMarkdown({
+      ...createArtifact(),
+      type: 'file',
+      externalFormat: 'text',
+      contentSummary: 'Text · plan.md · 128 B',
+      contentExtract: {
+        extractedAt: 20,
+        status: 'extracted',
+        format: 'text',
+        sourceKind: 'imported_file',
+        fileName: 'plan.md',
+        mimeType: 'text/markdown',
+        bytesRead: 58,
+        textLength: 42,
+        truncated: false,
+        snippet: '# 推进计划\n\nShip the content extraction slice.',
+        summary: 'Text extract · plan.md · 42 chars',
+      },
+    });
+
+    expect(markdown).toContain('contentExtractStatus: extracted');
+    expect(markdown).toContain('contentExtractSource: imported_file');
+    expect(markdown).toContain('contentExtractBytes: 58');
+    expect(markdown).toContain('contentExtractTextLength: 42');
+    expect(markdown).toContain('contentExtractTruncated: false');
+    expect(markdown).toContain('contentExtractSnippet: # 推进计划\\n\\nShip the content extraction slice.');
+    expect(markdown).toContain('contentExtractAt: 1970-01-01T00:00:00.020Z');
+  });
+
   it('includes Desktop Bridge call summaries in repository output markdown', () => {
     const markdown = buildOutputMarkdown({
       ...createArtifact(),
@@ -254,20 +284,36 @@ describe('repository outputs', () => {
     const result = await createRepositoryOutput({
       binding: createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
       artifact: createArtifact({
-        id: 'art_file',
-        title: '路线图 PPT',
+        id: 'art_text',
+        title: '推进计划',
         type: 'file',
-        externalFormat: 'powerpoint',
-        contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+        externalFormat: 'text',
+        contentSummary: 'Text · plan.md · 128 B',
+        contentExtract: {
+          extractedAt: 20,
+          status: 'extracted',
+          format: 'text',
+          sourceKind: 'imported_file',
+          bytesRead: 58,
+          textLength: 42,
+          truncated: false,
+          snippet: '# 推进计划',
+          summary: 'Text extract · plan.md · 42 chars',
+        },
       }),
     });
 
-    expect(result.outputPath).toBe('outputs/files/art_file.md');
+    expect(result.outputPath).toBe('outputs/files/art_text.md');
     expect(result.previewPath).toBeUndefined();
     expect(writeText).toHaveBeenCalledWith(
       '/repo',
-      'outputs/files/art_file.md',
-      expect.stringContaining('contentSummary: PowerPoint · roadmap.pptx · 4 KB'),
+      'outputs/files/art_text.md',
+      expect.stringContaining('contentSummary: Text · plan.md · 128 B'),
+    );
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'outputs/index.md',
+      expect.stringContaining('  - contentExtract: extracted, 42 chars'),
     );
   });
 

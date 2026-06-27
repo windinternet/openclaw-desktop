@@ -58,11 +58,11 @@ OpenClaw Desktop
 
 这两层必须分开。
 
-| 层 | 解决的问题 | 内容 |
-|---|---|---|
-| Repository Context | 当前仓库怎么工作 | repoPath、binding、仓库 `AGENTS.md`、当前仓库规则、写入边界 |
+| 层                          | 解决的问题               | 内容                                                                                              |
+| --------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------- |
+| Repository Context          | 当前仓库怎么工作         | repoPath、binding、仓库 `AGENTS.md`、当前仓库规则、写入边界                                       |
 | Desktop Self-Knowledge Pack | Desktop 这个软件能做什么 | 页面能力、ActionRun 协议、Artifact 协议、Repository 工具、HTML runtime、聊天如何调用 Desktop 能力 |
-| Action / Session Context | 本次具体要干什么 | 用户意图、选中文件、选中事项、产物需求、审批状态 |
+| Action / Session Context    | 本次具体要干什么         | 用户意图、选中文件、选中事项、产物需求、审批状态                                                  |
 
 优先级规则：
 
@@ -118,6 +118,7 @@ HTML 产物是特色能力：
 - 任何有价值的结果都能保存为产物。
 - 产物能清楚标注来源：chat / workflow / agent_team / manual / mcp_tool / action_run。
 - HTML 产物可预览、可打开、可版本化、可沉淀到仓库。
+- 已导入文本、代码和 HTML 文件副本可安全抽取 `contentExtract`，并进入 Artifact 详情、Gateway 命令、搜索、复用引用和 Repository outputs；Office/PDF/媒体内容级解析仍作为后续能力推进。
 
 ### P0-3 ActionRun 定位统一
 

@@ -81,6 +81,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     saveMeta: (artifactId: string, meta: unknown) => ipcRenderer.invoke('artifact:saveMeta', artifactId, meta),
     saveHtml: (artifactId: string, version: number, html: string) => ipcRenderer.invoke('artifact:saveHtml', artifactId, version, html),
     importFile: (artifactId: string, sourcePath: string, preferredFileName?: string) => ipcRenderer.invoke('artifact:importFile', artifactId, sourcePath, preferredFileName),
+    readImportedText: (artifactId: string) => ipcRenderer.invoke('artifact:readImportedText', artifactId),
     list: () => ipcRenderer.invoke('artifact:list'),
     updateIndex: (entries: unknown) => ipcRenderer.invoke('artifact:updateIndex', entries),
     requestAuth: (artifactId: string, capability: string, detail: string) => ipcRenderer.invoke('artifact:requestAuth', artifactId, capability, detail),

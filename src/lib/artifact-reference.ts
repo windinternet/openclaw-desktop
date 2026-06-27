@@ -29,6 +29,8 @@ export function buildArtifactReuseReference(artifact: ArtifactMeta): ArtifactReu
     artifact.fileInspection?.limitations.length
       ? `  - fileInspectionLimitations: ${artifact.fileInspection.limitations.join(', ')}`
       : undefined,
+    artifact.contentExtract ? `  - contentExtract: ${artifact.contentExtract.status}` : undefined,
+    artifact.contentExtract ? `  - contentExtractSummary: ${artifact.contentExtract.summary}` : undefined,
     artifact.fileName ? `  - fileName: ${artifact.fileName}` : undefined,
     artifact.filePath ? `  - filePath: ${artifact.filePath}` : undefined,
     artifact.url ? `  - url: ${artifact.url}` : undefined,

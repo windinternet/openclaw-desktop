@@ -32,6 +32,7 @@
 - 非 HTML 产物会记录 `externalFormat` 和 `contentSummary`，用于把 Word、Excel、PPT、PDF、链接、应用入口和媒体文件从“路径”提升为可搜索、可复用、可沉淀的价值对象。
 - 非 HTML / Office / 文件型产物已具备最小预览卡片契约：Desktop 会根据 `externalFormat`、`contentSummary`、仓库路径、文件/链接/命令线索生成 format label、thumbnail label、summary、location、primary action 和 safety note；Artifacts UI、Desktop node `search/describe` 和 Repository output markdown 会暴露同一份线索。
 - Artifact meta 已支持 `fileInspection`，用于沉淀文件型、Office、PDF、媒体、链接、应用入口和命令型产物的检查事实：格式、来源类型、打开方式、预览状态、摘要、存储/原始路径和当前限制；Desktop node command `desktop.artifacts.inspect` 可为既有产物补写该记录并刷新 Repository output。该检查只基于现有 metadata，不读取文件内容、不生成 Office 原生预览、不执行命令。
+- Artifact meta 已支持 `contentExtract`，用于沉淀已导入文本、代码和 HTML 文件副本的内容抽取事实：读取字节数、文本长度、是否截断、抽取片段和抽取时间；Desktop node command `desktop.artifacts.content.extract` 只读取 Artifact storage 中的导入副本，不读取任意本地路径，不解析 Office/PDF/媒体文件，也不执行命令或授予权限。
 - ActionRun 生成文件型 `<artifact>` block 时，可以通过 `filePath / fileName / mimeType / fileSize / externalFormat / contentSummary / importFile` 传递非 HTML 产物元数据；`importFile: true` 会把本地文件复制到 Artifact storage。
 - ActionRun 自动保存的新产物会在仓库绑定就绪时尝试镜像到 Repository `outputs/`；文件型产物的 markdown 记录写入 `outputs/files/`，并回写 `repositoryOutputPath` 供 ActionRun 摘要引用。
 - Artifact 详情页可以复制稳定复用引用 `artifact://<artifactId>`；Desktop node command `desktop.artifacts.describe` 可返回同一份引用摘要，供 Gateway 普通聊天或 ActionRun 继续使用已有产物。
@@ -47,7 +48,7 @@
 
 - 继续补齐非 HTML ActionRun 产物的 Office 原生预览和真实缩略图；当前已有预览卡片、文件检查记录和动作/安全说明，但还不是文件内容级渲染。
 - 继续扩展 HTML 产物 Desktop Bridge 的命令执行策略；网络请求和导出已具备最小审批/记录能力，但命令执行仍不能静默开放，必须继续走更严格的审批与运行记录设计。
-- 补 Office 文件型产物的真实缩略图和内容摘要抽取；当前 `fileInspection` 已记录格式、来源、打开方式、预览状态、路径和限制，但还不读取文件正文。
+- 补 Office/PDF/媒体文件型产物的真实缩略图和内容级摘要抽取；当前 `fileInspection` 已记录格式、来源、打开方式、预览状态、路径和限制，`contentExtract` 已覆盖已导入文本/代码/HTML 副本，但 Office/PDF/媒体正文解析仍未开放。
 - 继续补齐可复用资产的版本策略和真正执行器边界；当前已有执行前审批意图记录与执行事实归档，但没有开放静默执行能力。
 
 ## 1. 定位
@@ -93,6 +94,7 @@ link / app / file / audio / image / video
 - 手动创建文件型产物时，Desktop 可以把本地文件复制到 Artifact storage，`filePath` 指向副本，`originalFilePath` 保留原始位置。
 - Desktop 会自动识别常见外部格式并写入 `externalFormat`，同时生成 `contentSummary` 用于列表、详情页和 Repository output。
 - Desktop 会为文件型、Office、PDF、媒体、链接、应用入口和命令型产物写入 `fileInspection`，记录来源类型、打开方式、预览状态、摘要、路径和限制。
+- Desktop 可为已导入的文本、代码和 HTML 文件副本写入 `contentExtract`，记录读取字节数、文本长度、截断状态和内容片段；该能力只读取 Artifact storage 副本。
 - Word / Excel / PPT 等 Office 成果先作为 `file` 产物记录，并通过 `fileInspection` 标记当前只能外部应用打开、缺原生预览/缩略图/内容抽取；后续再补摘要、缩略图和原生预览。
 
 ## 3. HTML 特色能力
@@ -152,8 +154,9 @@ Repository 中至少保存：
 - 预览路径。
 - 标签。
 - 与 work / plan / run 的关联。
+- 文件检查和安全内容抽取事实。
 
-`outputs/index.md` 用作快速目录，不替代单个产物的 markdown 审计记录。目录条目应尽量暴露 `artifact://` 引用、来源、更新时间、预览路径、外部格式、价值摘要、复用分类和标签，让 Agent 不必逐个打开文件也能识别关键成果。
+`outputs/index.md` 用作快速目录，不替代单个产物的 markdown 审计记录。目录条目应尽量暴露 `artifact://` 引用、来源、更新时间、预览路径、外部格式、价值摘要、内容抽取状态、复用分类和标签，让 Agent 不必逐个打开文件也能识别关键成果。
 
 ## 5. 与 ActionRun 的关系
 
@@ -226,6 +229,7 @@ Artifact 应记录：
 11. Repository `outputs/index.md` 能作为可扫读目录展示 Artifact 价值线索，并在重新镜像同一产物时刷新旧条目。
 12. 执行型复用产物能在真正执行前记录 `approval_required` 意图，在执行后记录结果事实；Desktop 只沉淀审批与运行线索，不静默执行命令。
 13. 文件型、Office、PDF、媒体、链接、应用入口和命令型产物能记录 `fileInspection`，并在 Artifact 详情、Desktop node `inspect/describe/search`、Repository output 中暴露检查事实和当前限制。
+14. 已导入文本、代码和 HTML 文件副本能通过 `desktop.artifacts.content.extract` 记录 `contentExtract`，并在 Artifact 详情、Desktop node `content.extract/describe/search`、Repository output 和 `outputs/index.md` 中暴露抽取事实。
 
 ## 8. 非目标
 

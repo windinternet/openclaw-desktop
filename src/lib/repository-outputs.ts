@@ -77,6 +77,19 @@ export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string
     artifact.fileInspection
       ? `fileInspectionAt: ${new Date(artifact.fileInspection.inspectedAt).toISOString()}`
       : undefined,
+    artifact.contentExtract ? `contentExtractStatus: ${artifact.contentExtract.status}` : undefined,
+    artifact.contentExtract ? `contentExtractFormat: ${artifact.contentExtract.format}` : undefined,
+    artifact.contentExtract ? `contentExtractSource: ${artifact.contentExtract.sourceKind}` : undefined,
+    artifact.contentExtract ? `contentExtractSummary: ${artifact.contentExtract.summary}` : undefined,
+    artifact.contentExtract?.fileName ? `contentExtractFileName: ${artifact.contentExtract.fileName}` : undefined,
+    artifact.contentExtract?.mimeType ? `contentExtractMimeType: ${artifact.contentExtract.mimeType}` : undefined,
+    artifact.contentExtract ? `contentExtractBytes: ${artifact.contentExtract.bytesRead}` : undefined,
+    artifact.contentExtract ? `contentExtractTextLength: ${artifact.contentExtract.textLength}` : undefined,
+    artifact.contentExtract ? `contentExtractTruncated: ${artifact.contentExtract.truncated}` : undefined,
+    artifact.contentExtract ? `contentExtractSnippet: ${formatInlineText(artifact.contentExtract.snippet)}` : undefined,
+    artifact.contentExtract
+      ? `contentExtractAt: ${new Date(artifact.contentExtract.extractedAt).toISOString()}`
+      : undefined,
     `previewCardFormat: ${previewCard.formatLabel}`,
     `previewCardThumbnail: ${previewCard.thumbnailLabel}`,
     `previewCardSummary: ${previewCard.summary}`,
@@ -197,6 +210,11 @@ function buildOutputIndexEntry(artifact: ArtifactMeta, outputPath: string, previ
     previewPath ? `  - preview: ${previewPath}` : undefined,
     artifact.externalFormat ? `  - format: ${artifact.externalFormat}` : undefined,
     artifact.contentSummary ? `  - summary: ${artifact.contentSummary}` : undefined,
+    artifact.contentExtract
+      ? `  - contentExtract: ${artifact.contentExtract.status}, ${artifact.contentExtract.textLength} chars${
+          artifact.contentExtract.truncated ? ', truncated' : ''
+        }`
+      : undefined,
     artifact.fileInspection
       ? `  - inspection: ${artifact.fileInspection.sourceKind}, ${artifact.fileInspection.previewStatus}`
       : undefined,
@@ -227,6 +245,10 @@ function formatArtifactSource(artifact: ArtifactMeta): string {
   return [artifact.source.type, artifact.source.id, artifact.source.name]
     .filter((part): part is string => typeof part === 'string' && part.length > 0)
     .join(' / ');
+}
+
+function formatInlineText(value: string): string {
+  return value.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n/g, '\\n');
 }
 
 function getRepositoryWriteApi() {

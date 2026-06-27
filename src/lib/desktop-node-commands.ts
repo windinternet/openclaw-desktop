@@ -1,4 +1,5 @@
 import type {
+  ArtifactContentExtract,
   ArtifactExecutionStatus,
   ArtifactExternalFormat,
   ArtifactFileInspection,
@@ -11,6 +12,7 @@ import type {
 import { artifactService, type GenerateParams } from './artifact-service';
 import { artifactPersistence } from './artifact-persistence';
 import { buildArtifactPreviewCard, buildArtifactSearchText } from './artifact-display';
+import { buildArtifactContentExtract, resolveArtifactContentExtractEligibility } from './artifact-content-extract';
 import { buildArtifactFileInspection, shouldInspectArtifactFile } from './artifact-file-inspection';
 import { buildArtifactReuseReference } from './artifact-reference';
 import { recordArtifactExecutionEvent } from './artifact-execution-record';
@@ -260,6 +262,7 @@ function buildArtifactSearchResult(artifact: ArtifactMeta) {
   const reference = buildArtifactReuseReference(artifact);
   const lastExecutionEvent = artifact.executionEvents?.[artifact.executionEvents.length - 1];
   const fileInspection = artifact.fileInspection;
+  const contentExtract = artifact.contentExtract;
   return {
     id: artifact.id,
     title: artifact.title,
@@ -279,6 +282,7 @@ function buildArtifactSearchResult(artifact: ArtifactMeta) {
     url: artifact.url,
     command: artifact.command,
     fileInspection,
+    contentExtract,
     previewCard: buildArtifactPreviewCard(artifact),
     executionEventCount: artifact.executionEvents?.length ?? 0,
     lastExecutionEvent,
@@ -689,6 +693,71 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
     };
   }
 
+  if (command === 'desktop.artifacts.content.extract') {
+    const artifactId = stringValue(params.artifactId);
+    if (!artifactId) return invalidParams('artifactId is required');
+    const artifact = await artifactPersistence.loadMeta(artifactId);
+    if (!artifact) return { ok: false, error: 'not-found', artifactId };
+
+    const eligibility = resolveArtifactContentExtractEligibility(artifact);
+    if (!eligibility.eligible) {
+      return {
+        ok: false,
+        error: 'content-extract-unavailable',
+        artifactId,
+        format: eligibility.format,
+        reason: eligibility.reason,
+      };
+    }
+
+    let extract: ArtifactContentExtract;
+    try {
+      const read = await artifactPersistence.readImportedText(artifactId);
+      extract = buildArtifactContentExtract(artifact, read, numberValue(params.extractedAt) ?? Date.now());
+    } catch (error) {
+      return {
+        ok: false,
+        error: 'content-extract-failed',
+        artifactId,
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    await artifactService.update(artifactId, {
+      contentExtract: extract,
+    });
+    const persistedArtifact = await artifactPersistence.loadMeta(artifactId);
+    const outputArtifact = persistedArtifact
+      ? { ...persistedArtifact, contentExtract: extract }
+      : { ...artifact, contentExtract: extract };
+
+    const repoPath = stringValue(params.repoPath);
+    let output: RepositoryOutputResult | null = null;
+    if (repoPath) {
+      output = await mirrorArtifactSnapshotToRepository({
+        artifactId,
+        artifact: outputArtifact,
+        repoPath,
+        gatewayInstanceId: stringValue(params.gatewayInstanceId),
+      });
+    }
+
+    return {
+      ok: true,
+      artifactId,
+      extract,
+      ...(output
+        ? {
+            output: {
+              outputId: output.outputId,
+              path: output.outputPath,
+              previewPath: output.previewPath,
+            },
+          }
+        : {}),
+    };
+  }
+
   if (command === 'desktop.artifacts.describe') {
     const artifactId = stringValue(params.artifactId);
     if (!artifactId) return invalidParams('artifactId is required');
@@ -713,6 +782,7 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
         externalFormat: artifact.externalFormat,
         contentSummary: artifact.contentSummary,
         fileInspection: artifact.fileInspection,
+        contentExtract: artifact.contentExtract,
         reuseKind: artifact.reuseKind,
         reuseEventCount: artifact.reuseEvents?.length ?? 0,
         lastReuseEvent,

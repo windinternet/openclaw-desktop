@@ -1,12 +1,23 @@
 import { app, BrowserWindow, dialog, ipcMain, Notification, protocol, shell } from 'electron'
 import path from 'node:path'
-import { readFileSync, existsSync, mkdirSync, writeFileSync, copyFileSync, statSync } from 'node:fs'
+import {
+  readFileSync,
+  existsSync,
+  mkdirSync,
+  writeFileSync,
+  copyFileSync,
+  statSync,
+  openSync,
+  readSync,
+  closeSync,
+} from 'node:fs'
 import os from 'node:os'
 import { ARTIFACT_IPC } from '../src/lib/artifact-ipc'
 import { buildArtifactBridgeFetchResponse, resolveArtifactBridgeFetchRequest } from '../src/lib/artifact-bridge-fetch'
 import { decideArtifactOpenTarget } from '../src/lib/artifact-open-target'
 import { resolveArtifactExportRequest } from '../src/lib/artifact-export'
 import { recordArtifactAuthDecision, recordArtifactBridgeCallResult } from '../src/lib/artifact-runtime-auth'
+import { inferArtifactExternalFormat } from '../src/lib/artifact-value-summary'
 import type { ArtifactBridgeCallStatus, ArtifactMeta } from '../src/lib/artifact-types'
 
 function artifactsRoot(): string {
@@ -67,6 +78,8 @@ class ArtifactBridgeDeniedError extends Error {}
 class ArtifactBridgeUnsupportedError extends Error {}
 
 const artifactPreviewWindows = new Map<number, ArtifactPreviewWindowContext>()
+const MAX_IMPORTED_TEXT_BYTES = 64 * 1024
+const TEXT_EXTRACT_FORMATS = new Set(['html', 'text', 'code'])
 
 export function registerArtifactProtocol(): void {
   protocol.handle('artifact', (request) => {
@@ -154,8 +167,55 @@ function detectMimeType(fileName: string): string | undefined {
     '.wav': 'audio/wav',
     '.mp4': 'video/mp4',
     '.mov': 'video/quicktime',
+    '.txt': 'text/plain',
+    '.md': 'text/markdown',
+    '.markdown': 'text/markdown',
+    '.json': 'application/json',
+    '.js': 'text/javascript',
+    '.jsx': 'text/javascript',
+    '.ts': 'text/typescript',
+    '.tsx': 'text/typescript',
+    '.py': 'text/x-python',
+    '.sh': 'text/x-shellscript',
+    '.sql': 'text/x-sql',
+    '.html': 'text/html',
+    '.css': 'text/css',
   }
   return known[ext]
+}
+
+function readImportedArtifactText(artifactId: string): { text: string; bytesRead: number; truncated: boolean } {
+  const meta = readMeta(artifactId)
+  if (!meta) throw new Error('Artifact not found')
+  if (!meta.filePath || !meta.originalFilePath) throw new Error('Artifact is not an imported file')
+
+  const format = inferArtifactExternalFormat(meta)
+  if (!TEXT_EXTRACT_FORMATS.has(format)) throw new Error(`Artifact format is not text-extractable: ${format}`)
+
+  const storageDir = path.resolve(filesDir(artifactId))
+  const targetPath = path.resolve(meta.filePath)
+  if (targetPath !== storageDir && !targetPath.startsWith(`${storageDir}${path.sep}`)) {
+    throw new Error('Imported artifact file is outside artifact storage')
+  }
+
+  const stat = statSync(targetPath)
+  if (!stat.isFile()) throw new Error('Imported artifact path is not a file')
+
+  const bytesToRead = Math.min(stat.size, MAX_IMPORTED_TEXT_BYTES)
+  const buffer = Buffer.alloc(bytesToRead)
+  const fd = openSync(targetPath, 'r')
+  let bytesRead = 0
+  try {
+    bytesRead = readSync(fd, buffer, 0, bytesToRead, 0)
+  } finally {
+    closeSync(fd)
+  }
+
+  return {
+    text: buffer.subarray(0, bytesRead).toString('utf-8'),
+    bytesRead,
+    truncated: stat.size > bytesRead,
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -519,6 +579,10 @@ export function registerArtifactIpcHandlers(): void {
       }
     },
   )
+
+  ipcMain.handle(ARTIFACT_IPC.READ_IMPORTED_TEXT, async (_event, artifactId: string) => {
+    return readImportedArtifactText(artifactId)
+  })
 
   ipcMain.handle(ARTIFACT_IPC.UPDATE_INDEX, async (_event, entries: unknown) => {
     const root = artifactsRoot()

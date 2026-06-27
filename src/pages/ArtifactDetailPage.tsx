@@ -305,6 +305,39 @@ export default function ArtifactDetailPage() {
                   )}
                 </div>
               )}
+              {meta.contentExtract && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div>
+                    <Text type="tertiary">{t('artifact.contentExtract')}: </Text>
+                    <Tag size="small">{meta.contentExtract.status}</Tag>
+                    <Tag size="small" type="light">
+                      {meta.contentExtract.format}
+                    </Tag>
+                    <Tag size="small" type="light">
+                      {meta.contentExtract.sourceKind}
+                    </Tag>
+                  </div>
+                  <Text type="secondary">{meta.contentExtract.summary}</Text>
+                  <Text type="tertiary" size="small">
+                    {meta.contentExtract.bytesRead} B · {meta.contentExtract.textLength} chars
+                    {meta.contentExtract.truncated ? ' · truncated' : ''}
+                  </Text>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <Text type="tertiary">{t('artifact.contentExtractSnippet')}: </Text>
+                    <Text
+                      code
+                      copyable
+                      style={{
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      {meta.contentExtract.snippet}
+                    </Text>
+                  </div>
+                </div>
+              )}
               {meta.reuseKind && (
                 <div>
                   <Text type="tertiary">{t('artifact.reuseKind')}: </Text>

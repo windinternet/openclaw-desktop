@@ -753,6 +753,8 @@
     "executionRecordCount": "{{count}} execution record",
     "fileInspection": "File inspection",
     "fileInspectionLimitations": "Inspection limits",
+    "contentExtract": "Content extract",
+    "contentExtractSnippet": "Extracted snippet",
     "importFileHint": "When a local file path is provided, a copy is imported into Artifact storage.",
     "originalFilePath": "Original path",
     "fileSize": "File size",

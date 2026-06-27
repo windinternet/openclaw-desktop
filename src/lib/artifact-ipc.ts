@@ -15,6 +15,7 @@ export const ARTIFACT_IPC = {
   SAVE_META: 'artifact:saveMeta',
   SAVE_HTML: 'artifact:saveHtml',
   IMPORT_FILE: 'artifact:importFile',
+  READ_IMPORTED_TEXT: 'artifact:readImportedText',
   UPDATE_INDEX: 'artifact:updateIndex',
   WRITE_SKILL: 'artifact:writeSkill',
 } as const;

@@ -64,6 +64,23 @@ export interface ArtifactFileInspection {
   limitations: string[];
 }
 
+export type ArtifactContentExtractStatus = 'extracted';
+export type ArtifactContentExtractSourceKind = 'imported_file';
+
+export interface ArtifactContentExtract {
+  extractedAt: number;
+  status: ArtifactContentExtractStatus;
+  format: ArtifactExternalFormat;
+  sourceKind: ArtifactContentExtractSourceKind;
+  summary: string;
+  fileName?: string;
+  mimeType?: string;
+  bytesRead: number;
+  textLength: number;
+  truncated: boolean;
+  snippet: string;
+}
+
 export interface ArtifactSource {
   type: 'chat' | 'workflow' | 'agent_team' | 'manual' | 'mcp_tool' | 'action_run';
   id?: string;
@@ -203,6 +220,7 @@ export interface ArtifactMeta {
   externalFormat?: ArtifactExternalFormat;
   contentSummary?: string;
   fileInspection?: ArtifactFileInspection;
+  contentExtract?: ArtifactContentExtract;
   reuseKind?: ArtifactReuseKind;
   repositoryOutputPath?: string;
   repositoryPreviewPath?: string;
