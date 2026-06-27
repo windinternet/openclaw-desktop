@@ -48,3 +48,4 @@ ActionRun 的结果可以是：
 - 3D Office 布局方案。
 - 复盘或健康检查结果。
 
+当 ActionRun 产生产物时，本地记录会保存 `artifactIds`。仓库 `runs/action-runs/*.md` 摘要会尽量解析对应 Artifact meta，列出产物标题、类型、Artifact 引用，以及 `outputs/` 中的 markdown 和 HTML preview 路径；读取不到 meta 时仍保留产物 ID，避免丢失审计线索。

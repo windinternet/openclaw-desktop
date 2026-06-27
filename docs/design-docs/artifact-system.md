@@ -16,7 +16,7 @@
 - Repository output markdown 会记录 artifactId、类型、状态、版本、更新时间、来源和预览路径。
 - Artifacts 页面和详情页会展示仓库输出状态与路径。
 - AI 魔法创建保存产物时会以 `action_run` 作为来源，并把产物 ID 回写到对应 ActionRun。
-- ActionRun 仓库摘要会列出本次运行生成的产物 ID。
+- ActionRun 仓库摘要会尽量解析本次运行生成的 Artifact meta，列出产物标题、类型、Artifact 引用和 Repository output / preview 路径；读取不到 meta 时退回产物 ID。
 - HTML 产物生成和追加时会记录 `htmlAudit`，标记自包含状态、审批需求和检查项。
 - Repository output markdown 会沉淀 HTML 审计摘要，Artifacts UI 会显示非自包含和需审批提示。
 - 文件、图片、音频、视频等非 HTML 产物可记录 `filePath` 或 `url`，打开时交给系统文件处理器或外部 URL 处理器。
@@ -24,7 +24,7 @@
 
 仍需继续收口：
 
-- 继续扩展非 AI 魔法创建入口的 ActionRun 产物自动关联，并在 ActionRun 摘要中补充仓库输出路径。
+- 继续扩展非 AI 魔法创建入口的 ActionRun 产物自动关联。
 - 继续补齐 HTML 产物运行时审批闭环，让 `htmlAudit` 与实际 Desktop Bridge 授权记录互相印证。
 - 补 Office 文件型产物的缩略图/摘要预览和更细的来源记录。
 - 把可复用资产、模板、工具、脚本提升为一等管理对象。
@@ -145,6 +145,7 @@ ActionRun 应记录：
 - 产物类型。
 - 产物路径。
 - 是否写入 Repository。
+- Repository output / preview 路径。
 - 生成过程中发生的审批。
 
 Artifact 应记录：

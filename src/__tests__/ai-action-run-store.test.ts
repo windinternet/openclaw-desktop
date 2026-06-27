@@ -7,6 +7,7 @@ import {
 } from '../lib/ai-action-run-store';
 import { AI_ACTION_RUNS_STORAGE_KEY } from '../lib/ai-action-center';
 import { AGENTIC_REPOSITORY_STORAGE_KEY } from '../lib/agentic-repository';
+import type { ArtifactMeta } from '../lib/artifact-types';
 import type { AgentTeamProfile, AiActionRun } from '../lib/types';
 
 function createRun(overrides: Partial<AiActionRun> = {}): AiActionRun {
@@ -38,6 +39,24 @@ function createProfile(): AgentTeamProfile {
   return {
     ...upsertAgentProfile(createEmptyAgentTeamProfile(), desired),
     instructions: [createInstruction('创建王皮特', desired.agentId)],
+  };
+}
+
+function createArtifact(overrides: Partial<ArtifactMeta> = {}): ArtifactMeta {
+  return {
+    id: 'art_1',
+    title: '交互式复盘报告',
+    icon: '📊',
+    type: 'report',
+    source: { type: 'action_run', id: 'action-99' },
+    tags: ['复盘'],
+    currentVersion: 1,
+    status: 'draft',
+    repositoryOutputPath: 'outputs/reports/art_1.md',
+    repositoryPreviewPath: 'outputs/html/art_1.html',
+    createdAt: 1,
+    updatedAt: 2,
+    ...overrides,
   };
 }
 
@@ -183,5 +202,91 @@ describe('AI ActionRun repository summaries', () => {
     expect(markdown).toContain('## Artifacts');
     expect(markdown).toContain('- art_1');
     expect(markdown).toContain('- art_2');
+  });
+
+  it('includes artifact details and repository output paths when metadata is available', () => {
+    const markdown = buildAiActionRunMarkdown(
+      createRun({
+        id: 'action-99',
+        type: 'artifact_create',
+        status: 'done',
+        input: '生成复盘报告',
+        resultSummary: '复盘报告已生成',
+        artifactIds: ['art_1'],
+      }),
+      [createArtifact()],
+    );
+
+    expect(markdown).toContain('- [交互式复盘报告](outputs/reports/art_1.md) (`art_1`, report)');
+    expect(markdown).toContain('  - preview: outputs/html/art_1.html');
+    expect(markdown).toContain('  - detail: artifact://art_1');
+  });
+
+  it('mirrors ActionRun summaries with artifact metadata from local Artifact storage', async () => {
+    const writeText = vi.fn();
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'runs/action-runs/index.md') return '# Action Runs\n';
+      return '';
+    });
+    const saveInstanceData = vi.fn();
+    const loadInstanceData = vi.fn(async (_instanceId: string, key: string) => {
+      if (key === AI_ACTION_RUNS_STORAGE_KEY) return [];
+      if (key === AGENTIC_REPOSITORY_STORAGE_KEY) {
+        return {
+          id: 'repo_instance-1',
+          name: 'Repo',
+          location: 'desktop-local',
+          repoPath: '/repo',
+          gatewayInstanceId: 'instance-1',
+          status: 'repo_ready',
+          paths: {
+            sources: 'sources',
+            wiki: 'wiki',
+            work: 'work',
+            plans: 'plans',
+            runs: 'runs',
+            outputs: 'outputs',
+            reviews: 'reviews',
+            schemas: 'schemas',
+          },
+        };
+      }
+      return null;
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        artifact: {
+          getMeta: vi.fn(async () => createArtifact()),
+        },
+        storage: {
+          loadInstanceData,
+          saveInstanceData,
+        },
+        repository: {
+          readText,
+          writeText,
+        },
+      },
+    });
+
+    await upsertAiActionRun(
+      'instance-1',
+      createRun({
+        id: 'action-99',
+        type: 'artifact_create',
+        sourcePage: 'artifacts',
+        status: 'done',
+        input: '生成复盘报告',
+        resultSummary: '复盘报告已生成',
+        artifactIds: ['art_1'],
+        updatedAt: 2,
+      }),
+    );
+
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'runs/action-runs/action-99.md',
+      expect.stringContaining('[交互式复盘报告](outputs/reports/art_1.md) (`art_1`, report)'),
+    );
   });
 });

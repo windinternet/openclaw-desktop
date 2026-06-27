@@ -14,7 +14,9 @@ import {
 } from './agent-team';
 import { fetchGatewayAgents } from './gateway-agents';
 import { loadRepositoryBinding } from './agentic-repository-store';
+import { artifactPersistence } from './artifact-persistence';
 import { loadInstanceData, saveInstanceDataAwaited } from './local-persistence';
+import type { ArtifactMeta } from './artifact-types';
 import type { AgentTeamProfile, AiActionRun, AiActionRunStatus } from './types';
 
 export interface AiActionGatewayClient {
@@ -39,7 +41,8 @@ export async function upsertAiActionRun(instanceId: string, run: AiActionRun): P
   return nextRuns;
 }
 
-export function buildAiActionRunMarkdown(run: AiActionRun): string {
+export function buildAiActionRunMarkdown(run: AiActionRun, artifacts: ArtifactMeta[] = []): string {
+  const artifactById = new Map(artifacts.map((artifact) => [artifact.id, artifact]));
   const lines = [
     `# ${run.type}`,
     '',
@@ -68,7 +71,17 @@ export function buildAiActionRunMarkdown(run: AiActionRun): string {
   if (run.artifactIds && run.artifactIds.length > 0) {
     lines.push('## Artifacts', '');
     for (const artifactId of run.artifactIds) {
-      lines.push(`- ${artifactId}`);
+      const artifact = artifactById.get(artifactId);
+      if (!artifact) {
+        lines.push(`- ${artifactId}`);
+        continue;
+      }
+      const title = artifact.repositoryOutputPath
+        ? `[${artifact.title}](${artifact.repositoryOutputPath})`
+        : artifact.title;
+      lines.push(`- ${title} (\`${artifact.id}\`, ${artifact.type})`);
+      if (artifact.repositoryPreviewPath) lines.push(`  - preview: ${artifact.repositoryPreviewPath}`);
+      lines.push(`  - detail: artifact://${artifact.id}`);
     }
     lines.push('');
   }
@@ -95,13 +108,30 @@ async function mirrorTerminalAiActionRunToRepository(instanceId: string, run: Ai
   if (!repository?.writeText || !repository.readText) return;
 
   const runPath = `${binding.paths.runs}/action-runs/${run.id}.md`;
-  await repository.writeText(binding.repoPath, runPath, buildAiActionRunMarkdown(run));
+  const artifacts = await loadRunArtifacts(run.artifactIds);
+  await repository.writeText(binding.repoPath, runPath, buildAiActionRunMarkdown(run, artifacts));
 
   const indexPath = `${binding.paths.runs}/action-runs/index.md`;
   const existingIndex = await repository.readText(binding.repoPath, indexPath);
   const indexEntry = `- [${run.type}](${runPath}) - ${run.status}`;
   const nextIndex = existingIndex.includes(runPath) ? existingIndex : `${existingIndex.trimEnd()}\n${indexEntry}\n`;
   await repository.writeText(binding.repoPath, indexPath, nextIndex);
+}
+
+async function loadRunArtifacts(artifactIds: string[] | undefined): Promise<ArtifactMeta[]> {
+  if (!artifactIds || artifactIds.length === 0) return [];
+
+  const artifacts = await Promise.all(
+    artifactIds.map(async (artifactId) => {
+      try {
+        return await artifactPersistence.loadMeta(artifactId);
+      } catch {
+        return null;
+      }
+    }),
+  );
+
+  return artifacts.filter((artifact): artifact is ArtifactMeta => artifact !== null);
 }
 
 export async function reconcileGatewayAgentCreationRun(
