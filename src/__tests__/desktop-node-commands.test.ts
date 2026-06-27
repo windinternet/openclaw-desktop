@@ -14,6 +14,7 @@ vi.mock('../lib/artifact-service', () => ({
 
 vi.mock('../lib/artifact-persistence', () => ({
   artifactPersistence: {
+    list: vi.fn(),
     loadMeta: vi.fn(),
     loadHtml: vi.fn(),
     openWindow: vi.fn(),
@@ -407,6 +408,146 @@ describe('desktop node commands', () => {
         repositoryPreviewPath: 'outputs/html/art_2.html',
       }),
       reference: expect.stringContaining('[成果](artifact://art_2)'),
+    });
+  });
+
+  it('searches existing artifacts by query and reusable value metadata', async () => {
+    mockedArtifactPersistence.list.mockResolvedValue([
+      {
+        id: 'art_report',
+        title: '季度经营报告',
+        icon: '📊',
+        type: 'report',
+        source: { type: 'mcp_tool', name: 'desktop.outputs.create' },
+        tags: ['finance'],
+        currentVersion: 1,
+        status: 'published',
+        createdAt: 1,
+        updatedAt: 10,
+        contentSummary: 'HTML · 可交互经营报告',
+        repositoryOutputPath: 'outputs/reports/art_report.md',
+        repositoryPreviewPath: 'outputs/html/art_report.html',
+      },
+      {
+        id: 'art_script',
+        title: '部署脚本',
+        icon: '📎',
+        type: 'file',
+        source: { type: 'action_run', id: 'run_deploy' },
+        tags: ['deploy'],
+        currentVersion: 3,
+        status: 'draft',
+        createdAt: 1,
+        updatedAt: 30,
+        externalFormat: 'code',
+        contentSummary: 'Script · deploy.sh',
+        reuseKind: 'script',
+        fileName: 'deploy.sh',
+        repositoryOutputPath: 'outputs/files/art_script.md',
+      },
+      {
+        id: 'art_roadmap',
+        title: '路线图 PPT',
+        icon: '📎',
+        type: 'file',
+        source: { type: 'chat', id: 'chat_1', name: '产品规划' },
+        tags: ['roadmap'],
+        currentVersion: 2,
+        status: 'draft',
+        createdAt: 1,
+        updatedAt: 20,
+        externalFormat: 'powerpoint',
+        contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+        reuseKind: 'template',
+        fileName: 'roadmap.pptx',
+        repositoryOutputPath: 'outputs/files/art_roadmap.md',
+        repositoryPreviewPath: 'outputs/html/art_roadmap.html',
+      },
+    ]);
+
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.search', {
+        query: 'roadmap',
+        type: 'file',
+        reuseKind: 'template',
+        limit: 5,
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      count: 1,
+      results: [
+        expect.objectContaining({
+          id: 'art_roadmap',
+          title: '路线图 PPT',
+          type: 'file',
+          uri: 'artifact://art_roadmap',
+          currentVersion: 2,
+          status: 'draft',
+          externalFormat: 'powerpoint',
+          contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+          reuseKind: 'template',
+          source: { type: 'chat', id: 'chat_1', name: '产品规划' },
+          repositoryOutputPath: 'outputs/files/art_roadmap.md',
+          repositoryPreviewPath: 'outputs/html/art_roadmap.html',
+          fileName: 'roadmap.pptx',
+          updatedAt: 20,
+          reference: expect.stringContaining('artifactId: art_roadmap'),
+        }),
+      ],
+    });
+
+    expect(mockedArtifactPersistence.list).toHaveBeenCalledOnce();
+  });
+
+  it('limits artifact search results while reporting the full filtered count', async () => {
+    mockedArtifactPersistence.list.mockResolvedValue([
+      {
+        id: 'art_old',
+        title: '旧文件',
+        icon: '📎',
+        type: 'file',
+        source: { type: 'manual' },
+        tags: [],
+        currentVersion: 1,
+        status: 'draft',
+        createdAt: 1,
+        updatedAt: 10,
+      },
+      {
+        id: 'art_new',
+        title: '新文件',
+        icon: '📎',
+        type: 'file',
+        source: { type: 'action_run', id: 'run_new' },
+        tags: [],
+        currentVersion: 1,
+        status: 'draft',
+        createdAt: 1,
+        updatedAt: 30,
+      },
+      {
+        id: 'art_report',
+        title: '报告',
+        icon: '📊',
+        type: 'report',
+        source: { type: 'chat' },
+        tags: [],
+        currentVersion: 1,
+        status: 'draft',
+        createdAt: 1,
+        updatedAt: 20,
+      },
+    ]);
+
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.search', {
+        type: 'file',
+        limit: 1,
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      count: 2,
+      results: [expect.objectContaining({ id: 'art_new', updatedAt: 30 })],
     });
   });
 

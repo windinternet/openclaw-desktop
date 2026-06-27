@@ -75,6 +75,8 @@ export function buildDesktopSelfKnowledgeSkillContent(): string {
     '',
     'When Gateway or ActionRun reuses an existing Artifact, call `desktop.artifacts.reuse.record` with `artifactId`, `context`, `status`, `purpose`, `resultSummary`, optional source metadata, and optional `repoPath` to mirror the updated Repository output. This records reuse/audit facts only; it does not execute tools, open files, or grant permissions.',
     '',
+    'Search existing Artifacts before asking the user for an artifact id. Gateway can call `desktop.artifacts.search` with optional `query`, `type`, `externalFormat`, `reuseKind`, `sourceType`, `status`, and `limit` to find recent matching value objects. Search results return `artifact://` URIs, value summaries, source, repository output / preview paths, file or URL clues, and reusable Markdown references; search does not open files, execute commands, or grant permissions.',
+    '',
     'Use `artifact://<artifactId>` as the stable reference for an existing Artifact. Desktop can copy a reusable Markdown reference from the Artifact detail page, and Gateway can call `desktop.artifacts.describe` to retrieve the same reference with title, type, value summary, source, repository output / preview paths, and file or URL clues.',
     '',
     'Gateway can create non-HTML Artifacts through `desktop.artifacts.create` or `desktop.outputs.create` by passing `url`, `command`, `filePath`, `fileName`, `fileSize`, `mimeType`, `externalFormat`, `contentSummary`, `reuseKind`, and `importFile`. Use `desktop.outputs.create` when the result should also be mirrored into Repository `outputs/`.',

@@ -1,5 +1,6 @@
 import type {
   ArtifactExternalFormat,
+  ArtifactMeta,
   ArtifactReuseContext,
   ArtifactReuseKind,
   ArtifactReuseStatus,
@@ -53,6 +54,14 @@ const ARTIFACT_EXTERNAL_FORMATS = new Set<ArtifactExternalFormat>([
 ]);
 
 const ARTIFACT_REUSE_KINDS = new Set<ArtifactReuseKind>(['asset', 'template', 'tool', 'script', 'workflow']);
+const ARTIFACT_SOURCE_TYPES = new Set<ArtifactMeta['source']['type']>([
+  'chat',
+  'workflow',
+  'agent_team',
+  'manual',
+  'mcp_tool',
+  'action_run',
+]);
 const ARTIFACT_REUSE_CONTEXTS = new Set<ArtifactReuseContext>([
   'chat',
   'workflow',
@@ -63,6 +72,7 @@ const ARTIFACT_REUSE_CONTEXTS = new Set<ArtifactReuseContext>([
   'repository',
 ]);
 const ARTIFACT_REUSE_STATUSES = new Set<ArtifactReuseStatus>(['used', 'succeeded', 'failed', 'cancelled']);
+const ARTIFACT_STATUSES = new Set<ArtifactMeta['status']>(['draft', 'published', 'archived']);
 
 const HTML_ARTIFACT_TYPES = new Set<ArtifactType>([
   'report',
@@ -105,6 +115,10 @@ function artifactTypeValue(value: unknown): ArtifactType {
   return typeof value === 'string' && ARTIFACT_TYPES.has(value as ArtifactType) ? (value as ArtifactType) : 'other';
 }
 
+function optionalArtifactTypeValue(value: unknown): ArtifactType | undefined {
+  return typeof value === 'string' && ARTIFACT_TYPES.has(value as ArtifactType) ? (value as ArtifactType) : undefined;
+}
+
 function artifactExternalFormatValue(value: unknown): ArtifactExternalFormat | undefined {
   return typeof value === 'string' && ARTIFACT_EXTERNAL_FORMATS.has(value as ArtifactExternalFormat)
     ? (value as ArtifactExternalFormat)
@@ -127,6 +141,18 @@ function artifactReuseStatusValue(value: unknown): ArtifactReuseStatus {
   return typeof value === 'string' && ARTIFACT_REUSE_STATUSES.has(value as ArtifactReuseStatus)
     ? (value as ArtifactReuseStatus)
     : 'used';
+}
+
+function artifactStatusValue(value: unknown): ArtifactMeta['status'] | undefined {
+  return typeof value === 'string' && ARTIFACT_STATUSES.has(value as ArtifactMeta['status'])
+    ? (value as ArtifactMeta['status'])
+    : undefined;
+}
+
+function artifactSourceTypeValue(value: unknown): ArtifactMeta['source']['type'] | undefined {
+  return typeof value === 'string' && ARTIFACT_SOURCE_TYPES.has(value as ArtifactMeta['source']['type'])
+    ? (value as ArtifactMeta['source']['type'])
+    : undefined;
 }
 
 function booleanValue(value: unknown): boolean | undefined {
@@ -207,6 +233,64 @@ async function mirrorRepositoryOutput(params: { repoPath: string; gatewayInstanc
 
 async function recordRepositoryOutput(artifactId: string, output: RepositoryOutputResult): Promise<void> {
   await artifactService.update(artifactId, buildArtifactRepositoryOutputUpdates(output));
+}
+
+function buildArtifactSearchText(artifact: ArtifactMeta): string {
+  return [
+    artifact.id,
+    artifact.title,
+    artifact.description,
+    artifact.type,
+    artifact.status,
+    artifact.tags.join(' '),
+    artifact.externalFormat,
+    artifact.contentSummary,
+    artifact.reuseKind,
+    artifact.repositoryOutputPath,
+    artifact.repositoryPreviewPath,
+    artifact.fileName,
+    artifact.filePath,
+    artifact.originalFilePath,
+    artifact.mimeType,
+    artifact.url,
+    artifact.command,
+    artifact.source.type,
+    artifact.source.id,
+    artifact.source.name,
+  ]
+    .filter((item): item is string => typeof item === 'string' && item.length > 0)
+    .join('\n')
+    .toLowerCase();
+}
+
+function buildArtifactSearchResult(artifact: ArtifactMeta) {
+  const reference = buildArtifactReuseReference(artifact);
+  return {
+    id: artifact.id,
+    title: artifact.title,
+    description: artifact.description,
+    type: artifact.type,
+    uri: reference.uri,
+    currentVersion: artifact.currentVersion,
+    status: artifact.status,
+    externalFormat: artifact.externalFormat,
+    contentSummary: artifact.contentSummary,
+    reuseKind: artifact.reuseKind,
+    tags: artifact.tags,
+    source: artifact.source,
+    repositoryOutputPath: artifact.repositoryOutputPath,
+    repositoryPreviewPath: artifact.repositoryPreviewPath,
+    fileName: artifact.fileName,
+    url: artifact.url,
+    command: artifact.command,
+    updatedAt: artifact.updatedAt,
+    reference: reference.markdown,
+  };
+}
+
+function artifactSearchLimit(value: unknown): number {
+  const limit = Math.trunc(numberValue(value) ?? 10);
+  return Math.max(1, Math.min(limit, 50));
 }
 
 function buildArtifactGenerateParams(params: Record<string, unknown>, command: string): GenerateParams {
@@ -509,6 +593,34 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
     if (!htmlChunk) return invalidParams('htmlChunk is required');
     await artifactService.append(artifactId, htmlChunk);
     return { ok: true, artifactId };
+  }
+
+  if (command === 'desktop.artifacts.search') {
+    const query = stringValue(params.query)?.toLowerCase();
+    const type = optionalArtifactTypeValue(params.type);
+    const externalFormat = artifactExternalFormatValue(params.externalFormat);
+    const reuseKind = artifactReuseKindValue(params.reuseKind);
+    const sourceType = artifactSourceTypeValue(params.sourceType);
+    const status = artifactStatusValue(params.status);
+    const limit = artifactSearchLimit(params.limit);
+    const artifacts = await artifactPersistence.list();
+    const results = artifacts
+      .filter((artifact) => {
+        if (type && artifact.type !== type) return false;
+        if (externalFormat && artifact.externalFormat !== externalFormat) return false;
+        if (reuseKind && artifact.reuseKind !== reuseKind) return false;
+        if (sourceType && artifact.source.type !== sourceType) return false;
+        if (status && artifact.status !== status) return false;
+        if (query && !buildArtifactSearchText(artifact).includes(query)) return false;
+        return true;
+      })
+      .sort((a, b) => b.updatedAt - a.updatedAt || a.title.localeCompare(b.title));
+
+    return {
+      ok: true,
+      count: results.length,
+      results: results.slice(0, limit).map(buildArtifactSearchResult),
+    };
   }
 
   if (command === 'desktop.artifacts.describe') {

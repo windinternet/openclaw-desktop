@@ -43,6 +43,8 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('Artifacts keep version history');
     expect(skillContent).toContain('version count and latest version metadata');
     expect(skillContent).toContain('artifact://<artifactId>');
+    expect(skillContent).toContain('desktop.artifacts.search');
+    expect(skillContent).toContain('Search existing Artifacts before asking the user for an artifact id');
     expect(skillContent).toContain('desktop.artifacts.describe');
     expect(skillContent).toContain('desktop.outputs.create');
     expect(skillContent).toContain('Repository `outputs/index.md`');

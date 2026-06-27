@@ -33,6 +33,7 @@
 - ActionRun 生成文件型 `<artifact>` block 时，可以通过 `filePath / fileName / mimeType / fileSize / externalFormat / contentSummary / importFile` 传递非 HTML 产物元数据；`importFile: true` 会把本地文件复制到 Artifact storage。
 - ActionRun 自动保存的新产物会在仓库绑定就绪时尝试镜像到 Repository `outputs/`；文件型产物的 markdown 记录写入 `outputs/files/`，并回写 `repositoryOutputPath` 供 ActionRun 摘要引用。
 - Artifact 详情页可以复制稳定复用引用 `artifact://<artifactId>`；Desktop node command `desktop.artifacts.describe` 可返回同一份引用摘要，供 Gateway 普通聊天或 ActionRun 继续使用已有产物。
+- 当 Gateway 或 ActionRun 不知道具体 `artifactId` 时，可先调用 Desktop node command `desktop.artifacts.search`，按 `query / type / externalFormat / reuseKind / sourceType / status / limit` 搜索已有产物；返回项包含 `artifact://` URI、价值摘要、来源、仓库 output / preview、文件或 URL 线索和可复用 Markdown 引用。搜索只读索引，不打开文件、不执行命令、不授予权限。
 - Artifact 详情页会展示版本历史；Desktop node command `desktop.artifacts.describe` 和 Repository output markdown 会暴露版本数量、最新版本标签、创建者和创建时间。
 - Desktop node command `desktop.artifacts.create` 和 `desktop.outputs.create` 已支持非 HTML 产物字段，包括 `url / command / filePath / fileName / fileSize / mimeType / externalFormat / contentSummary / importFile`；Gateway 普通聊天创建文件、链接、应用和媒体产物时也能进入同一套价值摘要、文件导入和 outputs 镜像链路。
 - Dashboard 最近产物会展示价值摘要、Repository output / preview 线索、来源和更新时间；Workbench outputs 视图会优先用 `externalFormat` 与价值摘要展示对话产物，让 PPT、PDF、链接、应用和媒体不再只显示为泛化 `file`。
