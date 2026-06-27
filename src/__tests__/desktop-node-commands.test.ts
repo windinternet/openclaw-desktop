@@ -745,6 +745,137 @@ describe('desktop node commands', () => {
     );
   });
 
+  it('prepares an executable artifact approval request before any runner executes it', async () => {
+    mockedArtifactPersistence.loadMeta.mockResolvedValue({
+      id: 'art_script',
+      title: '部署脚本',
+      icon: '📎',
+      type: 'file',
+      source: { type: 'action_run', id: 'run_create' },
+      tags: ['deploy'],
+      currentVersion: 3,
+      status: 'draft',
+      createdAt: 1,
+      updatedAt: 2,
+      reuseKind: 'script',
+      command: 'npm run deploy',
+      contentSummary: 'Script · deploy.sh',
+    });
+    mockedArtifactPersistence.loadHtml.mockResolvedValue(null);
+    mockedCreateRepositoryOutput.mockResolvedValue({
+      outputId: 'art_script',
+      outputPath: 'outputs/files/art_script.md',
+    });
+
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.execution.prepare', {
+        repoPath: '/repo',
+        gatewayInstanceId: 'inst-1',
+        artifactId: 'art_script',
+        sourceId: 'run_exec',
+        sourceName: '部署生产',
+        runner: 'ActionRun',
+        command: 'npm run deploy -- --dry-run',
+        approvalTitle: '运行部署脚本',
+        approvalRisk: 'high',
+        approvalReason: '会调用本地命令，需要用户审批',
+        requestedAt: 10,
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      artifactId: 'art_script',
+      event: expect.objectContaining({
+        status: 'approval_required',
+        sourceId: 'run_exec',
+        artifactVersion: 3,
+        command: 'npm run deploy -- --dry-run',
+        approvalRisk: 'high',
+      }),
+      approval: {
+        id: expect.any(String),
+        status: 'pending',
+        artifactId: 'art_script',
+        artifactUri: 'artifact://art_script',
+        title: '运行部署脚本',
+        risk: 'high',
+        reason: '会调用本地命令，需要用户审批',
+        runner: 'ActionRun',
+        command: 'npm run deploy -- --dry-run',
+        requiresUserApproval: true,
+        boundary: {
+          recordOnly: true,
+          desktopExecutes: false,
+          grantsPermission: false,
+        },
+      },
+      output: {
+        outputId: 'art_script',
+        path: 'outputs/files/art_script.md',
+        previewPath: undefined,
+      },
+    });
+
+    expect(mockedArtifactService.update).toHaveBeenCalledWith('art_script', {
+      executionEvents: [
+        expect.objectContaining({
+          status: 'approval_required',
+          sourceId: 'run_exec',
+          sourceName: '部署生产',
+          runner: 'ActionRun',
+          command: 'npm run deploy -- --dry-run',
+          approvalTitle: '运行部署脚本',
+          approvalRisk: 'high',
+          approvalReason: '会调用本地命令，需要用户审批',
+          artifactVersion: 3,
+          requestedAt: 10,
+        }),
+      ],
+    });
+    expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(
+      expect.objectContaining({
+        artifact: expect.objectContaining({
+          id: 'art_script',
+          executionEvents: [
+            expect.objectContaining({
+              sourceId: 'run_exec',
+              status: 'approval_required',
+            }),
+          ],
+        }),
+        binding: expect.objectContaining({ repoPath: '/repo', gatewayInstanceId: 'inst-1' }),
+      }),
+    );
+  });
+
+  it('rejects execution preparation for non-executable reusable artifact kinds', async () => {
+    mockedArtifactPersistence.loadMeta.mockResolvedValue({
+      id: 'art_template',
+      title: '周报模板',
+      icon: '📎',
+      type: 'file',
+      source: { type: 'manual' },
+      tags: [],
+      currentVersion: 1,
+      status: 'draft',
+      createdAt: 1,
+      updatedAt: 2,
+      reuseKind: 'template',
+    });
+
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.execution.prepare', {
+        artifactId: 'art_template',
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      error: 'not-executable-artifact',
+      artifactId: 'art_template',
+      reuseKind: 'template',
+    });
+
+    expect(mockedArtifactService.update).not.toHaveBeenCalled();
+  });
+
   it('rejects execution records for non-executable reusable artifact kinds', async () => {
     mockedArtifactPersistence.loadMeta.mockResolvedValue({
       id: 'art_template',

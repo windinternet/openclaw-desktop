@@ -713,6 +713,96 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
     };
   }
 
+  if (command === 'desktop.artifacts.execution.prepare') {
+    const artifactId = stringValue(params.artifactId);
+    if (!artifactId) return invalidParams('artifactId is required');
+    const artifact = await artifactPersistence.loadMeta(artifactId);
+    if (!artifact) return { ok: false, error: 'not-found', artifactId };
+    if (!artifact.reuseKind || !ARTIFACT_EXECUTABLE_REUSE_KINDS.has(artifact.reuseKind)) {
+      return {
+        ok: false,
+        error: 'not-executable-artifact',
+        artifactId,
+        reuseKind: artifact.reuseKind,
+      };
+    }
+
+    const requestedAt = numberValue(params.requestedAt) ?? Date.now();
+    const commandText = stringValue(params.command) ?? artifact.command;
+    const runner = stringValue(params.runner);
+    const approvalTitle = stringValue(params.approvalTitle) ?? `准备执行 ${artifact.title}`;
+    const approvalRisk = stringValue(params.approvalRisk) ?? 'high';
+    const approvalReason =
+      stringValue(params.approvalReason) ?? '执行型 Artifact 需要用户明确审批后，外部 runner 才能继续。';
+    const updatedArtifact = recordArtifactExecutionEvent(artifact, {
+      status: 'approval_required',
+      sourceId: stringValue(params.sourceId),
+      sourceName: stringValue(params.sourceName),
+      runner,
+      command: commandText,
+      approvalTitle,
+      approvalRisk,
+      approvalReason,
+      requestedAt,
+    });
+    const event = updatedArtifact.executionEvents?.[updatedArtifact.executionEvents.length - 1];
+
+    await artifactService.update(artifactId, {
+      executionEvents: updatedArtifact.executionEvents,
+    });
+    const persistedArtifact = await artifactPersistence.loadMeta(artifactId);
+    const outputArtifact = persistedArtifact
+      ? { ...persistedArtifact, executionEvents: updatedArtifact.executionEvents }
+      : updatedArtifact;
+
+    const repoPath = stringValue(params.repoPath);
+    let output: RepositoryOutputResult | null = null;
+    if (repoPath) {
+      const html = await artifactPersistence.loadHtml(artifactId, outputArtifact.currentVersion);
+      output = await createRepositoryOutput({
+        binding: createDefaultRepositoryBinding({
+          gatewayInstanceId: stringValue(params.gatewayInstanceId) ?? 'desktop-node',
+          repoPath,
+        }),
+        artifact: outputArtifact,
+        html: html ?? undefined,
+      });
+      await recordRepositoryOutput(artifactId, output);
+    }
+
+    return {
+      ok: true,
+      artifactId,
+      event,
+      approval: {
+        id: event?.id,
+        status: 'pending',
+        artifactId,
+        artifactUri: `artifact://${artifactId}`,
+        title: approvalTitle,
+        risk: approvalRisk,
+        reason: approvalReason,
+        runner,
+        command: commandText,
+        requiresUserApproval: true,
+        boundary: {
+          recordOnly: true,
+          desktopExecutes: false,
+          grantsPermission: false,
+        },
+      },
+      ...(output
+        ? {
+            output: {
+              outputId: output.outputId,
+              path: output.outputPath,
+              previewPath: output.previewPath,
+            },
+          }
+        : {}),
+    };
+  }
+
   if (command === 'desktop.artifacts.execution.record') {
     const artifactId = stringValue(params.artifactId);
     if (!artifactId) return invalidParams('artifactId is required');

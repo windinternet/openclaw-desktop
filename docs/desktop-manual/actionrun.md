@@ -56,4 +56,6 @@ ActionRun 的结果可以是：
 
 当 ActionRun 复用已有产物时，可以调用 `desktop.artifacts.reuse.record` 写入上下文、用途、状态、结果摘要和来源信息；仓库路径就绪时可同时刷新对应 Repository output。该记录用于追踪“用了哪个既有成果做了什么”，不代表 Desktop 直接执行该产物。
 
+当 ActionRun 准备把 `tool`、`script` 或 `workflow` 类产物交给外部 runner 前，应调用 `desktop.artifacts.execution.prepare` 记录 `approval_required` 执行意图，并把返回的 pending approval 载荷作为审批展示依据。该命令只建立审批锚点，不执行命令，也不代表用户已经批准。
+
 当 ActionRun 通过外部审批通道使用了 `tool`、`script` 或 `workflow` 类产物时，可以调用 `desktop.artifacts.execution.record` 归档审批、runner、命令文本、状态、结果摘要和输出线索。该命令只记录执行事实，不执行命令，也不绕过 ActionRun 审批。

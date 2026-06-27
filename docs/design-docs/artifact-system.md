@@ -40,14 +40,14 @@
 - Artifacts 列表、Dashboard 最近产物和 Workbench outputs 会展示价值摘要、`reuseKind`、Repository output / preview 线索、来源和更新时间；Artifacts 列表搜索会覆盖标题、描述、标签、价值摘要、外部格式、复用分类、来源和仓库路径，让 PPT、PDF、链接、应用和媒体不再只显示为泛化 `file`。
 - Artifact meta 已支持 `reuseKind: asset / template / tool / script / workflow`，用于把可复用资产、模板、工具、脚本和工作流从普通文件或 HTML 产物中稳定标记出来；该字段会进入 `<artifact>` block 解析、Desktop node 创建/描述、Repository output markdown、`artifact://` 复用引用和 Workbench outputs 分类。
 - Artifact meta 已支持 `reuseEvents`，用于记录某个产物被聊天、ActionRun、工作流、团队、仓库或 MCP 工具复用的事实、状态、用途、结果摘要和当时版本；Desktop node command `desktop.artifacts.reuse.record` 可写入该记录，并可在 `repoPath` 就绪时重新镜像 Repository output markdown。
-- Artifact meta 已支持 `executionEvents`，用于记录 `tool / script / workflow` 执行型复用产物的一次审批、运行或结果归档事实；Desktop node command `desktop.artifacts.execution.record` 只写入执行记录并刷新 Repository output，不执行命令、不授予权限。
+- Artifact meta 已支持 `executionEvents`，用于记录 `tool / script / workflow` 执行型复用产物的一次审批、运行或结果归档事实；Desktop node command `desktop.artifacts.execution.prepare` 可先写入 `approval_required` 执行意图并返回 pending approval 载荷，`desktop.artifacts.execution.record` 可继续归档后续审批/运行/结果，两者都只刷新记录和 Repository output，不执行命令、不授予权限。
 
 仍需继续收口：
 
 - 继续补齐非 HTML ActionRun 产物的 Office 原生预览和真实缩略图；当前已有预览卡片契约和动作/安全说明，但还不是文件内容级渲染。
 - 继续扩展 HTML 产物 Desktop Bridge 的命令执行策略；网络请求和导出已具备最小审批/记录能力，但命令执行仍不能静默开放，必须继续走更严格的审批与运行记录设计。
 - 补 Office 文件型产物的真实缩略图、内容摘要抽取和更细的来源记录；当前预览卡片只提供格式、摘要、位置、主动作和安全说明。
-- 继续补齐可复用资产的版本策略、真正执行前审批入口和执行器边界；当前已有执行事实归档，但没有开放静默执行能力。
+- 继续补齐可复用资产的版本策略和真正执行器边界；当前已有执行前审批意图记录与执行事实归档，但没有开放静默执行能力。
 
 ## 1. 定位
 
@@ -207,7 +207,7 @@ Artifact 应记录：
 
 这些分类会进入本地 Artifact meta、Repository output markdown、`artifact://` 引用、Desktop node command 描述结果和 Workbench outputs 分类。复用发生后，调用方可以通过 `desktop.artifacts.reuse.record` 写入 `reuseEvents`，记录上下文、来源、用途、状态、结果摘要、复用时间和当时 Artifact 版本。
 
-执行型复用产物（`tool / script / workflow`）还可以通过 `desktop.artifacts.execution.record` 写入 `executionEvents`，记录审批标题/风险/原因、runner、命令文本、状态、结果摘要、输出 Artifact、Repository output 和当时 Artifact 版本。该命令只做归档，不执行命令、不打开文件、不放宽任何权限。
+执行型复用产物（`tool / script / workflow`）在交给外部 runner 前，可以先通过 `desktop.artifacts.execution.prepare` 写入 `approval_required` 的执行意图，记录审批标题/风险/原因、runner、命令文本、来源和当时 Artifact 版本，并返回 pending approval 载荷。审批、运行或结果发生后，再通过 `desktop.artifacts.execution.record` 追加状态、结果摘要、输出 Artifact 和 Repository output 线索。两条命令都只做归档，不执行命令、不打开文件、不放宽任何权限。
 
 ## 7. P0 验收标准
 
@@ -222,6 +222,7 @@ Artifact 应记录：
 9. Artifact 版本历史能在创建和追加时记录，并在详情页、Desktop node 描述和 Repository output markdown 中可见。
 10. 普通聊天里一个或多个 `<artifact>` block 都能进入 Artifact storage，并在仓库就绪时镜像到 Repository outputs。
 11. Repository `outputs/index.md` 能作为可扫读目录展示 Artifact 价值线索，并在重新镜像同一产物时刷新旧条目。
+12. 执行型复用产物能在真正执行前记录 `approval_required` 意图，在执行后记录结果事实；Desktop 只沉淀审批与运行线索，不静默执行命令。
 
 ## 8. 非目标
 

@@ -109,6 +109,7 @@ Skill 应包含：
 - 既有产物可用稳定引用 `artifact://<artifactId>` 继续复用；Gateway 可调用 `desktop.artifacts.describe` 获取标题、类型、摘要、预览卡片、来源、仓库 output / preview 和文件或 URL 线索。
 - 不知道具体 `artifactId` 时，Gateway 应先调用 `desktop.artifacts.search`，用 `query / type / externalFormat / reuseKind / sourceType / status / limit` 查找已有产物；返回项包含 `artifact://` URI、价值摘要、预览卡片、来源、仓库 output / preview、文件或 URL 线索和可复用 Markdown 引用。搜索不打开文件、不执行命令、不授予权限。
 - 复用既有产物后，Gateway、ActionRun 或 MCP 工具应调用 `desktop.artifacts.reuse.record` 写入 `context / status / purpose / resultSummary / sourceId / sourceName / usedAt`；这是复用事实和审计记录，不执行脚本、不打开文件、不授予额外权限。
+- 执行型复用产物（`tool / script / workflow`）交给外部 runner 前，应先调用 `desktop.artifacts.execution.prepare` 写入 `approval_required` 执行意图并取得 pending approval 载荷；这是审批锚点，不执行命令、不授予执行权限。
 - 执行型复用产物（`tool / script / workflow`）有审批、运行或结果需要归档时，Gateway、ActionRun 或 MCP 工具应调用 `desktop.artifacts.execution.record` 写入 `status`、审批信息、runner、命令文本、结果摘要、输出 Artifact 和 Repository output 线索；这是执行事实记录，不执行命令、不授予执行权限。
 - Gateway 可通过 `desktop.artifacts.create` 或 `desktop.outputs.create` 创建非 HTML 产物，并传入 `url / command / filePath / fileName / fileSize / mimeType / externalFormat / contentSummary / reuseKind / importFile`；需要同时沉淀到 Repository `outputs/` 时使用 `desktop.outputs.create`。
 - Repository `outputs/index.md` 是可扫读的 Artifact 目录；条目会暴露 `artifact://` 引用、来源、更新时间、预览、格式、摘要、预览卡片、复用分类和标签，详细审计以单个产物 markdown 为准。

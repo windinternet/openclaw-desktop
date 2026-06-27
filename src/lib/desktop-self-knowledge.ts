@@ -75,6 +75,8 @@ export function buildDesktopSelfKnowledgeSkillContent(): string {
     '',
     'When Gateway or ActionRun reuses an existing Artifact, call `desktop.artifacts.reuse.record` with `artifactId`, `context`, `status`, `purpose`, `resultSummary`, optional source metadata, and optional `repoPath` to mirror the updated Repository output. This records reuse/audit facts only; it does not execute tools, open files, or grant permissions.',
     '',
+    'Before an executable reusable Artifact (`tool`, `script`, or `workflow`) is handed to an external runner, call `desktop.artifacts.execution.prepare` with `artifactId`, optional approval fields, runner, command, source metadata, and optional `repoPath`. This records an approval-required execution intent and returns a pending approval payload; it does not execute commands or grant execution permission.',
+    '',
     'When an executable reusable Artifact (`tool`, `script`, or `workflow`) has an approval, run, or result to archive, call `desktop.artifacts.execution.record` with `artifactId`, `status`, optional approval fields, runner, command, result summary, output Artifact id, and optional `repoPath`. This records executable Artifact run facts only; it does not execute commands or grant execution permission.',
     '',
     'Search existing Artifacts before asking the user for an artifact id. Gateway can call `desktop.artifacts.search` with optional `query`, `type`, `externalFormat`, `reuseKind`, `sourceType`, `status`, and `limit` to find recent matching value objects. Search results return `artifact://` URIs, value summaries, preview cards, source, repository output / preview paths, file or URL clues, and reusable Markdown references; search does not open files, execute commands, or grant permissions.',
