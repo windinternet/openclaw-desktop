@@ -1,17 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import {
-  Card,
-  Button,
-  Space,
-  Typography,
-  Tag,
-  Spin,
-  Empty,
-  Divider,
-  Toast,
-  Input,
-  Modal,
-} from '@douyinfe/semi-ui';
+import { Card, Button, Space, Typography, Tag, Spin, Empty, Divider, Toast, Input, Modal } from '@douyinfe/semi-ui';
 import { IconSearch, IconLink, IconPlay, IconTickCircle, IconClose, IconDownload } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useStore, createGatewayClient, GatewayConnectError } from '../lib';
@@ -151,10 +139,18 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
           const method = methods.includes('assistant.info') ? 'assistant.info' : 'assistant.get';
           const info = await client.request<Record<string, unknown>>(method);
           console.log('[ConnectionWizard] assistant info:', info);
-          assistantName = typeof info?.displayName === 'string' ? info.displayName
-            : typeof info?.name === 'string' ? info.name : undefined;
-          avatarUrl = typeof info?.avatarUrl === 'string' ? info.avatarUrl
-            : typeof info?.avatar === 'string' ? info.avatar : undefined;
+          assistantName =
+            typeof info?.displayName === 'string'
+              ? info.displayName
+              : typeof info?.name === 'string'
+                ? info.name
+                : undefined;
+          avatarUrl =
+            typeof info?.avatarUrl === 'string'
+              ? info.avatarUrl
+              : typeof info?.avatar === 'string'
+                ? info.avatar
+                : undefined;
         }
       } catch {
         console.log('[ConnectionWizard] assistant info not available');
@@ -165,8 +161,8 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
           const method = methods.includes('server.info') ? 'server.info' : 'meta';
           const info = await client.request<Record<string, unknown>>(method);
           console.log('[ConnectionWizard] server info:', info);
-          const nodeName = typeof info?.name === 'string' ? info.name
-            : typeof info?.hostname === 'string' ? info.hostname : undefined;
+          const nodeName =
+            typeof info?.name === 'string' ? info.name : typeof info?.hostname === 'string' ? info.hostname : undefined;
           if (nodeName) instanceName = nodeName;
         }
       } catch {
@@ -194,48 +190,48 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
     } catch (err) {
       const isGatewayError =
         err instanceof GatewayConnectError ||
-        (err instanceof Error && err.message.includes('CONTROL_UI_ORIGIN_NOT_ALLOWED'))
+        (err instanceof Error && err.message.includes('CONTROL_UI_ORIGIN_NOT_ALLOWED'));
 
       if (isGatewayError) {
         console.log('[ConnectionWizard] control-ui origin not allowed:', {
           isGatewayConnectError: err instanceof GatewayConnectError,
           message: err instanceof Error ? err.message : String(err),
-        })
+        });
 
-        const api = (window as any).electronAPI
+        const api = (window as any).electronAPI;
         if (api?.connect?.isLocal && api?.connect?.autoApprove) {
-          console.log('[ConnectionWizard] checking if url is local:', url)
-          const isLocal = await api.connect.isLocal(url)
-          console.log('[ConnectionWizard] isLocal result:', isLocal)
+          console.log('[ConnectionWizard] checking if url is local:', url);
+          const isLocal = await api.connect.isLocal(url);
+          console.log('[ConnectionWizard] isLocal result:', isLocal);
           if (isLocal) {
             if (autoApproveRetriedRef.current) {
-              Toast.error('自动批准后仍被拒绝，请检查 Gateway 配置')
+              Toast.error('自动批准后仍被拒绝，请检查 Gateway 配置');
             } else {
-              autoApproveRetriedRef.current = true
-              Toast.info('检测到本机连接，正在自动批准…')
-              console.log('[ConnectionWizard] calling autoApprove')
-              const result = await api.connect.autoApprove()
-              console.log('[ConnectionWizard] autoApprove result:', result)
+              autoApproveRetriedRef.current = true;
+              Toast.info('检测到本机连接，正在自动批准…');
+              console.log('[ConnectionWizard] calling autoApprove');
+              const result = await api.connect.autoApprove();
+              console.log('[ConnectionWizard] autoApprove result:', result);
               if (result.success) {
-                Toast.success('已自动批准 origin，重启 Gateway 后重试连接…')
+                Toast.success('已自动批准 origin，重启 Gateway 后重试连接…');
                 setTimeout(() => {
-                  void doConnect(url, token, name)
-                }, 5000)
+                  void doConnect(url, token, name);
+                }, 5000);
               } else {
-                Toast.error(result.error || '自动批准失败')
+                Toast.error(result.error || '自动批准失败');
               }
             }
           } else {
-            setRemoteHelpUrl(url)
-            setRemoteHelpVisible(true)
+            setRemoteHelpUrl(url);
+            setRemoteHelpVisible(true);
           }
         } else {
-          console.log('[ConnectionWizard] electronAPI.connect not available')
-          setRemoteHelpUrl(url)
-          setRemoteHelpVisible(true)
+          console.log('[ConnectionWizard] electronAPI.connect not available');
+          setRemoteHelpUrl(url);
+          setRemoteHelpVisible(true);
         }
-        setConnecting(false)
-        return
+        setConnecting(false);
+        return;
       }
       const message = err instanceof Error ? err.message : t('connection.connectFailed');
       Toast.error(message);
@@ -313,12 +309,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
             </Space>
           }
         >
-          {!isElectron && (
-            <Empty
-              title={t('connection.electronOnly')}
-              description={t('connection.electronOnlyDesc')}
-            />
-          )}
+          {!isElectron && <Empty title={t('connection.electronOnly')} description={t('connection.electronOnlyDesc')} />}
 
           {isElectron && !discovering && discovered.length === 0 && !discoverError && !scannedOnce && (
             <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 0' }}>
@@ -582,12 +573,9 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <Text>
-            目标 Gateway（{remoteHelpUrl}）拒绝了来自当前应用的连接，
-            因为该 origin 不在 Gateway 的允许列表中。
+            目标 Gateway（{remoteHelpUrl}）拒绝了来自当前应用的连接， 因为该 origin 不在 Gateway 的允许列表中。
           </Text>
-          <Text>
-            请在 Gateway 主机上执行以下操作来批准此连接：
-          </Text>
+          <Text>请在 Gateway 主机上执行以下操作来批准此连接：</Text>
           <div
             style={{
               padding: 12,
@@ -599,7 +587,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
             }}
           >
             <div># 方法 1：修改配置文件</div>
-            <div>openclaw config set gateway.controlUi.allowedOrigins --json '[&quot;file://&quot;]'</div>
+            <code>openclaw config set gateway.controlUi.allowedOrigins --json &apos;[&quot;file://&quot;]&apos;</code>
             <div style={{ marginTop: 8 }}># 方法 2：如果是在 Gateway 本机使用浏览器访问</div>
             <div>直接从 Gateway 主机打开浏览器访问 Gateway 地址即可</div>
           </div>

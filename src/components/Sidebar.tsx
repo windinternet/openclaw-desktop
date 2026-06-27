@@ -26,12 +26,7 @@ import { useSettingsStore } from '../lib/settings-store';
 import { decodeSessionKeyParam } from '../lib/session-content';
 import { filterUserVisibleSessions } from '../lib/ai-action-center';
 import { stripGeneratedSessionLabelSuffix } from '../lib/session-label';
-import {
-  getActiveNavKey,
-  NAV_GROUPS,
-  PRIMARY_ROUTE_MAP,
-  type PrimaryNavItem,
-} from '../lib/navigation';
+import { getActiveNavKey, NAV_GROUPS, PRIMARY_ROUTE_MAP, type PrimaryNavItem } from '../lib/navigation';
 
 const { Text } = Typography;
 
@@ -39,10 +34,7 @@ interface InfiniteLoaderViewProps {
   isRowLoaded: (params: { index: number }) => boolean;
   loadMoreRows: () => Promise<unknown>;
   rowCount: number;
-  children: (params: {
-    onRowsRendered: (params: unknown) => void;
-    registerChild: (ref: unknown) => void;
-  }) => ReactNode;
+  children: (params: { onRowsRendered: (params: unknown) => void; registerChild: (ref: unknown) => void }) => ReactNode;
 }
 
 interface AutoSizerViewProps {
@@ -190,15 +182,16 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
   );
 
   const gatewayUser = currentInstance?.gatewayUser;
-  const displayName = connectionStatus === 'connected'
-    ? (gatewayUser?.whatToCall || userDisplayName || currentInstance?.name || t('sidebar.operator'))
-    : connectionRetry
-      ? t('sidebar.retrying')
-      : connectionStatus === 'connecting'
-      ? t('instance.statusConnecting')
-      : connectionStatus === 'error'
-        ? t('sidebar.connectFailed')
-        : (gatewayUser?.whatToCall || userDisplayName || currentInstance?.name || t('instance.statusDisconnected'));
+  const displayName =
+    connectionStatus === 'connected'
+      ? gatewayUser?.whatToCall || userDisplayName || currentInstance?.name || t('sidebar.operator')
+      : connectionRetry
+        ? t('sidebar.retrying')
+        : connectionStatus === 'connecting'
+          ? t('instance.statusConnecting')
+          : connectionStatus === 'error'
+            ? t('sidebar.connectFailed')
+            : gatewayUser?.whatToCall || userDisplayName || currentInstance?.name || t('instance.statusDisconnected');
   const bioLine = gatewayUser?.notes?.split('\n')[0] ?? '';
   const fullNotes = gatewayUser?.notes ?? '';
   const hasPopover = !!(gatewayUser?.name || gatewayUser?.os || gatewayUser?.timezone || fullNotes);
@@ -213,7 +206,15 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
       {gatewayUser?.os && <div style={{ color: 'var(--semi-color-text-2)' }}>🖥 {gatewayUser.os}</div>}
       {gatewayUser?.timezone && <div style={{ color: 'var(--semi-color-text-2)' }}>🕐 {gatewayUser.timezone}</div>}
       {fullNotes && (
-        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--semi-color-border)', color: 'var(--semi-color-text-1)', whiteSpace: 'pre-wrap' }}>
+        <div
+          style={{
+            marginTop: 8,
+            paddingTop: 8,
+            borderTop: '1px solid var(--semi-color-border)',
+            color: 'var(--semi-color-text-1)',
+            whiteSpace: 'pre-wrap',
+          }}
+        >
           {fullNotes}
         </div>
       )}
@@ -274,17 +275,20 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
         </span>
       </div>
       {currentInstance?.name && (
-        <div style={{ marginTop: 8, color: 'var(--semi-color-text-1)' }}>
-          {currentInstance.name}
-        </div>
+        <div style={{ marginTop: 8, color: 'var(--semi-color-text-1)' }}>{currentInstance.name}</div>
       )}
       {currentInstance?.gatewayUrl && (
-        <div style={{ color: 'var(--semi-color-text-2)', wordBreak: 'break-all' }}>
-          {currentInstance.gatewayUrl}
-        </div>
+        <div style={{ color: 'var(--semi-color-text-2)', wordBreak: 'break-all' }}>{currentInstance.gatewayUrl}</div>
       )}
       {connectionRetry && (
-        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--semi-color-border)', color: 'var(--semi-color-text-1)' }}>
+        <div
+          style={{
+            marginTop: 8,
+            paddingTop: 8,
+            borderTop: '1px solid var(--semi-color-border)',
+            color: 'var(--semi-color-text-1)',
+          }}
+        >
           {t('sidebar.retryAttemptInfo', { attempt: connectionRetry.attempt, delay: retryDelayText })}
         </div>
       )}
@@ -375,19 +379,25 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
     setPopoverStyle({ position: 'fixed', left: Math.min(left, vw - pw - 8), bottom: Math.max(8, bottom) });
   }, []);
 
-  const showPopup = useCallback((e: MouseEvent) => {
-    if (!hasPopover) return;
-    if (hideTimer.current) clearTimeout(hideTimer.current);
-    calcPopover(e);
-    setShowPopover(true);
-  }, [hasPopover, calcPopover]);
+  const showPopup = useCallback(
+    (e: MouseEvent) => {
+      if (!hasPopover) return;
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+      calcPopover(e);
+      setShowPopover(true);
+    },
+    [hasPopover, calcPopover],
+  );
 
-  const movePopup = useCallback((e: MouseEvent) => {
-    if (!hasPopover) return;
-    if (hideTimer.current) clearTimeout(hideTimer.current);
-    calcPopover(e);
-    setShowPopover(true);
-  }, [hasPopover, calcPopover]);
+  const movePopup = useCallback(
+    (e: MouseEvent) => {
+      if (!hasPopover) return;
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+      calcPopover(e);
+      setShowPopover(true);
+    },
+    [hasPopover, calcPopover],
+  );
 
   const keepPopupOpen = useCallback(() => {
     if (hideTimer.current) clearTimeout(hideTimer.current);
@@ -398,7 +408,7 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
     hideTimer.current = setTimeout(() => setShowPopover(false), 150);
   }, []);
 
-  const formatSessionName = (s: typeof sessions[0]): string => {
+  const formatSessionName = (s: (typeof sessions)[0]): string => {
     const sessionKey = s.key || s.sessionKey || '';
     if (s.label) return stripGeneratedSessionLabelSuffix(s.label, sessionKey);
     if (s.title) return stripGeneratedSessionLabelSuffix(s.title, sessionKey);
@@ -438,15 +448,15 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
   };
 
   const sessionActivityStatesRead = useStore((s) => s.sessionActivityStates);
-  const runtimeSessionActivityStates = useStore(
-    (s) => (s.currentInstanceId && s.instanceRuntimes[s.currentInstanceId]) 
-      ? s.instanceRuntimes[s.currentInstanceId].sessionActivityStates 
+  const runtimeSessionActivityStates = useStore((s) =>
+    s.currentInstanceId && s.instanceRuntimes[s.currentInstanceId]
+      ? s.instanceRuntimes[s.currentInstanceId].sessionActivityStates
       : ({} as Record<string, 'generating' | 'completed' | 'error'>),
   );
   const clearSessionActivityState = useStore((s) => s.clearSessionActivityState);
   const patchSessionLabel = useStore((s) => s.patchSessionLabel);
 
-  const startEditing = useCallback((s: typeof sessions[0]) => {
+  const startEditing = useCallback((s: (typeof sessions)[0]) => {
     setEditingKey(s.key);
     setEditingValue(s.label ?? '');
     editingValueRef.current = s.label ?? '';
@@ -471,7 +481,9 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
     if (!key) return;
 
     patchSessionLabel(key, value || null).catch((err) => {
-      Toast.error(t('sidebar.labelSaveFailed', { error: err instanceof Error ? err.message : t('common.unknownError') }));
+      Toast.error(
+        t('sidebar.labelSaveFailed', { error: err instanceof Error ? err.message : t('common.unknownError') }),
+      );
       useStore.getState().fetchSessions();
     });
   }, [editingKey, patchSessionLabel, t]);
@@ -507,67 +519,149 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
 
   const footer = (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ flex: 1, minHeight: 0, borderTop: '1px solid var(--semi-color-border)', display: 'flex', flexDirection: 'column' }}>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          borderTop: '1px solid var(--semi-color-border)',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         {sessionHistoryHeader}
         {visibleSessions.length > 0 ? (
           <div style={{ flex: 1, minHeight: 0 }}>
-            <InfiniteLoaderView isRowLoaded={({ index }) => index < visibleSessions.length} loadMoreRows={() => Promise.resolve()} rowCount={visibleSessions.length}>
+            <InfiniteLoaderView
+              isRowLoaded={({ index }) => index < visibleSessions.length}
+              loadMoreRows={() => Promise.resolve()}
+              rowCount={visibleSessions.length}
+            >
               {({ onRowsRendered, registerChild }) => (
                 <AutoSizerView>
                   {({ width, height }) => (
-                    <VListView ref={registerChild} className="semi-light-scrollbar" height={height} onRowsRendered={onRowsRendered}
-                      rowCount={visibleSessions.length} rowHeight={44} width={width}
+                    <VListView
+                      ref={registerChild}
+                      className="semi-light-scrollbar"
+                      height={height}
+                      onRowsRendered={onRowsRendered}
+                      rowCount={visibleSessions.length}
+                      rowHeight={44}
+                      width={width}
                       rowRenderer={({ index, key, style }) => {
                         const s = visibleSessions[index];
                         if (!s) return null;
                         const isCurrent = s.key === currentSessionKey;
                         const isEditing = editingKey === s.key;
                         return (
-                          <div key={key} style={{ ...style, padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                            backgroundColor: isCurrent ? 'var(--semi-color-primary-light-default)' : 'transparent',
-                            borderLeft: isCurrent ? '3px solid var(--semi-color-primary)' : '3px solid transparent',
-                            boxShadow: isCurrent ? 'inset 0 0 0 1px var(--semi-color-primary-light-active)' : 'none',
-                          }}
-                            onClick={() => { if (!isEditing) { clearSessionActivityState(s.key); navigate(`/chat/${encodeURIComponent(s.key)}`); } }}
-                            onDoubleClick={(e) => { e.stopPropagation(); startEditing(s); }}>
+                          <div
+                            key={key}
+                            style={{
+                              ...style,
+                              padding: '0 8px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              backgroundColor: isCurrent ? 'var(--semi-color-primary-light-default)' : 'transparent',
+                              borderLeft: isCurrent ? '3px solid var(--semi-color-primary)' : '3px solid transparent',
+                              boxShadow: isCurrent ? 'inset 0 0 0 1px var(--semi-color-primary-light-active)' : 'none',
+                            }}
+                            onClick={() => {
+                              if (!isEditing) {
+                                clearSessionActivityState(s.key);
+                                navigate(`/chat/${encodeURIComponent(s.key)}`);
+                              }
+                            }}
+                            onDoubleClick={(e) => {
+                              e.stopPropagation();
+                              startEditing(s);
+                            }}
+                          >
                             {isEditing ? (
                               <Input
-                                ref={(inst) => { inputInstanceRef.current = inst as typeof inputInstanceRef.current; }}
+                                ref={(inst) => {
+                                  inputInstanceRef.current = inst as typeof inputInstanceRef.current;
+                                }}
                                 size="small"
                                 value={editingValue}
-                                onChange={(val) => { setEditingValue(val); editingValueRef.current = val; }}
+                                onChange={(val) => {
+                                  setEditingValue(val);
+                                  editingValueRef.current = val;
+                                }}
                                 onEnterPress={commitEdit}
                                 onBlur={commitEdit}
-                                onKeyDown={(e: ReactKeyboardEvent) => { if (e.key === 'Escape') cancelEdit(); }}
+                                onKeyDown={(e: ReactKeyboardEvent) => {
+                                  if (e.key === 'Escape') cancelEdit();
+                                }}
                                 style={{ flex: 1, minWidth: 0 }}
                                 maxLength={512}
                               />
                             ) : (
                               <Tooltip content={formatSessionName(s)} mouseEnterDelay={0.6}>
-                                <span className="sidebar-session-title" style={{ flex: 1, fontSize: 14, fontWeight: isCurrent ? 700 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isCurrent ? 'var(--semi-color-primary)' : 'var(--semi-color-text-0)' }}>
+                                <span
+                                  className="sidebar-session-title"
+                                  style={{
+                                    flex: 1,
+                                    fontSize: 14,
+                                    fontWeight: isCurrent ? 700 : 400,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    color: isCurrent ? 'var(--semi-color-primary)' : 'var(--semi-color-text-0)',
+                                  }}
+                                >
                                   {formatSessionName(s)}
                                 </span>
                               </Tooltip>
                             )}
-                            {!isEditing && (() => {
-                              const actState = runtimeSessionActivityStates[s.key] || sessionActivityStatesRead[s.key];
-                              if (actState === 'generating') {
-                                return <span className="session-spinner" style={{ width: 10, height: 10, borderRadius: '50%', border: '1.5px solid var(--semi-color-primary)', borderBottomColor: 'transparent', display: 'inline-block', flexShrink: 0 }} />;
-                              }
-                              const actColor =
-                                actState === 'completed' ? 'var(--semi-color-success' :
-                                actState === 'error' ? 'var(--semi-color-danger' :
-                                null;
-                              if (!actColor) return null;
-                              return (
-                                <span style={{
-                                  width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                                  backgroundColor: actColor,
-                                }} />
-                              );
-                            })()}
+                            {!isEditing &&
+                              (() => {
+                                const actState =
+                                  runtimeSessionActivityStates[s.key] || sessionActivityStatesRead[s.key];
+                                if (actState === 'generating') {
+                                  return (
+                                    <span
+                                      className="session-spinner"
+                                      style={{
+                                        width: 10,
+                                        height: 10,
+                                        borderRadius: '50%',
+                                        border: '1.5px solid var(--semi-color-primary)',
+                                        borderBottomColor: 'transparent',
+                                        display: 'inline-block',
+                                        flexShrink: 0,
+                                      }}
+                                    />
+                                  );
+                                }
+                                const actColor =
+                                  actState === 'completed'
+                                    ? 'var(--semi-color-success'
+                                    : actState === 'error'
+                                      ? 'var(--semi-color-danger'
+                                      : null;
+                                if (!actColor) return null;
+                                return (
+                                  <span
+                                    style={{
+                                      width: 6,
+                                      height: 6,
+                                      borderRadius: '50%',
+                                      flexShrink: 0,
+                                      backgroundColor: actColor,
+                                    }}
+                                  />
+                                );
+                              })()}
                             {!isEditing && s.updatedAt && (
-                              <span style={{ fontSize: 10, color: 'var(--semi-color-text-2)', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  color: 'var(--semi-color-text-2)',
+                                  flexShrink: 0,
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
                                 {formatRelativeTime(s.updatedAt)}
                               </span>
                             )}
@@ -582,19 +676,29 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
           </div>
         ) : (
           <div style={{ padding: '12px 24px', textAlign: 'center', flex: '1 1 auto' }}>
-            <Text type="tertiary" size="small">{t('nav.sessions')}</Text>
+            <Text type="tertiary" size="small">
+              {t('nav.sessions')}
+            </Text>
           </div>
         )}
-        </div>
+      </div>
       <div style={{ width: '100%', borderTop: '1px solid var(--semi-color-border)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', padding: '6px 0 0 0', gap: 8 }}>
-          <Avatar size="extra-small" src={currentInstance?.avatarUrl || undefined}
-            style={{ flexShrink: 0, backgroundColor: SIDEBAR_AVATAR_FALLBACK_BG }}>
+          <Avatar
+            size="extra-small"
+            src={currentInstance?.avatarUrl || undefined}
+            style={{ flexShrink: 0, backgroundColor: SIDEBAR_AVATAR_FALLBACK_BG }}
+          >
             {currentInstance?.name?.charAt(0).toUpperCase() ?? <IconServer />}
           </Avatar>
-          <div ref={triggerRef} onMouseEnter={showPopup} onMouseMove={movePopup} onMouseLeave={hidePopup}
-             style={{ flex: 1, minWidth: 0, overflow: 'hidden', cursor: hasPopover ? 'default' : undefined }}>
-             <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <div
+            ref={triggerRef}
+            onMouseEnter={showPopup}
+            onMouseMove={movePopup}
+            onMouseLeave={hidePopup}
+            style={{ flex: 1, minWidth: 0, overflow: 'hidden', cursor: hasPopover ? 'default' : undefined }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <span
                 className="sidebar-footer-display-name"
                 title={displayName}
@@ -609,15 +713,36 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
                   fontWeight: 600,
                 }}
               >
-                 {displayName}
+                {displayName}
               </span>
-               <Button icon={themeMode === 'dark' ? <IconSun size="small" /> : <IconMoon size="small" />} size="small" theme="borderless" onClick={toggleTheme} />
-              <Button icon={<IconSetting size="small" />} size="small" theme="borderless" onClick={() => navigate('/settings')} />
+              <Button
+                icon={themeMode === 'dark' ? <IconSun size="small" /> : <IconMoon size="small" />}
+                size="small"
+                theme="borderless"
+                onClick={toggleTheme}
+              />
+              <Button
+                icon={<IconSetting size="small" />}
+                size="small"
+                theme="borderless"
+                onClick={() => navigate('/settings')}
+              />
               <Button icon={<IconGithubLogo size="small" />} size="small" theme="borderless" onClick={openGitHub} />
-
             </div>
             {bioLine && (
-              <div style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', fontSize: 11, lineHeight: '16px', marginTop: 2, color: 'var(--semi-color-text-2)', wordBreak: 'break-all' }}>
+              <div
+                style={{
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  fontSize: 11,
+                  lineHeight: '16px',
+                  marginTop: 2,
+                  color: 'var(--semi-color-text-2)',
+                  wordBreak: 'break-all',
+                }}
+              >
                 {bioLine}
               </div>
             )}
@@ -630,80 +755,143 @@ export default function Sidebar({ onAddInstance, onOpenDrawer }: SidebarProps) {
   return (
     <>
       <style>{`@keyframes session-spin{to{transform:rotate(360deg)}}.session-spinner{animation:session-spin 1s linear infinite}`}</style>
-      <svg aria-hidden="true"
-       style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}>
+      <svg aria-hidden="true" style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}>
         <defs>
-          <linearGradient id="ig-dashboard" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#3b82f6"/><stop offset="100%" stopColor="#818cf8"/></linearGradient>
-          <linearGradient id="ig-search" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#f59e0b"/><stop offset="100%" stopColor="#fbbf24"/></linearGradient>
-          <linearGradient id="ig-new-session" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#10b981"/><stop offset="100%" stopColor="#34d399"/></linearGradient>
-          <linearGradient id="ig-knowledge" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#06b6d4"/><stop offset="100%" stopColor="#22d3ee"/></linearGradient>
-          <linearGradient id="ig-control-center" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#64748b"/><stop offset="100%" stopColor="#94a3b8"/></linearGradient>
-          <linearGradient id="ig-extensions" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#8b5cf6"/><stop offset="100%" stopColor="#a78bfa"/></linearGradient>
-          <linearGradient id="ig-tasks" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#f43f5e"/><stop offset="100%" stopColor="#fb7185"/></linearGradient>
-          <linearGradient id="ig-workspace" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#0ea5a8"/><stop offset="100%" stopColor="#2dd4bf"/></linearGradient>
-          <linearGradient id="ig-kanban" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#6366f1"/><stop offset="100%" stopColor="#818cf8"/></linearGradient>
-          <linearGradient id="ig-teams" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#0ea5e9"/><stop offset="100%" stopColor="#38bdf8"/></linearGradient>
-          <linearGradient id="ig-office" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#d946ef"/><stop offset="100%" stopColor="#f0abfc"/></linearGradient>
-          <linearGradient id="ig-memory" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#8b5cf6"/><stop offset="100%" stopColor="#c084fc"/></linearGradient>
-          <linearGradient id="ig-actions" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#f43f5e"/><stop offset="100%" stopColor="#fb7185"/></linearGradient>
-          <linearGradient id="ig-artifacts" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#f59e0b"/><stop offset="100%" stopColor="#ef4444"/></linearGradient>
+          <linearGradient id="ig-dashboard" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#3b82f6" />
+            <stop offset="100%" stopColor="#818cf8" />
+          </linearGradient>
+          <linearGradient id="ig-search" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#f59e0b" />
+            <stop offset="100%" stopColor="#fbbf24" />
+          </linearGradient>
+          <linearGradient id="ig-new-session" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#10b981" />
+            <stop offset="100%" stopColor="#34d399" />
+          </linearGradient>
+          <linearGradient id="ig-knowledge" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#06b6d4" />
+            <stop offset="100%" stopColor="#22d3ee" />
+          </linearGradient>
+          <linearGradient id="ig-control-center" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#64748b" />
+            <stop offset="100%" stopColor="#94a3b8" />
+          </linearGradient>
+          <linearGradient id="ig-extensions" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#8b5cf6" />
+            <stop offset="100%" stopColor="#a78bfa" />
+          </linearGradient>
+          <linearGradient id="ig-tasks" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#f43f5e" />
+            <stop offset="100%" stopColor="#fb7185" />
+          </linearGradient>
+          <linearGradient id="ig-workspace" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#0ea5a8" />
+            <stop offset="100%" stopColor="#2dd4bf" />
+          </linearGradient>
+          <linearGradient id="ig-kanban" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#6366f1" />
+            <stop offset="100%" stopColor="#818cf8" />
+          </linearGradient>
+          <linearGradient id="ig-teams" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#0ea5e9" />
+            <stop offset="100%" stopColor="#38bdf8" />
+          </linearGradient>
+          <linearGradient id="ig-office" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#d946ef" />
+            <stop offset="100%" stopColor="#f0abfc" />
+          </linearGradient>
+          <linearGradient id="ig-memory" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#8b5cf6" />
+            <stop offset="100%" stopColor="#c084fc" />
+          </linearGradient>
+          <linearGradient id="ig-actions" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#f43f5e" />
+            <stop offset="100%" stopColor="#fb7185" />
+          </linearGradient>
+          <linearGradient id="ig-artifacts" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#f59e0b" />
+            <stop offset="100%" stopColor="#ef4444" />
+          </linearGradient>
         </defs>
       </svg>
-    <div style={{ position: 'relative', display: 'flex', flex: 1, minHeight: 0 }}>
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: SIDEBAR_DRAG_HEIGHT,
-          WebkitAppRegion: 'drag',
-          zIndex: 1,
-        } as CSSProperties}
-      />
-      <Nav
-        mode="vertical"
-        selectedKeys={[activeKey]}
-        onSelect={handleSelect}
-        style={{ flex: 1, paddingTop: sidebarTopInset, boxSizing: 'border-box' }}
-        header={{
-          logo: instanceAvatar,
-          text: instanceHeaderText,
-        }}
-        footer={footer}
-      >
-        {sidebarNavGrouped ? (
-          NAV_GROUPS.map((group) => (
-            <div key={group.key} className="sidebar-nav-group">
-              <div className="sidebar-nav-section-label">{t(group.labelKey)}</div>
-              {group.items.map((item) => (
+      <div style={{ position: 'relative', display: 'flex', flex: 1, minHeight: 0 }}>
+        <div
+          style={
+            {
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: SIDEBAR_DRAG_HEIGHT,
+              WebkitAppRegion: 'drag',
+              zIndex: 1,
+            } as CSSProperties
+          }
+        />
+        <Nav
+          mode="vertical"
+          selectedKeys={[activeKey]}
+          onSelect={handleSelect}
+          style={{ flex: 1, paddingTop: sidebarTopInset, boxSizing: 'border-box' }}
+          header={{
+            logo: instanceAvatar,
+            text: instanceHeaderText,
+          }}
+          footer={footer}
+        >
+          {sidebarNavGrouped
+            ? NAV_GROUPS.map((group) => (
+                <div key={group.key} className="sidebar-nav-group">
+                  <div className="sidebar-nav-section-label">{t(group.labelKey)}</div>
+                  {group.items.map((item) => (
+                    <Nav.Item key={item.key} itemKey={item.key} text={t(item.labelKey)} icon={getNavIcon(item)} />
+                  ))}
+                </div>
+              ))
+            : NAV_GROUPS.flatMap((group) => group.items).map((item) => (
                 <Nav.Item key={item.key} itemKey={item.key} text={t(item.labelKey)} icon={getNavIcon(item)} />
               ))}
+        </Nav>
+      </div>
+      {showPopover &&
+        createPortal(
+          <div style={popoverStyle} onMouseEnter={keepPopupOpen} onMouseLeave={hidePopup}>
+            <div
+              style={{
+                background: 'var(--semi-color-bg-3)',
+                borderRadius: 8,
+                padding: 12,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                maxWidth: 280,
+                maxHeight: 'calc(100vh - 24px)',
+                overflow: 'auto',
+              }}
+            >
+              {popoverContent}
             </div>
-          ))
-        ) : (
-          NAV_GROUPS.flatMap((group) => group.items).map((item) => (
-            <Nav.Item key={item.key} itemKey={item.key} text={t(item.labelKey)} icon={getNavIcon(item)} />
-          ))
+          </div>,
+          document.body,
         )}
-      </Nav>
-    </div>
-      {showPopover && createPortal(
-        <div style={popoverStyle} onMouseEnter={keepPopupOpen} onMouseLeave={hidePopup}>
-          <div style={{ background: 'var(--semi-color-bg-3)', borderRadius: 8, padding: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.15)', maxWidth: 280, maxHeight: 'calc(100vh - 24px)', overflow: 'auto' }}>
-            {popoverContent}
-          </div>
-        </div>,
-        document.body
-      )}
-      {showConnectionPopover && createPortal(
-        <div style={connectionPopoverStyle} onMouseEnter={showConnectionPopup} onMouseLeave={hideConnectionPopup}>
-          <div style={{ background: 'var(--semi-color-bg-3)', borderRadius: 8, padding: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.15)', maxWidth: 284, maxHeight: 'calc(100vh - 24px)', overflow: 'auto' }}>
-            {connectionPopoverContent}
-          </div>
-        </div>,
-        document.body
-      )}
-  </>
+      {showConnectionPopover &&
+        createPortal(
+          <div style={connectionPopoverStyle} onMouseEnter={showConnectionPopup} onMouseLeave={hideConnectionPopup}>
+            <div
+              style={{
+                background: 'var(--semi-color-bg-3)',
+                borderRadius: 8,
+                padding: 12,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                maxWidth: 284,
+                maxHeight: 'calc(100vh - 24px)',
+                overflow: 'auto',
+              }}
+            >
+              {connectionPopoverContent}
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }

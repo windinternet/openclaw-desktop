@@ -62,59 +62,66 @@ function useResponsiveChartHeight(minHeight = DEFAULT_CHART_HEIGHT) {
 function EmptyChart({ text }: { text?: string }) {
   return (
     <div className="dashboard-antv-chart dashboard-chart-empty">
-      <Text type="tertiary" size="small">{text}</Text>
+      <Text type="tertiary" size="small">
+        {text}
+      </Text>
     </div>
   );
 }
 
 export function ModelUsageBarChart({ data, emptyText }: DashboardChartProps<DashboardValueDatum>) {
   const { containerRef, chartHeight } = useResponsiveChartHeight();
-  const config = useMemo(() => ({
-    data,
-    xField: 'value',
-    yField: 'label',
-    height: chartHeight,
-    autoFit: true,
-    padding: [8, 18, 28, 118],
-    colorField: 'label',
-    legend: false,
-    axis: {
-      x: {
-        title: false,
-        labelFontSize: 11,
-        labelFill: cssVar('--semi-color-text-1', '#4e5969'),
-        gridStroke: cssVar('--semi-color-border', '#e5e6eb'),
-        gridLineDash: [3, 3],
-        labelFormatter: (value: string) => formatCompactTokenValue(Number(value)),
+  const config = useMemo(
+    () => ({
+      data,
+      xField: 'value',
+      yField: 'label',
+      height: chartHeight,
+      autoFit: true,
+      padding: [8, 18, 28, 118],
+      colorField: 'label',
+      legend: false,
+      axis: {
+        x: {
+          title: false,
+          labelFontSize: 11,
+          labelFill: cssVar('--semi-color-text-1', '#4e5969'),
+          gridStroke: cssVar('--semi-color-border', '#e5e6eb'),
+          gridLineDash: [3, 3],
+          labelFormatter: (value: string) => formatCompactTokenValue(Number(value)),
+        },
+        y: {
+          title: false,
+          labelFontSize: 11,
+          labelFill: cssVar('--semi-color-text-0', '#1d2129'),
+        },
       },
-      y: {
-        title: false,
-        labelFontSize: 11,
-        labelFill: cssVar('--semi-color-text-0', '#1d2129'),
+      scale: {
+        color: {
+          range: [
+            cssVar('--semi-color-primary', '#0066ff'),
+            cssVar('--semi-color-success', '#00a870'),
+            cssVar('--semi-color-warning', '#ff7d00'),
+          ],
+        },
       },
-    },
-    scale: {
-      color: {
-        range: [
-          cssVar('--semi-color-primary', '#0066ff'),
-          cssVar('--semi-color-success', '#00a870'),
-          cssVar('--semi-color-warning', '#ff7d00'),
+      style: {
+        radiusTopRight: 6,
+        radiusBottomRight: 6,
+        maxWidth: 22,
+      },
+      tooltip: {
+        items: [
+          {
+            field: 'value',
+            name: 'Tokens',
+            valueFormatter: (value: number) => formatCompactTokenValue(value),
+          },
         ],
       },
-    },
-    style: {
-      radiusTopRight: 6,
-      radiusBottomRight: 6,
-      maxWidth: 22,
-    },
-    tooltip: {
-      items: [{
-        field: 'value',
-        name: 'Tokens',
-        valueFormatter: (value: number) => formatCompactTokenValue(value),
-      }],
-    },
-  }), [chartHeight, data]);
+    }),
+    [chartHeight, data],
+  );
 
   if (isEmpty(data)) return <EmptyChart text={emptyText} />;
 
@@ -127,38 +134,43 @@ export function ModelUsageBarChart({ data, emptyText }: DashboardChartProps<Dash
 
 export function TokenCompositionChart({ data, emptyText }: DashboardChartProps<DashboardValueDatum>) {
   const { containerRef, chartHeight } = useResponsiveChartHeight(COMPACT_CHART_HEIGHT);
-  const config = useMemo(() => ({
-    data,
-    angleField: 'value',
-    colorField: 'label',
-    height: chartHeight,
-    autoFit: true,
-    innerRadius: 0.62,
-    padding: [8, 8, 8, 8],
-    scale: {
-      color: {
-        range: [
-          cssVar('--semi-color-primary', '#0066ff'),
-          cssVar('--semi-color-success', '#00a870'),
-          cssVar('--semi-color-warning', '#ff7d00'),
-          cssVar('--semi-color-danger', '#f53f3f'),
+  const config = useMemo(
+    () => ({
+      data,
+      angleField: 'value',
+      colorField: 'label',
+      height: chartHeight,
+      autoFit: true,
+      innerRadius: 0.62,
+      padding: [8, 8, 8, 8],
+      scale: {
+        color: {
+          range: [
+            cssVar('--semi-color-primary', '#0066ff'),
+            cssVar('--semi-color-success', '#00a870'),
+            cssVar('--semi-color-warning', '#ff7d00'),
+            cssVar('--semi-color-danger', '#f53f3f'),
+          ],
+        },
+      },
+      legend: {
+        color: {
+          position: 'bottom',
+          layout: { justifyContent: 'center' },
+        },
+      },
+      tooltip: {
+        items: [
+          {
+            field: 'value',
+            name: 'Tokens',
+            valueFormatter: (value: number) => formatCompactTokenValue(value),
+          },
         ],
       },
-    },
-    legend: {
-      color: {
-        position: 'bottom',
-        layout: { justifyContent: 'center' },
-      },
-    },
-    tooltip: {
-      items: [{
-        field: 'value',
-        name: 'Tokens',
-        valueFormatter: (value: number) => formatCompactTokenValue(value),
-      }],
-    },
-  }), [chartHeight, data]);
+    }),
+    [chartHeight, data],
+  );
 
   if (isEmpty(data)) return <EmptyChart text={emptyText} />;
 
@@ -171,51 +183,56 @@ export function TokenCompositionChart({ data, emptyText }: DashboardChartProps<D
 
 export function ProviderQuotaBarChart({ data, emptyText }: DashboardChartProps<DashboardValueDatum>) {
   const { containerRef, chartHeight } = useResponsiveChartHeight(COMPACT_CHART_HEIGHT);
-  const config = useMemo(() => ({
-    data,
-    xField: 'value',
-    yField: 'label',
-    height: chartHeight,
-    autoFit: true,
-    padding: [8, 18, 26, 92],
-    colorField: 'category',
-    legend: false,
-    scale: {
-      x: { domain: [0, 100] },
-      color: {
-        range: [
-          cssVar('--semi-color-success', '#00a870'),
-          cssVar('--semi-color-warning', '#ff7d00'),
-          cssVar('--semi-color-danger', '#f53f3f'),
+  const config = useMemo(
+    () => ({
+      data,
+      xField: 'value',
+      yField: 'label',
+      height: chartHeight,
+      autoFit: true,
+      padding: [8, 18, 26, 92],
+      colorField: 'category',
+      legend: false,
+      scale: {
+        x: { domain: [0, 100] },
+        color: {
+          range: [
+            cssVar('--semi-color-success', '#00a870'),
+            cssVar('--semi-color-warning', '#ff7d00'),
+            cssVar('--semi-color-danger', '#f53f3f'),
+          ],
+        },
+      },
+      axis: {
+        x: {
+          title: false,
+          labelFontSize: 11,
+          labelFill: cssVar('--semi-color-text-1', '#4e5969'),
+          labelFormatter: (value: string) => `${Math.round(Number(value))}%`,
+        },
+        y: {
+          title: false,
+          labelFontSize: 11,
+          labelFill: cssVar('--semi-color-text-0', '#1d2129'),
+        },
+      },
+      style: {
+        radiusTopRight: 6,
+        radiusBottomRight: 6,
+        maxWidth: 18,
+      },
+      tooltip: {
+        items: [
+          {
+            field: 'value',
+            name: 'Left',
+            valueFormatter: (value: number) => `${Math.round(value)}%`,
+          },
         ],
       },
-    },
-    axis: {
-      x: {
-        title: false,
-        labelFontSize: 11,
-        labelFill: cssVar('--semi-color-text-1', '#4e5969'),
-        labelFormatter: (value: string) => `${Math.round(Number(value))}%`,
-      },
-      y: {
-        title: false,
-        labelFontSize: 11,
-        labelFill: cssVar('--semi-color-text-0', '#1d2129'),
-      },
-    },
-    style: {
-      radiusTopRight: 6,
-      radiusBottomRight: 6,
-      maxWidth: 18,
-    },
-    tooltip: {
-      items: [{
-        field: 'value',
-        name: 'Left',
-        valueFormatter: (value: number) => `${Math.round(value)}%`,
-      }],
-    },
-  }), [chartHeight, data]);
+    }),
+    [chartHeight, data],
+  );
 
   if (isEmpty(data)) return <EmptyChart text={emptyText} />;
 
@@ -228,47 +245,50 @@ export function ProviderQuotaBarChart({ data, emptyText }: DashboardChartProps<D
 
 export function ActivityTrendChart({ data, emptyText }: DashboardChartProps<DashboardActivityDatum>) {
   const { containerRef, chartHeight } = useResponsiveChartHeight();
-  const config = useMemo(() => ({
-    data,
-    xField: 'date',
-    yField: 'value',
-    colorField: 'category',
-    height: chartHeight,
-    autoFit: true,
-    padding: [16, 18, 32, 36],
-    shapeField: 'smooth',
-    scale: {
-      color: {
-        range: [
-          cssVar('--semi-color-primary', '#0066ff'),
-          cssVar('--semi-color-success', '#00a870'),
-          cssVar('--semi-color-warning', '#ff7d00'),
-          cssVar('--semi-color-danger', '#f53f3f'),
-        ],
+  const config = useMemo(
+    () => ({
+      data,
+      xField: 'date',
+      yField: 'value',
+      colorField: 'category',
+      height: chartHeight,
+      autoFit: true,
+      padding: [16, 18, 32, 36],
+      shapeField: 'smooth',
+      scale: {
+        color: {
+          range: [
+            cssVar('--semi-color-primary', '#0066ff'),
+            cssVar('--semi-color-success', '#00a870'),
+            cssVar('--semi-color-warning', '#ff7d00'),
+            cssVar('--semi-color-danger', '#f53f3f'),
+          ],
+        },
       },
-    },
-    axis: {
-      x: {
-        title: false,
-        labelFontSize: 11,
-        labelFill: cssVar('--semi-color-text-1', '#4e5969'),
-        lineStroke: cssVar('--semi-color-border', '#e5e6eb'),
+      axis: {
+        x: {
+          title: false,
+          labelFontSize: 11,
+          labelFill: cssVar('--semi-color-text-1', '#4e5969'),
+          lineStroke: cssVar('--semi-color-border', '#e5e6eb'),
+        },
+        y: {
+          title: false,
+          labelFontSize: 11,
+          labelFill: cssVar('--semi-color-text-1', '#4e5969'),
+          gridStroke: cssVar('--semi-color-border', '#e5e6eb'),
+          gridLineDash: [3, 3],
+        },
       },
-      y: {
-        title: false,
-        labelFontSize: 11,
-        labelFill: cssVar('--semi-color-text-1', '#4e5969'),
-        gridStroke: cssVar('--semi-color-border', '#e5e6eb'),
-        gridLineDash: [3, 3],
+      legend: {
+        color: { position: 'bottom' },
       },
-    },
-    legend: {
-      color: { position: 'bottom' },
-    },
-    tooltip: {
-      items: [{ field: 'value', name: 'Count' }],
-    },
-  }), [chartHeight, data]);
+      tooltip: {
+        items: [{ field: 'value', name: 'Count' }],
+      },
+    }),
+    [chartHeight, data],
+  );
 
   if (isEmpty(data)) return <EmptyChart text={emptyText} />;
 
@@ -281,32 +301,35 @@ export function ActivityTrendChart({ data, emptyText }: DashboardChartProps<Dash
 
 export function StatusDistributionChart({ data, emptyText }: DashboardChartProps<DashboardValueDatum>) {
   const { containerRef, chartHeight } = useResponsiveChartHeight(COMPACT_CHART_HEIGHT);
-  const config = useMemo(() => ({
-    data,
-    angleField: 'value',
-    colorField: 'label',
-    height: chartHeight,
-    autoFit: true,
-    innerRadius: 0.58,
-    padding: [8, 8, 8, 8],
-    scale: {
-      color: {
-        range: [
-          cssVar('--semi-color-success', '#00a870'),
-          cssVar('--semi-color-danger', '#f53f3f'),
-          cssVar('--semi-color-warning', '#ff7d00'),
-          cssVar('--semi-color-primary', '#0066ff'),
-          cssVar('--semi-color-text-2', '#86909c'),
-        ],
+  const config = useMemo(
+    () => ({
+      data,
+      angleField: 'value',
+      colorField: 'label',
+      height: chartHeight,
+      autoFit: true,
+      innerRadius: 0.58,
+      padding: [8, 8, 8, 8],
+      scale: {
+        color: {
+          range: [
+            cssVar('--semi-color-success', '#00a870'),
+            cssVar('--semi-color-danger', '#f53f3f'),
+            cssVar('--semi-color-warning', '#ff7d00'),
+            cssVar('--semi-color-primary', '#0066ff'),
+            cssVar('--semi-color-text-2', '#86909c'),
+          ],
+        },
       },
-    },
-    legend: {
-      color: { position: 'bottom' },
-    },
-    tooltip: {
-      items: [{ field: 'value', name: 'Runs' }],
-    },
-  }), [chartHeight, data]);
+      legend: {
+        color: { position: 'bottom' },
+      },
+      tooltip: {
+        items: [{ field: 'value', name: 'Runs' }],
+      },
+    }),
+    [chartHeight, data],
+  );
 
   if (isEmpty(data)) return <EmptyChart text={emptyText} />;
 

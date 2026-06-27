@@ -72,12 +72,14 @@ function isImageAttachment(attachment: GatewayChatAttachment): boolean {
 
 function isTextAttachment(attachment: GatewayChatAttachment): boolean {
   const contentType = attachment.contentType ?? attachment.mimeType ?? '';
-  return contentType.startsWith('text/')
-    || ['application/json', 'application/xml', 'text/xml'].includes(contentType);
+  return contentType.startsWith('text/') || ['application/json', 'application/xml', 'text/xml'].includes(contentType);
 }
 
 function getAttachmentFallbackMessage(attachments: GatewayChatAttachment[]): string {
-  return attachments.map((attachment) => attachment.name).filter(Boolean).join('\n');
+  return attachments
+    .map((attachment) => attachment.name)
+    .filter(Boolean)
+    .join('\n');
 }
 
 const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -113,9 +115,7 @@ async function readFileText(file: File): Promise<string | undefined> {
 
 export function extractChatInputAttachments(content: unknown): AttachmentLike[] {
   if (!isRecord(content)) return [];
-  return Array.isArray(content.attachments)
-    ? content.attachments.filter(isRecord)
-    : [];
+  return Array.isArray(content.attachments) ? content.attachments.filter(isRecord) : [];
 }
 
 export async function normalizeChatInputAttachments(attachments: unknown[]): Promise<GatewayChatAttachment[]> {
@@ -130,13 +130,12 @@ export async function normalizeChatInputAttachments(attachments: unknown[]): Pro
     const url = getString(raw.url ?? raw.file_url ?? raw.image_url);
     const data = getString(raw.data ?? raw.file_data);
     const id = getString(raw.uid ?? raw.id ?? raw.file_id) ?? `${name}-${normalized.length}`;
-    const contentType = getString(raw.contentType ?? raw.mimeType ?? raw.type)
-      ?? (file?.type || undefined)
-      ?? getMimeTypeFromDataUrl(data ?? url)
-      ?? getMimeTypeFromName(name);
-    const size = typeof raw.size === 'number' || typeof raw.size === 'string'
-      ? raw.size
-      : file?.size;
+    const contentType =
+      getString(raw.contentType ?? raw.mimeType ?? raw.type) ??
+      (file?.type || undefined) ??
+      getMimeTypeFromDataUrl(data ?? url) ??
+      getMimeTypeFromName(name);
+    const size = typeof raw.size === 'number' || typeof raw.size === 'string' ? raw.size : file?.size;
 
     const attachment: GatewayChatAttachment = {
       id,
@@ -161,26 +160,28 @@ export async function normalizeChatInputAttachments(attachments: unknown[]): Pro
 export function buildSemiMessageContent(
   text: string,
   attachments: GatewayChatAttachment[],
-): [{
-  type: 'message';
-  content: Array<
-    | { type: 'input_text'; text: string }
-    | {
-        type: 'input_file';
-        file_url?: string;
-        file_data?: string;
-        filename: string;
-        size?: string;
-        file_type?: string;
-      }
-    | {
-        type: 'input_image';
-        image_url?: string;
-        file_data?: string;
-        detail: 'auto';
-      }
-  >;
-}] {
+): [
+  {
+    type: 'message';
+    content: Array<
+      | { type: 'input_text'; text: string }
+      | {
+          type: 'input_file';
+          file_url?: string;
+          file_data?: string;
+          filename: string;
+          size?: string;
+          file_type?: string;
+        }
+      | {
+          type: 'input_image';
+          image_url?: string;
+          file_data?: string;
+          detail: 'auto';
+        }
+    >;
+  },
+] {
   const content: ReturnType<typeof buildSemiMessageContent>[0]['content'] = [];
 
   for (const attachment of attachments) {
@@ -222,13 +223,14 @@ export async function buildGatewayChatSendPayload(options: {
     message,
     sessionKey: options.sessionKey,
     idempotencyKey: options.idempotencyKey,
-    attachments: attachments.length > 0
-      ? attachments.map((attachment) => ({
-          fileName: attachment.name,
-          content: attachment.url ?? attachment.data ?? '',
-          mimeType: attachment.contentType ?? attachment.mimeType ?? 'application/octet-stream',
-          extractedText: attachment.extractedText ?? undefined,
-        }))
-      : undefined,
+    attachments:
+      attachments.length > 0
+        ? attachments.map((attachment) => ({
+            fileName: attachment.name,
+            content: attachment.url ?? attachment.data ?? '',
+            mimeType: attachment.contentType ?? attachment.mimeType ?? 'application/octet-stream',
+            extractedText: attachment.extractedText ?? undefined,
+          }))
+        : undefined,
   };
 }

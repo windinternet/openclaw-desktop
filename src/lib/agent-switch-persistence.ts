@@ -146,9 +146,7 @@ export function appendLogicalTimelineEntries(
   const existing = state.logicalTimelines[rootSessionKey] ?? [];
   const byId = new Map(existing.map((entry) => [entry.id, entry]));
   for (const entry of entries) byId.set(entry.id, entry);
-  const timeline = [...byId.values()]
-    .sort((a, b) => a.timestamp - b.timestamp)
-    .slice(-MAX_TIMELINE_ENTRIES);
+  const timeline = [...byId.values()].sort((a, b) => a.timestamp - b.timestamp).slice(-MAX_TIMELINE_ENTRIES);
   persist(instanceId, {
     ...state,
     logicalTimelines: {

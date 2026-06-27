@@ -27,7 +27,12 @@ import {
   IconSearch,
 } from '@douyinfe/semi-icons';
 import { useStore } from '../lib';
-import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway, filterUserVisibleSessions } from '../lib/ai-action-center';
+import {
+  createAiActionRun,
+  executeAiActionRunWithGateway,
+  syncAiActionRunWithGateway,
+  filterUserVisibleSessions,
+} from '../lib/ai-action-center';
 import { upsertAiActionRun } from '../lib/ai-action-run-store';
 import type { AiActionRun } from '../lib/types';
 import type { CronJob, CronRun } from '../lib/types';
@@ -122,28 +127,56 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
     }
   }, [connectionStatus, fetchCronJobs]);
 
-  useImperativeHandle(ref, () => ({
-    refresh: () => {
-      setLoading(true);
-      fetchCronJobs().finally(() => setLoading(false));
-    },
-    openAdd: () => setAddModalVisible(true),
-  }), [fetchCronJobs]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      refresh: () => {
+        setLoading(true);
+        fetchCronJobs().finally(() => setLoading(false));
+      },
+      openAdd: () => setAddModalVisible(true),
+    }),
+    [fetchCronJobs],
+  );
 
   const handleAdd = useCallback(async () => {
-    if (!scheduleDraft.trim()) { Toast.error(t('tasks.cronRequired')); return; }
+    if (!scheduleDraft.trim()) {
+      Toast.error(t('tasks.cronRequired'));
+      return;
+    }
     const job: any = {
       name: titleDraft || '',
       prompt: promptDraft || undefined,
       schedule: scheduleDraft.trim(),
       enabled: true,
       agentId: agentIdDraft || undefined,
-      delivery: deliveryModeDraft !== 'none'
-        ? { mode: deliveryModeDraft as 'announce' | 'webhook', target: deliveryTargetDraft || undefined, to: deliveryToDraft || undefined }
-        : { mode: 'none' as const },
+      delivery:
+        deliveryModeDraft !== 'none'
+          ? {
+              mode: deliveryModeDraft as 'announce' | 'webhook',
+              target: deliveryTargetDraft || undefined,
+              to: deliveryToDraft || undefined,
+            }
+          : { mode: 'none' as const },
     };
-    try { await createCronJob(job); Toast.success(t('tasks.created')); setAddModalVisible(false); } catch { Toast.error(t('tasks.createFailed')); }
-  }, [createCronJob, titleDraft, promptDraft, scheduleDraft, agentIdDraft, deliveryModeDraft, deliveryToDraft, deliveryTargetDraft, t]);
+    try {
+      await createCronJob(job);
+      Toast.success(t('tasks.created'));
+      setAddModalVisible(false);
+    } catch {
+      Toast.error(t('tasks.createFailed'));
+    }
+  }, [
+    createCronJob,
+    titleDraft,
+    promptDraft,
+    scheduleDraft,
+    agentIdDraft,
+    deliveryModeDraft,
+    deliveryToDraft,
+    deliveryTargetDraft,
+    t,
+  ]);
 
   const handleEdit = useCallback(async () => {
     if (!editJob) return;
@@ -153,20 +186,44 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
         prompt: promptDraft || undefined,
         schedule: scheduleDraft.trim(),
         agentId: agentIdDraft || undefined,
-        delivery: deliveryModeDraft !== 'none'
-          ? { mode: deliveryModeDraft as 'announce' | 'webhook', target: deliveryTargetDraft || undefined, to: deliveryToDraft || undefined }
-          : { mode: 'none' as const },
+        delivery:
+          deliveryModeDraft !== 'none'
+            ? {
+                mode: deliveryModeDraft as 'announce' | 'webhook',
+                target: deliveryTargetDraft || undefined,
+                to: deliveryToDraft || undefined,
+              }
+            : { mode: 'none' as const },
       } as any);
       Toast.success(t('tasks.updated'));
       setEditJob(null);
-    } catch { Toast.error(t('tasks.updateFailed')); }
-  }, [editJob, updateCronJob, titleDraft, promptDraft, scheduleDraft, agentIdDraft, deliveryModeDraft, deliveryToDraft, deliveryTargetDraft, t]);
+    } catch {
+      Toast.error(t('tasks.updateFailed'));
+    }
+  }, [
+    editJob,
+    updateCronJob,
+    titleDraft,
+    promptDraft,
+    scheduleDraft,
+    agentIdDraft,
+    deliveryModeDraft,
+    deliveryToDraft,
+    deliveryTargetDraft,
+    t,
+  ]);
 
   const handleMagicFill = useCallback(async () => {
     const st = useStore.getState();
     const client = st.activeClient?.getStatus() === 'connected' ? st.activeClient : null;
-    if (!promptDraft.trim()) { Toast.warning(t('tasks.fillContent')); return; }
-    if (!client || !st.currentInstanceId) { Toast.error(t('tasks.notConnected')); return; }
+    if (!promptDraft.trim()) {
+      Toast.warning(t('tasks.fillContent'));
+      return;
+    }
+    if (!client || !st.currentInstanceId) {
+      Toast.error(t('tasks.notConnected'));
+      return;
+    }
     const instanceId = st.currentInstanceId;
 
     setMagicLoading(true);
@@ -175,32 +232,52 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
       await upsertAiActionRun(instanceId, run);
       const executed = await executeAiActionRunWithGateway(client, run, {
         title: t('tasks.parseTitle'),
-        prompt: 'Extract cron job params from: ' + promptDraft + '\nReturn ONLY inside \x60\x60\x60ai-action\n{"kind":"completed","summary":"...","result":{"cronPrompt":"...","schedule":"cron expr","deliveryMode":"announce|none|webhook","deliverySessionKey":""}}\n\x60\x60\x60',
+        prompt:
+          'Extract cron job params from: ' +
+          promptDraft +
+          '\nReturn ONLY inside \x60\x60\x60ai-action\n{"kind":"completed","summary":"...","result":{"cronPrompt":"...","schedule":"cron expr","deliveryMode":"announce|none|webhook","deliverySessionKey":""}}\n\x60\x60\x60',
       });
 
       let synced: AiActionRun = executed;
       const deadline = Date.now() + 60000;
       while (Date.now() < deadline) {
         synced = await syncAiActionRunWithGateway(client, synced);
-        if (synced.status === 'done' || synced.status === 'failed' || synced.status === 'cancelled') { await upsertAiActionRun(instanceId, synced); break; }
+        if (synced.status === 'done' || synced.status === 'failed' || synced.status === 'cancelled') {
+          await upsertAiActionRun(instanceId, synced);
+          break;
+        }
         await new Promise((r) => setTimeout(r, 2000));
       }
 
-      if (synced.status !== 'done') { Toast.error(t('tasks.aiParseNotDone')); return; }
+      if (synced.status !== 'done') {
+        Toast.error(t('tasks.aiParseNotDone'));
+        return;
+      }
 
       // Parse
       const text = synced.lastAssistantResponse ?? '';
       let obj: any = null;
       const blocks = Array.from(text.matchAll(/```(?:json|ai-action)\s*([\s\S]*?)```/gi));
-      for (let i = blocks.length - 1; i >= 0 && !obj; i--) { try { const p = JSON.parse(blocks[i][1].trim()); obj = p?.result ?? p; } catch {} }
-      if (!obj) { Toast.error(t('tasks.parseFailed')); return; }
+      for (let i = blocks.length - 1; i >= 0 && !obj; i--) {
+        try {
+          const p = JSON.parse(blocks[i][1].trim());
+          obj = p?.result ?? p;
+        } catch {
+          /* Try older fenced blocks until one parses. */
+        }
+      }
+      if (!obj) {
+        Toast.error(t('tasks.parseFailed'));
+        return;
+      }
 
       // Apply to BOTH state and form
       if (typeof obj.title === 'string' && obj.title) setTitleDraft(obj.title);
       if (typeof obj.cronPrompt === 'string' && obj.cronPrompt) setPromptDraft(obj.cronPrompt);
       if (typeof obj.schedule === 'string' && obj.schedule) setScheduleDraft(obj.schedule);
       if (obj.deliveryMode === 'announce' || obj.deliveryMode === 'webhook') setDeliveryModeDraft(obj.deliveryMode);
-      if (typeof obj.deliverySessionKey === 'string' && obj.deliverySessionKey) setDeliveryToDraft(obj.deliverySessionKey);
+      if (typeof obj.deliverySessionKey === 'string' && obj.deliverySessionKey)
+        setDeliveryToDraft(obj.deliverySessionKey);
 
       // Also push to Semi Design Form via the real API
       const fields: Record<string, unknown> = {};
@@ -211,8 +288,12 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
       realApiRef.current?.setValues(fields);
 
       Toast.success(t('tasks.contentFilled'));
-    } catch (err) { console.error('[magicFill]', err); Toast.error(t('tasks.parseError')); }
-    finally { setMagicLoading(false); }
+    } catch (err) {
+      console.error('[magicFill]', err);
+      Toast.error(t('tasks.parseError'));
+    } finally {
+      setMagicLoading(false);
+    }
   }, [promptDraft, t]);
 
   const handleDelete = useCallback(
@@ -277,139 +358,138 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
     [fetchCronRuns],
   );
 
-  const columns = useMemo(() => [
-    {
-      title: t('tasks.name'),
-      dataIndex: 'name',
-      key: 'name',
-      width: 200,
-      render: (_: unknown, record: CronJob) => (
-        <Text style={{ fontWeight: (record.name || record.title) ? 500 : 400 }}>
-          {record.name || record.title || t('tasks.unnamed')}
-        </Text>
-      ),
-    },
-    {
-      title: t('tasks.schedule'),
-      dataIndex: 'schedule',
-      key: 'schedule',
-      width: 160,
-      render: (val: unknown) => (
-        <Text code size="small">
-          {formatCronSchedule(val as Parameters<typeof formatCronSchedule>[0])}
-        </Text>
-      ),
-    },
-    {
-      title: t('tasks.status'),
-      dataIndex: 'enabled',
-      key: 'enabled',
-      width: 100,
-      render: (val: boolean) =>
-        val ? (
-          <Tag color="green" type="light">
-            {t('tasks.enabled')}
-          </Tag>
-        ) : (
-          <Tag color="grey" type="light">
-            {t('tasks.disabled')}
-          </Tag>
-        ),
-    },
-    {
-      title: t('tasks.agent'),
-      dataIndex: 'agentId',
-      key: 'agentId',
-      width: 140,
-      render: (val: string | undefined) => {
-        if (!val) return <Text type="tertiary">-</Text>;
-        const agent = agents.find((a) => a.id === val);
-        return <Text size="small">{agentNameString(agent?.name) || agent?.id || val}</Text>;
-      },
-    },
-    {
-      title: t('tasks.lastRun'),
-      key: 'lastRun',
-      width: 180,
-      render: (_: unknown, record: CronJob) => {
-        const lastRunAt = record.lastRunAt ?? record.state?.lastRunAtMs;
-        const lastStatus = record.lastRunStatus ?? record.state?.lastRunStatus;
-        return (
-          <Space>
-            <Text size="small" type="tertiary">
-              {formatTime(lastRunAt)}
-            </Text>
-            {lastStatus && statusTag(lastStatus)}
-          </Space>
-        );
-      },
-    },
-    {
-      title: t('tasks.nextRun'),
-      key: 'nextRun',
-      width: 150,
-      render: (_: unknown, record: CronJob) => {
-        const nextRunAt = record.nextRunAt ?? record.state?.nextRunAtMs;
-        return (
-          <Text size="small" type="tertiary">
-            {formatTime(nextRunAt)}
+  const columns = useMemo(
+    () => [
+      {
+        title: t('tasks.name'),
+        dataIndex: 'name',
+        key: 'name',
+        width: 200,
+        render: (_: unknown, record: CronJob) => (
+          <Text style={{ fontWeight: record.name || record.title ? 500 : 400 }}>
+            {record.name || record.title || t('tasks.unnamed')}
           </Text>
-        );
+        ),
       },
-    },
-    {
-      title: t('tasks.actions'),
-      key: 'actions',
-      width: 220,
-      render: (_: unknown, record: CronJob) => (
-        <Space>
-          <Tooltip content={record.enabled ? t('tasks.disable') : t('tasks.enable')}>
-            <Switch
-              size="small"
-              checked={record.enabled}
-              onChange={(v) => handleToggle(record, v)}
-            />
-          </Tooltip>
-          <Tooltip content={t('tasks.runNow')}>
-            <Button
-              icon={<IconPlayCircle />}
-              size="small"
-              theme="borderless"
-              type="primary"
-              loading={runningJobs.has(record.id)}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleRunNow(record);
-              }}
-            />
-          </Tooltip>
-          <Tooltip content={t('tasks.edit')}>
-            <Button
-              icon={<IconEdit />}
-              size="small"
-              theme="borderless"
-              onClick={(e) => {
-                e.stopPropagation();
-                setEditJob(record);
-              }}
-            />
-          </Tooltip>
-          <Tooltip content={t('tasks.delete')}>
-            <Button
-              icon={<IconDelete />}
-              size="small"
-              theme="borderless"
-              type="danger"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDelete(record);
-              }}
-            />
-          </Tooltip>
-        </Space>
-      ),
-    },
-  ], [agents, handleToggle, handleRunNow, runningJobs, handleDelete, t]);
+      {
+        title: t('tasks.schedule'),
+        dataIndex: 'schedule',
+        key: 'schedule',
+        width: 160,
+        render: (val: unknown) => (
+          <Text code size="small">
+            {formatCronSchedule(val as Parameters<typeof formatCronSchedule>[0])}
+          </Text>
+        ),
+      },
+      {
+        title: t('tasks.status'),
+        dataIndex: 'enabled',
+        key: 'enabled',
+        width: 100,
+        render: (val: boolean) =>
+          val ? (
+            <Tag color="green" type="light">
+              {t('tasks.enabled')}
+            </Tag>
+          ) : (
+            <Tag color="grey" type="light">
+              {t('tasks.disabled')}
+            </Tag>
+          ),
+      },
+      {
+        title: t('tasks.agent'),
+        dataIndex: 'agentId',
+        key: 'agentId',
+        width: 140,
+        render: (val: string | undefined) => {
+          if (!val) return <Text type="tertiary">-</Text>;
+          const agent = agents.find((a) => a.id === val);
+          return <Text size="small">{agentNameString(agent?.name) || agent?.id || val}</Text>;
+        },
+      },
+      {
+        title: t('tasks.lastRun'),
+        key: 'lastRun',
+        width: 180,
+        render: (_: unknown, record: CronJob) => {
+          const lastRunAt = record.lastRunAt ?? record.state?.lastRunAtMs;
+          const lastStatus = record.lastRunStatus ?? record.state?.lastRunStatus;
+          return (
+            <Space>
+              <Text size="small" type="tertiary">
+                {formatTime(lastRunAt)}
+              </Text>
+              {lastStatus && statusTag(lastStatus)}
+            </Space>
+          );
+        },
+      },
+      {
+        title: t('tasks.nextRun'),
+        key: 'nextRun',
+        width: 150,
+        render: (_: unknown, record: CronJob) => {
+          const nextRunAt = record.nextRunAt ?? record.state?.nextRunAtMs;
+          return (
+            <Text size="small" type="tertiary">
+              {formatTime(nextRunAt)}
+            </Text>
+          );
+        },
+      },
+      {
+        title: t('tasks.actions'),
+        key: 'actions',
+        width: 220,
+        render: (_: unknown, record: CronJob) => (
+          <Space>
+            <Tooltip content={record.enabled ? t('tasks.disable') : t('tasks.enable')}>
+              <Switch size="small" checked={record.enabled} onChange={(v) => handleToggle(record, v)} />
+            </Tooltip>
+            <Tooltip content={t('tasks.runNow')}>
+              <Button
+                icon={<IconPlayCircle />}
+                size="small"
+                theme="borderless"
+                type="primary"
+                loading={runningJobs.has(record.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRunNow(record);
+                }}
+              />
+            </Tooltip>
+            <Tooltip content={t('tasks.edit')}>
+              <Button
+                icon={<IconEdit />}
+                size="small"
+                theme="borderless"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditJob(record);
+                }}
+              />
+            </Tooltip>
+            <Tooltip content={t('tasks.delete')}>
+              <Button
+                icon={<IconDelete />}
+                size="small"
+                theme="borderless"
+                type="danger"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(record);
+                }}
+              />
+            </Tooltip>
+          </Space>
+        ),
+      },
+    ],
+    [agents, handleToggle, handleRunNow, runningJobs, handleDelete, t],
+  );
 
   const filteredJobs = useMemo(() => {
     return cronJobs.filter((job) => {
@@ -449,8 +529,17 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
         onChange={(v: string) => setPromptDraft(v)}
         extraText={
           <Space>
-            <Text type="tertiary" size="small">{t('tasks.contentDesc')}</Text>
-            <Button icon={<IconBolt />} size="small" type="primary" theme="light" loading={magicLoading} onClick={handleMagicFill}>
+            <Text type="tertiary" size="small">
+              {t('tasks.contentDesc')}
+            </Text>
+            <Button
+              icon={<IconBolt />}
+              size="small"
+              type="primary"
+              theme="light"
+              loading={magicLoading}
+              onClick={handleMagicFill}
+            >
               {magicLoading ? t('tasks.aiParsing') : '✨ ' + t('tasks.magicFill')}
             </Button>
           </Space>
@@ -502,17 +591,29 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
         onChange={(v: any) => setDeliveryToDraft(String(v ?? ''))}
         showClear
       >
-        {sessions.filter((s: any) => s.key || s.sessionKey).map((s: any) => (
-          <Form.Select.Option key={s.key || s.sessionKey || ''} value={s.key || s.sessionKey || ''}>
-            <Tooltip content={<div style={{ fontSize: 12, lineHeight: 1.6 }}><div>Key: {s.key || s.sessionKey || '-'}</div><div>Agent: {s.agentId || '-'}</div><div>Status: {s.status || '-'}</div></div>}>
-              <Space>
-                <IconComment style={{ color: 'var(--semi-color-primary)' }} />
-                <span>{s.title || s.label || s.sessionKey || s.key || t('tasks.unnamedSession')}</span>
-                <Tag size="small" color="blue" type="light">{s.status || 'active'}</Tag>
-              </Space>
-            </Tooltip>
-          </Form.Select.Option>
-        ))}
+        {sessions
+          .filter((s: any) => s.key || s.sessionKey)
+          .map((s: any) => (
+            <Form.Select.Option key={s.key || s.sessionKey || ''} value={s.key || s.sessionKey || ''}>
+              <Tooltip
+                content={
+                  <div style={{ fontSize: 12, lineHeight: 1.6 }}>
+                    <div>Key: {s.key || s.sessionKey || '-'}</div>
+                    <div>Agent: {s.agentId || '-'}</div>
+                    <div>Status: {s.status || '-'}</div>
+                  </div>
+                }
+              >
+                <Space>
+                  <IconComment style={{ color: 'var(--semi-color-primary)' }} />
+                  <span>{s.title || s.label || s.sessionKey || s.key || t('tasks.unnamedSession')}</span>
+                  <Tag size="small" color="blue" type="light">
+                    {s.status || 'active'}
+                  </Tag>
+                </Space>
+              </Tooltip>
+            </Form.Select.Option>
+          ))}
       </Form.Select>
 
       <Form.Input
@@ -522,9 +623,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
         onChange={(v: string) => setDeliveryTargetDraft(v)}
         rules={[{ required: false }]}
       />
-      {!isEdit && (
-        <Form.Switch field="enabled" label={t('tasks.enableOnCreate')} initValue={true} />
-      )}
+      {!isEdit && <Form.Switch field="enabled" label={t('tasks.enableOnCreate')} initValue={true} />}
     </>
   );
 
@@ -538,8 +637,6 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
         overflow: 'hidden',
       }}
     >
-
-
       {/* Table */}
       <div style={{ flex: 1, overflow: 'auto', padding: embedded ? '0 24px' : 0 }}>
         {/* Filter bar */}
@@ -650,9 +747,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
                   key: 'duration',
                   width: 80,
                   render: (_: unknown, r: CronRun) =>
-                    r.startedAt && r.endedAt
-                      ? runTime(r.endedAt - r.startedAt)
-                      : '-',
+                    r.startedAt && r.endedAt ? runTime(r.endedAt - r.startedAt) : '-',
                 },
                 {
                   title: t('tasks.status'),
@@ -683,11 +778,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
               ];
               return (
                 <div style={{ padding: '12px 0' }}>
-                  <Text
-                    strong
-                    size="small"
-                    style={{ marginBottom: 8, display: 'block' }}
-                  >
+                  <Text strong size="small" style={{ marginBottom: 8, display: 'block' }}>
                     {t('tasks.runHistory')}
                   </Text>
                   <Table
@@ -719,7 +810,13 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
         width={520}
         destroyOnClose
       >
-        <Form getFormApi={(api: any) => { realApiRef.current = api; }} labelPosition="top" labelWidth={100}>
+        <Form
+          getFormApi={(api: any) => {
+            realApiRef.current = api;
+          }}
+          labelPosition="top"
+          labelWidth={100}
+        >
           {cronFormFields(false)}
           <div
             style={{

@@ -125,29 +125,32 @@ export default function AgentFilesPanel({
     [agentId, client, t],
   );
 
-  const loadFiles = useCallback(async (preferredName?: string) => {
-    if (!agentId || !client || !isConnected) return;
-    setFilesLoading(true);
-    try {
-      const nextFiles = await fetchGatewayAgentFiles(client, agentId);
-      setFiles(nextFiles);
-      const preferred =
-        nextFiles.find((file) => file.name === preferredName) ??
-        nextFiles.find((file) => file.name === 'IDENTITY.md') ??
-        nextFiles[0];
-      if (preferred) {
-        await readFile(preferred);
-      } else {
-        setSelectedFile(null);
-        setFileContent('');
-        setFileDraft('');
+  const loadFiles = useCallback(
+    async (preferredName?: string) => {
+      if (!agentId || !client || !isConnected) return;
+      setFilesLoading(true);
+      try {
+        const nextFiles = await fetchGatewayAgentFiles(client, agentId);
+        setFiles(nextFiles);
+        const preferred =
+          nextFiles.find((file) => file.name === preferredName) ??
+          nextFiles.find((file) => file.name === 'IDENTITY.md') ??
+          nextFiles[0];
+        if (preferred) {
+          await readFile(preferred);
+        } else {
+          setSelectedFile(null);
+          setFileContent('');
+          setFileDraft('');
+        }
+      } catch (err) {
+        Toast.error(err instanceof Error ? err.message : t('agentFiles.listFailed'));
+      } finally {
+        setFilesLoading(false);
       }
-    } catch (err) {
-      Toast.error(err instanceof Error ? err.message : t('agentFiles.listFailed'));
-    } finally {
-      setFilesLoading(false);
-    }
-  }, [agentId, client, isConnected, readFile, t]);
+    },
+    [agentId, client, isConnected, readFile, t],
+  );
 
   useEffect(() => {
     if (agentId && client && isConnected) {

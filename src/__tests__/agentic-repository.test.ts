@@ -184,20 +184,72 @@ describe('agentic repository model', () => {
   it('classifies repository gate states without mixing OpenClaw runtime tasks into workbench state', () => {
     expect(getRepositoryGateStatus({ binding: null, gitAvailable: true })).toBe('repo_unbound');
     expect(getRepositoryGateStatus({ binding: createBinding(), gitAvailable: false })).toBe('git_missing');
-    expect(getRepositoryGateStatus({ binding: createBinding(), gitAvailable: true, pathExists: false })).toBe('repo_path_missing');
-    expect(getRepositoryGateStatus({ binding: createBinding(), gitAvailable: true, pathExists: true, permissionDenied: true })).toBe('repo_permission_denied');
-    expect(getRepositoryGateStatus({ binding: createBinding(), gitAvailable: true, pathExists: true, isDirectory: false })).toBe('repo_path_missing');
-    expect(getRepositoryGateStatus({ binding: createBinding(), gitAvailable: true, pathExists: true, isDirectory: true, isGitRepo: false })).toBe('repo_not_git');
-    expect(getRepositoryGateStatus({ binding: createBinding(), gitAvailable: true, pathExists: true, isDirectory: true, isGitRepo: true, isEmpty: true })).toBe('repo_empty');
-    expect(getRepositoryGateStatus({ binding: createBinding(), gitAvailable: true, pathExists: true, isDirectory: true, isGitRepo: true, isEmpty: false, hasRequiredTemplate: false })).toBe('repo_needs_bootstrap');
-    expect(getRepositoryGateStatus({ binding: createBinding(), gitAvailable: true, pathExists: true, isDirectory: true, isGitRepo: true, isEmpty: false, hasRequiredTemplate: true })).toBe('repo_ready');
+    expect(getRepositoryGateStatus({ binding: createBinding(), gitAvailable: true, pathExists: false })).toBe(
+      'repo_path_missing',
+    );
+    expect(
+      getRepositoryGateStatus({
+        binding: createBinding(),
+        gitAvailable: true,
+        pathExists: true,
+        permissionDenied: true,
+      }),
+    ).toBe('repo_permission_denied');
+    expect(
+      getRepositoryGateStatus({ binding: createBinding(), gitAvailable: true, pathExists: true, isDirectory: false }),
+    ).toBe('repo_path_missing');
+    expect(
+      getRepositoryGateStatus({
+        binding: createBinding(),
+        gitAvailable: true,
+        pathExists: true,
+        isDirectory: true,
+        isGitRepo: false,
+      }),
+    ).toBe('repo_not_git');
+    expect(
+      getRepositoryGateStatus({
+        binding: createBinding(),
+        gitAvailable: true,
+        pathExists: true,
+        isDirectory: true,
+        isGitRepo: true,
+        isEmpty: true,
+      }),
+    ).toBe('repo_empty');
+    expect(
+      getRepositoryGateStatus({
+        binding: createBinding(),
+        gitAvailable: true,
+        pathExists: true,
+        isDirectory: true,
+        isGitRepo: true,
+        isEmpty: false,
+        hasRequiredTemplate: false,
+      }),
+    ).toBe('repo_needs_bootstrap');
+    expect(
+      getRepositoryGateStatus({
+        binding: createBinding(),
+        gitAvailable: true,
+        pathExists: true,
+        isDirectory: true,
+        isGitRepo: true,
+        isEmpty: false,
+        hasRequiredTemplate: true,
+      }),
+    ).toBe('repo_ready');
   });
 
   it('classifies gateway-local bindings as remote until Gateway repository capabilities are available', () => {
     const binding = createBinding({ location: 'gateway-local' });
 
-    expect(getRepositoryGateStatus({ binding, gitAvailable: true, remoteReachable: false })).toBe('repo_remote_unreachable');
-    expect(getRepositoryGateStatus({ binding, gitAvailable: true, remoteReachable: true, hasRequiredTemplate: true })).toBe('repo_ready');
+    expect(getRepositoryGateStatus({ binding, gitAvailable: true, remoteReachable: false })).toBe(
+      'repo_remote_unreachable',
+    );
+    expect(
+      getRepositoryGateStatus({ binding, gitAvailable: true, remoteReachable: true, hasRequiredTemplate: true }),
+    ).toBe('repo_ready');
   });
 
   it('uses an isolated remote capability checker for gateway-local repositories', async () => {
@@ -216,7 +268,9 @@ describe('agentic repository model', () => {
 
     expect(result.status).toBe('repo_remote_unreachable');
     expect(checkGit).not.toHaveBeenCalled();
-    await expect(createUnavailableGatewayRepositoryCapabilities().inspect(createBinding({ location: 'gateway-local' }))).resolves.toEqual({
+    await expect(
+      createUnavailableGatewayRepositoryCapabilities().inspect(createBinding({ location: 'gateway-local' })),
+    ).resolves.toEqual({
       remoteReachable: false,
       hasRequiredTemplate: false,
     });
@@ -297,8 +351,8 @@ describe('agentic repository storage and templates', () => {
     expect(handlers).toContain("off('destroyed'");
     expect(handlers).toContain('function listTree');
     expect(handlers).toContain('function gitLog');
-    expect(handlers).toContain("ls-files");
-    expect(handlers).toContain("--exclude-standard");
+    expect(handlers).toContain('ls-files');
+    expect(handlers).toContain('--exclude-standard');
     expect(handlers).toContain('resolveSafeExistingRepoPath');
     expect(handlers).toContain('resolveSafeWritableRepoPath');
     expect(handlers).toContain('isSymbolicLink');
@@ -412,10 +466,12 @@ describe('agentic repository storage and templates', () => {
       },
     });
 
-    const result = await inspectRepositoryBinding(createDefaultRepositoryBinding({
-      gatewayInstanceId: 'inst-1',
-      repoPath: '/repo',
-    }));
+    const result = await inspectRepositoryBinding(
+      createDefaultRepositoryBinding({
+        gatewayInstanceId: 'inst-1',
+        repoPath: '/repo',
+      }),
+    );
 
     expect(result.status).toBe('repo_ready');
     expect(result.binding.status).toBe('repo_ready');
@@ -448,10 +504,12 @@ describe('agentic repository storage and templates', () => {
       },
     });
 
-    const result = await inspectRepositoryBinding(createDefaultRepositoryBinding({
-      gatewayInstanceId: 'inst-1',
-      repoPath: '/Users/deepin/Desktop/Company/any-thing',
-    }));
+    const result = await inspectRepositoryBinding(
+      createDefaultRepositoryBinding({
+        gatewayInstanceId: 'inst-1',
+        repoPath: '/Users/deepin/Desktop/Company/any-thing',
+      }),
+    );
 
     expect(result.status).toBe('repo_ready');
     expect(result.binding.schemaProfile).toBe('llm-wiki');
@@ -522,7 +580,10 @@ describe('agentic repository storage and templates', () => {
 
   it('passes only Workbench structure signals to semantic mapping', () => {
     const source = readFileSync('src/components/RepositoryGate.tsx', 'utf8');
-    const signalBuilder = source.slice(source.indexOf('const buildWorkbenchStructureSignals'), source.indexOf('const isSafeMapping'));
+    const signalBuilder = source.slice(
+      source.indexOf('const buildWorkbenchStructureSignals'),
+      source.indexOf('const isSafeMapping'),
+    );
 
     expect(source).toContain('buildWorkbenchStructureSignals');
     expect(source).toContain('current-work');
@@ -573,12 +634,15 @@ describe('agentic repository storage and templates', () => {
 
   it('saves Workbench semantic mappings without a manual confirmation step', () => {
     const source = readFileSync('src/components/RepositoryGate.tsx', 'utf8');
-    const workbenchHandler = source.slice(source.indexOf('const handleSemanticWorkbenchMapping'), source.indexOf('const knowledgeMappingReady'));
+    const workbenchHandler = source.slice(
+      source.indexOf('const handleSemanticWorkbenchMapping'),
+      source.indexOf('const knowledgeMappingReady'),
+    );
 
     expect(workbenchHandler).not.toContain('Modal.confirm');
     expect(workbenchHandler).toContain('const next = await saveWorkbenchMapping(base, sanitized)');
     expect(workbenchHandler).toContain('await inspect(next)');
-    expect(workbenchHandler).toContain('Toast.success(t(\'repositoryGate.workbenchMappingSaved\'))');
+    expect(workbenchHandler).toContain("Toast.success(t('repositoryGate.workbenchMappingSaved'))");
   });
 
   it('wires startup repository context sync and manual fallback sync UI', () => {
@@ -593,12 +657,12 @@ describe('agentic repository storage and templates', () => {
       store.indexOf('recoverInterruptedAiActionRuns', connectedStatusIndex),
     );
     const detectionThen = mainPage.slice(
-      mainPage.indexOf('detectDesktopCompanionForInstance(currentId).then'),
-      mainPage.indexOf('return () => {', mainPage.indexOf('detectDesktopCompanionForInstance(currentId).then')),
+      mainPage.indexOf('detectDesktopCompanionForInstance(currentId)'),
+      mainPage.indexOf('return () => {', mainPage.indexOf('detectDesktopCompanionForInstance(currentId)')),
     );
     const beforeDetection = mainPage.slice(
       mainPage.indexOf('if (companionCheckedRef.current.has(currentId)) return;'),
-      mainPage.indexOf('detectDesktopCompanionForInstance(currentId).then'),
+      mainPage.indexOf('detectDesktopCompanionForInstance(currentId)'),
     );
     const missingCompanionBranch = detectionThen.slice(
       detectionThen.indexOf("if (info.status === 'missing' || info.status === 'disabled')"),
@@ -610,7 +674,7 @@ describe('agentic repository storage and templates', () => {
     expect(store).toContain('syncRepositoryContextWithCompanion(target.client, target.instanceId)');
     expect(store).toContain('syncRepositoryContextForInstance(instance.id)');
     expect(connectedBranch).toContain('syncRepositoryContextForInstance(instance.id)');
-    expect(store).toContain('console.warn(\'[syncRepositoryContextForInstance]\'');
+    expect(store).toContain("console.warn('[syncRepositoryContextForInstance]'");
     expect(mainPage).toContain('syncRepositoryContextForInstance(currentId)');
     expect(beforeDetection).not.toContain('companionInstallDismissedRef.current');
     expect(detectionThen).toContain("if (info.status === 'ready')");
@@ -624,7 +688,7 @@ describe('agentic repository storage and templates', () => {
     expect(gate).toContain('disabled={!activeClient || !bindingMatchesCurrentInstance}');
     expect(readyLine).toContain('bindingMatchesCurrentInstance');
     expect(gate).toMatch(/agentsMdContent\.trim\(\)\s*\?\s*agentsMdContent/);
-    expect(gate).toContain('Toast.error(t(\'repositoryGate.syncRepositoryRulesFailed\'))');
+    expect(gate).toContain("Toast.error(t('repositoryGate.syncRepositoryRulesFailed'))");
     expect(zh.repositoryGate.syncRepositoryRules).toBeTruthy();
     expect(zh.repositoryGate.syncRepositoryRules).toContain('Agent 工作区');
     expect(zh.repositoryGate.syncRepositoryRulesDone).toBeTruthy();

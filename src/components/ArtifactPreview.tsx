@@ -24,7 +24,9 @@ export function ArtifactPreview({ artifact }: Props) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>{artifact.icon}</span>
           <Text strong>{artifact.title}</Text>
-          <Tag size="small" color="orange" type="light">{artifact.type}</Tag>
+          <Tag size="small" color="orange" type="light">
+            {artifact.type}
+          </Tag>
         </div>
       }
       headerExtraContent={
@@ -32,8 +34,7 @@ export function ArtifactPreview({ artifact }: Props) {
           <Button size="small" theme="borderless" icon={<IconPlay />} onClick={() => openArtifactWindow(artifact.id)}>
             {t('artifact.open')}
           </Button>
-          <Button size="small" theme="borderless" icon={<IconExpand />}
-            onClick={() => setExpanded(!expanded)}>
+          <Button size="small" theme="borderless" icon={<IconExpand />} onClick={() => setExpanded(!expanded)}>
             {expanded ? t('artifact.collapse') : t('artifact.expand')}
           </Button>
         </div>
@@ -55,7 +56,9 @@ export function ArtifactPreview({ artifact }: Props) {
       )}
       <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
         {artifact.tags.map((tag) => (
-          <Tag key={tag} size="small" color="orange" type="light">{tag}</Tag>
+          <Tag key={tag} size="small" color="orange" type="light">
+            {tag}
+          </Tag>
         ))}
         <Text type="tertiary" size="small" style={{ flex: 1, textAlign: 'right' }}>
           v{artifact.currentVersion} · {new Date(artifact.updatedAt).toLocaleString()}

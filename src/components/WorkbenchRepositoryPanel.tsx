@@ -241,28 +241,35 @@ export default function WorkbenchRepositoryPanel({
       onClick={() => void openPreview(file)}
       style={{
         width: '100%',
-        border: selectedPreviewPath === file.path ? '1px solid var(--semi-color-primary)' : '1px solid var(--semi-color-border)',
-        background: selectedPreviewPath === file.path ? 'var(--semi-color-primary-light-default)' : 'var(--semi-color-bg-0)',
+        border:
+          selectedPreviewPath === file.path
+            ? '1px solid var(--semi-color-primary)'
+            : '1px solid var(--semi-color-border)',
+        background:
+          selectedPreviewPath === file.path ? 'var(--semi-color-primary-light-default)' : 'var(--semi-color-bg-0)',
         borderRadius: 6,
         padding: '8px 10px',
         cursor: 'pointer',
         textAlign: 'left',
       }}
     >
-      <Text strong ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>{file.name}</Text>
-      <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>{file.path}</Text>
+      <Text strong ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>
+        {file.name}
+      </Text>
+      <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>
+        {file.path}
+      </Text>
     </button>
   );
 
-  const renderFileList = (files: RepositoryMarkdownFile[], emptyText: string) => (
+  const renderFileList = (files: RepositoryMarkdownFile[], emptyText: string) =>
     files.length > 0 ? (
       <Space vertical align="start" style={{ width: '100%' }}>
         {files.map(renderFileButton)}
       </Space>
     ) : (
       <Empty description={emptyText} />
-    )
-  );
+    );
 
   const sectionStyle = {
     border: '1px solid var(--semi-color-border)',

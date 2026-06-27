@@ -52,14 +52,10 @@ export function collectChatArtifactCandidates(chats: ChatArtifactCandidateSource
   return candidates;
 }
 
-export function filterArtifactsForSessionKeys(
-  artifacts: ArtifactMeta[],
-  sessionKeys: string[],
-): ArtifactMeta[] {
+export function filterArtifactsForSessionKeys(artifacts: ArtifactMeta[], sessionKeys: string[]): ArtifactMeta[] {
   const keySet = new Set(sessionKeys.filter(Boolean));
-  return artifacts.filter((artifact) => (
-    artifact.source.type === 'chat'
-    && typeof artifact.source.id === 'string'
-    && keySet.has(artifact.source.id)
-  ));
+  return artifacts.filter(
+    (artifact) =>
+      artifact.source.type === 'chat' && typeof artifact.source.id === 'string' && keySet.has(artifact.source.id),
+  );
 }

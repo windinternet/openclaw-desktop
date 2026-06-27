@@ -10,11 +10,7 @@ function getApi(): ArtifactAPI {
 }
 
 export const authService = {
-  async requestAuthorization(
-    artifactId: string,
-    capability: string,
-    detail: string,
-  ): Promise<string | null> {
+  async requestAuthorization(artifactId: string, capability: string, detail: string): Promise<string | null> {
     const api = getApi();
     const result = await api.requestAuth(artifactId, capability, detail);
     return result.granted ? result.level : null;

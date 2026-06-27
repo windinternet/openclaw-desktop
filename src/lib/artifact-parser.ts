@@ -57,6 +57,22 @@ export async function saveArtifactFromChat(
 }
 
 function isValidArtifactType(type: unknown): type is ArtifactType {
-  const validTypes = ['report', 'dashboard', 'analysis', 'checklist', 'code', 'document', 'slide', 'form', 'other', 'link', 'app', 'file', 'audio', 'image', 'video'];
+  const validTypes = [
+    'report',
+    'dashboard',
+    'analysis',
+    'checklist',
+    'code',
+    'document',
+    'slide',
+    'form',
+    'other',
+    'link',
+    'app',
+    'file',
+    'audio',
+    'image',
+    'video',
+  ];
   return typeof type === 'string' && validTypes.includes(type);
 }

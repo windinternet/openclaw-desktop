@@ -96,9 +96,7 @@ describe('office scene interaction helpers', () => {
   });
 
   it('returns null when control raycast hits only missing or downed actors', () => {
-    const actors = new Map<string, OfficeShotTargetActor>([
-      ['downed-agent', { combat: { downedUntil: 5000 } }],
-    ]);
+    const actors = new Map<string, OfficeShotTargetActor>([['downed-agent', { combat: { downedUntil: 5000 } }]]);
     const hits: OfficeShotTargetHit[] = [
       { object: { userData: { agentId: 'missing-agent' } } },
       { object: { userData: { agentId: 'downed-agent' } } },
@@ -111,15 +109,25 @@ describe('office scene interaction helpers', () => {
     const downed = { combat: { downedUntil: 5000 } };
     const live = { combat: { downedUntil: null } };
 
-    expect(resolveNearestOfficeControlTarget([
-      { agentId: 'downed-agent', actor: downed, distance: 0.2 },
-      { agentId: 'live-agent', actor: live, distance: 1.1 },
-    ], 1.45)).toBe('live-agent');
+    expect(
+      resolveNearestOfficeControlTarget(
+        [
+          { agentId: 'downed-agent', actor: downed, distance: 0.2 },
+          { agentId: 'live-agent', actor: live, distance: 1.1 },
+        ],
+        1.45,
+      ),
+    ).toBe('live-agent');
 
-    expect(resolveNearestOfficeControlTarget([
-      { agentId: 'downed-agent', actor: downed, distance: 0.2 },
-      { agentId: 'far-live-agent', actor: live, distance: 1.6 },
-    ], 1.45)).toBeNull();
+    expect(
+      resolveNearestOfficeControlTarget(
+        [
+          { agentId: 'downed-agent', actor: downed, distance: 0.2 },
+          { agentId: 'far-live-agent', actor: live, distance: 1.6 },
+        ],
+        1.45,
+      ),
+    ).toBeNull();
   });
 
   it('allows jumping only for live actors that are on the ground', () => {

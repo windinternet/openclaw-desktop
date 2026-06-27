@@ -8,7 +8,13 @@ import type { ModelInfo } from '../lib/types';
 
 describe('gateway usage dashboard data', () => {
   const models: ModelInfo[] = [
-    { id: 'claude-sonnet-4.5', provider: 'anthropic', name: 'Claude Sonnet 4.5', thinking: true, contextWindow: 200000 },
+    {
+      id: 'claude-sonnet-4.5',
+      provider: 'anthropic',
+      name: 'Claude Sonnet 4.5',
+      thinking: true,
+      contextWindow: 200000,
+    },
     { id: 'gpt-4.1', provider: 'openai', name: 'GPT 4.1', vision: true, contextWindow: 128000 },
     { id: 'deepseek-v4-flash', provider: 'deepseek', name: 'DeepSeek V4 Flash', contextWindow: 64000 },
   ];
@@ -48,14 +54,34 @@ describe('gateway usage dashboard data', () => {
           { date: '2026-06-25', totalTokens: 1640, costUsd: 0.3 },
         ],
         byModel: [
-          { model: 'anthropic/claude-sonnet-4.5', provider: 'anthropic', totalTokens: 2000, costUsd: 0.36, sessionCount: 3 },
+          {
+            model: 'anthropic/claude-sonnet-4.5',
+            provider: 'anthropic',
+            totalTokens: 2000,
+            costUsd: 0.36,
+            sessionCount: 3,
+          },
           { model: 'openai/gpt-4.1', provider: 'openai', totalTokens: 440, costUsd: 0.06, sessionCount: 1 },
         ],
       },
       sessions: {
         sessions: [
-          { key: 'agent:main:one', title: '策略讨论', model: 'anthropic/claude-sonnet-4.5', totalTokens: 1800, inputTokens: 900, outputTokens: 300, updatedAt: 1_780_000_001_000 },
-          { key: 'agent:ops:two', title: '日报', usage: { total: 640, input: 300, output: 40 }, model: 'openai/gpt-4.1', updatedAt: 1_780_000_002_000 },
+          {
+            key: 'agent:main:one',
+            title: '策略讨论',
+            model: 'anthropic/claude-sonnet-4.5',
+            totalTokens: 1800,
+            inputTokens: 900,
+            outputTokens: 300,
+            updatedAt: 1_780_000_001_000,
+          },
+          {
+            key: 'agent:ops:two',
+            title: '日报',
+            usage: { total: 640, input: 300, output: 40 },
+            model: 'openai/gpt-4.1',
+            updatedAt: 1_780_000_002_000,
+          },
         ],
       },
     });
@@ -67,13 +93,15 @@ describe('gateway usage dashboard data', () => {
     expect(dashboard.totals.cacheReadTokens).toBe(800);
     expect(dashboard.totals.cacheWriteTokens).toBe(100);
     expect(dashboard.totals.estimatedCostUsd).toBe(0.42);
-    expect(dashboard.modelRows.map((row) => ({
-      model: row.model,
-      totalTokens: row.totalTokens,
-      sessionCount: row.sessionCount,
-      thinking: row.thinking,
-      vision: row.vision,
-    }))).toEqual([
+    expect(
+      dashboard.modelRows.map((row) => ({
+        model: row.model,
+        totalTokens: row.totalTokens,
+        sessionCount: row.sessionCount,
+        thinking: row.thinking,
+        vision: row.vision,
+      })),
+    ).toEqual([
       { model: 'anthropic/claude-sonnet-4.5', totalTokens: 2000, sessionCount: 3, thinking: true, vision: false },
       { model: 'openai/gpt-4.1', totalTokens: 440, sessionCount: 1, thinking: false, vision: true },
     ]);
@@ -142,13 +170,15 @@ describe('gateway usage dashboard data', () => {
       },
     });
 
-    expect(dashboard.totals).toEqual(expect.objectContaining({
-      inputTokens: 3068470,
-      outputTokens: 407513,
-      cacheReadTokens: 68252800,
-      totalTokens: 71728783,
-      estimatedCostUsd: 2.361160568,
-    }));
+    expect(dashboard.totals).toEqual(
+      expect.objectContaining({
+        inputTokens: 3068470,
+        outputTokens: 407513,
+        cacheReadTokens: 68252800,
+        totalTokens: 71728783,
+        estimatedCostUsd: 2.361160568,
+      }),
+    );
     expect(dashboard.trend).toHaveLength(7);
     expect(dashboard.trend.map((point) => point.date)).toEqual([
       '2026-06-02',
@@ -159,17 +189,21 @@ describe('gateway usage dashboard data', () => {
       '2026-06-07',
       '2026-06-08',
     ]);
-    expect(dashboard.modelRows[0]).toEqual(expect.objectContaining({
-      model: 'deepseek/deepseek-v4-flash',
-      totalTokens: 64501557,
-      estimatedCostUsd: 2.1184018,
-      sessionCount: 1041,
-    }));
-    expect(dashboard.recentSessions[0]).toEqual(expect.objectContaining({
-      title: '真实会话',
-      totalTokens: 7227226,
-      estimatedCostUsd: 0.242758768,
-    }));
+    expect(dashboard.modelRows[0]).toEqual(
+      expect.objectContaining({
+        model: 'deepseek/deepseek-v4-flash',
+        totalTokens: 64501557,
+        estimatedCostUsd: 2.1184018,
+        sessionCount: 1041,
+      }),
+    );
+    expect(dashboard.recentSessions[0]).toEqual(
+      expect.objectContaining({
+        title: '真实会话',
+        totalTokens: 7227226,
+        estimatedCostUsd: 0.242758768,
+      }),
+    );
   });
 
   it('falls back to sessions.usage aggregate daily points when cost trend is unavailable', () => {
@@ -205,11 +239,7 @@ describe('gateway usage dashboard data', () => {
 
     const dashboard = await fetchGatewayUsageDashboard(client, { models, now: new Date('2026-06-25T12:00:00Z') });
 
-    expect(calls.map(([method]) => method)).toEqual([
-      'usage.status',
-      'usage.cost',
-      'sessions.usage',
-    ]);
+    expect(calls.map(([method]) => method)).toEqual(['usage.status', 'usage.cost', 'sessions.usage']);
     expect(calls[1][1]).toEqual({ agentScope: 'all', from: '2026-06-18', to: '2026-06-25' });
     expect(dashboard.available).toBe(true);
     expect(dashboard.errors).toEqual(['usage.cost']);

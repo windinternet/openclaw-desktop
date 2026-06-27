@@ -132,17 +132,20 @@ describe('AI ActionRun repository summaries', () => {
       },
     });
 
-    await upsertAiActionRun('instance-1', createRun({
-      id: 'action-42',
-      type: 'agent_team_compose',
-      sourcePage: 'teams',
-      status: 'done',
-      input: '整理团队配置',
-      resultSummary: '团队配置已生成',
-      plan: '1. 检查团队\n2. 生成配置',
-      gatewaySessionKey: 'agent:main:desktop-action:agent_team_compose:action-42',
-      updatedAt: 2,
-    }));
+    await upsertAiActionRun(
+      'instance-1',
+      createRun({
+        id: 'action-42',
+        type: 'agent_team_compose',
+        sourcePage: 'teams',
+        status: 'done',
+        input: '整理团队配置',
+        resultSummary: '团队配置已生成',
+        plan: '1. 检查团队\n2. 生成配置',
+        gatewaySessionKey: 'agent:main:desktop-action:agent_team_compose:action-42',
+        updatedAt: 2,
+      }),
+    );
 
     expect(writeText).toHaveBeenCalledWith(
       '/repo',

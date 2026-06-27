@@ -1,33 +1,33 @@
 interface ElectronAPI {
   log?: {
-    send: (level: string, ...args: unknown[]) => void
-  }
+    send: (level: string, ...args: unknown[]) => void;
+  };
 }
 
-let hooked = false
+let hooked = false;
 
 function getElectronAPI(): ElectronAPI | undefined {
-  return (window as unknown as { electronAPI?: ElectronAPI }).electronAPI
+  return (window as unknown as { electronAPI?: ElectronAPI }).electronAPI;
 }
 
 function stringify(a: unknown): unknown {
-  if (a instanceof Error) return a.stack || a.message
+  if (a instanceof Error) return a.stack || a.message;
   if (typeof a === 'object') {
     try {
-      return JSON.stringify(a)
+      return JSON.stringify(a);
     } catch {
-      return String(a)
+      return String(a);
     }
   }
-  return String(a)
+  return String(a);
 }
 
 function setup(): void {
-  if (hooked) return
-  hooked = true
+  if (hooked) return;
+  hooked = true;
 
-  const logSend = getElectronAPI()?.log?.send
-  if (!logSend) return
+  const logSend = getElectronAPI()?.log?.send;
+  if (!logSend) return;
 
   const orig = {
     log: console.log.bind(console),
@@ -35,42 +35,42 @@ function setup(): void {
     error: console.error.bind(console),
     info: console.info.bind(console),
     debug: console.debug.bind(console),
-  }
+  };
 
-  let sending = false
+  let sending = false;
 
   function sendLog(level: string, ...args: unknown[]): void {
-    if (sending) return
-    sending = true
+    if (sending) return;
+    sending = true;
     try {
-      ;(logSend as (level: string, ...args: unknown[]) => void)(level, ...args.map(stringify))
+      (logSend as (level: string, ...args: unknown[]) => void)(level, ...args.map(stringify));
     } catch {
       /* ignore */
     } finally {
-      sending = false
+      sending = false;
     }
   }
 
   console.log = (...args: unknown[]) => {
-    orig.log(...args)
-    sendLog('LOG', ...args)
-  }
+    orig.log(...args);
+    sendLog('LOG', ...args);
+  };
   console.warn = (...args: unknown[]) => {
-    orig.warn(...args)
-    sendLog('WARN', ...args)
-  }
+    orig.warn(...args);
+    sendLog('WARN', ...args);
+  };
   console.error = (...args: unknown[]) => {
-    orig.error(...args)
-    sendLog('ERROR', ...args)
-  }
+    orig.error(...args);
+    sendLog('ERROR', ...args);
+  };
   console.info = (...args: unknown[]) => {
-    orig.info(...args)
-    sendLog('INFO', ...args)
-  }
+    orig.info(...args);
+    sendLog('INFO', ...args);
+  };
   console.debug = (...args: unknown[]) => {
-    orig.debug(...args)
-    sendLog('DEBUG', ...args)
-  }
+    orig.debug(...args);
+    sendLog('DEBUG', ...args);
+  };
 }
 
-setup()
+setup();

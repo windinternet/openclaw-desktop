@@ -1,4 +1,4 @@
-import type { PetQuote } from '../../lib/pet-types'
+import type { PetQuote } from '../../lib/pet-types';
 
 export const QUOTES: PetQuote[] = [
   { text: '今天也要加油哦！', emoji: '💪', weight: 1 },
@@ -12,14 +12,14 @@ export const QUOTES: PetQuote[] = [
   { text: '你的代码写得真棒', emoji: '🌟', weight: 0.5 },
   { text: '又处理了一条消息！', emoji: '⚡', weight: 0.6 },
   { text: '喵～', emoji: '🐱', weight: 0.7 },
-]
+];
 
 export function getRandomQuote(): PetQuote {
-  const totalWeight = QUOTES.reduce((sum, q) => sum + q.weight, 0)
-  let random = Math.random() * totalWeight
+  const totalWeight = QUOTES.reduce((sum, q) => sum + q.weight, 0);
+  let random = Math.random() * totalWeight;
   for (const quote of QUOTES) {
-    random -= quote.weight
-    if (random <= 0) return quote
+    random -= quote.weight;
+    if (random <= 0) return quote;
   }
-  return QUOTES[0]
+  return QUOTES[0];
 }

@@ -23,11 +23,12 @@ export default function UsageTrendChart({ trend }: UsageTrendChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [chartHeight, setChartHeight] = useState(MIN_CHART_HEIGHT);
   const data = useMemo(
-    () => trend.map((point) => ({
-      date: point.date.slice(5),
-      tokens: point.totalTokens,
-      cost: point.estimatedCostUsd,
-    })),
+    () =>
+      trend.map((point) => ({
+        date: point.date.slice(5),
+        tokens: point.totalTokens,
+        cost: point.estimatedCostUsd,
+      })),
     [trend],
   );
 
@@ -48,63 +49,63 @@ export default function UsageTrendChart({ trend }: UsageTrendChartProps) {
     return () => observer.disconnect();
   }, []);
 
-  const config = useMemo(() => ({
-    data,
-    xField: 'date',
-    yField: 'tokens',
-    height: chartHeight,
-    autoFit: true,
-    padding: [16, 12, 32, 42],
-    colorField: 'date',
-    scale: {
-      color: {
-        range: [
-          cssVar('--semi-color-primary', '#0066ff'),
-          cssVar('--semi-color-success', '#00a870'),
+  const config = useMemo(
+    () => ({
+      data,
+      xField: 'date',
+      yField: 'tokens',
+      height: chartHeight,
+      autoFit: true,
+      padding: [16, 12, 32, 42],
+      colorField: 'date',
+      scale: {
+        color: {
+          range: [cssVar('--semi-color-primary', '#0066ff'), cssVar('--semi-color-success', '#00a870')],
+        },
+      },
+      legend: false,
+      axis: {
+        x: {
+          title: false,
+          labelFontSize: 11,
+          labelFill: cssVar('--semi-color-text-1', '#4e5969'),
+          lineStroke: cssVar('--semi-color-border', '#e5e6eb'),
+          tick: false,
+        },
+        y: {
+          title: false,
+          labelFontSize: 11,
+          labelFill: cssVar('--semi-color-text-1', '#4e5969'),
+          gridStroke: cssVar('--semi-color-border', '#e5e6eb'),
+          gridLineDash: [3, 3],
+          labelFormatter: (value: string) => formatCompactTokenValue(Number(value)),
+        },
+      },
+      style: {
+        radiusTopLeft: 6,
+        radiusTopRight: 6,
+        radiusBottomLeft: 2,
+        radiusBottomRight: 2,
+        maxWidth: 34,
+      },
+      tooltip: {
+        title: (item: { date?: string }) => item.date ?? '',
+        items: [
+          {
+            field: 'tokens',
+            name: 'Tokens',
+            valueFormatter: (value: number) => formatNumber(value),
+          },
+          {
+            field: 'cost',
+            name: 'Cost',
+            valueFormatter: (value?: number) => (value === undefined ? '-' : `$${value.toFixed(4)}`),
+          },
         ],
       },
-    },
-    legend: false,
-    axis: {
-      x: {
-        title: false,
-        labelFontSize: 11,
-        labelFill: cssVar('--semi-color-text-1', '#4e5969'),
-        lineStroke: cssVar('--semi-color-border', '#e5e6eb'),
-        tick: false,
-      },
-      y: {
-        title: false,
-        labelFontSize: 11,
-        labelFill: cssVar('--semi-color-text-1', '#4e5969'),
-        gridStroke: cssVar('--semi-color-border', '#e5e6eb'),
-        gridLineDash: [3, 3],
-        labelFormatter: (value: string) => formatCompactTokenValue(Number(value)),
-      },
-    },
-    style: {
-      radiusTopLeft: 6,
-      radiusTopRight: 6,
-      radiusBottomLeft: 2,
-      radiusBottomRight: 2,
-      maxWidth: 34,
-    },
-    tooltip: {
-      title: (item: { date?: string }) => item.date ?? '',
-      items: [
-        {
-          field: 'tokens',
-          name: 'Tokens',
-          valueFormatter: (value: number) => formatNumber(value),
-        },
-        {
-          field: 'cost',
-          name: 'Cost',
-          valueFormatter: (value?: number) => (value === undefined ? '-' : `$${value.toFixed(4)}`),
-        },
-      ],
-    },
-  }), [chartHeight, data]);
+    }),
+    [chartHeight, data],
+  );
 
   return (
     <div ref={containerRef} className="dashboard-antv-chart">

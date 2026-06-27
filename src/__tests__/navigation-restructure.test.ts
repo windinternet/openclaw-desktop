@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import {
-  getActiveNavKey,
-  NAV_GROUPS,
-  PRIMARY_ROUTE_MAP,
-} from '../lib/navigation';
+import { getActiveNavKey, NAV_GROUPS, PRIMARY_ROUTE_MAP } from '../lib/navigation';
 
 function getByPath(source: unknown, path: string): unknown {
   return path.split('.').reduce<unknown>((value, key) => {
@@ -17,19 +13,13 @@ describe('navigation restructure', () => {
   it('keeps new session as a first-level overview entry', () => {
     const overview = NAV_GROUPS.find((group) => group.key === 'overview');
 
-    expect(overview?.items.map((item) => item.key)).toEqual([
-      'dashboard',
-      'new-session',
-    ]);
+    expect(overview?.items.map((item) => item.key)).toEqual(['dashboard', 'new-session']);
   });
 
   it('keeps repository work entries in the work group without a separate sessions hub', () => {
     const work = NAV_GROUPS.find((group) => group.key === 'work');
 
-    expect(work?.items.map((item) => item.key)).toEqual([
-      'workbench',
-      'knowledge',
-    ]);
+    expect(work?.items.map((item) => item.key)).toEqual(['workbench', 'knowledge']);
   });
 
   it('defaults to primary navigation without visible group headings but supports a settings toggle', () => {
@@ -37,9 +27,9 @@ describe('navigation restructure', () => {
     const settingsPage = readFileSync('src/pages/SettingsPage.tsx', 'utf8');
 
     expect(sidebar).toContain('settings.sidebarNavGrouped');
-    expect(sidebar).toContain('sidebarNavGrouped ?');
+    expect(sidebar).toMatch(/sidebarNavGrouped\s*\?/);
     expect(sidebar).toContain('sidebar-nav-section-label');
-    expect(sidebar).toContain('NAV_GROUPS.flatMap((group) => group.items).map');
+    expect(sidebar).toMatch(/NAV_GROUPS\.flatMap\(\(group\) => group\.items\)\.map/);
     expect(settingsPage).toContain("t('settings.sidebarNavGrouped')");
     expect(settingsPage).toContain('updateSettings({ sidebarNavGrouped: checked })');
   });
@@ -71,9 +61,9 @@ describe('navigation restructure', () => {
 
     expect(sidebar).toContain('id="ig-knowledge"');
     expect(sidebar).toContain('id="ig-control-center"');
-    expect(css).toContain(".semi-icon-branch svg path");
+    expect(css).toContain('.semi-icon-branch svg path');
     expect(css).toContain("fill: url('#ig-knowledge') !important;");
-    expect(css).toContain(".semi-icon-setting svg path");
+    expect(css).toContain('.semi-icon-setting svg path');
     expect(css).toContain("fill: url('#ig-control-center') !important;");
   });
 
@@ -197,7 +187,7 @@ describe('navigation hub pages', () => {
     expect(control).toContain('<TuningPage embedded');
     expect(control).toContain('<RepositoryProtocolPage embedded');
     expect(control).not.toContain('SettingsPage');
-    expect(control).not.toContain("itemKey=\"settings\"");
+    expect(control).not.toContain('itemKey="settings"');
   });
 
   it('lets embedded child pages hide their own page headers', () => {

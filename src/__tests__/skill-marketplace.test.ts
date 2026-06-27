@@ -35,48 +35,55 @@ describe('skill marketplace sources', () => {
   });
 
   it('builds SkillHub API URLs for default browse and keyword search', () => {
-    expect(createSkillMarketplaceSearchUrl({
-      sourceId: 'skillhub',
-      query: '',
-      limit: 20,
-    })).toBe('https://api.skillhub.cn/api/skills?page=1&pageSize=20&sortBy=downloads&order=desc');
+    expect(
+      createSkillMarketplaceSearchUrl({
+        sourceId: 'skillhub',
+        query: '',
+        limit: 20,
+      }),
+    ).toBe('https://api.skillhub.cn/api/skills?page=1&pageSize=20&sortBy=downloads&order=desc');
 
-    expect(createSkillMarketplaceSearchUrl({
-      sourceId: 'skillhub',
-      query: 'code review',
-      limit: 12,
-    })).toBe('https://api.skillhub.cn/api/skills?page=1&pageSize=12&sortBy=downloads&order=desc&keyword=code+review');
+    expect(
+      createSkillMarketplaceSearchUrl({
+        sourceId: 'skillhub',
+        query: 'code review',
+        limit: 12,
+      }),
+    ).toBe('https://api.skillhub.cn/api/skills?page=1&pageSize=12&sortBy=downloads&order=desc&keyword=code+review');
   });
 
   it('builds ClawHub API URLs for default browse and keyword search', () => {
-    expect(createSkillMarketplaceSearchUrl({
-      sourceId: 'clawhub',
-      limit: 20,
-    })).toBe('https://wry-manatee-359.convex.site/api/v1/packages?limit=20&family=skill');
+    expect(
+      createSkillMarketplaceSearchUrl({
+        sourceId: 'clawhub',
+        limit: 20,
+      }),
+    ).toBe('https://wry-manatee-359.convex.site/api/v1/packages?limit=20&family=skill');
 
-    expect(createSkillMarketplaceSearchUrl({
-      sourceId: 'clawhub',
-      query: 'code review',
-      limit: 12,
-    })).toBe('https://wry-manatee-359.convex.site/api/v1/packages/search?q=code+review&limit=12&family=skill');
+    expect(
+      createSkillMarketplaceSearchUrl({
+        sourceId: 'clawhub',
+        query: 'code review',
+        limit: 12,
+      }),
+    ).toBe('https://wry-manatee-359.convex.site/api/v1/packages/search?q=code+review&limit=12&family=skill');
   });
 });
 
 describe('normalizeSkillMarketplaceSearchResponse', () => {
   it('normalizes marketplace API results from supported response shapes', () => {
-    const direct = normalizeSkillMarketplaceSearchResponse([
-      { id: 'a', name: 'Doc Writer', sourceId: 'skillhub' },
-    ]);
-    const wrappedSkills = normalizeSkillMarketplaceSearchResponse({
-      skills: [{ slug: 'code-review', displayName: 'Code Review', source: 'clawhub' }],
-    }, 'clawhub');
+    const direct = normalizeSkillMarketplaceSearchResponse([{ id: 'a', name: 'Doc Writer', sourceId: 'skillhub' }]);
+    const wrappedSkills = normalizeSkillMarketplaceSearchResponse(
+      {
+        skills: [{ slug: 'code-review', displayName: 'Code Review', source: 'clawhub' }],
+      },
+      'clawhub',
+    );
     const wrappedItems = normalizeSkillMarketplaceSearchResponse({
       items: [{ slug: 'test-runner', title: 'Test Runner' }],
     });
 
-    expect(direct).toEqual([
-      expect.objectContaining({ id: 'a', name: 'Doc Writer', sourceId: 'skillhub' }),
-    ]);
+    expect(direct).toEqual([expect.objectContaining({ id: 'a', name: 'Doc Writer', sourceId: 'skillhub' })]);
     expect(wrappedSkills).toEqual([
       expect.objectContaining({ id: 'code-review', name: 'Code Review', sourceId: 'clawhub' }),
     ]);
@@ -86,15 +93,18 @@ describe('normalizeSkillMarketplaceSearchResponse', () => {
   });
 
   it('keeps SkillHub marketplace identity even when upstream source is ClawHub', () => {
-    const results = normalizeSkillMarketplaceSearchResponse([
-      {
-        slug: 'self-improving-agent',
-        name: 'Self-Improving Agent',
-        source: 'clawhub',
-        ownerName: 'pskoett',
-        description_zh: '自我改进代理',
-      },
-    ], 'skillhub');
+    const results = normalizeSkillMarketplaceSearchResponse(
+      [
+        {
+          slug: 'self-improving-agent',
+          name: 'Self-Improving Agent',
+          source: 'clawhub',
+          ownerName: 'pskoett',
+          description_zh: '自我改进代理',
+        },
+      ],
+      'skillhub',
+    );
 
     expect(results).toEqual([
       expect.objectContaining({
@@ -114,7 +124,7 @@ describe('Extensions marketplace UI', () => {
     const pageSource = readFileSync('src/pages/ExtensionsPage.tsx', 'utf8');
     const storeSource = readFileSync('src/lib/store.ts', 'utf8');
 
-    expect(pageSource).toContain("itemKey=\"marketplace\"");
+    expect(pageSource).toContain('itemKey="marketplace"');
     expect(pageSource).toContain("t('extensions.marketplace')");
     expect(pageSource).toContain('searchSkillMarketplace');
     expect(pageSource).toContain('installMarketplaceSkill');

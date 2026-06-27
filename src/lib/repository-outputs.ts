@@ -38,7 +38,9 @@ export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string
     artifact.description ? `description: ${artifact.description}` : undefined,
     artifact.tags.length > 0 ? `tags: ${artifact.tags.join(', ')}` : undefined,
     '',
-  ].filter((line): line is string => typeof line === 'string').join('\n');
+  ]
+    .filter((line): line is string => typeof line === 'string')
+    .join('\n');
 }
 
 export async function createRepositoryOutput(params: CreateRepositoryOutputParams): Promise<RepositoryOutputResult> {
@@ -51,18 +53,12 @@ export async function createRepositoryOutput(params: CreateRepositoryOutputParam
     await repository.writeText(params.binding.repoPath, previewPath, params.html);
   }
 
-  await repository.writeText(
-    params.binding.repoPath,
-    outputPath,
-    buildOutputMarkdown(params.artifact, previewPath),
-  );
+  await repository.writeText(params.binding.repoPath, outputPath, buildOutputMarkdown(params.artifact, previewPath));
 
   const indexPath = `${params.binding.paths.outputs}/index.md`;
   const existingIndex = await repository.readText(params.binding.repoPath, indexPath);
   const indexEntry = `- [${params.artifact.title}](${outputPath})`;
-  const nextIndex = existingIndex.includes(outputPath)
-    ? existingIndex
-    : `${existingIndex.trimEnd()}\n${indexEntry}\n`;
+  const nextIndex = existingIndex.includes(outputPath) ? existingIndex : `${existingIndex.trimEnd()}\n${indexEntry}\n`;
   await repository.writeText(params.binding.repoPath, indexPath, nextIndex);
 
   return { outputId: params.artifact.id, outputPath, previewPath };

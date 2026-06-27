@@ -242,7 +242,7 @@ export default function RepositoryGate({
     try {
       let agentsMdContent = '';
       try {
-        agentsMdContent = await window.electronAPI?.repository?.readText?.(binding.repoPath, 'AGENTS.md') ?? '';
+        agentsMdContent = (await window.electronAPI?.repository?.readText?.(binding.repoPath, 'AGENTS.md')) ?? '';
       } catch {
         agentsMdContent = '';
       }
@@ -252,16 +252,20 @@ export default function RepositoryGate({
       });
       const result = await syncRepositoryContextToAgentFiles(activeClient, payload);
       if (result.failed.length > 0) {
-        Toast.warning(t('repositoryGate.syncRepositoryRulesPartial', {
-          updated: result.updated,
-          failed: result.failed.length,
-        }));
+        Toast.warning(
+          t('repositoryGate.syncRepositoryRulesPartial', {
+            updated: result.updated,
+            failed: result.failed.length,
+          }),
+        );
         return;
       }
-      Toast.success(t('repositoryGate.syncRepositoryRulesDone', {
-        updated: result.updated,
-        unchanged: result.unchanged,
-      }));
+      Toast.success(
+        t('repositoryGate.syncRepositoryRulesDone', {
+          updated: result.updated,
+          unchanged: result.unchanged,
+        }),
+      );
     } catch {
       Toast.error(t('repositoryGate.syncRepositoryRulesFailed'));
     } finally {
@@ -273,12 +277,20 @@ export default function RepositoryGate({
     const repository = window.electronAPI?.repository;
     if (!repository?.readText) return [];
     const readText = repository.readText;
-    const candidates = ['AGENTS.md', 'README.md', 'CLAUDE.md', 'GEMINI.md', ...tree.filter((entry) => /(^|\/)(README|index|log)\.md$/i.test(entry)).slice(0, 8)];
+    const candidates = [
+      'AGENTS.md',
+      'README.md',
+      'CLAUDE.md',
+      'GEMINI.md',
+      ...tree.filter((entry) => /(^|\/)(README|index|log)\.md$/i.test(entry)).slice(0, 8),
+    ];
     const unique = Array.from(new Set(candidates.filter((entry) => !entry.endsWith('/')))).slice(0, 10);
-    const excerpts = await Promise.all(unique.map(async (entry) => ({
-      path: entry,
-      content: await readText(path, entry),
-    })));
+    const excerpts = await Promise.all(
+      unique.map(async (entry) => ({
+        path: entry,
+        content: await readText(path, entry),
+      })),
+    );
     return excerpts.filter((item) => item.content.trim().length > 0);
   };
 
@@ -293,15 +305,28 @@ export default function RepositoryGate({
     const normalized = path.toLowerCase();
     const hints: string[] = [];
     if (/(^|\/)(inbox|capture|captures|input|inputs)(\/|\.md$)/.test(normalized)) hints.push('inbox');
-    if (/(^|\/)(now|current|active)\.md$/.test(normalized) || /(^|\/)(current|active)(\/|$)/.test(normalized)) hints.push('current-work');
-    if (/(^|\/)(next|todo|backlog|someday)\.md$/.test(normalized) || /(^|\/)(next|todo|backlog|someday)(\/|$)/.test(normalized)) hints.push('next-work');
-    if (/(^|\/)(done|completed|archive)\.md$/.test(normalized) || /(^|\/)(done|completed)(\/|$)/.test(normalized)) hints.push('done-work');
-    if (/(^|\/)(project|projects|initiative|initiatives|client|clients)(\/|$)/.test(normalized) || /(^|\/)(readme|brief|prd)\.md$/.test(normalized)) hints.push('project-system');
-    if (/(^|\/)(plan|roadmap|milestone|timeline)\.md$/.test(normalized) || /(^|\/)(plans)(\/|$)/.test(normalized)) hints.push('planning');
+    if (/(^|\/)(now|current|active)\.md$/.test(normalized) || /(^|\/)(current|active)(\/|$)/.test(normalized))
+      hints.push('current-work');
+    if (
+      /(^|\/)(next|todo|backlog|someday)\.md$/.test(normalized) ||
+      /(^|\/)(next|todo|backlog|someday)(\/|$)/.test(normalized)
+    )
+      hints.push('next-work');
+    if (/(^|\/)(done|completed|archive)\.md$/.test(normalized) || /(^|\/)(done|completed)(\/|$)/.test(normalized))
+      hints.push('done-work');
+    if (
+      /(^|\/)(project|projects|initiative|initiatives|client|clients)(\/|$)/.test(normalized) ||
+      /(^|\/)(readme|brief|prd)\.md$/.test(normalized)
+    )
+      hints.push('project-system');
+    if (/(^|\/)(plan|roadmap|milestone|timeline)\.md$/.test(normalized) || /(^|\/)(plans)(\/|$)/.test(normalized))
+      hints.push('planning');
     if (/(^|\/)(run|runs|log|logs|journal)(\/|\.md$)/.test(normalized)) hints.push('execution-record');
-    if (/(^|\/)(output|outputs|deliverable|deliverables|artifact|artifacts)(\/|$)/.test(normalized)) hints.push('output');
+    if (/(^|\/)(output|outputs|deliverable|deliverables|artifact|artifacts)(\/|$)/.test(normalized))
+      hints.push('output');
     if (/(^|\/)(review|reviews|retro|retrospective)(\/|\.md$)/.test(normalized)) hints.push('review');
-    if (/(^|\/)(tool|tools|script|scripts|template|templates|sop|prompts?)(\/|\.md$)/.test(normalized)) hints.push('reusable-tool');
+    if (/(^|\/)(tool|tools|script|scripts|template|templates|sop|prompts?)(\/|\.md$)/.test(normalized))
+      hints.push('reusable-tool');
     if (/(^|\/)(knowledge|wiki|source|sources|map|maps)(\/|$)/.test(normalized)) hints.push('knowledge-system');
     if (/(^|\/)(agent|agents|agentic|workflow|workflows)(\/|\.md$)/.test(normalized)) hints.push('agent-workflow');
     return hints;
@@ -368,11 +393,13 @@ export default function RepositoryGate({
 
     setMappingLoading(true);
     try {
-      const base = binding ?? await createAndSaveRepositoryBinding({
-        gatewayInstanceId: currentInstanceId,
-        repoPath: path,
-        location,
-      });
+      const base =
+        binding ??
+        (await createAndSaveRepositoryBinding({
+          gatewayInstanceId: currentInstanceId,
+          repoPath: path,
+          location,
+        }));
       const tree = await repository.listTree(path, 400);
       const excerpts = await readMappingExcerpts(path, tree);
       const run = createAiActionRun({
@@ -458,11 +485,13 @@ export default function RepositoryGate({
 
     setMappingLoading(true);
     try {
-      const base = binding ?? await createAndSaveRepositoryBinding({
-        gatewayInstanceId: currentInstanceId,
-        repoPath: path,
-        location,
-      });
+      const base =
+        binding ??
+        (await createAndSaveRepositoryBinding({
+          gatewayInstanceId: currentInstanceId,
+          repoPath: path,
+          location,
+        }));
       const tree = await repository.listTree(path, 400);
       const structureSignals = buildWorkbenchStructureSignals(tree);
       const run = createAiActionRun({
@@ -511,7 +540,9 @@ export default function RepositoryGate({
 
   const knowledgeMappingReady = Boolean(binding?.knowledge && binding.knowledge.mappingSource !== 'default');
   const workbenchMappingReady = Boolean(binding?.workbench?.isWorkbenchRepository);
-  const semanticMappingReady = canUseSemanticMappingForStatus(status) && ((area === 'knowledge' && knowledgeMappingReady) || (area === 'workbench' && workbenchMappingReady));
+  const semanticMappingReady =
+    canUseSemanticMappingForStatus(status) &&
+    ((area === 'knowledge' && knowledgeMappingReady) || (area === 'workbench' && workbenchMappingReady));
   const bindingMatchesCurrentInstance = Boolean(binding && binding.gatewayInstanceId === currentInstanceId);
   const ready = bindingMatchesCurrentInstance && (status === 'repo_ready' || semanticMappingReady);
   const displayStatus = ready ? 'repo_ready' : status;
@@ -551,7 +582,12 @@ export default function RepositoryGate({
                 { label: t('repositoryGate.gatewayLocal'), value: 'gateway-local' },
               ]}
             />
-            <Button icon={<IconRefresh />} loading={loading} disabled={!canRefresh} onClick={() => binding && inspect(binding)}>
+            <Button
+              icon={<IconRefresh />}
+              loading={loading}
+              disabled={!canRefresh}
+              onClick={() => binding && inspect(binding)}
+            >
               {t('common.refresh')}
             </Button>
           </Space>
@@ -559,7 +595,9 @@ export default function RepositoryGate({
             <Card style={{ width: '100%', background: 'var(--semi-color-fill-0)' }} bodyStyle={{ padding: 14 }}>
               <Space vertical align="start" style={{ width: '100%' }}>
                 <Text strong>{t('repositoryGate.desktopSetupTitle')}</Text>
-                <Text type="tertiary" size="small">{t('repositoryGate.desktopSetupDesc')}</Text>
+                <Text type="tertiary" size="small">
+                  {t('repositoryGate.desktopSetupDesc')}
+                </Text>
                 <Space wrap>
                   <Button
                     icon={<IconFolderOpen />}
@@ -589,7 +627,11 @@ export default function RepositoryGate({
                     {t('repositoryGate.syncRepositoryRules')}
                   </Button>
                   {area === 'knowledge' && (
-                    <Button loading={mappingLoading} disabled={!currentInstanceId || !repoPath.trim()} onClick={() => void handleSemanticKnowledgeMapping()}>
+                    <Button
+                      loading={mappingLoading}
+                      disabled={!currentInstanceId || !repoPath.trim()}
+                      onClick={() => void handleSemanticKnowledgeMapping()}
+                    >
                       {t('repositoryGate.semanticMapKnowledge')}
                     </Button>
                   )}
@@ -605,9 +647,13 @@ export default function RepositoryGate({
                   )}
                 </Space>
                 {repoPath ? (
-                  <Text type="tertiary" size="small">{t('repositoryGate.currentPath', { path: repoPath })}</Text>
+                  <Text type="tertiary" size="small">
+                    {t('repositoryGate.currentPath', { path: repoPath })}
+                  </Text>
                 ) : (
-                  <Text type="tertiary" size="small">{t('repositoryGate.noFolderSelected')}</Text>
+                  <Text type="tertiary" size="small">
+                    {t('repositoryGate.noFolderSelected')}
+                  </Text>
                 )}
               </Space>
             </Card>
@@ -615,7 +661,9 @@ export default function RepositoryGate({
             <Card style={{ width: '100%', background: 'var(--semi-color-fill-0)' }} bodyStyle={{ padding: 14 }}>
               <Space vertical align="start" style={{ width: '100%' }}>
                 <Text strong>{t('repositoryGate.gatewaySetupTitle')}</Text>
-                <Text type="tertiary" size="small">{t('repositoryGate.gatewaySetupDesc')}</Text>
+                <Text type="tertiary" size="small">
+                  {t('repositoryGate.gatewaySetupDesc')}
+                </Text>
                 <Input
                   value={gatewayRepoUrl}
                   onChange={setGatewayRepoUrl}
@@ -631,15 +679,13 @@ export default function RepositoryGate({
                     {t('repositoryGate.gatewayInitializeHome')}
                   </Button>
                 </Space>
-                <Text type="tertiary" size="small">{t('repositoryGate.gatewayTargetPath', { path: gatewayTargetPath })}</Text>
+                <Text type="tertiary" size="small">
+                  {t('repositoryGate.gatewayTargetPath', { path: gatewayTargetPath })}
+                </Text>
               </Space>
             </Card>
           )}
-          <Button
-            theme="borderless"
-            type="tertiary"
-            onClick={() => setAdvancedManualPath((value) => !value)}
-          >
+          <Button theme="borderless" type="tertiary" onClick={() => setAdvancedManualPath((value) => !value)}>
             {t('repositoryGate.advancedManualPath')}
           </Button>
           {advancedManualPath && (
@@ -647,10 +693,19 @@ export default function RepositoryGate({
               <Input
                 value={repoPath}
                 onChange={setRepoPath}
-                placeholder={showDesktopActions ? t('repositoryGate.desktopPathPlaceholder') : t('repositoryGate.gatewayPathPlaceholder')}
+                placeholder={
+                  showDesktopActions
+                    ? t('repositoryGate.desktopPathPlaceholder')
+                    : t('repositoryGate.gatewayPathPlaceholder')
+                }
                 style={{ minWidth: 320, flex: 1 }}
               />
-              <Button type="primary" loading={loading} disabled={!currentInstanceId || !repoPath.trim()} onClick={handleBind}>
+              <Button
+                type="primary"
+                loading={loading}
+                disabled={!currentInstanceId || !repoPath.trim()}
+                onClick={handleBind}
+              >
                 {t('repositoryGate.bind')}
               </Button>
             </Space>
@@ -663,9 +718,7 @@ export default function RepositoryGate({
         </Space>
       </Card>
       {ready && binding && children && (
-        <div style={{ marginTop: 20 }}>
-          {typeof children === 'function' ? children(binding) : children}
-        </div>
+        <div style={{ marginTop: 20 }}>{typeof children === 'function' ? children(binding) : children}</div>
       )}
     </div>
   );

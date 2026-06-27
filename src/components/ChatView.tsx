@@ -66,9 +66,7 @@ export default function ChatView({
   const renderMessage = (msg: ChatMessage) => {
     const isUser = msg.role === 'user';
     const isCurrentStreaming = msg.status === 'streaming';
-    const displayContent = isCurrentStreaming && streamingContent
-      ? msg.content + streamingContent
-      : msg.content;
+    const displayContent = isCurrentStreaming && streamingContent ? msg.content + streamingContent : msg.content;
 
     return (
       <div
@@ -83,11 +81,7 @@ export default function ChatView({
           animation: 'fadeIn 0.2s ease',
         }}
       >
-        <Avatar
-          size="small"
-          color={isUser ? 'light-blue' : 'blue'}
-          style={{ flexShrink: 0, marginTop: 4 }}
-        >
+        <Avatar size="small" color={isUser ? 'light-blue' : 'blue'} style={{ flexShrink: 0, marginTop: 4 }}>
           {isUser ? '👤' : '🦐'}
         </Avatar>
         <div
@@ -103,12 +97,8 @@ export default function ChatView({
             style={{
               padding: '10px 16px',
               borderRadius: 12,
-              backgroundColor: isUser
-                ? 'var(--semi-color-primary)'
-                : 'var(--semi-color-fill-0)',
-              color: isUser
-                ? '#fff'
-                : 'var(--semi-color-text-0)',
+              backgroundColor: isUser ? 'var(--semi-color-primary)' : 'var(--semi-color-fill-0)',
+              color: isUser ? '#fff' : 'var(--semi-color-text-0)',
               fontSize: 14,
               lineHeight: 1.6,
               whiteSpace: 'pre-wrap',
@@ -147,11 +137,7 @@ export default function ChatView({
 
           {/* Timestamp */}
           {msg.time && !isCurrentStreaming && (
-            <Text
-              size="small"
-              type="tertiary"
-              style={{ fontSize: 11, padding: '0 4px' }}
-            >
+            <Text size="small" type="tertiary" style={{ fontSize: 11, padding: '0 4px' }}>
               {msg.time}
             </Text>
           )}
@@ -173,37 +159,37 @@ export default function ChatView({
       {/* Messages area */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', minHeight: 0 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {loading ? (
-          <div
-            style={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Spin size="large" />
-          </div>
-        ) : messages.length === 0 ? (
-          <div
-            style={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexDirection: 'column',
-              gap: 8,
-            }}
-          >
-            <Text type="tertiary" style={{ fontSize: 15 }}>
-              {t('chat.greeting')}
-            </Text>
-          </div>
-        ) : (
-          messages.map(renderMessage)
-        )}
-        <div ref={messagesEndRef} />
-      </div>
+          {loading ? (
+            <div
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Spin size="large" />
+            </div>
+          ) : messages.length === 0 ? (
+            <div
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 8,
+              }}
+            >
+              <Text type="tertiary" style={{ fontSize: 15 }}>
+                {t('chat.greeting')}
+              </Text>
+            </div>
+          ) : (
+            messages.map(renderMessage)
+          )}
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
       {/* Input area */}

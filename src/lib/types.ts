@@ -680,4 +680,12 @@ export interface SearchResult {
 
 // ── Artifact ──────────────────────────────────────────────────────
 
-export type { ArtifactMeta, ArtifactType, ArtifactSource, VersionEntry, ArtifactAuth, AuthLevel, ArtifactTemplate } from './artifact-types';
+export type {
+  ArtifactMeta,
+  ArtifactType,
+  ArtifactSource,
+  VersionEntry,
+  ArtifactAuth,
+  AuthLevel,
+  ArtifactTemplate,
+} from './artifact-types';

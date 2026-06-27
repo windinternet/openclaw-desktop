@@ -294,7 +294,9 @@ describe('new session creation params', () => {
     expect(zh).toContain('"subtitle": "连接 OpenClaw Gateway、工作台与知识库，让每次会话都沉淀成可追踪的工作记录。"');
     expect(zh).not.toContain('7x24 小时，随时响应的全能电脑 AI 助手');
     expect(en).toContain('"title": "OpenClaw Desktop"');
-    expect(en).toContain('"subtitle": "Connect OpenClaw Gateway, Workbench, and Knowledge Base so every session becomes traceable work."');
+    expect(en).toContain(
+      '"subtitle": "Connect OpenClaw Gateway, Workbench, and Knowledge Base so every session becomes traceable work."',
+    );
     expect(css).toContain('min-height: 100%');
     expect(css).toContain('grid-template-columns: repeat(5, minmax(0, 1fr))');
     expect(css).toContain('.chat-composer-frame--new-session');
@@ -305,16 +307,16 @@ describe('new session creation params', () => {
     expect(css).toContain('.new-session-logo-mark::after');
     expect(css).toContain('appOrbitPulse');
     expect(css).toContain('appIconFloat');
-    expect(css).toContain('body[theme-mode="dark"] .new-session-logo-mark');
+    expect(css).toMatch(/body\[theme-mode=['"]dark['"]\]\s+\.new-session-logo-mark/);
     expect(css.match(/\.new-session-logo-mark\s*\{[^}]*\}/)?.[0]).not.toContain('background:');
     expect(css.match(/\.new-session-logo-mark\s*\{[^}]*\}/)?.[0]).not.toContain('border:');
     expect(css.match(/\.new-session-logo-mark\s*\{[^}]*\}/)?.[0]).not.toContain('padding:');
     expect(css.match(/\.new-session-logo-mark\s*\{[^}]*\}/)?.[0]).not.toContain('box-shadow:');
-    expect(css).toContain('body[theme-mode="dark"] .new-session-launch-card');
-    expect(css).toContain('body[theme-mode="dark"] .new-session-card-illustration');
-    expect(css).toContain('body[theme-mode="dark"] .new-session-card-icon');
-    expect(css).toContain('body[theme-mode="dark"] .new-session-card-line');
-    expect(css).toContain('body[theme-mode="dark"] .new-session-card-chip');
+    expect(css).toMatch(/body\[theme-mode=['"]dark['"]\]\s+\.new-session-launch-card/);
+    expect(css).toMatch(/body\[theme-mode=['"]dark['"]\]\s+\.new-session-card-illustration/);
+    expect(css).toMatch(/body\[theme-mode=['"]dark['"]\]\s+\.new-session-card-icon/);
+    expect(css).toMatch(/body\[theme-mode=['"]dark['"]\]\s+\.new-session-card-line/);
+    expect(css).toMatch(/body\[theme-mode=['"]dark['"]\]\s+\.new-session-card-chip/);
     expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput-footer-configure-select.semi-select');
     expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput-footer-configure-select.semi-select:hover');
     expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput-footer-configure-select.semi-select,');
@@ -361,7 +363,10 @@ describe('new session creation params', () => {
     expect(
       extractDraftText({
         inputContents: [
-          { type: 'paragraph', content: [{ type: 'text', text: 'A' }, { type: 'hardBreak' }, { type: 'text', text: 'B' }] },
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'A' }, { type: 'hardBreak' }, { type: 'text', text: 'B' }],
+          },
         ],
       }),
     ).toBe('A\nB');

@@ -33,16 +33,13 @@ export default function WorkbenchPage() {
     <RepositoryGate
       area="workbench"
       setupVisible={false}
-      fallback={(
-        <Empty
-          title={t('workbench.repositoryRequiredTitle')}
-          description={t('workbench.repositoryRequiredDesc')}
-        >
+      fallback={
+        <Empty title={t('workbench.repositoryRequiredTitle')} description={t('workbench.repositoryRequiredDesc')}>
           <Button type="primary" onClick={() => setActiveTab('binding')}>
             {t('workbench.openRepositoryTab')}
           </Button>
         </Empty>
-      )}
+      }
     >
       {(binding) => <WorkbenchRepositoryPanel binding={binding} panelView={panelView} />}
     </RepositoryGate>
@@ -51,8 +48,12 @@ export default function WorkbenchPage() {
   return (
     <div style={{ height: '100%', overflow: 'auto', padding: '16px 24px 24px' }}>
       <div style={{ marginBottom: 12 }}>
-        <Title heading={3} style={{ margin: 0 }}>{activeMeta.title}</Title>
-        <Text type="tertiary" size="small">{activeMeta.desc}</Text>
+        <Title heading={3} style={{ margin: 0 }}>
+          {activeMeta.title}
+        </Title>
+        <Text type="tertiary" size="small">
+          {activeMeta.desc}
+        </Text>
       </div>
       <Tabs activeKey={activeTab} onChange={handleTabChange} type="line" tabBarExtraContent={tabActions}>
         <Tabs.TabPane tab={t('workbench.dashboard')} itemKey="dashboard">
@@ -69,7 +70,7 @@ export default function WorkbenchPage() {
             <RepositoryGate
               area="workbench"
               setupVisible={false}
-              fallback={(
+              fallback={
                 <Empty
                   title={t('workbench.repositoryRequiredTitle')}
                   description={t('workbench.repositoryRequiredDesc')}
@@ -78,7 +79,7 @@ export default function WorkbenchPage() {
                     {t('workbench.openRepositoryTab')}
                   </Button>
                 </Empty>
-              )}
+              }
             >
               {(binding) => <RepositoryWorkbenchKanban binding={binding} />}
             </RepositoryGate>

@@ -21,51 +21,72 @@ describe('model selection helpers', () => {
       { id: 'writer', model: { primary: 'deepseek-flash' } },
     ];
 
-    expect(resolvePreferredModel({
-      models,
-      agents,
-      selectedAgentId: 'writer',
-      gatewayDefaultModel: 'gpt-4.1',
-    })).toBe('DeepSeek/deepseek-flash');
+    expect(
+      resolvePreferredModel({
+        models,
+        agents,
+        selectedAgentId: 'writer',
+        gatewayDefaultModel: 'gpt-4.1',
+      }),
+    ).toBe('DeepSeek/deepseek-flash');
   });
 
   it('falls back to the Gateway global default before the first configured model', () => {
-    expect(resolvePreferredModel({
-      models,
-      agents: [],
-      selectedAgentId: '',
-      gatewayDefaultModel: 'gpt-4.1',
-    })).toBe('OpenAI/gpt-4.1');
+    expect(
+      resolvePreferredModel({
+        models,
+        agents: [],
+        selectedAgentId: '',
+        gatewayDefaultModel: 'gpt-4.1',
+      }),
+    ).toBe('OpenAI/gpt-4.1');
   });
 
   it('preserves an existing session model before applying defaults', () => {
-    expect(resolvePreferredModel({
-      models,
-      agents: [{ id: 'main', model: { primary: 'deepseek-pro' } }],
-      selectedAgentId: 'main',
-      gatewayDefaultModel: 'gpt-4.1',
-      sessionModel: 'session-model',
-    })).toBe('session-model');
+    expect(
+      resolvePreferredModel({
+        models,
+        agents: [{ id: 'main', model: { primary: 'deepseek-pro' } }],
+        selectedAgentId: 'main',
+        gatewayDefaultModel: 'gpt-4.1',
+        sessionModel: 'session-model',
+      }),
+    ).toBe('session-model');
   });
 
   it('matches provider-qualified defaults against bare model list ids', () => {
-    expect(resolvePreferredModel({
-      models: [
-        { id: 'deepseek-v4-flash', provider: 'deepseek', name: 'DeepSeek V4 Flash', alias: 'DeepSeek' },
-        { id: 'mimo-v2.5-pro', provider: 'mimo', name: '小米 Mimo V2.5 Pro', alias: '小米 Mimo' },
-      ],
-      agents: [{ id: 'main', model: { primary: 'mimo/mimo-v2.5-pro' } }],
-      selectedAgentId: 'main',
-      gatewayDefaultModel: 'mimo/mimo-v2.5-pro',
-    })).toBe('mimo/mimo-v2.5-pro');
+    expect(
+      resolvePreferredModel({
+        models: [
+          { id: 'deepseek-v4-flash', provider: 'deepseek', name: 'DeepSeek V4 Flash', alias: 'DeepSeek' },
+          { id: 'mimo-v2.5-pro', provider: 'mimo', name: '小米 Mimo V2.5 Pro', alias: '小米 Mimo' },
+        ],
+        agents: [{ id: 'main', model: { primary: 'mimo/mimo-v2.5-pro' } }],
+        selectedAgentId: 'main',
+        gatewayDefaultModel: 'mimo/mimo-v2.5-pro',
+      }),
+    ).toBe('mimo/mimo-v2.5-pro');
   });
 
   it('formats model labels with provider, display name, and concrete model id', () => {
-    expect(formatModelOptionLabel({ id: 'deepseek-pro', provider: 'DeepSeek', name: 'Pro' })).toBe('DeepSeek / Pro · deepseek-pro');
-    expect(formatModelOptionLabel({ id: 'deepseek-flash', provider: 'DeepSeek', name: 'Flash' })).toBe('DeepSeek / Flash · deepseek-flash');
+    expect(formatModelOptionLabel({ id: 'deepseek-pro', provider: 'DeepSeek', name: 'Pro' })).toBe(
+      'DeepSeek / Pro · deepseek-pro',
+    );
+    expect(formatModelOptionLabel({ id: 'deepseek-flash', provider: 'DeepSeek', name: 'Flash' })).toBe(
+      'DeepSeek / Flash · deepseek-flash',
+    );
     expect(formatModelOptionLabel({ id: 'gpt-4.1', provider: 'OpenAI', name: 'gpt-4.1' })).toBe('OpenAI / gpt-4.1');
-    expect(formatModelOptionLabel({ id: 'deepseek-v4-flash', provider: 'deepseek', name: 'DeepSeek V4 Flash', alias: 'DeepSeek' })).toBe('deepseek / DeepSeek V4 Flash');
-    expect(formatModelOptionLabel({ id: 'mimo-v2.5-pro', provider: 'mimo', name: '小米 Mimo V2.5 Pro', alias: '小米 Mimo' })).toBe('mimo / 小米 Mimo V2.5 Pro');
+    expect(
+      formatModelOptionLabel({
+        id: 'deepseek-v4-flash',
+        provider: 'deepseek',
+        name: 'DeepSeek V4 Flash',
+        alias: 'DeepSeek',
+      }),
+    ).toBe('deepseek / DeepSeek V4 Flash');
+    expect(
+      formatModelOptionLabel({ id: 'mimo-v2.5-pro', provider: 'mimo', name: '小米 Mimo V2.5 Pro', alias: '小米 Mimo' }),
+    ).toBe('mimo / 小米 Mimo V2.5 Pro');
   });
 
   it('uses provider-qualified option values for chat configuration', () => {
@@ -75,12 +96,16 @@ describe('model selection helpers', () => {
   });
 
   it('extracts Gateway default model from config.get payloads', () => {
-    expect(extractGatewayDefaultModel({
-      parsed: { agents: { defaults: { model: { primary: 'deepseek-pro' } } } },
-    })).toBe('deepseek-pro');
-    expect(extractGatewayDefaultModel({
-      parsed: { agents: { defaults: { model: 'gpt-4.1' } } },
-    })).toBe('gpt-4.1');
+    expect(
+      extractGatewayDefaultModel({
+        parsed: { agents: { defaults: { model: { primary: 'deepseek-pro' } } } },
+      }),
+    ).toBe('deepseek-pro');
+    expect(
+      extractGatewayDefaultModel({
+        parsed: { agents: { defaults: { model: 'gpt-4.1' } } },
+      }),
+    ).toBe('gpt-4.1');
   });
 
   it('documents new session and chat pages use shared model defaults and full labels', () => {

@@ -78,7 +78,8 @@ export default function CollaborationPage() {
     }
     loadAiActionRuns(currentInstanceId)
       .then((next) => {
-        if (!cancelled) setRuns(next.filter((run) => run.sourcePage === 'teams' || run.sourcePage === 'office').slice(0, 3));
+        if (!cancelled)
+          setRuns(next.filter((run) => run.sourcePage === 'teams' || run.sourcePage === 'office').slice(0, 3));
       })
       .catch(() => {
         if (!cancelled) setRuns([]);
@@ -92,8 +93,12 @@ export default function CollaborationPage() {
     <div className="collaboration-page">
       <style>{collaborationStyles}</style>
       <div style={{ marginBottom: 12 }}>
-        <Title heading={3} style={{ margin: 0 }}>{activeMeta.title}</Title>
-        <Text type="tertiary" size="small">{activeMeta.desc}</Text>
+        <Title heading={3} style={{ margin: 0 }}>
+          {activeMeta.title}
+        </Title>
+        <Text type="tertiary" size="small">
+          {activeMeta.desc}
+        </Text>
       </div>
       <Tabs
         className="collaboration-tabs"
@@ -102,29 +107,52 @@ export default function CollaborationPage() {
         type="line"
         tabBarExtraContent={tabActions}
       >
-        <Tabs.TabPane tab={<><IconUserGroup /> {t('nav.teams')}</>} itemKey="teams">
+        <Tabs.TabPane
+          tab={
+            <>
+              <IconUserGroup /> {t('nav.teams')}
+            </>
+          }
+          itemKey="teams"
+        >
           {activeTab === 'teams' && <TeamsPage embedded onHeaderActionsChange={setTabActions} />}
         </Tabs.TabPane>
-        <Tabs.TabPane tab={<><IconDesktop /> {t('nav.office')}</>} itemKey="office">
+        <Tabs.TabPane
+          tab={
+            <>
+              <IconDesktop /> {t('nav.office')}
+            </>
+          }
+          itemKey="office"
+        >
           {activeTab === 'office' && (
             <div className="office-tab-body" style={{ height: '100%' }}>
               <Office3DPage embedded />
             </div>
           )}
         </Tabs.TabPane>
-        <Tabs.TabPane tab={<><IconBolt /> {t('collaboration.relatedRuns')}</>} itemKey="runs">
-          {activeTab === 'runs' && <Space align="start" wrap>
-            <div onClick={() => navigate('/workbench')}>
-              <Card style={{ width: 320, cursor: 'pointer' }} bodyStyle={{ minHeight: 132 }}>
-                <Space vertical align="start">
-                  <Text strong>{t('collaboration.relatedRuns')}</Text>
-                  <Text type="tertiary" size="small">
-                    {runs[0]?.resultSummary || runs[0]?.input || t('collaboration.relatedRunsDesc')}
-                  </Text>
-                </Space>
-              </Card>
-            </div>
-          </Space>}
+        <Tabs.TabPane
+          tab={
+            <>
+              <IconBolt /> {t('collaboration.relatedRuns')}
+            </>
+          }
+          itemKey="runs"
+        >
+          {activeTab === 'runs' && (
+            <Space align="start" wrap>
+              <div onClick={() => navigate('/workbench')}>
+                <Card style={{ width: 320, cursor: 'pointer' }} bodyStyle={{ minHeight: 132 }}>
+                  <Space vertical align="start">
+                    <Text strong>{t('collaboration.relatedRuns')}</Text>
+                    <Text type="tertiary" size="small">
+                      {runs[0]?.resultSummary || runs[0]?.input || t('collaboration.relatedRunsDesc')}
+                    </Text>
+                  </Space>
+                </Card>
+              </div>
+            </Space>
+          )}
         </Tabs.TabPane>
       </Tabs>
     </div>

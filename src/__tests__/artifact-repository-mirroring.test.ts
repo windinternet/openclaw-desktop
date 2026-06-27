@@ -64,11 +64,13 @@ describe('artifact repository mirroring', () => {
       previewPath: 'outputs/html/art_1.html',
     });
 
-    await expect(useStore.getState().generateArtifact({
-      title: 'Quarterly Report',
-      type: 'report',
-      html: '<html>ok</html>',
-    })).resolves.toEqual(artifact);
+    await expect(
+      useStore.getState().generateArtifact({
+        title: 'Quarterly Report',
+        type: 'report',
+        html: '<html>ok</html>',
+      }),
+    ).resolves.toEqual(artifact);
 
     expect(mockedMirrorArtifactToReadyRepositoryOutput).toHaveBeenCalledWith('inst-1', artifact, '<html>ok</html>');
   });

@@ -1,4 +1,10 @@
-import { AI_ACTION_RUNS_STORAGE_KEY, normalizeAiActionRuns, queryAiActionRunStatus, resumeAiActionRunWithGateway, syncAiActionRunWithGateway } from './ai-action-center';
+import {
+  AI_ACTION_RUNS_STORAGE_KEY,
+  normalizeAiActionRuns,
+  queryAiActionRunStatus,
+  resumeAiActionRunWithGateway,
+  syncAiActionRunWithGateway,
+} from './ai-action-center';
 import {
   AGENT_TEAM_PROFILE_STORAGE_KEY,
   bindAgentProfileToGatewayAgent,
@@ -87,9 +93,7 @@ async function mirrorTerminalAiActionRunToRepository(instanceId: string, run: Ai
   const indexPath = `${binding.paths.runs}/action-runs/index.md`;
   const existingIndex = await repository.readText(binding.repoPath, indexPath);
   const indexEntry = `- [${run.type}](${runPath}) - ${run.status}`;
-  const nextIndex = existingIndex.includes(runPath)
-    ? existingIndex
-    : `${existingIndex.trimEnd()}\n${indexEntry}\n`;
+  const nextIndex = existingIndex.includes(runPath) ? existingIndex : `${existingIndex.trimEnd()}\n${indexEntry}\n`;
   await repository.writeText(binding.repoPath, indexPath, nextIndex);
 }
 
@@ -210,7 +214,6 @@ export async function syncAiActionRunsWithGateway(
   await saveAiActionRuns(instanceId, nextRuns);
   return nextRuns;
 }
-
 
 /**
  * Gateway 重连后自动恢复所有非终态 ActionRun。

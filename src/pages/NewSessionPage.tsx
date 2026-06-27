@@ -1,13 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Typography } from '@douyinfe/semi-ui';
-import {
-  IconBolt,
-  IconCalendarClock,
-  IconCheckList,
-  IconClock,
-  IconFile,
-  IconFolderOpen,
-} from '@douyinfe/semi-icons';
+import { IconBolt, IconCalendarClock, IconCheckList, IconClock, IconFile, IconFolderOpen } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
 import NewSessionComposer from '../components/NewSessionComposer';

@@ -295,8 +295,6 @@ export async function syncAiActionRunWithGateway(
   return run;
 }
 
-
-
 /**
  * 非破坏性查询 ActionRun 在 Gateway 上的最新状态。
  * 与 syncAiActionRunWithGateway 不同，该函数不会覆盖 run 已有的 error 或 resultSummary，
@@ -332,7 +330,6 @@ export async function queryAiActionRunStatus(
     };
   }
 }
-
 
 /**
  * 向卡住的 ActionRun 对应 Gateway 会话发送追问消息，触发 Agent 继续执行。

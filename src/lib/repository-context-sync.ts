@@ -5,10 +5,7 @@ import {
   type DesktopCompanionStatus,
 } from './desktop-companion';
 import type { GatewayClient } from './gateway';
-import {
-  buildRepositoryContextPayload,
-  type RepositoryContextPayload,
-} from './repository-context';
+import { buildRepositoryContextPayload, type RepositoryContextPayload } from './repository-context';
 
 const FALLBACK_AGENTS_MD_CONTENT = '仓库根目录 AGENTS.md 暂不可读。';
 

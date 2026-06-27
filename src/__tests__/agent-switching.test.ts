@@ -30,11 +30,14 @@ describe('agent switching helpers', () => {
   });
 
   it('builds a bounded recent timeline excerpt as a handoff fallback', () => {
-    const excerpt = buildRecentTimelineExcerpt([
-      { role: 'user', agentId: 'a', contentText: '第一条' },
-      { role: 'assistant', agentId: 'a', contentText: '第二条' },
-      { role: 'assistant', agentId: 'b', contentText: '第三条' },
-    ], 2);
+    const excerpt = buildRecentTimelineExcerpt(
+      [
+        { role: 'user', agentId: 'a', contentText: '第一条' },
+        { role: 'assistant', agentId: 'a', contentText: '第二条' },
+        { role: 'assistant', agentId: 'b', contentText: '第三条' },
+      ],
+      2,
+    );
 
     expect(excerpt).not.toContain('第一条');
     expect(excerpt).toContain('[assistant:a] 第二条');
@@ -54,9 +57,7 @@ describe('agent switching helpers', () => {
   });
 
   it('extracts child session keys from direct and output envelopes', () => {
-    expect(extractChildSessionKey({ childSessionKey: 'agent:b:subagent:one' })).toBe(
-      'agent:b:subagent:one',
-    );
+    expect(extractChildSessionKey({ childSessionKey: 'agent:b:subagent:one' })).toBe('agent:b:subagent:one');
     expect(extractChildSessionKey({ output: { childSessionKey: 'agent:b:subagent:two' } })).toBe(
       'agent:b:subagent:two',
     );
@@ -80,12 +81,7 @@ describe('agent switching helpers', () => {
       },
     } as unknown as GatewayClient;
 
-    const summaryPromise = requestAgentHandoffSummary(
-      client,
-      'agent:a:dashboard:root',
-      'Friendly Writer',
-      1000,
-    );
+    const summaryPromise = requestAgentHandoffSummary(client, 'agent:a:dashboard:root', 'Friendly Writer', 1000);
     await Promise.resolve();
     listener?.({
       type: 'event',
@@ -122,20 +118,15 @@ describe('agent switching helpers', () => {
     }));
     const client = { request } as unknown as GatewayClient;
 
-    await expect(spawnAgentChildSession(client, 'agent:a:dashboard:root', 'b')).resolves.toBe(
-      'agent:b:subagent:child',
-    );
-    expect(request).toHaveBeenCalledWith(
-      'tools.invoke',
-      buildSessionsSpawnRequest('agent:a:dashboard:root', 'b'),
-    );
+    await expect(spawnAgentChildSession(client, 'agent:a:dashboard:root', 'b')).resolves.toBe('agent:b:subagent:child');
+    expect(request).toHaveBeenCalledWith('tools.invoke', buildSessionsSpawnRequest('agent:a:dashboard:root', 'b'));
   });
 
   it('documents both agent switching strategies in the session page', () => {
     const source = readFileSync('src/pages/SessionChatPage.tsx', 'utf8');
 
     expect(source).toContain("strategy === 'new-session'");
-    expect(source).toContain("activeClient.request<{ key?: string; sessionKey?: string }>(");
+    expect(source).toContain('activeClient.request<{ key?: string; sessionKey?: string }>(');
     expect(source).toContain('spawnAgentChildSession(activeClient, rootSessionKey, targetAgentId)');
     expect(source).toContain('savePendingSummary(currentInstanceId');
     expect(source).toContain('setActiveSessionKey(destinationSessionKey)');

@@ -11,10 +11,7 @@ export default function KnowledgeBasePage() {
   const [activeTab, setActiveTab] = useState<KnowledgeSection | 'repository'>('dashboard');
 
   const repositoryFallback = (
-    <Empty
-      title={t('knowledge.repositoryRequiredTitle')}
-      description={t('knowledge.repositoryRequiredDesc')}
-    >
+    <Empty title={t('knowledge.repositoryRequiredTitle')} description={t('knowledge.repositoryRequiredDesc')}>
       <Button type="primary" onClick={() => setActiveTab('repository')}>
         {t('knowledge.openRepositoryTab')}
       </Button>
@@ -22,22 +19,23 @@ export default function KnowledgeBasePage() {
   );
 
   const renderKnowledgeSection = (section: KnowledgeSection) => (
-    <RepositoryGate
-      area="knowledge"
-      setupVisible={false}
-      fallback={repositoryFallback}
-    >
-      {(binding) => (
-        <KnowledgeRepositoryPanel binding={binding} section={section} />
-      )}
+    <RepositoryGate area="knowledge" setupVisible={false} fallback={repositoryFallback}>
+      {(binding) => <KnowledgeRepositoryPanel binding={binding} section={section} />}
     </RepositoryGate>
   );
 
   return (
     <div style={{ height: '100%', overflow: 'auto', padding: 24 }}>
-      <Title heading={3} style={{ marginTop: 0 }}>{t('nav.knowledge')}</Title>
+      <Title heading={3} style={{ marginTop: 0 }}>
+        {t('nav.knowledge')}
+      </Title>
       <Text type="tertiary">{t('knowledge.pageDesc')}</Text>
-      <Tabs activeKey={activeTab} onChange={(key) => setActiveTab(key as KnowledgeSection | 'repository')} type="line" style={{ marginTop: 12 }}>
+      <Tabs
+        activeKey={activeTab}
+        onChange={(key) => setActiveTab(key as KnowledgeSection | 'repository')}
+        type="line"
+        style={{ marginTop: 12 }}
+      >
         <Tabs.TabPane tab={t('knowledge.dashboard')} itemKey="dashboard">
           {activeTab === 'dashboard' && renderKnowledgeSection('dashboard')}
         </Tabs.TabPane>

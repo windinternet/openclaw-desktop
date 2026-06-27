@@ -1,33 +1,13 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Badge,
-  Button,
-  Card,
-  Space,
-  Tag,
-  Toast,
-  Tooltip,
-  Typography,
-} from '@douyinfe/semi-ui';
-import {
-  IconMaximize,
-  IconMinimize,
-  IconRefresh,
-  IconServer,
-  IconUndo,
-  IconUserGroup,
-} from '@douyinfe/semi-icons';
+import { Badge, Button, Card, Space, Tag, Toast, Tooltip, Typography } from '@douyinfe/semi-ui';
+import { IconMaximize, IconMinimize, IconRefresh, IconServer, IconUndo, IconUserGroup } from '@douyinfe/semi-icons';
 
 import OfficeScene from '../components/office/OfficeScene';
 import { PRESET_THEME_COLORS, useSettingsStore, useStore } from '../lib';
 import { assignOfficeLayout } from '../lib/office-layout';
 import { loadInstanceData, saveInstanceData } from '../lib/local-persistence';
-import {
-  OFFICE_PROFILE_STORAGE_KEY,
-  createDefaultOfficeProfile,
-  normalizeOfficeProfile,
-} from '../lib/office-profile';
+import { OFFICE_PROFILE_STORAGE_KEY, createDefaultOfficeProfile, normalizeOfficeProfile } from '../lib/office-profile';
 import { deriveOfficeAgents } from '../lib/office-state';
 import { createOfficeTheme } from '../lib/office-theme';
 import { getEffectiveThemeMode } from '../lib/theme';
@@ -231,9 +211,7 @@ export default function Office3DPage({ embedded = false }: Office3DPageProps = {
     () => createDefaultOfficeProfile(currentInstance?.name),
     [currentInstance?.name],
   );
-  const [officeProfile, setOfficeProfile] = useState<OfficeProfile>(
-    () => fallbackOfficeProfile,
-  );
+  const [officeProfile, setOfficeProfile] = useState<OfficeProfile>(() => fallbackOfficeProfile);
   const displayOfficeProfile = currentInstanceId ? officeProfile : fallbackOfficeProfile;
 
   const effectiveThemeMode = getEffectiveThemeMode(settings.themeMode);
@@ -241,10 +219,7 @@ export default function Office3DPage({ embedded = false }: Office3DPageProps = {
     () => createOfficeTheme(effectiveThemeMode, themeColorValue(settings.themeColor)),
     [effectiveThemeMode, settings.themeColor],
   );
-  const officeAgents = useMemo(
-    () => assignOfficeLayout(deriveOfficeAgents(agents, sessions)),
-    [agents, sessions],
-  );
+  const officeAgents = useMemo(() => assignOfficeLayout(deriveOfficeAgents(agents, sessions)), [agents, sessions]);
   const selectedAgent = officeAgents.find((agent) => agent.agentId === selectedAgentId) ?? officeAgents[0] ?? null;
   const workingCount = officeAgents.filter((agent) => agent.zone === 'work').length;
   const meetingCount = officeAgents.filter((agent) => agent.zone === 'meeting').length;
@@ -307,17 +282,28 @@ export default function Office3DPage({ embedded = false }: Office3DPageProps = {
       meetingCount,
       loungeCount,
     });
-  }, [displayOfficeProfile.receptionGreeting, connectionStatus, officeAgents, activeSessions, workingCount, meetingCount, loungeCount, t]);
+  }, [
+    displayOfficeProfile.receptionGreeting,
+    connectionStatus,
+    officeAgents,
+    activeSessions,
+    workingCount,
+    meetingCount,
+    loungeCount,
+    t,
+  ]);
 
   return (
     <div
       className={`office-page${embedded ? ' office-page--embedded' : ''}${fullscreen ? ' office-page--fullscreen' : ''}`}
-      style={{
-        '--office-page-background': officeTheme.pageBackground,
-        '--office-panel-background': officeTheme.panel.background,
-        '--office-panel-border': officeTheme.panel.border,
-        '--office-panel-shadow': officeTheme.panel.shadow,
-      } as CSSProperties}
+      style={
+        {
+          '--office-page-background': officeTheme.pageBackground,
+          '--office-panel-background': officeTheme.panel.background,
+          '--office-panel-border': officeTheme.panel.border,
+          '--office-panel-shadow': officeTheme.panel.shadow,
+        } as CSSProperties
+      }
     >
       <style>{officeStyles}</style>
 
@@ -335,9 +321,7 @@ export default function Office3DPage({ embedded = false }: Office3DPageProps = {
             <Title heading={4} style={{ color: officeTheme.panel.text, marginTop: 0 }}>
               {t('office.notReady')}
             </Title>
-            <Text style={{ color: officeTheme.panel.muted }}>
-              {sceneError}
-            </Text>
+            <Text style={{ color: officeTheme.panel.muted }}>{sceneError}</Text>
           </Card>
         </div>
       ) : (
@@ -368,8 +352,12 @@ export default function Office3DPage({ embedded = false }: Office3DPageProps = {
             <Space>
               <Badge dot type={connectionBadgeType(connectionStatus)} />
               <Text style={{ color: officeTheme.panel.muted }}>{connectionLabel(connectionStatus)}</Text>
-              <Tag color="blue" size="small">{officeAgents.length} Agents</Tag>
-              <Tag color="green" size="small">{t('office.sessionCount', { count: activeSessions })}</Tag>
+              <Tag color="blue" size="small">
+                {officeAgents.length} Agents
+              </Tag>
+              <Tag color="green" size="small">
+                {t('office.sessionCount', { count: activeSessions })}
+              </Tag>
             </Space>
           </Space>
         </Card>
@@ -433,7 +421,9 @@ export default function Office3DPage({ embedded = false }: Office3DPageProps = {
 
       <Card className="office-panel office-legend" bodyStyle={{ padding: 16 }}>
         <Space vertical align="start" spacing={8}>
-          <Text strong style={{ color: officeTheme.panel.text }}>{t('office.behaviorLegend')}</Text>
+          <Text strong style={{ color: officeTheme.panel.text }}>
+            {t('office.behaviorLegend')}
+          </Text>
           <Text style={{ color: officeTheme.panel.muted }}>{t('office.behaviorDesc1')}</Text>
           <Text style={{ color: officeTheme.panel.muted }}>{t('office.behaviorDesc2')}</Text>
           <Text style={{ color: officeTheme.panel.muted }}>{t('office.behaviorDesc3')}</Text>

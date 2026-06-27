@@ -4,18 +4,10 @@ import { createOfficeTheme } from '../lib/office-theme';
 function hexDistance(a: string, b: string): number {
   const parts = [a, b].map((hex) => {
     const clean = hex.replace('#', '');
-    return [
-      parseInt(clean.slice(0, 2), 16),
-      parseInt(clean.slice(2, 4), 16),
-      parseInt(clean.slice(4, 6), 16),
-    ];
+    return [parseInt(clean.slice(0, 2), 16), parseInt(clean.slice(2, 4), 16), parseInt(clean.slice(4, 6), 16)];
   });
 
-  return Math.hypot(
-    parts[0][0] - parts[1][0],
-    parts[0][1] - parts[1][1],
-    parts[0][2] - parts[1][2],
-  );
+  return Math.hypot(parts[0][0] - parts[1][0], parts[0][1] - parts[1][1], parts[0][2] - parts[1][2]);
 }
 
 describe('office theme', () => {
@@ -50,10 +42,7 @@ describe('office theme', () => {
   });
 
   it('keeps office zone colors visually separated in both themes', () => {
-    const themes = [
-      createOfficeTheme('light', '#00A870'),
-      createOfficeTheme('dark', '#722ED1'),
-    ];
+    const themes = [createOfficeTheme('light', '#00A870'), createOfficeTheme('dark', '#722ED1')];
 
     themes.forEach((theme) => {
       expect(hexDistance(theme.scene.work, theme.scene.meeting)).toBeGreaterThan(120);

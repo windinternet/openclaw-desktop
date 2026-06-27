@@ -112,6 +112,8 @@ describe('applyTheme', () => {
 
     expect(DEFAULT_HOME_VIEW_OPTIONS.map((option) => option.value)).toEqual(sidebarItems.map((item) => item.key));
     expect(DEFAULT_HOME_VIEW_OPTIONS.map((option) => option.route)).toEqual(sidebarItems.map((item) => item.route));
-    expect(DEFAULT_HOME_VIEW_OPTIONS.map((option) => option.labelKey)).toEqual(sidebarItems.map((item) => item.labelKey));
+    expect(DEFAULT_HOME_VIEW_OPTIONS.map((option) => option.labelKey)).toEqual(
+      sidebarItems.map((item) => item.labelKey),
+    );
   });
 });

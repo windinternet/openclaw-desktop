@@ -1,4 +1,4 @@
-import './lib/console-hook'
+import './lib/console-hook';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import '@douyinfe/semi-ui/lib/es/_base/base.css';

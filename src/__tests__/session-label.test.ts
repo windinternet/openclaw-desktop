@@ -11,6 +11,8 @@ describe('stripGeneratedSessionLabelSuffix', () => {
   });
 
   it('keeps dashboard labels when the trailing segment is not the generated four-character suffix', () => {
-    expect(stripGeneratedSessionLabelSuffix('排查 action-abc123', 'agent:main:dashboard:mzz9')).toBe('排查 action-abc123');
+    expect(stripGeneratedSessionLabelSuffix('排查 action-abc123', 'agent:main:dashboard:mzz9')).toBe(
+      '排查 action-abc123',
+    );
   });
 });

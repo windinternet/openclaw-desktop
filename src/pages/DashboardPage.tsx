@@ -14,14 +14,23 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useStore, type AiActionRun, type SessionInfo } from '../lib';
-import { ActivityTrendChart, ModelUsageBarChart, StatusDistributionChart, TokenCompositionChart } from '../components/charts/DashboardVisualCharts';
+import {
+  ActivityTrendChart,
+  ModelUsageBarChart,
+  StatusDistributionChart,
+  TokenCompositionChart,
+} from '../components/charts/DashboardVisualCharts';
 import UsageTrendChart from '../components/charts/UsageTrendChart';
 import type { ArtifactMeta } from '../lib/artifact-types';
 import { loadAiActionRuns } from '../lib/ai-action-run-store';
 import { loadRepositoryBinding } from '../lib/agentic-repository-store';
 import { normalizeDashboardGatewaySummary } from '../lib/dashboard-gateway-summary';
 import { fetchGatewayUsageDashboard, type GatewayUsageDashboard } from '../lib/gateway-usage';
-import { loadKnowledgeSnapshot, type KnowledgeSnapshot, type RepositoryMarkdownFile } from '../lib/repository-knowledge';
+import {
+  loadKnowledgeSnapshot,
+  type KnowledgeSnapshot,
+  type RepositoryMarkdownFile,
+} from '../lib/repository-knowledge';
 import { loadWorkbenchSnapshot, type WorkbenchSnapshot } from '../lib/repository-workbench';
 
 const { Title, Text } = Typography;
@@ -104,8 +113,14 @@ function DashboardSection({ title, description, action, children }: SectionProps
     <section className="dashboard-section">
       <div className="dashboard-section-header">
         <div>
-          <Title heading={5} style={{ margin: 0 }}>{title}</Title>
-          {description ? <Text type="tertiary" size="small">{description}</Text> : null}
+          <Title heading={5} style={{ margin: 0 }}>
+            {title}
+          </Title>
+          {description ? (
+            <Text type="tertiary" size="small">
+              {description}
+            </Text>
+          ) : null}
         </div>
         {action}
       </div>
@@ -119,9 +134,15 @@ function MetricPill({ icon, label, value, note }: { icon: ReactNode; label: stri
     <div className="dashboard-metric-pill">
       <div className="dashboard-metric-icon">{icon}</div>
       <div>
-        <Text type="tertiary" size="small">{label}</Text>
+        <Text type="tertiary" size="small">
+          {label}
+        </Text>
         <div className="dashboard-metric-value">{value}</div>
-        {note ? <Text type="tertiary" size="small">{note}</Text> : null}
+        {note ? (
+          <Text type="tertiary" size="small">
+            {note}
+          </Text>
+        ) : null}
       </div>
     </div>
   );
@@ -147,7 +168,13 @@ function AssetRow({
         <span
           className="dashboard-asset-title"
           title={title}
-          style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}
+          style={{
+            display: 'block',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            fontWeight: 600,
+          }}
         >
           {title}
         </span>
@@ -155,7 +182,14 @@ function AssetRow({
           <span
             className="dashboard-asset-meta"
             title={meta}
-            style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--semi-color-text-2)', fontSize: 12 }}
+            style={{
+              display: 'block',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              color: 'var(--semi-color-text-2)',
+              fontSize: 12,
+            }}
           >
             {meta}
           </span>
@@ -265,41 +299,34 @@ export default function DashboardPage() {
     [artifacts],
   );
 
-  const recentRuns = useMemo(
-    () => [...actionRuns].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 5),
-    [actionRuns],
+  const recentRuns = useMemo(() => [...actionRuns].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 5), [actionRuns]);
+
+  const repositoryWork = useMemo(
+    () =>
+      [
+        ...(workbenchSnapshot?.activeWork ?? []),
+        ...(workbenchSnapshot?.activePlans ?? []),
+        ...(workbenchSnapshot?.reviews ?? []),
+      ].sort((a, b) => b.updatedAt - a.updatedAt),
+    [workbenchSnapshot],
   );
 
-  const repositoryWork = useMemo(() => [
-    ...(workbenchSnapshot?.activeWork ?? []),
-    ...(workbenchSnapshot?.activePlans ?? []),
-    ...(workbenchSnapshot?.reviews ?? []),
-  ].sort((a, b) => b.updatedAt - a.updatedAt), [workbenchSnapshot]);
+  const recentWork = useMemo(() => repositoryWork.slice(0, 5), [repositoryWork]);
 
-  const recentWork = useMemo(
-    () => repositoryWork.slice(0, 5),
-    [repositoryWork],
-  );
+  const knowledgeFiles = useMemo(() => knowledgeSnapshot?.recentFiles ?? [], [knowledgeSnapshot]);
 
-  const knowledgeFiles = useMemo(
-    () => knowledgeSnapshot?.recentFiles ?? [],
-    [knowledgeSnapshot],
-  );
-
-  const recentKnowledge = useMemo(
-    () => knowledgeFiles.slice(0, 5),
-    [knowledgeFiles],
-  );
+  const recentKnowledge = useMemo(() => knowledgeFiles.slice(0, 5), [knowledgeFiles]);
   const gatewaySummary = useMemo(
     () => normalizeDashboardGatewaySummary({ health, gatewayStatus, agents }),
     [agents, gatewayStatus, health],
   );
 
   const modelUsageChartData = useMemo(
-    () => (usageDashboard?.modelRows ?? []).slice(0, 6).map((row) => ({
-      label: row.label,
-      value: row.totalTokens,
-    })),
+    () =>
+      (usageDashboard?.modelRows ?? []).slice(0, 6).map((row) => ({
+        label: row.label,
+        value: row.totalTokens,
+      })),
     [usageDashboard],
   );
 
@@ -337,38 +364,39 @@ export default function DashboardPage() {
     knowledgeFiles.forEach((file) => increment(file.updatedAt, t('nav.knowledge')));
     artifacts.forEach((artifact) => increment(artifact.updatedAt, t('dashboard.outputsArtifacts')));
 
-    return days.flatMap((date) => categories.map((category) => ({
-      date: shortDayLabel(date),
-      category,
-      value: counts.get(`${date}:${category}`) ?? 0,
-    })));
+    return days.flatMap((date) =>
+      categories.map((category) => ({
+        date: shortDayLabel(date),
+        category,
+        value: counts.get(`${date}:${category}`) ?? 0,
+      })),
+    );
   }, [artifacts, knowledgeFiles, repositoryWork, sessions, t]);
 
   const actionRunStatusData = useMemo(() => {
     const counts = new Map<string, number>();
     actionRuns.forEach((run) => counts.set(run.status, (counts.get(run.status) ?? 0) + 1));
-    return [...counts.entries()]
-      .map(([label, value]) => ({ label, value }))
-      .sort((a, b) => b.value - a.value);
+    return [...counts.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
   }, [actionRuns]);
 
   const artifactTypeData = useMemo(() => {
     const counts = new Map<string, number>();
     artifacts.forEach((artifact) => counts.set(artifact.type, (counts.get(artifact.type) ?? 0) + 1));
-    return [...counts.entries()]
-      .map(([label, value]) => ({ label, value }))
-      .sort((a, b) => b.value - a.value);
+    return [...counts.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
   }, [artifacts]);
 
-  const statusBadgeType: 'success' | 'warning' | 'danger' | 'default' =
-    isConnected ? 'success' : isLoading ? 'warning' : 'danger';
+  const statusBadgeType: 'success' | 'warning' | 'danger' | 'default' = isConnected
+    ? 'success'
+    : isLoading
+      ? 'warning'
+      : 'danger';
   const statusLabel = isConnected
     ? t('instance.statusConnected')
     : connectionRetry
       ? t('dashboard.retrying', { n: connectionRetry.attempt })
       : isLoading
-      ? t('instance.statusConnecting')
-      : t('instance.statusDisconnected');
+        ? t('instance.statusConnecting')
+        : t('instance.statusDisconnected');
   const gatewayVersion = gatewaySummary.runtimeVersion || '-';
 
   const handleRefresh = async () => {
@@ -392,21 +420,40 @@ export default function DashboardPage() {
             <Badge dot type={statusBadgeType} />
             <Text style={{ fontWeight: 700 }}>{statusLabel}</Text>
             {gatewaySummary.healthStatus ? (
-              <Tag size="small" color={gatewaySummary.healthStatus === 'ok' ? 'green' : gatewaySummary.healthStatus === 'degraded' ? 'orange' : 'red'}>
+              <Tag
+                size="small"
+                color={
+                  gatewaySummary.healthStatus === 'ok'
+                    ? 'green'
+                    : gatewaySummary.healthStatus === 'degraded'
+                      ? 'orange'
+                      : 'red'
+                }
+              >
                 {gatewaySummary.healthStatus}
               </Tag>
             ) : null}
             {connectionRetry ? (
-              <Tag size="small" color="orange">{t('dashboard.retryAfter', { delay: formatRetryDelay(connectionRetry.delayMs) })}</Tag>
+              <Tag size="small" color="orange">
+                {t('dashboard.retryAfter', { delay: formatRetryDelay(connectionRetry.delayMs) })}
+              </Tag>
             ) : null}
           </div>
           <div className="dashboard-status-copy">
             <Text type="tertiary">{isConnected ? t('dashboard.gatewayReady') : t('dashboard.gatewayLimited')}</Text>
           </div>
         </div>
-        <MetricPill icon={<IconServer />} label={t('dashboard.connectedAgents')} value={formatNumber(gatewaySummary.agentCount)} />
+        <MetricPill
+          icon={<IconServer />}
+          label={t('dashboard.connectedAgents')}
+          value={formatNumber(gatewaySummary.agentCount)}
+        />
         <MetricPill icon={<IconBox />} label={t('dashboard.gatewayVersion')} value={gatewayVersion} />
-        <MetricPill icon={<IconComment />} label={t('dashboard.gatewaySessions')} value={formatNumber(gatewaySummary.sessionCount)} />
+        <MetricPill
+          icon={<IconComment />}
+          label={t('dashboard.gatewaySessions')}
+          value={formatNumber(gatewaySummary.sessionCount)}
+        />
       </div>
     </DashboardSection>
   );
@@ -415,10 +462,35 @@ export default function DashboardPage() {
     <DashboardSection title={t('dashboard.gatewayUsage')} description={t('dashboard.gatewayUsageDesc')}>
       <div className="dashboard-usage-layout">
         <div className="dashboard-usage-summary-grid">
-          <MetricPill icon={<IconBolt />} label={t('dashboard.totalTokens')} value={formatNumber(usageDashboard?.totals.totalTokens)} note={usageDashboard?.available ? t('dashboard.realUsageSource') : t('dashboard.realUsageUnavailable')} />
-          <MetricPill icon={<IconComment />} label={t('dashboard.inputTokens')} value={formatNumber(usageDashboard?.totals.inputTokens)} note={t('dashboard.outputTokensValue', { count: formatNumber(usageDashboard?.totals.outputTokens) })} />
-          <MetricPill icon={<IconBox />} label={t('dashboard.cacheTokens')} value={formatNumber((usageDashboard?.totals.cacheReadTokens ?? 0) + (usageDashboard?.totals.cacheWriteTokens ?? 0))} note={t('dashboard.cacheTokenBreakdown', { read: formatNumber(usageDashboard?.totals.cacheReadTokens), write: formatNumber(usageDashboard?.totals.cacheWriteTokens) })} />
-          <MetricPill icon={<IconAppCenter />} label={t('dashboard.estimatedCost')} value={formatCost(usageDashboard?.totals.estimatedCostUsd)} note={t('dashboard.costAvailabilityNote')} />
+          <MetricPill
+            icon={<IconBolt />}
+            label={t('dashboard.totalTokens')}
+            value={formatNumber(usageDashboard?.totals.totalTokens)}
+            note={usageDashboard?.available ? t('dashboard.realUsageSource') : t('dashboard.realUsageUnavailable')}
+          />
+          <MetricPill
+            icon={<IconComment />}
+            label={t('dashboard.inputTokens')}
+            value={formatNumber(usageDashboard?.totals.inputTokens)}
+            note={t('dashboard.outputTokensValue', { count: formatNumber(usageDashboard?.totals.outputTokens) })}
+          />
+          <MetricPill
+            icon={<IconBox />}
+            label={t('dashboard.cacheTokens')}
+            value={formatNumber(
+              (usageDashboard?.totals.cacheReadTokens ?? 0) + (usageDashboard?.totals.cacheWriteTokens ?? 0),
+            )}
+            note={t('dashboard.cacheTokenBreakdown', {
+              read: formatNumber(usageDashboard?.totals.cacheReadTokens),
+              write: formatNumber(usageDashboard?.totals.cacheWriteTokens),
+            })}
+          />
+          <MetricPill
+            icon={<IconAppCenter />}
+            label={t('dashboard.estimatedCost')}
+            value={formatCost(usageDashboard?.totals.estimatedCostUsd)}
+            note={t('dashboard.costAvailabilityNote')}
+          />
         </div>
 
         <div className="dashboard-visual-row">
@@ -431,7 +503,9 @@ export default function DashboardPage() {
           <div className="dashboard-chart-panel dashboard-chart-panel-wide">
             <div className="dashboard-usage-panel-title">
               <Text style={{ fontWeight: 700 }}>{t('dashboard.modelUsage')}</Text>
-              <Tag size="small" color="blue">{modelUsageChartData.length}</Tag>
+              <Tag size="small" color="blue">
+                {modelUsageChartData.length}
+              </Tag>
             </div>
             <ModelUsageBarChart data={modelUsageChartData} emptyText={t('dashboard.noChartData')} />
           </div>
@@ -440,27 +514,45 @@ export default function DashboardPage() {
         <div className="dashboard-usage-panel dashboard-usage-trend">
           <div className="dashboard-usage-panel-title">
             <Text style={{ fontWeight: 700 }}>{t('dashboard.usageTrend')}</Text>
-            {usageDashboard?.errors.length ? <Tag size="small" color="orange">{usageDashboard.errors.join(', ')}</Tag> : null}
+            {usageDashboard?.errors.length ? (
+              <Tag size="small" color="orange">
+                {usageDashboard.errors.join(', ')}
+              </Tag>
+            ) : null}
           </div>
           {usageDashboard?.trend.length ? (
             <UsageTrendChart trend={usageDashboard.trend} />
-          ) : <Text type="tertiary" size="small">{t('dashboard.usageTrendUnavailable')}</Text>}
+          ) : (
+            <Text type="tertiary" size="small">
+              {t('dashboard.usageTrendUnavailable')}
+            </Text>
+          )}
         </div>
 
         <div className="dashboard-usage-panel dashboard-high-usage-sessions">
           <div className="dashboard-usage-panel-title">
             <Text style={{ fontWeight: 700 }}>{t('dashboard.recentHighUsageSessions')}</Text>
-            <Tag size="small" color="grey">{usageDashboard?.recentSessions.length ?? 0}</Tag>
+            <Tag size="small" color="grey">
+              {usageDashboard?.recentSessions.length ?? 0}
+            </Tag>
           </div>
-          {usageDashboard?.recentSessions.length ? usageDashboard.recentSessions.slice(0, 4).map((session) => (
-            <AssetRow
-              key={session.key}
-              icon={<IconFile />}
-              title={session.title}
-              meta={`${session.model ?? session.agentId ?? 'session'} · ${formatNumber(session.totalTokens)} tokens`}
-              onClick={() => navigate(`/chat/${encodeURIComponent(session.key)}`)}
-            />
-          )) : <Text type="tertiary" size="small">{t('dashboard.realUsageUnavailable')}</Text>}
+          {usageDashboard?.recentSessions.length ? (
+            usageDashboard.recentSessions
+              .slice(0, 4)
+              .map((session) => (
+                <AssetRow
+                  key={session.key}
+                  icon={<IconFile />}
+                  title={session.title}
+                  meta={`${session.model ?? session.agentId ?? 'session'} · ${formatNumber(session.totalTokens)} tokens`}
+                  onClick={() => navigate(`/chat/${encodeURIComponent(session.key)}`)}
+                />
+              ))
+          ) : (
+            <Text type="tertiary" size="small">
+              {t('dashboard.realUsageUnavailable')}
+            </Text>
+          )}
         </div>
       </div>
     </DashboardSection>
@@ -472,8 +564,12 @@ export default function DashboardPage() {
       description={t('dashboard.recentWorkKnowledgeDesc')}
       action={
         <div className="dashboard-section-actions">
-          <Button size="small" theme="borderless" onClick={() => navigate('/workbench')}>{t('dashboard.viewWorkbench')}</Button>
-          <Button size="small" theme="borderless" onClick={() => navigate('/knowledge')}>{t('dashboard.viewKnowledge')}</Button>
+          <Button size="small" theme="borderless" onClick={() => navigate('/workbench')}>
+            {t('dashboard.viewWorkbench')}
+          </Button>
+          <Button size="small" theme="borderless" onClick={() => navigate('/knowledge')}>
+            {t('dashboard.viewKnowledge')}
+          </Button>
         </div>
       }
     >
@@ -486,20 +582,34 @@ export default function DashboardPage() {
       <div className="dashboard-column-grid">
         <div className="dashboard-asset-column">
           <Text style={{ fontWeight: 700 }}>{t('dashboard.recentSessions')}</Text>
-          {recentSessions.length > 0 ? recentSessions.map((session) => (
-            <AssetRow
-              key={session.key}
-              icon={<IconComment />}
-              title={session.title || session.label || session.key}
-              meta={`${session.agentId ?? 'agent'} · ${formatDate(getSessionTime(session))}`}
-              tag={<Tag size="small" color={getStatusTagColor(session.status ?? 'idle')}>{session.status ?? 'idle'}</Tag>}
-              onClick={() => navigate(`/chat/${encodeURIComponent(session.key)}`)}
-            />
-          )) : <Text type="tertiary" size="small">{t('dashboard.noSessions')}</Text>}
+          {recentSessions.length > 0 ? (
+            recentSessions.map((session) => (
+              <AssetRow
+                key={session.key}
+                icon={<IconComment />}
+                title={session.title || session.label || session.key}
+                meta={`${session.agentId ?? 'agent'} · ${formatDate(getSessionTime(session))}`}
+                tag={
+                  <Tag size="small" color={getStatusTagColor(session.status ?? 'idle')}>
+                    {session.status ?? 'idle'}
+                  </Tag>
+                }
+                onClick={() => navigate(`/chat/${encodeURIComponent(session.key)}`)}
+              />
+            ))
+          ) : (
+            <Text type="tertiary" size="small">
+              {t('dashboard.noSessions')}
+            </Text>
+          )}
         </div>
         <div className="dashboard-asset-column">
           <Text style={{ fontWeight: 700 }}>{t('dashboard.repositoryWork')}</Text>
-          {repositoryUnavailable ? <Text type="tertiary" size="small">{t('dashboard.repositoryUnavailable')}</Text> : null}
+          {repositoryUnavailable ? (
+            <Text type="tertiary" size="small">
+              {t('dashboard.repositoryUnavailable')}
+            </Text>
+          ) : null}
           {recentWork.map((file) => (
             <AssetRow
               key={file.path}
@@ -509,11 +619,19 @@ export default function DashboardPage() {
               onClick={() => navigate('/workbench')}
             />
           ))}
-          {!repositoryUnavailable && recentWork.length === 0 ? <Text type="tertiary" size="small">{t('dashboard.noRepositoryWork')}</Text> : null}
+          {!repositoryUnavailable && recentWork.length === 0 ? (
+            <Text type="tertiary" size="small">
+              {t('dashboard.noRepositoryWork')}
+            </Text>
+          ) : null}
         </div>
         <div className="dashboard-asset-column">
           <Text style={{ fontWeight: 700 }}>{t('nav.knowledge')}</Text>
-          {repositoryUnavailable ? <Text type="tertiary" size="small">{t('dashboard.repositoryUnavailable')}</Text> : null}
+          {repositoryUnavailable ? (
+            <Text type="tertiary" size="small">
+              {t('dashboard.repositoryUnavailable')}
+            </Text>
+          ) : null}
           {recentKnowledge.map((file) => (
             <AssetRow
               key={file.path}
@@ -523,7 +641,11 @@ export default function DashboardPage() {
               onClick={() => navigate('/knowledge')}
             />
           ))}
-          {!repositoryUnavailable && recentKnowledge.length === 0 ? <Text type="tertiary" size="small">{t('dashboard.noKnowledge')}</Text> : null}
+          {!repositoryUnavailable && recentKnowledge.length === 0 ? (
+            <Text type="tertiary" size="small">
+              {t('dashboard.noKnowledge')}
+            </Text>
+          ) : null}
         </div>
       </div>
     </DashboardSection>
@@ -533,7 +655,11 @@ export default function DashboardPage() {
     <DashboardSection
       title={t('dashboard.outputsArtifacts')}
       description={t('dashboard.outputsArtifactsDesc')}
-      action={<Button size="small" theme="borderless" onClick={() => navigate('/artifacts')}>{t('dashboard.viewArtifacts')}</Button>}
+      action={
+        <Button size="small" theme="borderless" onClick={() => navigate('/artifacts')}>
+          {t('dashboard.viewArtifacts')}
+        </Button>
+      }
     >
       <div className="dashboard-visual-row">
         <div className="dashboard-chart-panel dashboard-chart-panel-compact">
@@ -551,29 +677,52 @@ export default function DashboardPage() {
       </div>
       <div className="dashboard-output-layout">
         <div className="dashboard-output-list">
-          {recentArtifacts.length > 0 ? recentArtifacts.map((artifact: ArtifactMeta) => (
-            <AssetRow
-              key={artifact.id}
-              icon={<span aria-hidden="true">{artifact.icon}</span>}
-              title={artifact.title}
-              meta={`${artifact.type} · ${formatDate(artifact.updatedAt)}`}
-              tag={<Tag size="small" color={artifact.status === 'published' ? 'green' : artifact.status === 'draft' ? 'blue' : 'grey'}>{artifact.status}</Tag>}
-              onClick={() => navigate(`/artifacts/${encodeURIComponent(artifact.id)}`)}
-            />
-          )) : <Text type="tertiary" size="small">{t('dashboard.noArtifacts')}</Text>}
+          {recentArtifacts.length > 0 ? (
+            recentArtifacts.map((artifact: ArtifactMeta) => (
+              <AssetRow
+                key={artifact.id}
+                icon={<span aria-hidden="true">{artifact.icon}</span>}
+                title={artifact.title}
+                meta={`${artifact.type} · ${formatDate(artifact.updatedAt)}`}
+                tag={
+                  <Tag
+                    size="small"
+                    color={artifact.status === 'published' ? 'green' : artifact.status === 'draft' ? 'blue' : 'grey'}
+                  >
+                    {artifact.status}
+                  </Tag>
+                }
+                onClick={() => navigate(`/artifacts/${encodeURIComponent(artifact.id)}`)}
+              />
+            ))
+          ) : (
+            <Text type="tertiary" size="small">
+              {t('dashboard.noArtifacts')}
+            </Text>
+          )}
         </div>
         <div className="dashboard-run-list">
           <Text style={{ fontWeight: 700 }}>{t('dashboard.recentActionRuns')}</Text>
-          {recentRuns.length > 0 ? recentRuns.map((run) => (
-            <AssetRow
-              key={run.id}
-              icon={<IconBolt />}
-              title={run.input || run.type}
-              meta={`${run.agentId} · ${formatDate(run.updatedAt)}`}
-              tag={<Tag size="small" color={getStatusTagColor(run.status)}>{run.status}</Tag>}
-              onClick={() => navigate('/workbench')}
-            />
-          )) : <Text type="tertiary" size="small">{t('dashboard.noActionRuns')}</Text>}
+          {recentRuns.length > 0 ? (
+            recentRuns.map((run) => (
+              <AssetRow
+                key={run.id}
+                icon={<IconBolt />}
+                title={run.input || run.type}
+                meta={`${run.agentId} · ${formatDate(run.updatedAt)}`}
+                tag={
+                  <Tag size="small" color={getStatusTagColor(run.status)}>
+                    {run.status}
+                  </Tag>
+                }
+                onClick={() => navigate('/workbench')}
+              />
+            ))
+          ) : (
+            <Text type="tertiary" size="small">
+              {t('dashboard.noActionRuns')}
+            </Text>
+          )}
         </div>
       </div>
     </DashboardSection>
@@ -591,7 +740,9 @@ export default function DashboardPage() {
       <div className="dashboard-main">
         <div className="dashboard-title-row">
           <div>
-            <Title heading={3} style={{ margin: 0 }}>{t('nav.dashboard')}</Title>
+            <Title heading={3} style={{ margin: 0 }}>
+              {t('nav.dashboard')}
+            </Title>
             <Text type="tertiary">{t('dashboard.pageDesc')}</Text>
           </div>
           <Button icon={<IconRefresh />} theme="borderless" onClick={handleRefresh} loading={isLoading} />
@@ -604,12 +755,14 @@ export default function DashboardPage() {
 
         <DashboardSection title={t('dashboard.attention')} description={t('dashboard.attentionDesc')}>
           <div className="dashboard-attention-list">
-            {attentionItems.length > 0 ? attentionItems.map((item) => (
-              <div key={item} className="dashboard-attention-item">
-                <IconBolt />
-                <Text>{item}</Text>
-              </div>
-            )) : (
+            {attentionItems.length > 0 ? (
+              attentionItems.map((item) => (
+                <div key={item} className="dashboard-attention-item">
+                  <IconBolt />
+                  <Text>{item}</Text>
+                </div>
+              ))
+            ) : (
               <div className="dashboard-attention-item">
                 <IconBolt />
                 <Text>{t('dashboard.attentionClear')}</Text>
@@ -617,7 +770,6 @@ export default function DashboardPage() {
             )}
           </div>
         </DashboardSection>
-
       </div>
     </div>
   );

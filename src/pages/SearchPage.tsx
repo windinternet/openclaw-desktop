@@ -162,7 +162,9 @@ export default function SearchPage() {
   return (
     <div style={{ padding: 24, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={{ marginBottom: 24 }}>
-        <Title heading={3} style={{ marginBottom: 4 }}>{t('nav.search')}</Title>
+        <Title heading={3} style={{ marginBottom: 4 }}>
+          {t('nav.search')}
+        </Title>
         <Text type="tertiary">{t('page.searchDesc')}</Text>
       </div>
 
@@ -186,9 +188,7 @@ export default function SearchPage() {
               />
             </div>
 
-            {!debouncedQuery.trim() && (
-              <Empty description={t('search.enterKeyword')} style={{ marginTop: 48 }} />
-            )}
+            {!debouncedQuery.trim() && <Empty description={t('search.enterKeyword')} style={{ marginTop: 48 }} />}
 
             {debouncedQuery.trim() && filteredSessions.length === 0 && (
               <Empty description={t('search.noMatchingSessions')} style={{ marginTop: 48 }} />
@@ -201,7 +201,9 @@ export default function SearchPage() {
                   role="button"
                   tabIndex={0}
                   onClick={() => navigate(`/chat/${s.key}`)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/chat/${s.key}`); }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') navigate(`/chat/${s.key}`);
+                  }}
                   style={{ cursor: 'pointer' }}
                 >
                   <Card
@@ -212,9 +214,13 @@ export default function SearchPage() {
                           <Tag
                             size="small"
                             color={
-                              s.status === 'active' ? 'green' :
-                              s.status === 'idle' ? 'blue' :
-                              s.status === 'completed' ? 'grey' : 'orange'
+                              s.status === 'active'
+                                ? 'green'
+                                : s.status === 'idle'
+                                  ? 'blue'
+                                  : s.status === 'completed'
+                                    ? 'grey'
+                                    : 'orange'
                             }
                           >
                             {s.status}
@@ -223,15 +229,19 @@ export default function SearchPage() {
                       </div>
                     }
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 13, color: 'var(--semi-color-text-2)' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        fontSize: 13,
+                        color: 'var(--semi-color-text-2)',
+                      }}
+                    >
                       <span>{formatTimestamp(s.updatedAt || s.createdAt)}</span>
-                      {s.messageCount !== undefined && (
-                        <span>{t('chat.messageCount', { count: s.messageCount })}</span>
-                      )}
+                      {s.messageCount !== undefined && <span>{t('chat.messageCount', { count: s.messageCount })}</span>}
                       {s.sessionKey && s.sessionKey !== s.key && (
-                        <span style={{ fontSize: 12, color: 'var(--semi-color-text-2)' }}>
-                          key: {s.sessionKey}
-                        </span>
+                        <span style={{ fontSize: 12, color: 'var(--semi-color-text-2)' }}>key: {s.sessionKey}</span>
                       )}
                     </div>
                   </Card>
@@ -245,12 +255,7 @@ export default function SearchPage() {
         <Tabs.TabPane tab={t('search.webSearch')} itemKey="web">
           <div style={{ flex: 1, overflow: 'auto' }}>
             <Space style={{ marginBottom: 16, width: '100%' }} align="start">
-              <Select
-                value={provider}
-                onChange={handleProviderChange}
-                style={{ width: 140 }}
-                size="large"
-              >
+              <Select value={provider} onChange={handleProviderChange} style={{ width: 140 }} size="large">
                 {PROVIDERS.map((p) => (
                   <Select.Option key={p.value} value={p.value}>
                     {p.label}
@@ -267,13 +272,7 @@ export default function SearchPage() {
                 size="large"
                 style={{ flex: 1 }}
               />
-              <Button
-                theme="solid"
-                icon={<IconSearch />}
-                onClick={handleWebSearch}
-                loading={webLoading}
-                size="large"
-              >
+              <Button theme="solid" icon={<IconSearch />} onClick={handleWebSearch} loading={webLoading} size="large">
                 {t('common.search')}
               </Button>
             </Space>
@@ -284,20 +283,13 @@ export default function SearchPage() {
               </div>
             )}
 
-            {webError && !webLoading && (
-              <Empty
-                description={webError}
-                style={{ marginTop: 32 }}
-              />
-            )}
+            {webError && !webLoading && <Empty description={webError} style={{ marginTop: 32 }} />}
 
             {!webLoading && !webError && hasSearched && webResults.length === 0 && (
               <Empty description={t('search.noResults')} style={{ marginTop: 48 }} />
             )}
 
-            {!hasSearched && !webLoading && (
-              <Empty description={t('search.enterToSearch')} style={{ marginTop: 48 }} />
-            )}
+            {!hasSearched && !webLoading && <Empty description={t('search.enterToSearch')} style={{ marginTop: 48 }} />}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {webResults.map((r, idx) => {
@@ -310,8 +302,12 @@ export default function SearchPage() {
                     role="button"
                     tabIndex={0}
                     style={{ cursor: 'pointer' }}
-                    onClick={() => { if (url) window.open(url, '_blank'); }}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && url) window.open(url, '_blank'); }}
+                    onClick={() => {
+                      if (url) window.open(url, '_blank');
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && url) window.open(url, '_blank');
+                    }}
                   >
                     <Card
                       title={
@@ -336,9 +332,7 @@ export default function SearchPage() {
                           {url}
                         </Text>
                       )}
-                      <Text style={{ color: 'var(--semi-color-text-1)', fontSize: 14 }}>
-                        {snippet}
-                      </Text>
+                      <Text style={{ color: 'var(--semi-color-text-1)', fontSize: 14 }}>{snippet}</Text>
                     </Card>
                   </div>
                 );

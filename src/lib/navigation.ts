@@ -10,13 +10,7 @@ export interface PrimaryNavItem {
   key: PrimaryNavKey;
   labelKey: string;
   route: string;
-  icon:
-    | 'dashboard'
-    | 'new-session'
-    | 'workbench'
-    | 'knowledge'
-    | 'collaboration'
-    | 'control-center';
+  icon: 'dashboard' | 'new-session' | 'workbench' | 'knowledge' | 'collaboration' | 'control-center';
 }
 
 export interface PrimaryNavGroup {
@@ -52,12 +46,15 @@ export const NAV_GROUPS: PrimaryNavGroup[] = [
   },
 ];
 
-export const PRIMARY_ROUTE_MAP: Record<PrimaryNavKey, string> = NAV_GROUPS
-  .flatMap((group) => group.items)
-  .reduce<Record<PrimaryNavKey, string>>((map, item) => {
+export const PRIMARY_ROUTE_MAP: Record<PrimaryNavKey, string> = NAV_GROUPS.flatMap((group) => group.items).reduce<
+  Record<PrimaryNavKey, string>
+>(
+  (map, item) => {
     map[item.key] = item.route;
     return map;
-  }, {} as Record<PrimaryNavKey, string>);
+  },
+  {} as Record<PrimaryNavKey, string>,
+);
 
 const LEGACY_ROUTE_ACTIVE_KEYS: Array<{ prefix: string; key: PrimaryNavKey }> = [
   { prefix: '/actions', key: 'workbench' },
@@ -78,9 +75,9 @@ function matchesPathSegment(pathname: string, prefix: string): boolean {
 export function getActiveNavKey(pathname: string): PrimaryNavKey {
   if (pathname === '/') return 'dashboard';
 
-  const direct = NAV_GROUPS
-    .flatMap((group) => group.items)
-    .find((item) => item.route !== '/' && matchesPathSegment(pathname, item.route));
+  const direct = NAV_GROUPS.flatMap((group) => group.items).find(
+    (item) => item.route !== '/' && matchesPathSegment(pathname, item.route),
+  );
 
   if (direct) return direct.key;
 

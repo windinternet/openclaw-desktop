@@ -61,17 +61,35 @@ describe('brand asset pack', () => {
     expect(readPngSize('src/pet/assets/app-icon-256.png')).toEqual({ width: 256, height: 256 });
     expect(readPngSize('src/pet/assets/mascot-transparent-256.png')).toEqual({ width: 256, height: 256 });
     expect(readPngSize('assets/brand/openclaw-desktop-club-logo-1200x360.png')).toEqual({ width: 1200, height: 360 });
-    expect(readPngSize('assets/brand/openclaw-desktop-logo-horizontal-1200x360.png')).toEqual({ width: 1200, height: 360 });
+    expect(readPngSize('assets/brand/openclaw-desktop-logo-horizontal-1200x360.png')).toEqual({
+      width: 1200,
+      height: 360,
+    });
     expect(readPngSize('assets/brand/openclaw-logo-horizontal-1200x360.png')).toEqual({ width: 1200, height: 360 });
-    expect(readPngSize('assets/brand/openclaw-desktop-logo-light-panel-1200x360.png')).toEqual({ width: 1200, height: 360 });
-    expect(readPngSize('assets/brand/openclaw-desktop-club-logo-dark-panel-1200x360.png')).toEqual({ width: 1200, height: 360 });
+    expect(readPngSize('assets/brand/openclaw-desktop-logo-light-panel-1200x360.png')).toEqual({
+      width: 1200,
+      height: 360,
+    });
+    expect(readPngSize('assets/brand/openclaw-desktop-club-logo-dark-panel-1200x360.png')).toEqual({
+      width: 1200,
+      height: 360,
+    });
   });
 
   it('keeps image2 chroma masters and alpha master outputs', () => {
-    expect(readPngSize('assets/brand/source/openclaw-app-icon-chroma-master.png')).toEqual({ width: 1254, height: 1254 });
+    expect(readPngSize('assets/brand/source/openclaw-app-icon-chroma-master.png')).toEqual({
+      width: 1254,
+      height: 1254,
+    });
     expect(readPngSize('assets/brand/source/openclaw-mascot-chroma-master.png')).toEqual({ width: 1402, height: 1122 });
-    expect(readPngSize('assets/brand/source/openclaw-desktop-logo-light-chroma-master.png')).toEqual({ width: 1983, height: 793 });
-    expect(readPngSize('assets/brand/source/openclaw-desktop-club-logo-dark-chroma-master.png')).toEqual({ width: 1983, height: 793 });
+    expect(readPngSize('assets/brand/source/openclaw-desktop-logo-light-chroma-master.png')).toEqual({
+      width: 1983,
+      height: 793,
+    });
+    expect(readPngSize('assets/brand/source/openclaw-desktop-club-logo-dark-chroma-master.png')).toEqual({
+      width: 1983,
+      height: 793,
+    });
     expectTransparentPng('assets/brand/source/openclaw-app-icon-transparent-master.png');
     expectTransparentPng('assets/brand/source/openclaw-mascot-transparent-master.png');
     expectTransparentPng('assets/brand/source/openclaw-desktop-logo-light-transparent-master.png');

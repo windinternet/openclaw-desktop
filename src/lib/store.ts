@@ -57,10 +57,7 @@ import {
 import { recoverInterruptedAiActionRuns, syncAiActionRunsWithGateway } from './ai-action-run-store';
 import { writeArtifactSkill } from './artifact-skill';
 import { loadAppSnapshot, removePersistedInstance, saveCurrentInstanceId, saveInstances } from './local-persistence';
-import {
-  startRepositoryAgentsFileSyncWatcher,
-  syncRepositoryContextWithCompanion,
-} from './repository-context-sync';
+import { startRepositoryAgentsFileSyncWatcher, syncRepositoryContextWithCompanion } from './repository-context-sync';
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
@@ -188,10 +185,7 @@ interface StoreState {
   loadInstances: () => Promise<void>;
   addInstance: (config: Omit<InstanceConfig, 'id' | 'lastConnectedAt'>) => void;
   removeInstance: (id: string) => void;
-  updateInstancePreferences: (
-    id: string,
-    preferences: Pick<InstanceConfig, 'agentSwitchStrategy'>,
-  ) => void;
+  updateInstancePreferences: (id: string, preferences: Pick<InstanceConfig, 'agentSwitchStrategy'>) => void;
   setCurrentInstance: (id: string | null) => void;
   setConnectionStatus: (status: ConnectionStatus, error?: string) => void;
   getCurrentInstance: () => InstanceConfig | null;
@@ -309,7 +303,10 @@ function getClient(state: StoreState): GatewayClient | null {
   return null;
 }
 
-function getInstanceClient(state: StoreState, requestedInstanceId?: string): { instanceId: string; client: GatewayClient } | null {
+function getInstanceClient(
+  state: StoreState,
+  requestedInstanceId?: string,
+): { instanceId: string; client: GatewayClient } | null {
   const instanceId = requestedInstanceId ?? state.currentInstanceId;
   if (!instanceId) return null;
   const client = state.instanceRuntimes[instanceId]?.client;
@@ -318,10 +315,12 @@ function getInstanceClient(state: StoreState, requestedInstanceId?: string): { i
 }
 
 function isDesktopNodeApprovalRequest(request: DesktopCompanionApprovalRequest): boolean {
-  return request.clientId === 'openclaw-tui'
-    || request.clientMode === 'node'
-    || request.role === 'node'
-    || request.roles.includes('node');
+  return (
+    request.clientId === 'openclaw-tui' ||
+    request.clientMode === 'node' ||
+    request.role === 'node' ||
+    request.roles.includes('node')
+  );
 }
 
 function getCompanionApprovalInfo(message = 'Desktop node 需要 Gateway 授权'): DesktopCompanionInfo {
@@ -334,7 +333,7 @@ function getCompanionApprovalInfo(message = 'Desktop node 需要 Gateway 授权'
 }
 
 function cleanupRepositoryAgentsFileSyncWatcher(instanceId: string): void {
-  repositoryAgentsFileSyncWatcherTokens.set(instanceId, repositoryAgentsFileSyncWatcherSeq += 1);
+  repositoryAgentsFileSyncWatcherTokens.set(instanceId, (repositoryAgentsFileSyncWatcherSeq += 1));
   const watcher = repositoryAgentsFileSyncWatchers.get(instanceId);
   if (!watcher) return;
   repositoryAgentsFileSyncWatchers.delete(instanceId);
@@ -354,13 +353,13 @@ async function ensureRepositoryAgentsFileSyncWatcher(
   const existing = repositoryAgentsFileSyncWatchers.get(instanceId);
   if (existing?.repoPath === repoPath) return;
   cleanupRepositoryAgentsFileSyncWatcher(instanceId);
-  const watchToken = repositoryAgentsFileSyncWatcherSeq += 1;
+  const watchToken = (repositoryAgentsFileSyncWatcherSeq += 1);
   repositoryAgentsFileSyncWatcherTokens.set(instanceId, watchToken);
   const cleanup = await startRepositoryAgentsFileSyncWatcher({ repoPath, onChanged });
   if (
-    repositoryAgentsFileSyncWatcherTokens.get(instanceId) !== watchToken
-    || !isCurrent()
-    || repositoryAgentsFileSyncWatchers.get(instanceId)?.repoPath !== undefined
+    repositoryAgentsFileSyncWatcherTokens.get(instanceId) !== watchToken ||
+    !isCurrent() ||
+    repositoryAgentsFileSyncWatchers.get(instanceId)?.repoPath !== undefined
   ) {
     cleanup();
     return;
@@ -620,20 +619,33 @@ export const useStore = create<StoreState>((set, get) => ({
               if (stream === 'assistant' || stream === 'tool') {
                 get().patchSessionActivityState(evtSessionKey, 'generating');
                 if (stream === 'assistant') {
-                  emitPetEvent({ type: 'agent:streaming', timestamp: Date.now() })
+                  emitPetEvent({ type: 'agent:streaming', timestamp: Date.now() });
                 } else if (stream === 'tool') {
-                  const data = (typeof p.data === 'object' && p.data !== null) ? p.data as Record<string, unknown> : null
-                  emitPetEvent({ type: 'agent:tool-call', payload: { toolName: (data?.toolName as string) || (data?.name as string) }, timestamp: Date.now() })
+                  const data =
+                    typeof p.data === 'object' && p.data !== null ? (p.data as Record<string, unknown>) : null;
+                  emitPetEvent({
+                    type: 'agent:tool-call',
+                    payload: { toolName: (data?.toolName as string) || (data?.name as string) },
+                    timestamp: Date.now(),
+                  });
                 }
               } else if (stream === 'lifecycle') {
-                const data = (typeof p.data === 'object' && p.data !== null) ? p.data as Record<string, unknown> : null;
+                const data = typeof p.data === 'object' && p.data !== null ? (p.data as Record<string, unknown>) : null;
                 const phase = (p.phase ?? data?.phase ?? '') as string;
                 if (phase === 'error') {
                   get().patchSessionActivityState(evtSessionKey, 'error');
-                  emitPetEvent({ type: 'agent:error', payload: { errorMessage: (data?.error as string) || '未知错误' }, timestamp: Date.now() })
+                  emitPetEvent({
+                    type: 'agent:error',
+                    payload: { errorMessage: (data?.error as string) || '未知错误' },
+                    timestamp: Date.now(),
+                  });
                 } else if (phase === 'end' || phase === 'done' || phase === 'complete') {
                   get().patchSessionActivityState(evtSessionKey, 'completed');
-                  emitPetEvent({ type: 'agent:completed', payload: { summary: summary ?? undefined }, timestamp: Date.now() })
+                  emitPetEvent({
+                    type: 'agent:completed',
+                    payload: { summary: summary ?? undefined },
+                    timestamp: Date.now(),
+                  });
                 }
               }
             }
@@ -658,9 +670,9 @@ export const useStore = create<StoreState>((set, get) => ({
       },
       onStatusChange: (status: ConnectionStatus) => {
         const s = get();
-          if (s.instanceRuntimes[instance.id]?.client !== client) return; // 旧 client 的回调忽略
-          if (status === 'connected') {
-            emitPetEvent({ type: 'connection:connected', timestamp: Date.now() })
+        if (s.instanceRuntimes[instance.id]?.client !== client) return; // 旧 client 的回调忽略
+        if (status === 'connected') {
+          emitPetEvent({ type: 'connection:connected', timestamp: Date.now() });
           set((current) =>
             withInstanceRuntime(current, instance.id, {
               connectionStatus: 'connected',
@@ -707,7 +719,7 @@ export const useStore = create<StoreState>((set, get) => ({
                 });
             });
         } else if (status === 'error') {
-          emitPetEvent({ type: 'connection:error', payload: { errorMessage: '网关连接错误' }, timestamp: Date.now() })
+          emitPetEvent({ type: 'connection:error', payload: { errorMessage: '网关连接错误' }, timestamp: Date.now() });
           cleanupRepositoryAgentsFileSyncWatcher(instance.id);
           set((current) =>
             withInstanceRuntime(current, instance.id, {
@@ -716,12 +728,12 @@ export const useStore = create<StoreState>((set, get) => ({
             }),
           );
         } else if (status === 'disconnected') {
-          emitPetEvent({ type: 'connection:disconnected', timestamp: Date.now() })
+          emitPetEvent({ type: 'connection:disconnected', timestamp: Date.now() });
           cleanupRepositoryAgentsFileSyncWatcher(instance.id);
           set((current) => withInstanceRuntime(current, instance.id, { connectionStatus: 'disconnected' }));
           disconnectDesktopBridge(instance.id);
         } else if (status === 'connecting') {
-          emitPetEvent({ type: 'connection:connecting', timestamp: Date.now() })
+          emitPetEvent({ type: 'connection:connecting', timestamp: Date.now() });
           set((current) => withInstanceRuntime(current, instance.id, { connectionStatus: 'connecting' }));
         }
       },
@@ -855,18 +867,23 @@ export const useStore = create<StoreState>((set, get) => ({
         cleanupRepositoryAgentsFileSyncWatcher(target.instanceId);
         console.warn('[syncRepositoryContextForInstance]', result.message);
       } else if (
-        result.status === 'repository_api_unavailable'
-        || result.status === 'fallback_available'
-        || result.status === 'no_binding'
+        result.status === 'repository_api_unavailable' ||
+        result.status === 'fallback_available' ||
+        result.status === 'no_binding'
       ) {
         cleanupRepositoryAgentsFileSyncWatcher(target.instanceId);
         console.info('[syncRepositoryContextForInstance]', result);
       } else if (result.status === 'synced') {
-        await ensureRepositoryAgentsFileSyncWatcher(target.instanceId, result.payload.repoPath, () => {
-          void get().syncRepositoryContextForInstance(target.instanceId);
-        }, () => {
-          return get().instanceRuntimes[target.instanceId]?.client?.getStatus() === 'connected';
-        });
+        await ensureRepositoryAgentsFileSyncWatcher(
+          target.instanceId,
+          result.payload.repoPath,
+          () => {
+            void get().syncRepositoryContextForInstance(target.instanceId);
+          },
+          () => {
+            return get().instanceRuntimes[target.instanceId]?.client?.getStatus() === 'connected';
+          },
+        );
         if (result.warning) console.warn('[syncRepositoryContextForInstance]', result.warning);
       }
     } catch (err) {
@@ -1059,9 +1076,11 @@ export const useStore = create<StoreState>((set, get) => ({
         runId: String(entry.runId ?? ''),
         jobId: String(entry.jobId ?? jobId),
         ts: typeof entry.ts === 'number' ? entry.ts : 0,
-        startedAt: typeof entry.runAtMs === 'number' ? entry.runAtMs : (typeof entry.ts === 'number' ? entry.ts : 0),
-        endedAt: typeof entry.durationMs === 'number' && typeof entry.ts === 'number'
-          ? entry.ts + entry.durationMs : undefined,
+        startedAt: typeof entry.runAtMs === 'number' ? entry.runAtMs : typeof entry.ts === 'number' ? entry.ts : 0,
+        endedAt:
+          typeof entry.durationMs === 'number' && typeof entry.ts === 'number'
+            ? entry.ts + entry.durationMs
+            : undefined,
         status: String(entry.status ?? ''),
         summary: typeof entry.summary === 'string' ? entry.summary : undefined,
         error: typeof entry.error === 'string' ? entry.error : undefined,
@@ -1091,32 +1110,40 @@ export const useStore = create<StoreState>((set, get) => ({
     const target = getInstanceClient(get(), requestedInstanceId);
     if (!target) return;
     const { instanceId, client } = target;
-    set((state) => withInstanceRuntime(state, instanceId, {
-      pluginInventoryStatus: 'loading',
-      pluginInventoryError: null,
-    }));
+    set((state) =>
+      withInstanceRuntime(state, instanceId, {
+        pluginInventoryStatus: 'loading',
+        pluginInventoryError: null,
+      }),
+    );
     try {
       const data = await client.request<DesktopCompanionPluginsListResponse>('desktopCompanion.plugins.list', {
         timeoutMs: 30000,
       });
       if (data?.ok === true) {
-        set((state) => withInstanceRuntime(state, instanceId, {
-          plugins: Array.isArray(data.plugins) ? data.plugins : [],
-          pluginInventoryStatus: 'ready',
-          pluginInventoryError: null,
-        }));
+        set((state) =>
+          withInstanceRuntime(state, instanceId, {
+            plugins: Array.isArray(data.plugins) ? data.plugins : [],
+            pluginInventoryStatus: 'ready',
+            pluginInventoryError: null,
+          }),
+        );
         return;
       }
 
-      set((state) => withInstanceRuntime(state, instanceId, {
-        pluginInventoryStatus: 'degraded',
-        pluginInventoryError: data?.message || data?.error || 'Companion plugin inventory unavailable',
-      }));
+      set((state) =>
+        withInstanceRuntime(state, instanceId, {
+          pluginInventoryStatus: 'degraded',
+          pluginInventoryError: data?.message || data?.error || 'Companion plugin inventory unavailable',
+        }),
+      );
     } catch (err) {
-      set((state) => withInstanceRuntime(state, instanceId, {
-        pluginInventoryStatus: 'degraded',
-        pluginInventoryError: err instanceof Error ? err.message : 'Companion plugin inventory unavailable',
-      }));
+      set((state) =>
+        withInstanceRuntime(state, instanceId, {
+          pluginInventoryStatus: 'degraded',
+          pluginInventoryError: err instanceof Error ? err.message : 'Companion plugin inventory unavailable',
+        }),
+      );
     }
   },
 
@@ -1345,7 +1372,9 @@ export const useStore = create<StoreState>((set, get) => ({
           },
         };
       });
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   },
 
   patchSessionActivityState: (sessionKey, state) => {
@@ -1356,7 +1385,9 @@ export const useStore = create<StoreState>((set, get) => ({
       const next = { ...runtime.sessionActivityStates, [sessionKey]: state };
       // Persist completed/error states to localStorage (generating state is not persisted)
       if (state !== 'generating') {
-        try { localStorage.setItem('openclaw-session-activity-states', JSON.stringify(next)); } catch {
+        try {
+          localStorage.setItem('openclaw-session-activity-states', JSON.stringify(next));
+        } catch {
           /* ignore unavailable localStorage */
         }
       }
@@ -1380,7 +1411,9 @@ export const useStore = create<StoreState>((set, get) => ({
       const next = { ...runtime.sessionActivityStates };
       delete next[sessionKey];
       // Sync to localStorage
-      try { localStorage.setItem('openclaw-session-activity-states', JSON.stringify(next)); } catch {
+      try {
+        localStorage.setItem('openclaw-session-activity-states', JSON.stringify(next));
+      } catch {
         /* ignore unavailable localStorage */
       }
       return {

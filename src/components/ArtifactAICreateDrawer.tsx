@@ -37,8 +37,23 @@ export function ArtifactAICreateDrawer({ visible, onClose }: Props) {
   const isGeneratingRef = useRef(false);
 
   const isValidType = (t: string): boolean =>
-    ['report', 'dashboard', 'analysis', 'checklist', 'code', 'document', 'slide', 'form', 'other',
-     'link', 'app', 'file', 'audio', 'image', 'video'].includes(t);
+    [
+      'report',
+      'dashboard',
+      'analysis',
+      'checklist',
+      'code',
+      'document',
+      'slide',
+      'form',
+      'other',
+      'link',
+      'app',
+      'file',
+      'audio',
+      'image',
+      'video',
+    ].includes(t);
 
   const handleGenerate = useCallback(async () => {
     if (!input.trim() || isGeneratingRef.current) return;
@@ -102,7 +117,9 @@ export function ArtifactAICreateDrawer({ visible, onClose }: Props) {
               };
               break;
             }
-          } catch { /* skip invalid JSON */ }
+          } catch {
+            /* skip invalid JSON */
+          }
         }
         if (parsed) {
           setPreview(parsed);
@@ -156,77 +173,106 @@ export function ArtifactAICreateDrawer({ visible, onClose }: Props) {
   };
 
   return (
-    <Modal
-      title="AI 魔法创建"
-      visible={visible}
-      onCancel={handleClose}
-      footer={null}
-      width={520}
-    >
+    <Modal title="AI 魔法创建" visible={visible} onCancel={handleClose} footer={null} width={520}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <TextArea
-        placeholder="用自然语言描述你想创建的产物，例如：&#10;把 https://openclaw.ai/docs 存为一个链接产物，标签：AI、开发工具"
-        value={input}
-        onChange={(v) => setInput(v)}
-        rows={5}
-        maxCount={2000}
-        disabled={generating}
-      />
+        <TextArea
+          placeholder="用自然语言描述你想创建的产物，例如：&#10;把 https://openclaw.ai/docs 存为一个链接产物，标签：AI、开发工具"
+          value={input}
+          onChange={(v) => setInput(v)}
+          rows={5}
+          maxCount={2000}
+          disabled={generating}
+        />
 
-      <Button
-        colorful
-        theme="solid"
-        type="primary"
-        icon={<IconAIFilledLevel1 />}
-        loading={generating}
-        disabled={!input.trim() || generating}
-        onClick={handleGenerate}
-        block
-      >
-        AI 魔法生成
-      </Button>
+        <Button
+          colorful
+          theme="solid"
+          type="primary"
+          icon={<IconAIFilledLevel1 />}
+          loading={generating}
+          disabled={!input.trim() || generating}
+          onClick={handleGenerate}
+          block
+        >
+          AI 魔法生成
+        </Button>
 
-      {generating && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 24, gap: 12 }}>
-          <Spin size="large" />
-          <Text type="tertiary">AI 正在分析你的描述...</Text>
-        </div>
-      )}
+        {generating && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 24, gap: 12 }}>
+            <Spin size="large" />
+            <Text type="tertiary">AI 正在分析你的描述...</Text>
+          </div>
+        )}
 
-      {error && (
-        <div style={{ padding: 12, background: 'var(--semi-color-danger-light-default)', borderRadius: 8 }}>
-          <Text type="danger">{error}</Text>
-        </div>
-      )}
+        {error && (
+          <div style={{ padding: 12, background: 'var(--semi-color-danger-light-default)', borderRadius: 8 }}>
+            <Text type="danger">{error}</Text>
+          </div>
+        )}
 
-      {preview && !generating && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <Text strong style={{ fontSize: 14 }}>预览结果</Text>
-          <div style={{ padding: 16, border: '1px solid var(--semi-color-border)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Text strong style={{ fontSize: 16 }}>{preview.title}</Text>
-              <Tag size="small" color="blue" type="light">{preview.type}</Tag>
+        {preview && !generating && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <Text strong style={{ fontSize: 14 }}>
+              预览结果
+            </Text>
+            <div
+              style={{
+                padding: 16,
+                border: '1px solid var(--semi-color-border)',
+                borderRadius: 8,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Text strong style={{ fontSize: 16 }}>
+                  {preview.title}
+                </Text>
+                <Tag size="small" color="blue" type="light">
+                  {preview.type}
+                </Tag>
+              </div>
+              {preview.description && (
+                <Paragraph ellipsis={{ rows: 2 }} style={{ fontSize: 13, color: 'var(--semi-color-text-1)' }}>
+                  {preview.description}
+                </Paragraph>
+              )}
+              {preview.url && (
+                <Text type="tertiary" size="small" copyable>
+                  {preview.url}
+                </Text>
+              )}
+              {preview.command && (
+                <Text type="tertiary" size="small" copyable code>
+                  {preview.command}
+                </Text>
+              )}
+              {preview.fileName && (
+                <Text type="tertiary" size="small">
+                  {preview.fileName}
+                </Text>
+              )}
+              {preview.tags && preview.tags.length > 0 && (
+                <Space spacing={4}>
+                  {preview.tags.map((tag) => (
+                    <Tag key={tag} size="small" type="light">
+                      {tag}
+                    </Tag>
+                  ))}
+                </Space>
+              )}
             </div>
-            {preview.description && (
-              <Paragraph ellipsis={{ rows: 2 }} style={{ fontSize: 13, color: 'var(--semi-color-text-1)' }}>
-                {preview.description}
-              </Paragraph>
-            )}
-            {preview.url && <Text type="tertiary" size="small" copyable>{preview.url}</Text>}
-            {preview.command && <Text type="tertiary" size="small" copyable code>{preview.command}</Text>}
-            {preview.fileName && <Text type="tertiary" size="small">{preview.fileName}</Text>}
-            {preview.tags && preview.tags.length > 0 && (
-              <Space spacing={4}>
-                {preview.tags.map((tag) => <Tag key={tag} size="small" type="light">{tag}</Tag>)}
-              </Space>
-            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button theme="solid" onClick={handleSave} style={{ flex: 1 }}>
+                保存产物
+              </Button>
+              <Button icon={<IconRefresh />} onClick={handleGenerate}>
+                重新生成
+              </Button>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button theme="solid" onClick={handleSave} style={{ flex: 1 }}>保存产物</Button>
-            <Button icon={<IconRefresh />} onClick={handleGenerate}>重新生成</Button>
-          </div>
-        </div>
-      )}
+        )}
       </div>
     </Modal>
   );

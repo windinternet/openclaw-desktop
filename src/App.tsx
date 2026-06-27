@@ -27,7 +27,8 @@ import { DEFAULT_HOME_VIEW_OPTIONS } from './lib/settings-types';
 
 function HomeRoute() {
   const defaultHomeView = useSettingsStore((s) => s.settings.defaultHomeView);
-  const homeOption = DEFAULT_HOME_VIEW_OPTIONS.find((option) => option.value === defaultHomeView) ?? DEFAULT_HOME_VIEW_OPTIONS[0];
+  const homeOption =
+    DEFAULT_HOME_VIEW_OPTIONS.find((option) => option.value === defaultHomeView) ?? DEFAULT_HOME_VIEW_OPTIONS[0];
 
   if (homeOption.route !== '/') {
     return <Navigate to={homeOption.route} replace />;

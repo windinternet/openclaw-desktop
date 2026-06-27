@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ArtifactMeta } from '../lib/artifact-types';
-import {
-  collectChatArtifactCandidates,
-  filterArtifactsForSessionKeys,
-} from '../lib/session-artifacts';
+import { collectChatArtifactCandidates, filterArtifactsForSessionKeys } from '../lib/session-artifacts';
 
 describe('session artifact helpers', () => {
   it('collects completed assistant artifact blocks from structured chat content', () => {
@@ -35,11 +32,13 @@ describe('session artifact helpers', () => {
     ]);
 
     expect(candidates).toHaveLength(1);
-    expect(candidates[0]).toEqual(expect.objectContaining({
-      key: 'agent:main:demo:msg-1:销售报告',
-      sourceSessionKey: 'agent:main:demo',
-      sourceMessageId: 'msg-1',
-    }));
+    expect(candidates[0]).toEqual(
+      expect.objectContaining({
+        key: 'agent:main:demo:msg-1:销售报告',
+        sourceSessionKey: 'agent:main:demo',
+        sourceMessageId: 'msg-1',
+      }),
+    );
     expect(candidates[0].parsed.title).toBe('销售报告');
   });
 

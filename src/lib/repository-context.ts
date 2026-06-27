@@ -92,7 +92,11 @@ export function upsertRepositoryContextBlock(content: string, payload: Repositor
   return `${base}${lineEnding}${lineEnding}${block}`;
 }
 
-function expandManagedBlockRemovalRange(content: string, blockStart: number, blockEnd: number): { start: number; end: number } {
+function expandManagedBlockRemovalRange(
+  content: string,
+  blockStart: number,
+  blockEnd: number,
+): { start: number; end: number } {
   const beforeSeparatorStart = findSeparatorStartBefore(content, blockStart);
   const afterSeparatorEnd = findSeparatorEndAfter(content, blockEnd);
   const hasContentBefore = content.slice(0, beforeSeparatorStart).length > 0;
@@ -130,9 +134,9 @@ function detectLineEnding(content: string): string {
 function hasManagedBlockHeader(content: string, start: number): boolean {
   const afterStart = content.slice(start + OPENCLAW_REPOSITORY_CONTEXT_START.length);
   return (
-    afterStart.startsWith(`\n${OPENCLAW_REPOSITORY_CONTEXT_HEADER}`)
-    || afterStart.startsWith(`\r\n${OPENCLAW_REPOSITORY_CONTEXT_HEADER}`)
-    || afterStart.startsWith(`\r${OPENCLAW_REPOSITORY_CONTEXT_HEADER}`)
+    afterStart.startsWith(`\n${OPENCLAW_REPOSITORY_CONTEXT_HEADER}`) ||
+    afterStart.startsWith(`\r\n${OPENCLAW_REPOSITORY_CONTEXT_HEADER}`) ||
+    afterStart.startsWith(`\r${OPENCLAW_REPOSITORY_CONTEXT_HEADER}`)
   );
 }
 
@@ -149,6 +153,8 @@ function findManagedBlockStart(content: string, from: number, before: number): n
 
 function escapeManagedSentinels(content: string): string {
   return content
-    .split(OPENCLAW_REPOSITORY_CONTEXT_START).join('&lt;!-- OPENCLAW_DESKTOP_REPOSITORY_CONTEXT:BEGIN --&gt;')
-    .split(OPENCLAW_REPOSITORY_CONTEXT_END).join('&lt;!-- OPENCLAW_DESKTOP_REPOSITORY_CONTEXT:END --&gt;');
+    .split(OPENCLAW_REPOSITORY_CONTEXT_START)
+    .join('&lt;!-- OPENCLAW_DESKTOP_REPOSITORY_CONTEXT:BEGIN --&gt;')
+    .split(OPENCLAW_REPOSITORY_CONTEXT_END)
+    .join('&lt;!-- OPENCLAW_DESKTOP_REPOSITORY_CONTEXT:END --&gt;');
 }

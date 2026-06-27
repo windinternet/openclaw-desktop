@@ -17,11 +17,13 @@ describe('repository context helpers', () => {
       repoPath: '/Users/deepin/work/repo',
     });
 
-    expect(buildRepositoryContextPayload({
-      binding,
-      agentsMdContent: 'hello',
-      updatedAt: 123456,
-    })).toEqual({
+    expect(
+      buildRepositoryContextPayload({
+        binding,
+        agentsMdContent: 'hello',
+        updatedAt: 123456,
+      }),
+    ).toEqual({
       version: 1,
       instanceId: 'inst-1',
       bindingId: 'repo_inst-1',
@@ -36,11 +38,13 @@ describe('repository context helpers', () => {
     const agentsMdContent = '# AGENTS.md\n\n- 使用中文规则。';
 
     expect(hashRepositoryContextText(agentsMdContent)).toBe('fnv1a-72be57d5');
-    expect(buildRepositoryContextPayload({
-      binding: createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
-      agentsMdContent,
-      updatedAt: 1,
-    }).agentsMdHash).toBe('fnv1a-72be57d5');
+    expect(
+      buildRepositoryContextPayload({
+        binding: createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+        agentsMdContent,
+        updatedAt: 1,
+      }).agentsMdHash,
+    ).toBe('fnv1a-72be57d5');
   });
 
   it('builds a managed repository context block with path, AGENTS.md content, and scope warning', () => {

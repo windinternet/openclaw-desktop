@@ -8,14 +8,14 @@ import type {
 } from './types';
 
 export class GatewayConnectError extends Error {
-  code?: string
-  details?: unknown
+  code?: string;
+  details?: unknown;
 
   constructor(message: string, code?: string, details?: unknown) {
-    super(message)
-    this.name = 'GatewayConnectError'
-    this.code = code
-    this.details = details
+    super(message);
+    this.name = 'GatewayConnectError';
+    this.code = code;
+    this.details = details;
   }
 }
 
@@ -173,7 +173,13 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
     ws.send(JSON.stringify(data));
   }
 
-  function sendConnect(device?: { id: string; publicKey: string; signature: string; signedAt: number; nonce: string }): void {
+  function sendConnect(device?: {
+    id: string;
+    publicKey: string;
+    signature: string;
+    signedAt: number;
+    nonce: string;
+  }): void {
     const auth = token ? { token } : undefined;
     console.log('[GatewayClient] sendConnect:', {
       hasDevice: !!device,
@@ -531,12 +537,10 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
     return testClient
       .connect()
       .then(() =>
-        testClient
-          .request<Record<string, unknown>>('health')
-          .then((result) => {
-            const version = typeof result?.version === 'string' ? result.version : undefined;
-            return { success: true as const, version };
-          }),
+        testClient.request<Record<string, unknown>>('health').then((result) => {
+          const version = typeof result?.version === 'string' ? result.version : undefined;
+          return { success: true as const, version };
+        }),
       )
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : 'Connection failed';

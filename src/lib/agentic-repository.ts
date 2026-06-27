@@ -209,9 +209,10 @@ function normalizeKnowledgeRepositoryMapping(value: unknown, paths: RepositoryPa
     schemaPath: optionalString(value.schemaPath) ?? fallback.schemaPath,
     mapsRoot: optionalString(value.mapsRoot),
     assetsRoot: optionalString(value.assetsRoot),
-    confidence: value.confidence === 'low' || value.confidence === 'medium' || value.confidence === 'high'
-      ? value.confidence
-      : undefined,
+    confidence:
+      value.confidence === 'low' || value.confidence === 'medium' || value.confidence === 'high'
+        ? value.confidence
+        : undefined,
     mappingSource:
       value.mappingSource === 'agent' || value.mappingSource === 'manual' || value.mappingSource === 'fallback'
         ? value.mappingSource
@@ -234,10 +235,12 @@ function normalizeWorkbenchSemanticMapping(value: unknown): WorkbenchSemanticMap
 }
 
 function normalizeWorkbenchSemanticSlots(value: Record<string, unknown>): WorkbenchSemanticSlots {
-  const plans = isRecord(value.plans) ? {
-    active: normalizeSemanticSlot(value.plans.active),
-    completed: normalizeSemanticSlot(value.plans.completed),
-  } : undefined;
+  const plans = isRecord(value.plans)
+    ? {
+        active: normalizeSemanticSlot(value.plans.active),
+        completed: normalizeSemanticSlot(value.plans.completed),
+      }
+    : undefined;
   const normalized: WorkbenchSemanticSlots = {
     inbox: normalizeSemanticSlot(value.inbox),
     current: normalizeSemanticSlot(value.current),
@@ -262,11 +265,15 @@ function normalizeSemanticSlot(value: unknown): SemanticSlot | undefined {
   if (paths.length === 0) return undefined;
   const kind = value.kind === 'document' || value.kind === 'directory' || value.kind === 'mixed' ? value.kind : 'mixed';
   return {
-    label: typeof value.label === 'string' && value.label.trim() ? value.label.trim().slice(0, 80) : 'Workbench section',
+    label:
+      typeof value.label === 'string' && value.label.trim() ? value.label.trim().slice(0, 80) : 'Workbench section',
     paths: paths.slice(0, 20),
     kind,
     confidence: normalizeSemanticConfidence(value.confidence) ?? 'medium',
-    reason: typeof value.reason === 'string' && value.reason.trim() ? value.reason.trim().slice(0, 240) : 'Agent semantic mapping.',
+    reason:
+      typeof value.reason === 'string' && value.reason.trim()
+        ? value.reason.trim().slice(0, 240)
+        : 'Agent semantic mapping.',
   };
 }
 

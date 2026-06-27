@@ -31,7 +31,7 @@ describe('OfficeScene agent labels', () => {
     expect(source).toContain('state.controlledAgentId = selectedAgentId;');
     expect(source).toContain('actor.group.position.copy(nextTarget);');
     expect(source).toContain('MANUAL_AGENT_WALK_SPEED = 5.8');
-    expect(source).toContain('state.cameraMode === \'first-person\'');
+    expect(source).toContain("state.cameraMode === 'first-person'");
     expect(source).toContain('createHitBox(0.92, 1.55, 0.92');
     expect(source).toContain('state.controlledAgentId !== agent.agentId');
     expect(source).toContain('intersectPlane(groundPlane, groundPoint)');
@@ -123,8 +123,8 @@ describe('OfficeScene agent labels', () => {
     expect(source).toContain('stopOfficeAutoFire(state)');
     expect(source).toContain('window.setInterval(() => {');
     expect(source).toContain('window.clearInterval(state.autoFireTimer)');
-    expect(source).toContain('container.addEventListener(\'pointerup\', stopAutoFire)');
-    expect(source).toContain('window.addEventListener(\'blur\', stopAutoFire)');
+    expect(source).toContain("container.addEventListener('pointerup', stopAutoFire)");
+    expect(source).toContain("window.addEventListener('blur', stopAutoFire)");
   });
 
   it('renders richer diagnostic pulse feedback with emitter flash, tracer, and scan pulse', () => {
@@ -138,9 +138,9 @@ describe('OfficeScene agent labels', () => {
     expect(source).toContain('createMuzzleFlash');
     expect(source).toContain('createShotTracer');
     expect(source).toContain('createHitPulse');
-    expect(source).toContain("state.muzzleFlash");
-    expect(source).toContain("state.shotTracer");
-    expect(source).toContain("state.hitPulse");
+    expect(source).toContain('state.muzzleFlash');
+    expect(source).toContain('state.shotTracer');
+    expect(source).toContain('state.hitPulse');
   });
 
   it('billboards combat shield bars toward the active camera every frame', () => {

@@ -80,9 +80,7 @@ describe('Gateway retry state', () => {
     });
     expect(FakeWebSocket.instances).toHaveLength(3);
 
-    await expect(Promise.race([connectPromise, Promise.resolve('still pending')])).resolves.toBe(
-      'still pending',
-    );
+    await expect(Promise.race([connectPromise, Promise.resolve('still pending')])).resolves.toBe('still pending');
     client.disconnect();
   });
 

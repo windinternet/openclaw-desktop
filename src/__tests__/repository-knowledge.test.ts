@@ -63,11 +63,10 @@ describe('repository knowledge', () => {
     const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
       if (relativePath === 'wiki/index.md') return '# Wiki Index\n[Agentic](topics/agentic.md)';
       if (relativePath === 'wiki/log.md') return '# Wiki Log';
-      if (relativePath === 'wiki/topics/agentic.md') return [
-        '# Agentic',
-        '[Matter](../../work/active/matter.md)',
-        '[Output](../../outputs/reports/report.md)',
-      ].join('\n');
+      if (relativePath === 'wiki/topics/agentic.md')
+        return ['# Agentic', '[Matter](../../work/active/matter.md)', '[Output](../../outputs/reports/report.md)'].join(
+          '\n',
+        );
       return '';
     });
     vi.stubGlobal('window', {
@@ -86,9 +85,7 @@ describe('repository knowledge', () => {
       'sources/notes/raw.md',
       'wiki/index.md',
     ]);
-    expect(snapshot.backlinks).toEqual([
-      { sourcePath: 'wiki/index.md', targetPath: 'wiki/topics/agentic.md' },
-    ]);
+    expect(snapshot.backlinks).toEqual([{ sourcePath: 'wiki/index.md', targetPath: 'wiki/topics/agentic.md' }]);
     expect(snapshot.relatedRepositoryLinks).toEqual([
       { sourcePath: 'wiki/topics/agentic.md', targetPath: 'work/active/matter.md', type: 'work' },
       { sourcePath: 'wiki/topics/agentic.md', targetPath: 'outputs/reports/report.md', type: 'output' },
@@ -144,7 +141,8 @@ describe('repository knowledge', () => {
 
   it('does not duplicate nested sources as wiki pages for mapped repositories', async () => {
     const listMarkdown = vi.fn(async (_repoPath: string, directory: string) => {
-      if (directory === '30-knowledge/sources') return [{ path: '30-knowledge/sources/raw.md', name: 'raw.md', size: 20, updatedAt: 3 }];
+      if (directory === '30-knowledge/sources')
+        return [{ path: '30-knowledge/sources/raw.md', name: 'raw.md', size: 20, updatedAt: 3 }];
       if (directory === '30-knowledge') {
         return [
           { path: '30-knowledge/index.md', name: 'index.md', size: 50, updatedAt: 5 },
@@ -228,15 +226,19 @@ describe('repository knowledge', () => {
     const source = readFileSync('src/lib/repository-knowledge.ts', 'utf8');
     const prompt = buildKnowledgeRepositoryMappingPrompt({
       repoPath: '/repo',
-      tree: ['AGENTS.md', 'README.md', '30-knowledge/index.md', '30-knowledge/wiki/topic.md', '30-knowledge/sources/raw.md'],
-      excerpts: [
-        { path: 'AGENTS.md', content: 'sources 是事实源，wiki 是智能体维护的知识层。' },
+      tree: [
+        'AGENTS.md',
+        'README.md',
+        '30-knowledge/index.md',
+        '30-knowledge/wiki/topic.md',
+        '30-knowledge/sources/raw.md',
       ],
+      excerpts: [{ path: 'AGENTS.md', content: 'sources 是事实源，wiki 是智能体维护的知识层。' }],
     });
 
     expect(template).toContain('{{tree}}');
     expect(template).toContain('{{excerpts}}');
-    expect(source).toContain("knowledge-semantic-mapping.md?raw");
+    expect(source).toContain('knowledge-semantic-mapping.md?raw');
     expect(source).toContain('renderPromptTemplate');
     expect(prompt).toContain('LLM 维护的持久 Wiki 知识库');
     expect(prompt).toContain('Raw sources');
@@ -253,26 +255,28 @@ describe('repository knowledge', () => {
   });
 
   it('parses binding-time semantic mapping responses into agent mappings', () => {
-    const parsed = parseKnowledgeRepositoryMappingResponse([
-      '```ai-action',
-      JSON.stringify({
-        version: 1,
-        kind: 'completed',
-        summary: '已识别知识库映射',
-        result: {
-          isKnowledgeRepository: true,
-          confidence: 'high',
-          mapping: {
-            sourceRoot: '30-knowledge/sources',
-            wikiRoot: '30-knowledge/wiki',
-            indexPath: '30-knowledge/index.md',
-            logPath: '30-knowledge/log.md',
-            schemaPath: 'AGENTS.md',
+    const parsed = parseKnowledgeRepositoryMappingResponse(
+      [
+        '```ai-action',
+        JSON.stringify({
+          version: 1,
+          kind: 'completed',
+          summary: '已识别知识库映射',
+          result: {
+            isKnowledgeRepository: true,
+            confidence: 'high',
+            mapping: {
+              sourceRoot: '30-knowledge/sources',
+              wikiRoot: '30-knowledge/wiki',
+              indexPath: '30-knowledge/index.md',
+              logPath: '30-knowledge/log.md',
+              schemaPath: 'AGENTS.md',
+            },
           },
-        },
-      }),
-      '```',
-    ].join('\n'));
+        }),
+        '```',
+      ].join('\n'),
+    );
 
     expect(parsed).toEqual({
       isKnowledgeRepository: true,
@@ -290,9 +294,7 @@ describe('repository knowledge', () => {
   });
 
   it('searches only sources and wiki paths for knowledge queries', async () => {
-    const search = vi.fn(async () => [
-      { path: 'wiki/index.md', line: 1, snippet: 'Agentic Repository' },
-    ]);
+    const search = vi.fn(async () => [{ path: 'wiki/index.md', line: 1, snippet: 'Agentic Repository' }]);
     vi.stubGlobal('window', {
       electronAPI: {
         repository: { search },
@@ -311,8 +313,12 @@ describe('repository knowledge', () => {
   it('classifies knowledge search results by repository area', () => {
     const binding = createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' });
 
-    expect(classifyKnowledgeSearchResult(binding, { path: 'sources/notes/raw.md', line: 1, snippet: 'raw' }).sourceType).toBe('sources');
-    expect(classifyKnowledgeSearchResult(binding, { path: 'wiki/topics/agentic.md', line: 1, snippet: 'wiki' }).sourceType).toBe('wiki');
+    expect(
+      classifyKnowledgeSearchResult(binding, { path: 'sources/notes/raw.md', line: 1, snippet: 'raw' }).sourceType,
+    ).toBe('sources');
+    expect(
+      classifyKnowledgeSearchResult(binding, { path: 'wiki/topics/agentic.md', line: 1, snippet: 'wiki' }).sourceType,
+    ).toBe('wiki');
   });
 
   it('extracts markdown links and finds backlinks', () => {
@@ -320,24 +326,31 @@ describe('repository knowledge', () => {
       'topics/topic.md',
     ]);
 
-    expect(findBacklinks([
-      { path: 'wiki/index.md', content: '[Topic](topics/topic.md)' },
-      { path: 'wiki/other.md', content: '[Other](other.md)' },
-    ], 'topics/topic.md')).toEqual(['wiki/index.md']);
+    expect(
+      findBacklinks(
+        [
+          { path: 'wiki/index.md', content: '[Topic](topics/topic.md)' },
+          { path: 'wiki/other.md', content: '[Other](other.md)' },
+        ],
+        'topics/topic.md',
+      ),
+    ).toEqual(['wiki/index.md']);
   });
 
   it('parses table and list index entries without duplicates', () => {
-    expect(parseKnowledgeIndexEntries({
-      binding: createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
-      indexPath: 'wiki/index.md',
-      markdown: [
-        '| 条目 | 摘要 | 来源 |',
-        '|---|---|---|',
-        '| [Topic](topics/topic.md) | Summary | Source |',
-        '- [Topic](topics/topic.md)',
-        '- [Raw](../sources/raw.md)',
-      ].join('\n'),
-    })).toEqual([
+    expect(
+      parseKnowledgeIndexEntries({
+        binding: createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+        indexPath: 'wiki/index.md',
+        markdown: [
+          '| 条目 | 摘要 | 来源 |',
+          '|---|---|---|',
+          '| [Topic](topics/topic.md) | Summary | Source |',
+          '- [Topic](topics/topic.md)',
+          '- [Raw](../sources/raw.md)',
+        ].join('\n'),
+      }),
+    ).toEqual([
       { title: 'Topic', path: 'wiki/topics/topic.md', kind: 'wiki', summary: 'Summary' },
       { title: 'Raw', path: 'sources/raw.md', kind: 'source', summary: '' },
     ]);
@@ -356,6 +369,6 @@ describe('repository knowledge', () => {
     expect(source).toContain('loadKnowledgeDocumentHistory');
     expect(source).toContain("t('knowledge.gitHistory')");
     expect(source).toContain('buildKnowledgeRewritePrompt');
-    expect(source).toContain("createAiActionRun({");
+    expect(source).toContain('createAiActionRun({');
   });
 });

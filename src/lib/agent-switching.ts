@@ -37,14 +37,9 @@ export function buildAgentHandoffPrompt(targetAgentName: string): string {
 }
 
 export function buildContextualUserMessage(summary: string, userMessage: string): string {
-  return [
-    CONTEXT_SUMMARY_START,
-    summary.trim(),
-    CONTEXT_SUMMARY_END,
-    '',
-    USER_MESSAGE_START,
-    userMessage.trim(),
-  ].join('\n');
+  return [CONTEXT_SUMMARY_START, summary.trim(), CONTEXT_SUMMARY_END, '', USER_MESSAGE_START, userMessage.trim()].join(
+    '\n',
+  );
 }
 
 export function buildRecentTimelineExcerpt(entries: TimelineExcerptEntry[], limit = 20): string {
@@ -55,10 +50,7 @@ export function buildRecentTimelineExcerpt(entries: TimelineExcerptEntry[], limi
     .join('\n');
 }
 
-export function buildSessionsSpawnRequest(
-  rootSessionKey: string,
-  targetAgentId: string,
-): SessionsSpawnInvokeRequest {
+export function buildSessionsSpawnRequest(rootSessionKey: string, targetAgentId: string): SessionsSpawnInvokeRequest {
   return {
     name: 'sessions_spawn',
     sessionKey: rootSessionKey,

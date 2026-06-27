@@ -6,6 +6,24 @@ import tsParser from '@typescript-eslint/parser';
 import reactPlugin from 'eslint-plugin-react';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
 
+const typescriptRecommendedRules = {
+  ...js.configs.recommended.rules,
+  ...tsPlugin.configs.recommended.rules,
+  // TypeScript already validates type-only names such as React, JSX, Electron, and NodeJS.
+  'no-undef': 'off',
+  // The current codebase still uses explicit gateway/IPC payload shapes in a few broad surfaces.
+  '@typescript-eslint/no-explicit-any': 'warn',
+};
+
+const reactHooksRules = {
+  ...reactHooksPlugin.configs.recommended.rules,
+  // These rules target React Compiler readiness. This app is React 18 and does not enable the compiler yet.
+  'react-hooks/immutability': 'off',
+  'react-hooks/preserve-manual-memoization': 'off',
+  'react-hooks/purity': 'off',
+  'react-hooks/set-state-in-effect': 'off',
+};
+
 export default [
   {
     ignores: ['dist/', 'dist-electron/', 'release/', 'node_modules/'],
@@ -28,8 +46,7 @@ export default [
       '@typescript-eslint': tsPlugin,
     },
     rules: {
-      ...js.configs.recommended.rules,
-      ...tsPlugin.configs.recommended.rules,
+      ...typescriptRecommendedRules,
       'no-console': 'warn',
       '@typescript-eslint/no-unused-vars': [
         'error',
@@ -68,10 +85,9 @@ export default [
       },
     },
     rules: {
-      ...js.configs.recommended.rules,
-      ...tsPlugin.configs.recommended.rules,
+      ...typescriptRecommendedRules,
       ...reactPlugin.configs.recommended.rules,
-      ...reactHooksPlugin.configs.recommended.rules,
+      ...reactHooksRules,
       'no-console': 'warn',
       '@typescript-eslint/no-unused-vars': [
         'error',
@@ -103,8 +119,7 @@ export default [
       '@typescript-eslint': tsPlugin,
     },
     rules: {
-      ...js.configs.recommended.rules,
-      ...tsPlugin.configs.recommended.rules,
+      ...typescriptRecommendedRules,
       '@typescript-eslint/no-require-imports': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',

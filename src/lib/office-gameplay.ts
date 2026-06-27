@@ -37,11 +37,7 @@ export const OFFICE_HIT_MESSAGES = [
   '这一下只校验到了仪式感。',
 ];
 
-export const OFFICE_LAST_WORDS = [
-  '等我重启一下钳子驱动。',
-  '缓存没了，甲壳也开始发烫。',
-  '我只是进入了离线检修模式。',
-];
+export const OFFICE_LAST_WORDS = ['等我重启一下钳子驱动。', '缓存没了，甲壳也开始发烫。', '我只是进入了离线检修模式。'];
 
 export const OFFICE_RESPAWN_MESSAGES = [
   '上线，继续处理任务流。',
@@ -61,11 +57,7 @@ export function createOfficeCombatState(now = 0): OfficeCombatState {
   };
 }
 
-export function applyOfficeShot(
-  combat: OfficeCombatState,
-  now: number,
-  random = Math.random,
-): OfficeShotResult {
+export function applyOfficeShot(combat: OfficeCombatState, now: number, random = Math.random): OfficeShotResult {
   if (combat.downedUntil !== null) {
     return {
       combat,

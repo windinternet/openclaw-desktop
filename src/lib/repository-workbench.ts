@@ -99,9 +99,9 @@ export async function loadWorkbenchSnapshot(binding: RepositoryBinding): Promise
   ]);
 
   const planMetadata = await Promise.all(
-    [...activePlans, ...completedPlans].map(async (file) => (
-      parsePlanMetadata(file.path, await repository.readText(binding.repoPath, file.path))
-    )),
+    [...activePlans, ...completedPlans].map(async (file) =>
+      parsePlanMetadata(file.path, await repository.readText(binding.repoPath, file.path)),
+    ),
   );
 
   return {
@@ -165,9 +165,9 @@ async function loadSemanticSections(binding: RepositoryBinding): Promise<Workben
     ['tools', slots.tools],
     ['logs', slots.logs],
   ];
-  const sections = await Promise.all(entries.map(async ([key, slot]) => (
-    slot ? loadSemanticSection(binding, key, slot) : null
-  )));
+  const sections = await Promise.all(
+    entries.map(async ([key, slot]) => (slot ? loadSemanticSection(binding, key, slot) : null)),
+  );
   return sections.filter((section): section is WorkbenchSemanticSection => Boolean(section));
 }
 
@@ -249,7 +249,10 @@ export function deriveProjects(section?: WorkbenchSemanticSection): WorkbenchPro
     .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
 }
 
-export function deriveTaskGroup(id: WorkbenchTaskGroup['id'], section?: WorkbenchSemanticSection): WorkbenchTaskGroup | null {
+export function deriveTaskGroup(
+  id: WorkbenchTaskGroup['id'],
+  section?: WorkbenchSemanticSection,
+): WorkbenchTaskGroup | null {
   if (!section) return null;
   const items = section.documents.flatMap((document) => extractTaskItems(document.content, id, document.path));
   return {

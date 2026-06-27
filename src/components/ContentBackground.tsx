@@ -43,8 +43,7 @@ function ContentBackground() {
           top: -60,
           right: -40,
           borderRadius: '50%',
-          background:
-            'radial-gradient(circle, var(--semi-color-primary) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, var(--semi-color-primary) 0%, transparent 70%)',
           filter: 'blur(100px)',
           opacity: 0.16,
           pointerEvents: 'none',
@@ -61,8 +60,7 @@ function ContentBackground() {
           bottom: -50,
           left: -50,
           borderRadius: '50%',
-          background:
-            'radial-gradient(circle, var(--semi-color-info) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, var(--semi-color-info) 0%, transparent 70%)',
           filter: 'blur(80px)',
           opacity: 0.14,
           pointerEvents: 'none',
@@ -79,10 +77,9 @@ function ContentBackground() {
           top: '35%',
           right: '6%',
           borderRadius: '50%',
-          background:
-            'radial-gradient(circle, var(--semi-color-danger) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, var(--semi-color-danger) 0%, transparent 70%)',
           filter: 'blur(90px)',
-          opacity: 0.10,
+          opacity: 0.1,
           pointerEvents: 'none',
           animation: 'bg-orb-3 20s ease-in-out infinite alternate',
         }}
@@ -95,11 +92,10 @@ function ContentBackground() {
           inset: 0,
           pointerEvents: 'none',
           backgroundImage: PARTICLE_POSITIONS.map(
-            (pos) =>
-              `radial-gradient(2px 2px at ${pos}, var(--semi-color-text-2) 0%, transparent 100%)`,
+            (pos) => `radial-gradient(2px 2px at ${pos}, var(--semi-color-text-2) 0%, transparent 100%)`,
           ).join(', '),
           backgroundRepeat: 'no-repeat',
-          opacity: 0.20,
+          opacity: 0.2,
           animation: 'bg-particles-pulse 8s ease-in-out infinite',
         }}
       />

@@ -175,9 +175,9 @@ export function parseKnowledgeIndexEntries(options: {
 
     const cells = line.includes('|')
       ? line
-        .split('|')
-        .map((cell) => cell.trim())
-        .filter(Boolean)
+          .split('|')
+          .map((cell) => cell.trim())
+          .filter(Boolean)
       : [];
     if (cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell))) continue;
 
@@ -212,14 +212,16 @@ export function buildKnowledgeRewritePrompt(options: {
 }): string {
   const { binding } = options;
   const selected = options.selectedPath || options.sourcePath;
-  const focus = selected ? `当前选中的知识库文件：${selected}` : '当前没有选中文件，请先根据索引和最近资料判断更新对象。';
-  const instruction = options.userInstruction?.trim() || (
-    options.intent === 'digest-source'
+  const focus = selected
+    ? `当前选中的知识库文件：${selected}`
+    : '当前没有选中文件，请先根据索引和最近资料判断更新对象。';
+  const instruction =
+    options.userInstruction?.trim() ||
+    (options.intent === 'digest-source'
       ? '把选中的资料源消化为可复用 Wiki 条目。'
       : options.intent === 'update-selected'
         ? '改写或补全选中的 Wiki 条目，并同步索引与日志。'
-        : '巡检并刷新知识库索引与维护日志。'
-  );
+        : '巡检并刷新知识库索引与维护日志。');
 
   return [
     '你是 OpenClaw Desktop 知识库自动改写助手，目标是维护绑定仓库中的 LLM Wiki。',
@@ -257,10 +259,9 @@ export function buildKnowledgeRepositoryMappingPrompt(options: {
   return renderPromptTemplate(knowledgeSemanticMappingTemplate, {
     repoPath: options.repoPath,
     tree: options.tree.map((item) => `- ${item}`).join('\n') || '- （空）',
-    excerpts: options.excerpts.map((item) => [
-      `--- ${item.path} ---`,
-      item.content.slice(0, 4000),
-    ].join('\n')).join('\n\n') || '（无）',
+    excerpts:
+      options.excerpts.map((item) => [`--- ${item.path} ---`, item.content.slice(0, 4000)].join('\n')).join('\n\n') ||
+      '（无）',
   });
 }
 
@@ -294,13 +295,13 @@ export function parseKnowledgeRepositoryMappingResponse(text: string): Knowledge
   return null;
 }
 
-export async function searchKnowledge(
-  binding: RepositoryBinding,
-  query: string,
-): Promise<RepositorySearchResult[]> {
+export async function searchKnowledge(binding: RepositoryBinding, query: string): Promise<RepositorySearchResult[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
-  const results = await getKnowledgeSearchApi().search(binding.repoPath, trimmed, [binding.knowledge.sourceRoot, binding.knowledge.wikiRoot]);
+  const results = await getKnowledgeSearchApi().search(binding.repoPath, trimmed, [
+    binding.knowledge.sourceRoot,
+    binding.knowledge.wikiRoot,
+  ]);
   return results.map((result) => classifyKnowledgeSearchResult(binding, result));
 }
 
@@ -353,13 +354,8 @@ export function extractMarkdownLinks(markdown: string): string[] {
   return links;
 }
 
-export function findBacklinks(
-  files: Array<{ path: string; content: string }>,
-  targetPath: string,
-): string[] {
-  return files
-    .filter((file) => extractMarkdownLinks(file.content).includes(targetPath))
-    .map((file) => file.path);
+export function findBacklinks(files: Array<{ path: string; content: string }>, targetPath: string): string[] {
+  return files.filter((file) => extractMarkdownLinks(file.content).includes(targetPath)).map((file) => file.path);
 }
 
 export function normalizeRepositoryLink(sourcePath: string, href: string): string | null {
@@ -400,7 +396,10 @@ function cleanMarkdownCell(cell: string): string {
     .trim();
 }
 
-function normalizeMappingResult(value: Record<string, unknown>, confidence?: 'low' | 'medium' | 'high'): KnowledgeRepositoryMapping | null {
+function normalizeMappingResult(
+  value: Record<string, unknown>,
+  confidence?: 'low' | 'medium' | 'high',
+): KnowledgeRepositoryMapping | null {
   const sourceRoot = stringValue(value.sourceRoot);
   const wikiRoot = stringValue(value.wikiRoot);
   const indexPath = stringValue(value.indexPath);

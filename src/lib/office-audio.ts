@@ -24,12 +24,7 @@ type WindowWithAudio = Window & {
   webkitAudioContext?: typeof AudioContext;
 };
 
-export const OFFICE_NPC_YELPS = [
-  '诶，收到诊断。',
-  '钳子驱动重校准。',
-  '日志有点痒。',
-  '这不在任务说明里。',
-];
+export const OFFICE_NPC_YELPS = ['诶，收到诊断。', '钳子驱动重校准。', '日志有点痒。', '这不在任务说明里。'];
 
 let officeAudioContext: BrowserAudioContext | null = null;
 

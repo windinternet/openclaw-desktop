@@ -1,6 +1,6 @@
 # Agentic Repository Workbench 设计
 
-> 状态：设计中
+> 状态：第一版完成，持续打磨
 > 目标：在保留 OpenClaw Desktop 原生控制台定位的基础上，引入仓库化知识库与事务推进系统。
 
 ## 1. 定位

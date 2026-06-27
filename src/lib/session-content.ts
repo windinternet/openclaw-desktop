@@ -426,10 +426,11 @@ export function summarizeToolResultForDisplay(toolResult: unknown, maxLength = 8
     // Plain text output is already useful.
   }
 
-  const singleLine = text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .find(Boolean) ?? '';
+  const singleLine =
+    text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find(Boolean) ?? '';
   const normalized = singleLine.replace(/\s+/g, ' ').trim();
   if (normalized.length <= maxLength) return normalized;
   return `${normalized.slice(0, maxLength)}...`;

@@ -10,7 +10,10 @@ import {
   type RepositoryStatus,
 } from './agentic-repository';
 import { loadInstanceData, saveInstanceDataAwaited } from './local-persistence';
-import { createUnavailableGatewayRepositoryCapabilities, type GatewayRepositoryCapabilities } from './repository-remote-capabilities';
+import {
+  createUnavailableGatewayRepositoryCapabilities,
+  type GatewayRepositoryCapabilities,
+} from './repository-remote-capabilities';
 
 export interface RepositoryInspectDetails {
   pathExists?: boolean;
@@ -43,7 +46,9 @@ export async function loadRepositoryBinding(
     const binding = normalizeRepositoryBinding(stored);
     if (binding) return binding;
 
-    const legacy = normalizeRepositoryBinding(await loadInstanceData<unknown>(instanceId, AGENTIC_REPOSITORY_STORAGE_KEY));
+    const legacy = normalizeRepositoryBinding(
+      await loadInstanceData<unknown>(instanceId, AGENTIC_REPOSITORY_STORAGE_KEY),
+    );
     return legacy?.location === location ? legacy : null;
   }
 
@@ -52,11 +57,7 @@ export async function loadRepositoryBinding(
 }
 
 export async function saveRepositoryBinding(binding: RepositoryBinding): Promise<void> {
-  await saveInstanceDataAwaited(
-    binding.gatewayInstanceId,
-    repositoryBindingStorageKey(binding.location),
-    binding,
-  );
+  await saveInstanceDataAwaited(binding.gatewayInstanceId, repositoryBindingStorageKey(binding.location), binding);
   await saveInstanceDataAwaited(binding.gatewayInstanceId, AGENTIC_REPOSITORY_STORAGE_KEY, binding);
 }
 

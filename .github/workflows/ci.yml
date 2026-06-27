@@ -104,7 +104,7 @@ jobs:
             fi
           }
 
-          check_doc "ARCHITECTURE.md"
+          check_doc "docs/ARCHITECTURE.md"
           check_doc "docs/product-specs"
           check_doc "docs/design-docs"
           check_doc "docs/FRONTEND.md"

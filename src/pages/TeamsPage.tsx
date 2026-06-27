@@ -554,7 +554,10 @@ export default function TeamsPage({ embedded = false, onHeaderActionsChange }: E
             { key: 'Identity Emoji', value: agent.identity?.emoji || '—' },
             { key: 'Identity Avatar', value: agent.identity?.avatar || '—' },
             { key: t('teams.fieldAvatarStatus'), value: agent.identity?.avatarStatus || '—' },
-            { key: t('teams.fieldSource'), value: selectedMember.source === 'gateway' ? t('teams.openclawGateway') : t('teams.localDraft') },
+            {
+              key: t('teams.fieldSource'),
+              value: selectedMember.source === 'gateway' ? t('teams.openclawGateway') : t('teams.localDraft'),
+            },
             { key: t('teams.fieldStatus'), value: getAgentStatusLabel(agent.status) },
             { key: t('teams.fieldSessionCount'), value: String(agent.sessionCount ?? 0) },
             { key: 'Workspace', value: agent.workspace || '—' },
@@ -726,19 +729,22 @@ export default function TeamsPage({ embedded = false, onHeaderActionsChange }: E
     </div>
   );
 
-  const headerActions = useMemo(() => (
-    <Space>
-      <Button icon={<IconRefresh />} onClick={handleRefresh} loading={refreshing}>
-        {t('common.refresh')}
-      </Button>
-      <Button icon={<IconSend />} onClick={() => setComposerModalVisible(true)}>
-        {t('teams.compose')}
-      </Button>
-      <Button icon={<IconPlus />} type="primary" theme="solid" onClick={() => setQuickModalVisible(true)}>
-        {t('teams.createAgent')}
-      </Button>
-    </Space>
-  ), [handleRefresh, refreshing, t]);
+  const headerActions = useMemo(
+    () => (
+      <Space>
+        <Button icon={<IconRefresh />} onClick={handleRefresh} loading={refreshing}>
+          {t('common.refresh')}
+        </Button>
+        <Button icon={<IconSend />} onClick={() => setComposerModalVisible(true)}>
+          {t('teams.compose')}
+        </Button>
+        <Button icon={<IconPlus />} type="primary" theme="solid" onClick={() => setQuickModalVisible(true)}>
+          {t('teams.createAgent')}
+        </Button>
+      </Space>
+    ),
+    [handleRefresh, refreshing, t],
+  );
 
   useEffect(() => {
     if (!embedded) return undefined;
@@ -762,7 +768,9 @@ export default function TeamsPage({ embedded = false, onHeaderActionsChange }: E
             <Title heading={3} style={{ margin: 0 }}>
               {t('teams.title')}
             </Title>
-            <Text type="tertiary">{t('page.teamsDesc')} · {t('teams.subtitle')}</Text>
+            <Text type="tertiary">
+              {t('page.teamsDesc')} · {t('teams.subtitle')}
+            </Text>
           </div>
           {headerActions}
         </div>
@@ -773,7 +781,9 @@ export default function TeamsPage({ embedded = false, onHeaderActionsChange }: E
         <Tag color="green">{t('teams.nGatewayAgents', { count: gatewayAgentCount })}</Tag>
         <Tag color="orange">{t('teams.nPendingProfiles', { count: pendingProfileCount })}</Tag>
         {failedProfileCount > 0 && <Tag color="red">{t('teams.nFailedProfiles', { count: failedProfileCount })}</Tag>}
-        <Tag color={isConnected ? 'green' : 'grey'}>{isConnected ? t('teams.gatewayConnected') : t('teams.gatewayNotConnected')}</Tag>
+        <Tag color={isConnected ? 'green' : 'grey'}>
+          {isConnected ? t('teams.gatewayConnected') : t('teams.gatewayNotConnected')}
+        </Tag>
       </div>
 
       {isLoading ? (

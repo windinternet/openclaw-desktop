@@ -81,11 +81,7 @@ export {
 
 export type { ThemeMode, ThemeColor, SupportedLocale, AppSettings } from './settings-types';
 export { PRESET_THEME_COLORS, DEFAULT_SETTINGS } from './settings-types';
-export type {
-  AssistantReplyGrouping,
-  SessionMessageDisplaySettings,
-  SessionToolCallDisplay,
-} from './session-content';
+export type { AssistantReplyGrouping, SessionMessageDisplaySettings, SessionToolCallDisplay } from './session-content';
 export { DEFAULT_SESSION_MESSAGE_DISPLAY_SETTINGS, normalizeSessionMessageDisplaySettings } from './session-content';
 export type { AgentSwitchStrategy, InstanceAgentSwitchStrategy } from './agent-switch-settings';
 export { resolveAgentSwitchStrategy } from './agent-switch-settings';

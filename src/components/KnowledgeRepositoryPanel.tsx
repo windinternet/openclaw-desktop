@@ -6,7 +6,13 @@ import { useNavigate } from 'react-router-dom';
 import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway, useStore } from '../lib';
 import { upsertAiActionRun } from '../lib/ai-action-run-store';
 import type { RepositoryBinding } from '../lib/agentic-repository';
-import type { KnowledgeDocument, KnowledgeSnapshot, RepositoryGitLogEntry, RepositoryMarkdownFile, RepositorySearchResult } from '../lib/repository-knowledge';
+import type {
+  KnowledgeDocument,
+  KnowledgeSnapshot,
+  RepositoryGitLogEntry,
+  RepositoryMarkdownFile,
+  RepositorySearchResult,
+} from '../lib/repository-knowledge';
 import {
   buildKnowledgeRewritePrompt,
   loadKnowledgeDocumentHistory,
@@ -18,7 +24,15 @@ import MarkdownView from './MarkdownView';
 
 const { Text, Title } = Typography;
 
-export type KnowledgeSection = 'dashboard' | 'entries' | 'wiki' | 'sources' | 'recent' | 'relationships' | 'index' | 'log';
+export type KnowledgeSection =
+  | 'dashboard'
+  | 'entries'
+  | 'wiki'
+  | 'sources'
+  | 'recent'
+  | 'relationships'
+  | 'index'
+  | 'log';
 
 export default function KnowledgeRepositoryPanel({
   binding,
@@ -125,7 +139,9 @@ export default function KnowledgeRepositoryPanel({
             ? t('knowledge.updateSelected')
             : t('knowledge.refreshIndexLog'),
         selectedPath ? selectedPath : '',
-      ].filter(Boolean).join(': ');
+      ]
+        .filter(Boolean)
+        .join(': ');
       const actionRun = createAiActionRun({
         type: 'knowledge_rewrite',
         sourcePage: 'knowledge',
@@ -151,7 +167,8 @@ export default function KnowledgeRepositoryPanel({
         await new Promise((resolve) => setTimeout(resolve, 2000));
         latestRun = await syncAiActionRunWithGateway(activeClient, latestRun);
         await upsertAiActionRun(currentInstanceId, latestRun);
-        if (latestRun.status === 'awaiting_approval' || latestRun.status === 'done' || latestRun.status === 'failed') break;
+        if (latestRun.status === 'awaiting_approval' || latestRun.status === 'done' || latestRun.status === 'failed')
+          break;
       }
 
       Toast.success(t('knowledge.rewriteStarted'));
@@ -170,30 +187,37 @@ export default function KnowledgeRepositoryPanel({
       onClick={() => openFile(file)}
       style={{
         width: '100%',
-        border: selectedDocument?.path === file.path ? '1px solid var(--semi-color-primary)' : '1px solid var(--semi-color-border)',
-        background: selectedDocument?.path === file.path ? 'var(--semi-color-primary-light-default)' : 'var(--semi-color-bg-0)',
+        border:
+          selectedDocument?.path === file.path
+            ? '1px solid var(--semi-color-primary)'
+            : '1px solid var(--semi-color-border)',
+        background:
+          selectedDocument?.path === file.path ? 'var(--semi-color-primary-light-default)' : 'var(--semi-color-bg-0)',
         borderRadius: 6,
         padding: '8px 10px',
         cursor: 'pointer',
         textAlign: 'left',
       }}
     >
-      <Text strong ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>{file.name}</Text>
-      <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>{file.path}</Text>
+      <Text strong ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>
+        {file.name}
+      </Text>
+      <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>
+        {file.path}
+      </Text>
     </button>
   );
 
-  const renderFileList = (files: RepositoryMarkdownFile[], emptyText: string) => (
+  const renderFileList = (files: RepositoryMarkdownFile[], emptyText: string) =>
     files.length > 0 ? (
       <Space vertical align="start" style={{ width: '100%' }}>
         {files.map(renderFileButton)}
       </Space>
     ) : (
       <Empty description={emptyText} />
-    )
-  );
+    );
 
-  const renderEntryList = () => (
+  const renderEntryList = () =>
     snapshot?.indexEntries && snapshot.indexEntries.length > 0 ? (
       <Space vertical align="start" style={{ width: '100%' }}>
         {snapshot.indexEntries.map((entry) => (
@@ -203,8 +227,14 @@ export default function KnowledgeRepositoryPanel({
             onClick={() => void openDocument(entry.path)}
             style={{
               width: '100%',
-              border: selectedDocument?.path === entry.path ? '1px solid var(--semi-color-primary)' : '1px solid var(--semi-color-border)',
-              background: selectedDocument?.path === entry.path ? 'var(--semi-color-primary-light-default)' : 'var(--semi-color-bg-0)',
+              border:
+                selectedDocument?.path === entry.path
+                  ? '1px solid var(--semi-color-primary)'
+                  : '1px solid var(--semi-color-border)',
+              background:
+                selectedDocument?.path === entry.path
+                  ? 'var(--semi-color-primary-light-default)'
+                  : 'var(--semi-color-bg-0)',
               borderRadius: 6,
               padding: '9px 10px',
               cursor: 'pointer',
@@ -217,15 +247,30 @@ export default function KnowledgeRepositoryPanel({
               </Tag>
               <Text strong>{entry.title}</Text>
             </Space>
-            {entry.summary ? <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block', marginTop: 6 }}>{entry.summary}</Text> : null}
-            <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block', marginTop: 4 }}>{entry.path}</Text>
+            {entry.summary ? (
+              <Text
+                type="tertiary"
+                size="small"
+                ellipsis={{ showTooltip: true }}
+                style={{ display: 'block', marginTop: 6 }}
+              >
+                {entry.summary}
+              </Text>
+            ) : null}
+            <Text
+              type="tertiary"
+              size="small"
+              ellipsis={{ showTooltip: true }}
+              style={{ display: 'block', marginTop: 4 }}
+            >
+              {entry.path}
+            </Text>
           </button>
         ))}
       </Space>
     ) : (
       <Empty description={t('common.noData')} />
-    )
-  );
+    );
 
   const renderRelationships = () => {
     const hasRelationships = (snapshot?.backlinks.length ?? 0) + (snapshot?.relatedRepositoryLinks.length ?? 0) > 0;
@@ -251,8 +296,12 @@ export default function KnowledgeRepositoryPanel({
                   textAlign: 'left',
                 }}
               >
-                <Text size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>{link.sourcePath}</Text>
-                <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>{link.targetPath}</Text>
+                <Text size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>
+                  {link.sourcePath}
+                </Text>
+                <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>
+                  {link.targetPath}
+                </Text>
               </button>
             ))}
           </Space>
@@ -275,9 +324,15 @@ export default function KnowledgeRepositoryPanel({
                   textAlign: 'left',
                 }}
               >
-                <Tag size="small" color={link.type === 'work' ? 'orange' : 'purple'}>{link.type}</Tag>
-                <Text size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block', marginTop: 4 }}>{link.sourcePath}</Text>
-                <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>{link.targetPath}</Text>
+                <Tag size="small" color={link.type === 'work' ? 'orange' : 'purple'}>
+                  {link.type}
+                </Tag>
+                <Text size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block', marginTop: 4 }}>
+                  {link.sourcePath}
+                </Text>
+                <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>
+                  {link.targetPath}
+                </Text>
               </button>
             ))}
           </Space>
@@ -312,7 +367,11 @@ export default function KnowledgeRepositoryPanel({
     >
       <Space align="center" style={{ justifyContent: 'space-between', width: '100%', marginBottom: 8 }}>
         <Title heading={5} style={{ margin: 0 }}>
-          {activeSection === 'index' ? t('knowledge.index') : activeSection === 'log' ? t('knowledge.log') : t('knowledge.selectedDocument')}
+          {activeSection === 'index'
+            ? t('knowledge.index')
+            : activeSection === 'log'
+              ? t('knowledge.log')
+              : t('knowledge.selectedDocument')}
         </Title>
         {selectedDocument?.sourceType && activeSection !== 'index' && activeSection !== 'log' && (
           <Tag color={selectedDocument.sourceType === 'sources' ? 'blue' : 'green'}>
@@ -328,8 +387,18 @@ export default function KnowledgeRepositoryPanel({
         <MarkdownView content={snapshot?.logMarkdown ?? ''} />
       ) : selectedDocument ? (
         <>
-          <Text type="tertiary" size="small">{selectedDocument.path}</Text>
-          <div style={{ border: '1px solid var(--semi-color-border)', borderRadius: 8, padding: 12, marginTop: 12, marginBottom: 12 }}>
+          <Text type="tertiary" size="small">
+            {selectedDocument.path}
+          </Text>
+          <div
+            style={{
+              border: '1px solid var(--semi-color-border)',
+              borderRadius: 8,
+              padding: 12,
+              marginTop: 12,
+              marginBottom: 12,
+            }}
+          >
             <Space align="center" style={{ justifyContent: 'space-between', width: '100%', marginBottom: 8 }}>
               <Text strong>{t('knowledge.gitHistory')}</Text>
               {historyLoading && <Spin size="small" />}
@@ -340,15 +409,23 @@ export default function KnowledgeRepositoryPanel({
                   <div key={entry.hash} style={{ width: '100%' }}>
                     <Space align="center" wrap>
                       <Tag color="grey">{entry.shortHash}</Tag>
-                      <Text size="small" type="tertiary">{entry.date}</Text>
-                      <Text size="small" type="tertiary">{entry.author}</Text>
+                      <Text size="small" type="tertiary">
+                        {entry.date}
+                      </Text>
+                      <Text size="small" type="tertiary">
+                        {entry.author}
+                      </Text>
                     </Space>
-                    <Text size="small" style={{ display: 'block', marginTop: 4 }}>{entry.subject}</Text>
+                    <Text size="small" style={{ display: 'block', marginTop: 4 }}>
+                      {entry.subject}
+                    </Text>
                   </div>
                 ))}
               </Space>
             ) : (
-              <Text type="tertiary" size="small">{t('knowledge.gitHistoryEmpty')}</Text>
+              <Text type="tertiary" size="small">
+                {t('knowledge.gitHistoryEmpty')}
+              </Text>
             )}
           </div>
           <MarkdownView content={selectedDocument.content} />
@@ -359,7 +436,7 @@ export default function KnowledgeRepositoryPanel({
     </Card>
   );
 
-  const renderSearchResults = () => (
+  const renderSearchResults = () =>
     results.length > 0 && (
       <Card style={{ width: '100%' }} bodyStyle={{ padding: 12 }}>
         <Text strong>{t('knowledge.searchResults')}</Text>
@@ -380,17 +457,31 @@ export default function KnowledgeRepositoryPanel({
               }}
             >
               <Space align="center">
-                {result.sourceType && <Tag size="small">{result.sourceType === 'sources' ? t('knowledge.sources') : t('knowledge.wiki')}</Tag>}
-                <Text strong size="small">{result.line}</Text>
+                {result.sourceType && (
+                  <Tag size="small">
+                    {result.sourceType === 'sources' ? t('knowledge.sources') : t('knowledge.wiki')}
+                  </Tag>
+                )}
+                <Text strong size="small">
+                  {result.line}
+                </Text>
               </Space>
-              <Text size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block', marginTop: 4 }}>{result.path}</Text>
-              <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block', marginTop: 4 }}>{result.snippet}</Text>
+              <Text size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block', marginTop: 4 }}>
+                {result.path}
+              </Text>
+              <Text
+                type="tertiary"
+                size="small"
+                ellipsis={{ showTooltip: true }}
+                style={{ display: 'block', marginTop: 4 }}
+              >
+                {result.snippet}
+              </Text>
             </button>
           ))}
         </Space>
       </Card>
-    )
-  );
+    );
 
   const renderDashboard = () => {
     const relationshipCount = (snapshot?.backlinks.length ?? 0) + (snapshot?.relatedRepositoryLinks.length ?? 0);
@@ -403,9 +494,19 @@ export default function KnowledgeRepositoryPanel({
     ];
 
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(360px, 0.85fr) minmax(0, 1.15fr)', gap: 16, width: '100%', alignItems: 'start' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(360px, 0.85fr) minmax(0, 1.15fr)',
+          gap: 16,
+          width: '100%',
+          alignItems: 'start',
+        }}
+      >
         <Card bodyStyle={{ minHeight: 460 }}>
-          <Title heading={5} style={{ marginTop: 0 }}>{t('knowledge.dashboard')}</Title>
+          <Title heading={5} style={{ marginTop: 0 }}>
+            {t('knowledge.dashboard')}
+          </Title>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10, marginBottom: 16 }}>
             {stats.map((item) => (
               <div
@@ -418,17 +519,23 @@ export default function KnowledgeRepositoryPanel({
                 }}
               >
                 <Tag color={item.color}>{item.label}</Tag>
-                <Title heading={4} style={{ margin: '8px 0 0' }}>{item.value}</Title>
+                <Title heading={4} style={{ margin: '8px 0 0' }}>
+                  {item.value}
+                </Title>
               </div>
             ))}
           </div>
           <div style={{ borderTop: '1px solid var(--semi-color-border)', paddingTop: 12 }}>
-            <Title heading={6} style={{ marginTop: 0 }}>{t('knowledge.recentUpdates')}</Title>
+            <Title heading={6} style={{ marginTop: 0 }}>
+              {t('knowledge.recentUpdates')}
+            </Title>
             {renderFileList(snapshot?.recentFiles.slice(0, 5) ?? [], t('common.noData'))}
           </div>
         </Card>
         <Card bodyStyle={{ minHeight: 460 }}>
-          <Title heading={5} style={{ marginTop: 0 }}>{hasEntries ? t('knowledge.indexEntries') : t('knowledge.wiki')}</Title>
+          <Title heading={5} style={{ marginTop: 0 }}>
+            {hasEntries ? t('knowledge.indexEntries') : t('knowledge.wiki')}
+          </Title>
           {hasEntries ? renderEntryList() : renderFileList(snapshot?.wiki.slice(0, 8) ?? [], t('knowledge.emptyWiki'))}
         </Card>
       </div>
@@ -458,7 +565,11 @@ export default function KnowledgeRepositoryPanel({
             icon={<IconFile />}
             loading={rewriteLoading}
             disabled={!selectedDocument}
-            onClick={() => void handleKnowledgeRewrite(selectedDocument?.sourceType === 'sources' ? 'digest-source' : 'update-selected')}
+            onClick={() =>
+              void handleKnowledgeRewrite(
+                selectedDocument?.sourceType === 'sources' ? 'digest-source' : 'update-selected',
+              )
+            }
           >
             {t('knowledge.updateSelected')}
           </Button>
@@ -481,66 +592,104 @@ export default function KnowledgeRepositoryPanel({
         </Button>
       </Space>
 
-      {activeSection === 'dashboard' ? renderDashboard() : activeSection === 'index' || activeSection === 'log' ? (
+      {activeSection === 'dashboard' ? (
+        renderDashboard()
+      ) : activeSection === 'index' || activeSection === 'log' ? (
         <>
           {renderSearchResults()}
           {renderReader()}
         </>
       ) : (
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 360px) minmax(0, 1fr)', gap: 16, width: '100%', alignItems: 'start' }}>
-        <Card bodyStyle={{ padding: 0, maxHeight: 'calc(100vh - 300px)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          {!section && (
-            <Tabs
-              activeKey={activeSection}
-              onChange={(key) => setActiveSection(key as KnowledgeSection)}
-              type="button"
-              style={{ padding: '12px 12px 0' }}
-            >
-              <Tabs.TabPane tab={t('knowledge.indexEntries')} itemKey="entries" />
-              <Tabs.TabPane tab={t('knowledge.wiki')} itemKey="wiki" />
-              <Tabs.TabPane tab={t('knowledge.sources')} itemKey="sources" />
-              <Tabs.TabPane tab={t('knowledge.recentUpdates')} itemKey="recent" />
-              <Tabs.TabPane tab={t('knowledge.relationships')} itemKey="relationships" />
-              <Tabs.TabPane tab={t('knowledge.index')} itemKey="index" />
-              <Tabs.TabPane tab={t('knowledge.log')} itemKey="log" />
-            </Tabs>
-          )}
-          {results.length > 0 && (
-            <div style={{ borderTop: '1px solid var(--semi-color-border)', padding: 12, maxHeight: 180, overflow: 'auto' }}>
-              <Text strong>{t('knowledge.searchResults')}</Text>
-              <Space vertical align="start" style={{ width: '100%', marginTop: 8 }}>
-                {results.map((result) => (
-                  <button
-                    key={`${result.path}:${result.line}`}
-                    type="button"
-                    onClick={() => void openDocument(result.path)}
-                    style={{
-                      width: '100%',
-                      border: '1px solid var(--semi-color-border)',
-                      background: 'var(--semi-color-bg-0)',
-                      borderRadius: 6,
-                      padding: '8px 10px',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                    }}
-                  >
-                    <Space align="center">
-                      {result.sourceType && <Tag size="small">{result.sourceType === 'sources' ? t('knowledge.sources') : t('knowledge.wiki')}</Tag>}
-                      <Text strong size="small">{result.line}</Text>
-                    </Space>
-                    <Text size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block', marginTop: 4 }}>{result.path}</Text>
-                    <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block', marginTop: 4 }}>{result.snippet}</Text>
-                  </button>
-                ))}
-              </Space>
-            </div>
-          )}
-          <div style={{ padding: 12, overflow: 'auto' }}>
-            {renderNavigator()}
-          </div>
-        </Card>
-        {renderReader()}
-      </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(300px, 360px) minmax(0, 1fr)',
+            gap: 16,
+            width: '100%',
+            alignItems: 'start',
+          }}
+        >
+          <Card
+            bodyStyle={{
+              padding: 0,
+              maxHeight: 'calc(100vh - 300px)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            {!section && (
+              <Tabs
+                activeKey={activeSection}
+                onChange={(key) => setActiveSection(key as KnowledgeSection)}
+                type="button"
+                style={{ padding: '12px 12px 0' }}
+              >
+                <Tabs.TabPane tab={t('knowledge.indexEntries')} itemKey="entries" />
+                <Tabs.TabPane tab={t('knowledge.wiki')} itemKey="wiki" />
+                <Tabs.TabPane tab={t('knowledge.sources')} itemKey="sources" />
+                <Tabs.TabPane tab={t('knowledge.recentUpdates')} itemKey="recent" />
+                <Tabs.TabPane tab={t('knowledge.relationships')} itemKey="relationships" />
+                <Tabs.TabPane tab={t('knowledge.index')} itemKey="index" />
+                <Tabs.TabPane tab={t('knowledge.log')} itemKey="log" />
+              </Tabs>
+            )}
+            {results.length > 0 && (
+              <div
+                style={{
+                  borderTop: '1px solid var(--semi-color-border)',
+                  padding: 12,
+                  maxHeight: 180,
+                  overflow: 'auto',
+                }}
+              >
+                <Text strong>{t('knowledge.searchResults')}</Text>
+                <Space vertical align="start" style={{ width: '100%', marginTop: 8 }}>
+                  {results.map((result) => (
+                    <button
+                      key={`${result.path}:${result.line}`}
+                      type="button"
+                      onClick={() => void openDocument(result.path)}
+                      style={{
+                        width: '100%',
+                        border: '1px solid var(--semi-color-border)',
+                        background: 'var(--semi-color-bg-0)',
+                        borderRadius: 6,
+                        padding: '8px 10px',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <Space align="center">
+                        {result.sourceType && (
+                          <Tag size="small">
+                            {result.sourceType === 'sources' ? t('knowledge.sources') : t('knowledge.wiki')}
+                          </Tag>
+                        )}
+                        <Text strong size="small">
+                          {result.line}
+                        </Text>
+                      </Space>
+                      <Text size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block', marginTop: 4 }}>
+                        {result.path}
+                      </Text>
+                      <Text
+                        type="tertiary"
+                        size="small"
+                        ellipsis={{ showTooltip: true }}
+                        style={{ display: 'block', marginTop: 4 }}
+                      >
+                        {result.snippet}
+                      </Text>
+                    </button>
+                  ))}
+                </Space>
+              </div>
+            )}
+            <div style={{ padding: 12, overflow: 'auto' }}>{renderNavigator()}</div>
+          </Card>
+          {renderReader()}
+        </div>
       )}
     </Space>
   );

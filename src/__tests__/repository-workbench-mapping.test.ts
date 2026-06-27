@@ -15,7 +15,7 @@ describe('repository workbench semantic mapping', () => {
     expect(template).toContain('只读结构识别');
     expect(template).toContain('{{tree}}');
     expect(template).toContain('{{structureSignals}}');
-    expect(source).toContain("workbench-semantic-mapping.md?raw");
+    expect(source).toContain('workbench-semantic-mapping.md?raw');
     expect(source).toContain('renderPromptTemplate');
   });
 
@@ -49,31 +49,33 @@ describe('repository workbench semantic mapping', () => {
   });
 
   it('parses a completed mapping response', () => {
-    const parsed = parseWorkbenchSemanticMappingResponse([
-      '```ai-action',
-      JSON.stringify({
-        version: 1,
-        kind: 'completed',
-        result: {
-          isWorkbenchRepository: true,
-          confidence: 'high',
-          reason: 'Has work system.',
-          mapping: {
-            mappingSource: 'agent',
-            slots: {
-              current: {
-                label: 'Current',
-                paths: ['10-ops/tasks/now.md'],
-                kind: 'document',
-                confidence: 'high',
-                reason: 'Current work.',
+    const parsed = parseWorkbenchSemanticMappingResponse(
+      [
+        '```ai-action',
+        JSON.stringify({
+          version: 1,
+          kind: 'completed',
+          result: {
+            isWorkbenchRepository: true,
+            confidence: 'high',
+            reason: 'Has work system.',
+            mapping: {
+              mappingSource: 'agent',
+              slots: {
+                current: {
+                  label: 'Current',
+                  paths: ['10-ops/tasks/now.md'],
+                  kind: 'document',
+                  confidence: 'high',
+                  reason: 'Current work.',
+                },
               },
             },
           },
-        },
-      }),
-      '```',
-    ].join('\n'));
+        }),
+        '```',
+      ].join('\n'),
+    );
 
     expect(parsed).toEqual({
       isWorkbenchRepository: true,
@@ -98,57 +100,63 @@ describe('repository workbench semantic mapping', () => {
   });
 
   it('parses completed mapping from a json fenced block when models ignore the ai-action fence label', () => {
-    const parsed = parseWorkbenchSemanticMappingResponse([
-      '识别完成。',
-      '```json',
-      JSON.stringify({
-        version: 1,
-        kind: 'completed',
-        summary: '已识别工作台语义映射',
-        result: {
-          isWorkbenchRepository: true,
-          confidence: 'high',
-          reason: 'Has work system.',
-          mapping: {
-            mappingSource: 'agent',
-            slots: {
-              current: createSlot(['10-ops/tasks/now.md']),
+    const parsed = parseWorkbenchSemanticMappingResponse(
+      [
+        '识别完成。',
+        '```json',
+        JSON.stringify({
+          version: 1,
+          kind: 'completed',
+          summary: '已识别工作台语义映射',
+          result: {
+            isWorkbenchRepository: true,
+            confidence: 'high',
+            reason: 'Has work system.',
+            mapping: {
+              mappingSource: 'agent',
+              slots: {
+                current: createSlot(['10-ops/tasks/now.md']),
+              },
             },
           },
-        },
-      }),
-      '```',
-    ].join('\n'));
+        }),
+        '```',
+      ].join('\n'),
+    );
 
     expect(parsed?.isWorkbenchRepository).toBe(true);
     expect(parsed?.mapping?.slots.current?.paths).toEqual(['10-ops/tasks/now.md']);
   });
 
   it('parses completed mapping when model output has unescaped quotes inside string values', () => {
-    const parsed = parseWorkbenchSemanticMappingResponse([
-      '```ai-action',
-      '{"version":1,"kind":"completed","summary":"已识别工作台语义映射","result":{"isWorkbenchRepository":true,"confidence":"high","reason":"ok","mapping":{"mappingSource":"agent","slots":{"current":{"label":"正在做","paths":["10-ops/tasks/now.md"],"kind":"document","confidence":"high","reason":"now.md 是标准工程看板中的"当前任务"文件"}}}}}',
-      '```',
-    ].join('\n'));
+    const parsed = parseWorkbenchSemanticMappingResponse(
+      [
+        '```ai-action',
+        '{"version":1,"kind":"completed","summary":"已识别工作台语义映射","result":{"isWorkbenchRepository":true,"confidence":"high","reason":"ok","mapping":{"mappingSource":"agent","slots":{"current":{"label":"正在做","paths":["10-ops/tasks/now.md"],"kind":"document","confidence":"high","reason":"now.md 是标准工程看板中的"当前任务"文件"}}}}}',
+        '```',
+      ].join('\n'),
+    );
 
     expect(parsed?.isWorkbenchRepository).toBe(true);
     expect(parsed?.mapping?.slots.current?.reason).toContain('"当前任务"');
   });
 
   it('parses a negative mapping response without a mapping object', () => {
-    const parsed = parseWorkbenchSemanticMappingResponse([
-      '```ai-action',
-      JSON.stringify({
-        version: 1,
-        kind: 'completed',
-        result: {
-          isWorkbenchRepository: false,
-          confidence: 'low',
-          reason: 'Plain code repository.',
-        },
-      }),
-      '```',
-    ].join('\n'));
+    const parsed = parseWorkbenchSemanticMappingResponse(
+      [
+        '```ai-action',
+        JSON.stringify({
+          version: 1,
+          kind: 'completed',
+          result: {
+            isWorkbenchRepository: false,
+            confidence: 'low',
+            reason: 'Plain code repository.',
+          },
+        }),
+        '```',
+      ].join('\n'),
+    );
 
     expect(parsed).toEqual({
       isWorkbenchRepository: false,
@@ -158,91 +166,97 @@ describe('repository workbench semantic mapping', () => {
   });
 
   it('does not fall back to older blocks when the latest parsable block has an invalid mapping', () => {
-    const parsed = parseWorkbenchSemanticMappingResponse([
-      '```ai-action',
-      JSON.stringify({
-        version: 1,
-        kind: 'completed',
-        result: {
-          isWorkbenchRepository: true,
-          confidence: 'high',
-          reason: 'Older valid mapping.',
-          mapping: {
-            mappingSource: 'agent',
-            slots: {
-              current: createSlot(['10-ops/tasks/now.md']),
+    const parsed = parseWorkbenchSemanticMappingResponse(
+      [
+        '```ai-action',
+        JSON.stringify({
+          version: 1,
+          kind: 'completed',
+          result: {
+            isWorkbenchRepository: true,
+            confidence: 'high',
+            reason: 'Older valid mapping.',
+            mapping: {
+              mappingSource: 'agent',
+              slots: {
+                current: createSlot(['10-ops/tasks/now.md']),
+              },
             },
           },
-        },
-      }),
-      '```',
-      '```ai-action',
-      JSON.stringify({
-        version: 1,
-        kind: 'completed',
-        result: {
-          isWorkbenchRepository: true,
-          confidence: 'high',
-          reason: 'Latest block is structurally invalid.',
-          mapping: {
-            mappingSource: 'agent',
+        }),
+        '```',
+        '```ai-action',
+        JSON.stringify({
+          version: 1,
+          kind: 'completed',
+          result: {
+            isWorkbenchRepository: true,
+            confidence: 'high',
+            reason: 'Latest block is structurally invalid.',
+            mapping: {
+              mappingSource: 'agent',
+            },
           },
-        },
-      }),
-      '```',
-    ].join('\n'));
+        }),
+        '```',
+      ].join('\n'),
+    );
 
     expect(parsed).toBeNull();
   });
 
   it('returns null when the latest parsable block omits isWorkbenchRepository', () => {
-    const parsed = parseWorkbenchSemanticMappingResponse([
-      '```ai-action',
-      JSON.stringify({
-        version: 1,
-        kind: 'completed',
-        result: {
-          confidence: 'low',
-          reason: 'Missing repository classification.',
-        },
-      }),
-      '```',
-    ].join('\n'));
+    const parsed = parseWorkbenchSemanticMappingResponse(
+      [
+        '```ai-action',
+        JSON.stringify({
+          version: 1,
+          kind: 'completed',
+          result: {
+            confidence: 'low',
+            reason: 'Missing repository classification.',
+          },
+        }),
+        '```',
+      ].join('\n'),
+    );
 
     expect(parsed).toBeNull();
   });
 
   it('parses the latest valid block when older ai-action blocks are negative or invalid', () => {
-    const parsed = parseWorkbenchSemanticMappingResponse([
-      '```ai-action',
-      JSON.stringify({
-        version: 1,
-        kind: 'completed',
-        result: {
-          isWorkbenchRepository: false,
-          confidence: 'low',
-          reason: 'Older negative result.',
-        },
-      }),
-      '```',
-      '```ai-action',
-      JSON.stringify({
-        version: 1,
-        kind: 'completed',
-        result: {
-          isWorkbenchRepository: true,
-          confidence: 'medium',
-          reason: 'Latest valid result.',
-          mapping: {
-            mappingSource: 'agent',
-            slots: {
-              current: createSlot(['20-projects/demo/README.md']),
+    const parsed = parseWorkbenchSemanticMappingResponse(
+      [
+        '```ai-action',
+        JSON.stringify({
+          version: 1,
+          kind: 'completed',
+          result: {
+            isWorkbenchRepository: false,
+            confidence: 'low',
+            reason: 'Older negative result.',
+          },
+        }),
+        '```',
+        '```ai-action',
+        JSON.stringify({
+          version: 1,
+          kind: 'completed',
+          result: {
+            isWorkbenchRepository: true,
+            confidence: 'medium',
+            reason: 'Latest valid result.',
+            mapping: {
+              mappingSource: 'agent',
+              slots: {
+                current: createSlot(['20-projects/demo/README.md']),
+              },
             },
           },
-        },
-      }),
-      '```',
-    ].join('\n'));
+        }),
+        '```',
+      ].join('\n'),
+    );
 
     expect(parsed?.isWorkbenchRepository).toBe(true);
     expect(parsed?.reason).toBe('Latest valid result.');

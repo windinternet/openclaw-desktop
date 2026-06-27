@@ -135,7 +135,13 @@ function createBox(
   depth: number,
   color: string,
   position: THREE.Vector3Tuple,
-  options: { opacity?: number; roughness?: number; metalness?: number; emissive?: string; emissiveIntensity?: number } = {},
+  options: {
+    opacity?: number;
+    roughness?: number;
+    metalness?: number;
+    emissive?: string;
+    emissiveIntensity?: number;
+  } = {},
 ): THREE.Mesh {
   const material = new THREE.MeshStandardMaterial({
     color,
@@ -159,7 +165,14 @@ function createCylinder(
   height: number,
   color: string,
   position: THREE.Vector3Tuple,
-  options: { radialSegments?: number; opacity?: number; roughness?: number; metalness?: number; emissive?: string; emissiveIntensity?: number } = {},
+  options: {
+    radialSegments?: number;
+    opacity?: number;
+    roughness?: number;
+    metalness?: number;
+    emissive?: string;
+    emissiveIntensity?: number;
+  } = {},
 ): THREE.Mesh {
   const material = new THREE.MeshStandardMaterial({
     color,
@@ -231,13 +244,34 @@ function createInsetFloorPanel(
   panel.renderOrder = 2;
   panel.receiveShadow = true;
   panel.name = 'office-inset-floor-panel-surface';
-  const rim = createBox(width + 0.08, 0.025, depth + 0.08, theme.scene.floorGrid, [position[0], position[1] - 0.006, position[2]], {
-    opacity: theme.mode === 'light' ? 0.18 : 0.34,
-    roughness: 0.72,
-  });
+  const rim = createBox(
+    width + 0.08,
+    0.025,
+    depth + 0.08,
+    theme.scene.floorGrid,
+    [position[0], position[1] - 0.006, position[2]],
+    {
+      opacity: theme.mode === 'light' ? 0.18 : 0.34,
+      roughness: 0.72,
+    },
+  );
   shadow.name = 'office-inset-floor-panel-shadow';
-  const frontGlow = createGlowBox(width * 0.88, 0.018, 0.045, theme.scene.zoneBorder, [position[0], position[1] + 0.055, position[2] - depth / 2 + 0.05], theme.mode === 'light' ? 0.18 : 0.32);
-  const sideGlow = createGlowBox(0.045, 0.018, depth * 0.82, theme.scene.screen, [position[0] - width / 2 + 0.05, position[1] + 0.055, position[2]], theme.mode === 'light' ? 0.16 : 0.28);
+  const frontGlow = createGlowBox(
+    width * 0.88,
+    0.018,
+    0.045,
+    theme.scene.zoneBorder,
+    [position[0], position[1] + 0.055, position[2] - depth / 2 + 0.05],
+    theme.mode === 'light' ? 0.18 : 0.32,
+  );
+  const sideGlow = createGlowBox(
+    0.045,
+    0.018,
+    depth * 0.82,
+    theme.scene.screen,
+    [position[0] - width / 2 + 0.05, position[1] + 0.055, position[2]],
+    theme.mode === 'light' ? 0.16 : 0.28,
+  );
   group.add(shadow, rim, panel, frontGlow, sideGlow);
   return group;
 }
@@ -367,7 +401,9 @@ function createCrosshair(theme: OfficeTheme): THREE.Sprite {
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false }));
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false }),
+  );
   sprite.scale.set(44, 44, 1);
   sprite.visible = false;
   sprite.renderOrder = 1000;
@@ -395,7 +431,9 @@ function createHitHint(theme: OfficeTheme): THREE.Sprite {
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false }));
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false }),
+  );
   sprite.scale.set(260, 54, 1);
   sprite.visible = false;
   sprite.renderOrder = 1000;
@@ -473,12 +511,14 @@ function createMuzzleFlash(theme: OfficeTheme): THREE.Sprite {
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: texture,
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  }));
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
   sprite.name = 'office-muzzle-flash';
   sprite.scale.set(0.42, 0.42, 1);
   sprite.renderOrder = 40;
@@ -575,12 +615,7 @@ function createGlowBox(
   return mesh;
 }
 
-function createWallLightStrip(
-  width: number,
-  color: string,
-  position: THREE.Vector3Tuple,
-  opacity: number,
-): THREE.Mesh {
+function createWallLightStrip(width: number, color: string, position: THREE.Vector3Tuple, opacity: number): THREE.Mesh {
   return createGlowBox(width, 0.08, 0.035, color, position, opacity);
 }
 
@@ -627,11 +662,18 @@ function createOperationsFloorRoutes(theme: OfficeTheme): THREE.Group {
     [4.95, 2.2],
     [-1.25, -4.45],
   ].forEach(([x, z], index) => {
-    const node = createCylinder(0.12, 0.12, 0.03, index % 2 === 0 ? theme.scene.screen : theme.scene.accent, [x, 0.065, z], {
-      radialSegments: 18,
-      opacity: 0.72,
-      roughness: 0.16,
-    });
+    const node = createCylinder(
+      0.12,
+      0.12,
+      0.03,
+      index % 2 === 0 ? theme.scene.screen : theme.scene.accent,
+      [x, 0.065, z],
+      {
+        radialSegments: 18,
+        opacity: 0.72,
+        roughness: 0.16,
+      },
+    );
     node.name = 'office-operations-route-node';
     node.rotation.x = Math.PI / 2;
     group.add(node);
@@ -654,33 +696,47 @@ function createClawEmblem(theme: OfficeTheme): THREE.Group {
   return group;
 }
 
-
-
-
-const CLEANER_WAYPOINTS: {x: number; z: number}[] = [
-  {x: -8.0, z: 4.5}, {x: -5.0, z: 5.5}, {x: -2.0, z: 5.0},
-  {x: 2.0, z: 5.0}, {x: 6.0, z: 4.8}, {x: 6.0, z: 2.5},
-  {x: 6.0, z: 0.5}, {x: 3.0, z: 0.5}, {x: -1.0, z: 0.8},
-  {x: -4.0, z: 1.5}, {x: -7.0, z: 3.0}, {x: -8.0, z: 4.5},
+const CLEANER_WAYPOINTS: { x: number; z: number }[] = [
+  { x: -8.0, z: 4.5 },
+  { x: -5.0, z: 5.5 },
+  { x: -2.0, z: 5.0 },
+  { x: 2.0, z: 5.0 },
+  { x: 6.0, z: 4.8 },
+  { x: 6.0, z: 2.5 },
+  { x: 6.0, z: 0.5 },
+  { x: 3.0, z: 0.5 },
+  { x: -1.0, z: 0.8 },
+  { x: -4.0, z: 1.5 },
+  { x: -7.0, z: 3.0 },
+  { x: -8.0, z: 4.5 },
 ];
 
 function createInteractPrompt(theme: OfficeTheme): THREE.Sprite {
   const c = document.createElement('canvas');
-  c.width = 120; c.height = 56;
+  c.width = 120;
+  c.height = 56;
   const ctx = c.getContext('2d');
   if (ctx) {
     ctx.fillStyle = theme.mode === 'light' ? 'rgba(255,255,255,0.92)' : 'rgba(30,41,59,0.92)';
     ctx.strokeStyle = theme.scene.accent;
     ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.roundRect(4, 4, 112, 48, 12); ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.roundRect(4, 4, 112, 48, 12);
+    ctx.fill();
+    ctx.stroke();
     ctx.fillStyle = theme.scene.accent;
     ctx.font = '700 26px system-ui, sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     ctx.fillText('[F] \u4e92\u52a8', 60, 28);
   }
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthTest: false, depthWrite: false }));
-  s.scale.set(0.55, 0.26, 1); s.visible = false;
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: t, transparent: true, depthTest: false, depthWrite: false }),
+  );
+  s.scale.set(0.55, 0.26, 1);
+  s.visible = false;
   s.renderOrder = 999;
   return s;
 }
@@ -700,15 +756,22 @@ const REACTION_MESSAGES = [
 
 function showSpeechBubble(scene: THREE.Scene, text: string, theme: OfficeTheme, position: THREE.Vector3): void {
   const existing = scene.getObjectByName('speech-bubble-active');
-  if (existing) { scene.remove(existing); (existing as THREE.Sprite).material.map?.dispose(); (existing as THREE.Sprite).material.dispose(); }
+  if (existing) {
+    scene.remove(existing);
+    (existing as THREE.Sprite).material.map?.dispose();
+    (existing as THREE.Sprite).material.dispose();
+  }
   const bubble = createSpeechBubble(text, theme);
   bubble.name = 'speech-bubble-active';
   bubble.position.copy(position);
   scene.add(bubble);
-  setTimeout(() => { scene.remove(bubble); bubble.material.map?.dispose(); bubble.material.dispose(); }, 6000);
+  setTimeout(() => {
+    scene.remove(bubble);
+    bubble.material.map?.dispose();
+    bubble.material.dispose();
+  }, 6000);
 }
 
-// @ts-ignore -- used in F handlers
 const INTERACTION_MESSAGES = [
   '\u4f60\u597d\uff01\u9700\u8981\u5e2e\u5fd9\u5417\uff1f',
   '\u55e8\uff5e',
@@ -773,7 +836,9 @@ function createSpeechBubble(text: string, theme: OfficeTheme): THREE.Sprite {
   ctx.font = `500 ${fontSize}px system-ui, -apple-system, sans-serif`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  lines.forEach((line, i) => { ctx.fillText(line, padding, padding + i * lineHeight); });
+  lines.forEach((line, i) => {
+    ctx.fillText(line, padding, padding + i * lineHeight);
+  });
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true }));
@@ -862,11 +927,7 @@ function updateLoungeActivityProp(actor: ActorState, theme: OfficeTheme): void {
   }
 }
 
-function createCrayfishSegment(
-  color: string,
-  position: THREE.Vector3Tuple,
-  scale: THREE.Vector3Tuple,
-): THREE.Mesh {
+function createCrayfishSegment(color: string, position: THREE.Vector3Tuple, scale: THREE.Vector3Tuple): THREE.Mesh {
   const segment = new THREE.Mesh(
     new THREE.SphereGeometry(0.22, 18, 12),
     new THREE.MeshStandardMaterial({
@@ -1214,7 +1275,9 @@ function createFloorLamp(x: number, z: number, theme: OfficeTheme): THREE.Group 
   const shade = theme.mode === 'light' ? '#fde68a' : '#f59e0b';
   lamp.add(createCylinder(0.08, 0.12, 0.1, theme.scene.wall, [x, 0.05, z], { radialSegments: 14, roughness: 0.55 }));
   lamp.add(createCylinder(0.035, 0.035, 1.05, theme.scene.trim, [x, 0.58, z], { radialSegments: 10, roughness: 0.28 }));
-  lamp.add(createCylinder(0.26, 0.36, 0.3, shade, [x, 1.22, z], { radialSegments: 18, opacity: 0.82, roughness: 0.36 }));
+  lamp.add(
+    createCylinder(0.26, 0.36, 0.3, shade, [x, 1.22, z], { radialSegments: 18, opacity: 0.82, roughness: 0.36 }),
+  );
   return lamp;
 }
 
@@ -1287,7 +1350,10 @@ function createTaskFlowSandTable(theme: OfficeTheme): THREE.Group {
     opacity: 0.72,
   });
   for (let index = 0; index < points.length - 1; index += 1) {
-    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([points[index], points[index + 1]]), lineMaterial);
+    const line = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([points[index], points[index + 1]]),
+      lineMaterial,
+    );
     line.name = 'office-task-flow-route';
     group.add(line);
   }
@@ -1352,9 +1418,7 @@ function createScene(container: HTMLDivElement, theme: OfficeTheme, companyName:
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(theme.scene.background);
-  scene.fog = theme.mode === 'dark'
-    ? new THREE.Fog(theme.scene.fog, 24, 54)
-    : null;
+  scene.fog = theme.mode === 'dark' ? new THREE.Fog(theme.scene.fog, 24, 54) : null;
 
   // Overlay scene for HUD elements (interact prompt)
   const overlayScene = new THREE.Scene();
@@ -1363,7 +1427,10 @@ function createScene(container: HTMLDivElement, theme: OfficeTheme, companyName:
   const thirdPersonCamera = new THREE.OrthographicCamera(-7, 7, 5, -5, 0.1, 120);
   const firstPersonCamera = new THREE.PerspectiveCamera(64, 1, 0.05, 90);
 
-  const ambient = new THREE.AmbientLight(theme.mode === 'light' ? '#c7d2fe' : '#dbeafe', theme.mode === 'light' ? 1.05 : 1.4);
+  const ambient = new THREE.AmbientLight(
+    theme.mode === 'light' ? '#c7d2fe' : '#dbeafe',
+    theme.mode === 'light' ? 1.05 : 1.4,
+  );
   scene.add(ambient);
 
   const keyLight = new THREE.DirectionalLight('#fff3e8', 2.85);
@@ -1430,27 +1497,42 @@ function createScene(container: HTMLDivElement, theme: OfficeTheme, companyName:
   };
   applyCameraControl(state, container);
   // Create NPC actors + visual aids (interact ring/glow/prompt)
-  const receptionActor = createCrayfishOperator({
-    agentId: 'office-receptionist', name: '\u524d\u53f0', status: 'online', zone: 'lounge',
-    behavior: 'listening', color: theme.scene.accent,
-    position: { x: -1.25, y: OFFICE_AGENT_GROUND_Y, z: -5.3 },
-  }, theme);
+  const receptionActor = createCrayfishOperator(
+    {
+      agentId: 'office-receptionist',
+      name: '\u524d\u53f0',
+      status: 'online',
+      zone: 'lounge',
+      behavior: 'listening',
+      color: theme.scene.accent,
+      position: { x: -1.25, y: OFFICE_AGENT_GROUND_Y, z: -5.3 },
+    },
+    theme,
+  );
   receptionActor.group.scale.setScalar(0.68);
   receptionActor.isNpc = true;
   state.actors.set('office-receptionist', receptionActor);
   scene.add(receptionActor.group);
 
-  const cleanerActor = createCrayfishOperator({
-    agentId: 'office-cleaner', name: '\u6e05\u6d01\u5de5', status: 'online', zone: 'lounge',
-    behavior: 'resting', color: '#60a5fa',
-    position: { x: -8.0, y: OFFICE_AGENT_GROUND_Y, z: 4.5 },
-  }, theme);
+  const cleanerActor = createCrayfishOperator(
+    {
+      agentId: 'office-cleaner',
+      name: '\u6e05\u6d01\u5de5',
+      status: 'online',
+      zone: 'lounge',
+      behavior: 'resting',
+      color: '#60a5fa',
+      position: { x: -8.0, y: OFFICE_AGENT_GROUND_Y, z: 4.5 },
+    },
+    theme,
+  );
   cleanerActor.group.scale.setScalar(0.72);
   cleanerActor.isNpc = true;
   const mopMat = new THREE.MeshStandardMaterial({ color: '#8B4513', roughness: 0.7 });
   const headMat = new THREE.MeshStandardMaterial({ color: '#E8E0D0', roughness: 0.9 });
   const mopStick = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.5, 6), mopMat);
-  mopStick.position.set(0.38, 0.32, 0.05); mopStick.rotation.x = 0.15;
+  mopStick.position.set(0.38, 0.32, 0.05);
+  mopStick.rotation.x = 0.15;
   cleanerActor.activityProp.add(mopStick);
   const mopHead = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, 0.12), headMat);
   mopHead.position.set(0.38, 0.06, 0.05);
@@ -1460,15 +1542,29 @@ function createScene(container: HTMLDivElement, theme: OfficeTheme, companyName:
 
   // Interact ring
   const ringGeo = new THREE.TorusGeometry(0.5, 0.035, 8, 32);
-  const ringMat = new THREE.MeshStandardMaterial({ color: theme.scene.accent, emissive: theme.scene.accent, emissiveIntensity: 0.5, transparent: true, opacity: 0.7 });
+  const ringMat = new THREE.MeshStandardMaterial({
+    color: theme.scene.accent,
+    emissive: theme.scene.accent,
+    emissiveIntensity: 0.5,
+    transparent: true,
+    opacity: 0.7,
+  });
   const ring = new THREE.Mesh(ringGeo, ringMat);
-  ring.rotation.x = Math.PI / 2; ring.visible = false; scene.add(ring);
+  ring.rotation.x = Math.PI / 2;
+  ring.visible = false;
+  scene.add(ring);
   state.interactRing = ring;
 
   // Body glow
-  const glowMat = new THREE.MeshBasicMaterial({ color: theme.scene.accent, transparent: true, opacity: 0.12, side: THREE.BackSide });
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: theme.scene.accent,
+    transparent: true,
+    opacity: 0.12,
+    side: THREE.BackSide,
+  });
   const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 1.8, 16, 1), glowMat);
-  glow.visible = false; scene.add(glow);
+  glow.visible = false;
+  scene.add(glow);
   state.bodyGlow = glow;
 
   const interactSprite = createInteractPrompt(theme);
@@ -1557,7 +1653,13 @@ function disposeShotEffects(state: SceneState): void {
   state.hitPoint = null;
 }
 
-function showShotBeam(state: SceneState, start: THREE.Vector3, end: THREE.Vector3, theme: OfficeTheme, now: number): void {
+function showShotBeam(
+  state: SceneState,
+  start: THREE.Vector3,
+  end: THREE.Vector3,
+  theme: OfficeTheme,
+  now: number,
+): void {
   disposeShotEffects(state);
 
   const tracer = createShotTracer(start, end, theme);
@@ -1596,9 +1698,7 @@ function handleOfficeShot(state: SceneState, container: HTMLDivElement): boolean
   const fallbackEnd = origin.clone().add(state.raycaster.ray.direction.clone().multiplyScalar(8));
   const hits = state.raycaster.intersectObjects(state.scene.children, true);
   const agentId = resolveOfficeShotTarget(hits, state.actors, state.controlledAgentId);
-  const hit = agentId
-    ? hits.find((item) => item.object.userData.agentId === agentId)
-    : undefined;
+  const hit = agentId ? hits.find((item) => item.object.userData.agentId === agentId) : undefined;
   const theme = state.currentTheme;
   const end = hit?.point ?? fallbackEnd;
 
@@ -1717,8 +1817,16 @@ function resetCameraControl(state: SceneState, container: HTMLDivElement): void 
       prevActor.manualWalking = false;
       prevActor.target.copy(prevActor.group.position);
       if (state.currentTheme) {
-        showSpeechBubble(state.scene, REACTION_MESSAGES[Math.floor(Math.random() * REACTION_MESSAGES.length)], state.currentTheme, new THREE.Vector3(prevActor.group.position.x, prevActor.group.position.y + 1.8, prevActor.group.position.z));
-        setTimeout(() => { prevActor.isPlayerControlled = false; prevActor.nextLeisureDecisionAt = 0; }, 6500);
+        showSpeechBubble(
+          state.scene,
+          REACTION_MESSAGES[Math.floor(Math.random() * REACTION_MESSAGES.length)],
+          state.currentTheme,
+          new THREE.Vector3(prevActor.group.position.x, prevActor.group.position.y + 1.8, prevActor.group.position.z),
+        );
+        setTimeout(() => {
+          prevActor.isPlayerControlled = false;
+          prevActor.nextLeisureDecisionAt = 0;
+        }, 6500);
       }
     }
   }
@@ -1777,7 +1885,11 @@ function moveSelectedActorFromKeys(state: SceneState, selectedAgentId: string | 
     if (selectedAgentId && actor.agent.agentId !== selectedAgentId && !actor.isNpc) {
       actor.manualWalking = false;
     }
-    if (actor.agent.agentId !== selectedAgentId && actor.nextLeisureDecisionAt === Number.POSITIVE_INFINITY && !actor.isNpc) {
+    if (
+      actor.agent.agentId !== selectedAgentId &&
+      actor.nextLeisureDecisionAt === Number.POSITIVE_INFINITY &&
+      !actor.isNpc
+    ) {
       actor.nextLeisureDecisionAt = 0;
     }
   });
@@ -1795,7 +1907,11 @@ function moveSelectedActorFromKeys(state: SceneState, selectedAgentId: string | 
   actor.isPlayerControlled = true;
   // Always face camera direction via direct Y rotation (avoids lookAt quirk)
   actor.group.rotation.y = state.cameraControl.azimuth + Math.PI;
-  const cameraForward = new THREE.Vector3(-Math.sin(state.cameraControl.azimuth), 0, -Math.cos(state.cameraControl.azimuth));
+  const cameraForward = new THREE.Vector3(
+    -Math.sin(state.cameraControl.azimuth),
+    0,
+    -Math.cos(state.cameraControl.azimuth),
+  );
   actor.lastMoveDirection.copy(cameraForward);
   actor.target.copy(actor.group.position); // keep target synced
 
@@ -1823,7 +1939,7 @@ function applyFirstPersonCamera(state: SceneState, container: HTMLDivElement, ac
   eye.y = actor.group.position.y + 0.96;
   const fwd = new THREE.Vector3(-Math.sin(state.cameraControl.azimuth), 0, -Math.cos(state.cameraControl.azimuth));
   eye.addScaledVector(fwd, 0.24);
-  
+
   // Look direction from camera azimuth/elevation
   const lookDir = new THREE.Vector3(
     -Math.sin(state.cameraControl.azimuth) * Math.cos(state.cameraControl.elevation),
@@ -1931,11 +2047,7 @@ function chooseNextLeisureTarget(actor: ActorState, time: number): THREE.Vector3
   for (let attempt = 0; attempt < 14; attempt += 1) {
     const angle = seed + attempt * 2.399963229728653;
     const distance = wanderScale * (0.45 + (attempt % 4) * 0.18);
-    const target = new THREE.Vector3(
-      base.x + Math.cos(angle) * distance,
-      base.y,
-      base.z + Math.sin(angle) * distance,
-    );
+    const target = new THREE.Vector3(base.x + Math.cos(angle) * distance, base.y, base.z + Math.sin(angle) * distance);
     clampFreeRoamVector(target);
     if (!isFreeRoamPointBlocked(target.x, target.z, 0.04)) return target;
   }
@@ -2064,7 +2176,12 @@ function animateActor(actor: ActorState, time: number, delta: number, selected: 
       actor.jumpVelocity = 0;
     }
   }
-  if (!actor.isPlayerControlled && isLeisureActor(actor) && time >= actor.nextLeisureDecisionAt && actor.group.position.distanceTo(actor.target) < 0.08) {
+  if (
+    !actor.isPlayerControlled &&
+    isLeisureActor(actor) &&
+    time >= actor.nextLeisureDecisionAt &&
+    actor.group.position.distanceTo(actor.target) < 0.08
+  ) {
     actor.target.copy(chooseNextLeisureTarget(actor, time));
     actor.nextLeisureDecisionAt = time + 3200 + Math.abs(Math.sin(actor.phase)) * 4200;
   }
@@ -2168,10 +2285,13 @@ function handleSceneClick(
   const groundPoint = new THREE.Vector3();
   const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -OFFICE_AGENT_GROUND_Y);
   state.raycaster.ray.intersectPlane(groundPlane, groundPoint);
-  const nearestAgentId = resolveNearestOfficeControlTarget(Array.from(state.actors.values()).map((actor) => {
-    const distance = Math.hypot(actor.group.position.x - groundPoint.x, actor.group.position.z - groundPoint.z);
-    return { agentId: actor.agent.agentId, actor, distance };
-  }), 1.45);
+  const nearestAgentId = resolveNearestOfficeControlTarget(
+    Array.from(state.actors.values()).map((actor) => {
+      const distance = Math.hypot(actor.group.position.x - groundPoint.x, actor.group.position.z - groundPoint.z);
+      return { agentId: actor.agent.agentId, actor, distance };
+    }),
+    1.45,
+  );
   onSelectAgent(nearestAgentId);
 }
 
@@ -2184,7 +2304,8 @@ export default function OfficeScene({
   selectedAgentId,
   onSelectAgent,
   onSceneError,
-  receptionMessage,}: OfficeSceneProps) {
+  receptionMessage,
+}: OfficeSceneProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const onSelectRef = useRef(onSelectAgent);
   const onSceneErrorRef = useRef(onSceneError);
@@ -2200,7 +2321,13 @@ export default function OfficeScene({
     [disconnected],
   );
 
-  useEffect(() => { agentsRef.current = agents; onSelectRef.current = onSelectAgent; onSceneErrorRef.current = onSceneError; receptionInfoRef.current = receptionMessage ?? ''; themeRef.current = theme; });
+  useEffect(() => {
+    agentsRef.current = agents;
+    onSelectRef.current = onSelectAgent;
+    onSceneErrorRef.current = onSceneError;
+    receptionInfoRef.current = receptionMessage ?? '';
+    themeRef.current = theme;
+  });
   useEffect(() => {
     agentsRef.current = agents;
     const state = stateRef.current;
@@ -2237,7 +2364,17 @@ export default function OfficeScene({
       const resizeObserver = new ResizeObserver(() => resizeScene(state, container));
       resizeObserver.observe(container);
 
-      const showBubble = () => { const r = state.actors.get('office-receptionist'); if (r) showSpeechBubble(state.scene, receptionInfoRef.current || '\u6b22\u8fce\uff01', themeRef.current, new THREE.Vector3(r.group.position.x, r.group.position.y + 1.8, r.group.position.z)); else showReceptionBubble(state, receptionInfoRef.current || '\u6b22\u8fce\uff01', themeRef.current); };
+      const showBubble = () => {
+        const r = state.actors.get('office-receptionist');
+        if (r)
+          showSpeechBubble(
+            state.scene,
+            receptionInfoRef.current || '\u6b22\u8fce\uff01',
+            themeRef.current,
+            new THREE.Vector3(r.group.position.x, r.group.position.y + 1.8, r.group.position.z),
+          );
+        else showReceptionBubble(state, receptionInfoRef.current || '\u6b22\u8fce\uff01', themeRef.current);
+      };
       const stopAutoFire = () => stopOfficeAutoFire(state);
       const onPointerDown = (event: PointerEvent) => {
         if (event.button === 0 && handleOfficeShot(state, container)) {
@@ -2273,9 +2410,10 @@ export default function OfficeScene({
           // FPS: compute azimuth/elevation directly with full range
           const sens = 0.003;
           state.cameraControl.azimuth = Number((state.cameraControl.azimuth - event.movementX * sens).toFixed(4));
-          state.cameraControl.elevation = Math.max(-1.4, Math.min(1.4,
-            Number((state.cameraControl.elevation - event.movementY * sens).toFixed(4))
-          ));
+          state.cameraControl.elevation = Math.max(
+            -1.4,
+            Math.min(1.4, Number((state.cameraControl.elevation - event.movementY * sens).toFixed(4))),
+          );
           return;
         }
         // Third-person mode: original drag behavior
@@ -2321,16 +2459,22 @@ export default function OfficeScene({
           }
           return;
         }
-                if (key === 'f') {
+        if (key === 'f') {
           event.preventDefault();
           const targetId = state.interactTargetId;
           if (targetId && state.currentTheme) {
             const actor = state.actors.get(targetId);
             if (actor && actor.combat.downedUntil === null) {
-              const msg = targetId === 'office-receptionist'
-                ? (receptionInfoRef.current || '\u6b22\u8fce\uff01')
-                : INTERACTION_MESSAGES[Math.floor(Math.random() * INTERACTION_MESSAGES.length)];
-              showSpeechBubble(state.scene, msg, state.currentTheme, new THREE.Vector3(actor.group.position.x, actor.group.position.y + 1.8, actor.group.position.z));
+              const msg =
+                targetId === 'office-receptionist'
+                  ? receptionInfoRef.current || '\u6b22\u8fce\uff01'
+                  : INTERACTION_MESSAGES[Math.floor(Math.random() * INTERACTION_MESSAGES.length)];
+              showSpeechBubble(
+                state.scene,
+                msg,
+                state.currentTheme,
+                new THREE.Vector3(actor.group.position.x, actor.group.position.y + 1.8, actor.group.position.z),
+              );
             }
           }
           return;
@@ -2376,16 +2520,22 @@ export default function OfficeScene({
           }
           return;
         }
-                if (event.key.toLowerCase() === 'f') {
+        if (event.key.toLowerCase() === 'f') {
           event.preventDefault();
           const targetId = state.interactTargetId;
           if (targetId && state.currentTheme) {
             const actor = state.actors.get(targetId);
             if (actor && actor.combat.downedUntil === null) {
-              const msg = targetId === 'office-receptionist'
-                ? (receptionInfoRef.current || '\u6b22\u8fce\uff01')
-                : INTERACTION_MESSAGES[Math.floor(Math.random() * INTERACTION_MESSAGES.length)];
-              showSpeechBubble(state.scene, msg, state.currentTheme, new THREE.Vector3(actor.group.position.x, actor.group.position.y + 1.8, actor.group.position.z));
+              const msg =
+                targetId === 'office-receptionist'
+                  ? receptionInfoRef.current || '\u6b22\u8fce\uff01'
+                  : INTERACTION_MESSAGES[Math.floor(Math.random() * INTERACTION_MESSAGES.length)];
+              showSpeechBubble(
+                state.scene,
+                msg,
+                state.currentTheme,
+                new THREE.Vector3(actor.group.position.x, actor.group.position.y + 1.8, actor.group.position.z),
+              );
             }
           }
           return;
@@ -2447,83 +2597,101 @@ export default function OfficeScene({
           enforceActorGrounding(actor);
         });
         try {
-        // Cleaner NPC waypoint movement
-        const cl = state.actors.get('office-cleaner');
-        if (cl && cl.isNpc && cl.combat.downedUntil === null) {
-          const cwp = CLEANER_WAYPOINTS;
-          const ct = cwp[state.cleanerWaypointIndex];
-          const cdx = ct.x - cl.group.position.x;
-          const cdz = ct.z - cl.group.position.z;
-          const cdist = Math.hypot(cdx, cdz);
-          if (cdist < 0.06) {
-            state.cleanerWaypointIndex = (state.cleanerWaypointIndex + 1) % cwp.length;
-            cl.group.lookAt(cwp[state.cleanerWaypointIndex].x, cl.group.position.y, cwp[state.cleanerWaypointIndex].z);
-          } else {
-            const cst = Math.min(1, 0.008);
-            cl.group.position.x += (cdx / cdist) * cst;
-            cl.group.position.z += (cdz / cdist) * cst;
-            cl.group.lookAt(ct.x, cl.group.position.y, ct.z);
-          }
-        }
-        // Interaction detection (read-only, visual updates only)
-        if (state.interactPrompt && state.interactRing && state.bodyGlow) {
-          const pp = state.cameraMode === 'first-person' && state.controlledAgentId
-            ? (state.actors.get(state.controlledAgentId)?.group.position ?? new THREE.Vector3(state.cameraControl.target.x, OFFICE_AGENT_GROUND_Y, state.cameraControl.target.z))
-            : new THREE.Vector3(state.cameraControl.target.x, OFFICE_AGENT_GROUND_Y, state.cameraControl.target.z);
-          const az = state.cameraControl.azimuth;
-          const cd = new THREE.Vector3(-Math.sin(az), 0, -Math.cos(az));
-          const cr = new THREE.Vector3(Math.cos(az), 0, -Math.sin(az));
-          const cu = new THREE.Vector3(0, 1, 0);
-          const bl = 3.2; const bw = 1.6; const bh = 2.2;
-          const bc = pp.clone().add(cd.clone().multiplyScalar(bl / 2));
-          let tgt: ActorState | null = null;
-          state.actors.forEach((a) => {
-            if (a.combat.downedUntil !== null) return;
-            const ta = a.group.position.clone().sub(bc);
-            if (ta.dot(cd) <= 0 || ta.dot(cd) >= bl) return;
-            if (Math.abs(ta.dot(cr)) >= bw / 2) return;
-            if (Math.abs(ta.dot(cu)) >= bh / 2) return;
-            tgt = a;
-          });
-          if (tgt) {
-            state.interactTargetId = (tgt as ActorState).agent.agentId;
-            const tp = (tgt as ActorState).group.position;
-            state.interactRing.position.set(tp.x, OFFICE_AGENT_GROUND_Y + 0.04, tp.z);
-            state.interactRing.visible = true;
-            (state.interactRing.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.3 + Math.abs(Math.sin(now * 0.003)) * 0.3;
-            state.bodyGlow.position.set(tp.x, tp.y + 0.8, tp.z);
-            state.bodyGlow.visible = true;
-            // Prompt sprite: fixed HUD position at bottom-center of screen
-            state.interactPrompt.position.set(state.overlayCamera.right / 2, state.overlayCamera.top * 0.08, 0);
-            // Canvas texture (no sprite disposal)
-            if ((state.interactPrompt.material as THREE.SpriteMaterial).map) (state.interactPrompt.material as THREE.SpriteMaterial).map!.dispose();
-            const cv = document.createElement('canvas');
-            cv.width = 300; cv.height = 56;
-            const cx = cv.getContext('2d');
-            if (cx && themeRef.current) {
-              const th = themeRef.current;
-              cx.fillStyle = th.mode === 'light' ? 'rgba(255,255,255,0.92)' : 'rgba(15,23,42,0.92)';
-              cx.strokeStyle = th.scene.accent; cx.lineWidth = 2;
-              cx.beginPath(); cx.roundRect(4, 4, 292, 48, 12); cx.fill(); cx.stroke();
-              cx.fillStyle = th.scene.accent;
-              cx.font = '600 18px system-ui, sans-serif';
-              cx.textAlign = 'center'; cx.textBaseline = 'middle';
-              cx.fillText('\u6309F\u4e0e' + (tgt as ActorState).agent.name + '\u4e92\u52a8', 150, 28);
+          // Cleaner NPC waypoint movement
+          const cl = state.actors.get('office-cleaner');
+          if (cl && cl.isNpc && cl.combat.downedUntil === null) {
+            const cwp = CLEANER_WAYPOINTS;
+            const ct = cwp[state.cleanerWaypointIndex];
+            const cdx = ct.x - cl.group.position.x;
+            const cdz = ct.z - cl.group.position.z;
+            const cdist = Math.hypot(cdx, cdz);
+            if (cdist < 0.06) {
+              state.cleanerWaypointIndex = (state.cleanerWaypointIndex + 1) % cwp.length;
+              cl.group.lookAt(
+                cwp[state.cleanerWaypointIndex].x,
+                cl.group.position.y,
+                cwp[state.cleanerWaypointIndex].z,
+              );
+            } else {
+              const cst = Math.min(1, 0.008);
+              cl.group.position.x += (cdx / cdist) * cst;
+              cl.group.position.z += (cdz / cdist) * cst;
+              cl.group.lookAt(ct.x, cl.group.position.y, ct.z);
             }
-            const ntex = new THREE.CanvasTexture(cv);
-            ntex.colorSpace = THREE.SRGBColorSpace;
-            (state.interactPrompt.material as THREE.SpriteMaterial).map = ntex;
-            state.interactPrompt.scale.set(300, 56, 1);
-            (state.interactPrompt.material as THREE.SpriteMaterial).needsUpdate = true;
-            state.interactPrompt.visible = true;
-          } else {
-            state.interactTargetId = null;
-            state.interactRing.visible = false;
-            state.bodyGlow.visible = false;
-            state.interactPrompt.visible = false;
           }
+          // Interaction detection (read-only, visual updates only)
+          if (state.interactPrompt && state.interactRing && state.bodyGlow) {
+            const pp =
+              state.cameraMode === 'first-person' && state.controlledAgentId
+                ? (state.actors.get(state.controlledAgentId)?.group.position ??
+                  new THREE.Vector3(state.cameraControl.target.x, OFFICE_AGENT_GROUND_Y, state.cameraControl.target.z))
+                : new THREE.Vector3(state.cameraControl.target.x, OFFICE_AGENT_GROUND_Y, state.cameraControl.target.z);
+            const az = state.cameraControl.azimuth;
+            const cd = new THREE.Vector3(-Math.sin(az), 0, -Math.cos(az));
+            const cr = new THREE.Vector3(Math.cos(az), 0, -Math.sin(az));
+            const cu = new THREE.Vector3(0, 1, 0);
+            const bl = 3.2;
+            const bw = 1.6;
+            const bh = 2.2;
+            const bc = pp.clone().add(cd.clone().multiplyScalar(bl / 2));
+            let tgt: ActorState | null = null;
+            state.actors.forEach((a) => {
+              if (a.combat.downedUntil !== null) return;
+              const ta = a.group.position.clone().sub(bc);
+              if (ta.dot(cd) <= 0 || ta.dot(cd) >= bl) return;
+              if (Math.abs(ta.dot(cr)) >= bw / 2) return;
+              if (Math.abs(ta.dot(cu)) >= bh / 2) return;
+              tgt = a;
+            });
+            if (tgt) {
+              state.interactTargetId = (tgt as ActorState).agent.agentId;
+              const tp = (tgt as ActorState).group.position;
+              state.interactRing.position.set(tp.x, OFFICE_AGENT_GROUND_Y + 0.04, tp.z);
+              state.interactRing.visible = true;
+              (state.interactRing.material as THREE.MeshStandardMaterial).emissiveIntensity =
+                0.3 + Math.abs(Math.sin(now * 0.003)) * 0.3;
+              state.bodyGlow.position.set(tp.x, tp.y + 0.8, tp.z);
+              state.bodyGlow.visible = true;
+              // Prompt sprite: fixed HUD position at bottom-center of screen
+              state.interactPrompt.position.set(state.overlayCamera.right / 2, state.overlayCamera.top * 0.08, 0);
+              // Canvas texture (no sprite disposal)
+              if ((state.interactPrompt.material as THREE.SpriteMaterial).map)
+                (state.interactPrompt.material as THREE.SpriteMaterial).map!.dispose();
+              const cv = document.createElement('canvas');
+              cv.width = 300;
+              cv.height = 56;
+              const cx = cv.getContext('2d');
+              if (cx && themeRef.current) {
+                const th = themeRef.current;
+                cx.fillStyle = th.mode === 'light' ? 'rgba(255,255,255,0.92)' : 'rgba(15,23,42,0.92)';
+                cx.strokeStyle = th.scene.accent;
+                cx.lineWidth = 2;
+                cx.beginPath();
+                cx.roundRect(4, 4, 292, 48, 12);
+                cx.fill();
+                cx.stroke();
+                cx.fillStyle = th.scene.accent;
+                cx.font = '600 18px system-ui, sans-serif';
+                cx.textAlign = 'center';
+                cx.textBaseline = 'middle';
+                cx.fillText('\u6309F\u4e0e' + (tgt as ActorState).agent.name + '\u4e92\u52a8', 150, 28);
+              }
+              const ntex = new THREE.CanvasTexture(cv);
+              ntex.colorSpace = THREE.SRGBColorSpace;
+              (state.interactPrompt.material as THREE.SpriteMaterial).map = ntex;
+              state.interactPrompt.scale.set(300, 56, 1);
+              (state.interactPrompt.material as THREE.SpriteMaterial).needsUpdate = true;
+              state.interactPrompt.visible = true;
+            } else {
+              state.interactTargetId = null;
+              state.interactRing.visible = false;
+              state.bodyGlow.visible = false;
+              state.interactPrompt.visible = false;
+            }
+          }
+        } catch {
+          /* interaction/cleaner errors silently ignored */
         }
-        } catch (e) { /* interaction/cleaner errors silently ignored */ }
         resolveActorCollisions(state.actors);
         const selectedActor = selectedRef.current ? state.actors.get(selectedRef.current) : null;
         if (selectedActor) {
@@ -2573,12 +2741,6 @@ export default function OfficeScene({
   }, [companyName, theme]);
 
   return (
-    <div
-      ref={containerRef}
-      className={sceneClassName}
-      data-office-theme={theme.mode}
-      role="application"
-      tabIndex={0}
-    />
+    <div ref={containerRef} className={sceneClassName} data-office-theme={theme.mode} role="application" tabIndex={0} />
   );
 }

@@ -47,11 +47,13 @@ describe('desktop node commands', () => {
       updatedAt: 1,
     });
 
-    await expect(handleDesktopNodeCommand('desktop.artifacts.create', {
-      title: '报告',
-      type: 'report',
-      html: '<!doctype html><html><body>ok</body></html>',
-    })).resolves.toEqual({
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.create', {
+        title: '报告',
+        type: 'report',
+        html: '<!doctype html><html><body>ok</body></html>',
+      }),
+    ).resolves.toEqual({
       ok: true,
       artifact: {
         id: 'art_1',
@@ -60,12 +62,14 @@ describe('desktop node commands', () => {
       },
     });
 
-    expect(mockedArtifactService.generate).toHaveBeenCalledWith(expect.objectContaining({
-      title: '报告',
-      type: 'report',
-      html: '<!doctype html><html><body>ok</body></html>',
-      source: { type: 'mcp_tool', name: 'desktop.artifacts.create' },
-    }));
+    expect(mockedArtifactService.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: '报告',
+        type: 'report',
+        html: '<!doctype html><html><body>ok</body></html>',
+        source: { type: 'mcp_tool', name: 'desktop.artifacts.create' },
+      }),
+    );
   });
 
   it('mirrors legacy artifact creation into repository outputs when repoPath is provided', async () => {
@@ -87,13 +91,15 @@ describe('desktop node commands', () => {
       previewPath: 'outputs/html/art_legacy.html',
     });
 
-    await expect(handleDesktopNodeCommand('desktop.artifacts.create', {
-      repoPath: '/repo',
-      gatewayInstanceId: 'inst-1',
-      title: '旧产物',
-      type: 'report',
-      html: '<html>legacy</html>',
-    })).resolves.toEqual({
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.create', {
+        repoPath: '/repo',
+        gatewayInstanceId: 'inst-1',
+        title: '旧产物',
+        type: 'report',
+        html: '<html>legacy</html>',
+      }),
+    ).resolves.toEqual({
       ok: true,
       artifact: {
         id: 'art_legacy',
@@ -107,11 +113,13 @@ describe('desktop node commands', () => {
       },
     });
 
-    expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(expect.objectContaining({
-      html: '<html>legacy</html>',
-      artifact: expect.objectContaining({ id: 'art_legacy' }),
-      binding: expect.objectContaining({ repoPath: '/repo', gatewayInstanceId: 'inst-1' }),
-    }));
+    expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(
+      expect.objectContaining({
+        html: '<html>legacy</html>',
+        artifact: expect.objectContaining({ id: 'art_legacy' }),
+        binding: expect.objectContaining({ repoPath: '/repo', gatewayInstanceId: 'inst-1' }),
+      }),
+    );
   });
 
   it('creates a repository output while preserving artifact compatibility', async () => {
@@ -133,12 +141,14 @@ describe('desktop node commands', () => {
       previewPath: 'outputs/html/art_2.html',
     });
 
-    await expect(handleDesktopNodeCommand('desktop.outputs.create', {
-      repoPath: '/repo',
-      title: '成果',
-      type: 'report',
-      html: '<html>ok</html>',
-    })).resolves.toEqual({
+    await expect(
+      handleDesktopNodeCommand('desktop.outputs.create', {
+        repoPath: '/repo',
+        title: '成果',
+        type: 'report',
+        html: '<html>ok</html>',
+      }),
+    ).resolves.toEqual({
       ok: true,
       artifact: {
         id: 'art_2',
@@ -152,11 +162,13 @@ describe('desktop node commands', () => {
       },
     });
 
-    expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(expect.objectContaining({
-      html: '<html>ok</html>',
-      artifact: expect.objectContaining({ id: 'art_2' }),
-      binding: expect.objectContaining({ repoPath: '/repo' }),
-    }));
+    expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(
+      expect.objectContaining({
+        html: '<html>ok</html>',
+        artifact: expect.objectContaining({ id: 'art_2' }),
+        binding: expect.objectContaining({ repoPath: '/repo' }),
+      }),
+    );
   });
 
   it('opens a repository output through the compatible artifact window', async () => {
@@ -174,9 +186,11 @@ describe('desktop node commands', () => {
     });
     mockedArtifactPersistence.openWindow.mockResolvedValue(1);
 
-    await expect(handleDesktopNodeCommand('desktop.outputs.open', {
-      artifactId: 'art_2',
-    })).resolves.toEqual({
+    await expect(
+      handleDesktopNodeCommand('desktop.outputs.open', {
+        artifactId: 'art_2',
+      }),
+    ).resolves.toEqual({
       ok: true,
       artifactId: 'art_2',
     });
@@ -205,12 +219,14 @@ describe('desktop node commands', () => {
       previewPath: 'outputs/html/art_2.html',
     });
 
-    await expect(handleDesktopNodeCommand('desktop.outputs.update', {
-      repoPath: '/repo',
-      artifactId: 'art_2',
-      title: '成果 v2',
-      tags: ['repo'],
-    })).resolves.toEqual({
+    await expect(
+      handleDesktopNodeCommand('desktop.outputs.update', {
+        repoPath: '/repo',
+        artifactId: 'art_2',
+        title: '成果 v2',
+        tags: ['repo'],
+      }),
+    ).resolves.toEqual({
       ok: true,
       artifactId: 'art_2',
       output: {
@@ -220,15 +236,20 @@ describe('desktop node commands', () => {
       },
     });
 
-    expect(mockedArtifactService.update).toHaveBeenCalledWith('art_2', expect.objectContaining({
-      title: '成果 v2',
-      tags: ['repo'],
-    }));
-    expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(expect.objectContaining({
-      artifact,
-      html: '<html>v2</html>',
-      binding: expect.objectContaining({ repoPath: '/repo' }),
-    }));
+    expect(mockedArtifactService.update).toHaveBeenCalledWith(
+      'art_2',
+      expect.objectContaining({
+        title: '成果 v2',
+        tags: ['repo'],
+      }),
+    );
+    expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(
+      expect.objectContaining({
+        artifact,
+        html: '<html>v2</html>',
+        binding: expect.objectContaining({ repoPath: '/repo' }),
+      }),
+    );
   });
 
   it('appends and mirrors a repository output through artifact compatibility', async () => {
@@ -252,11 +273,13 @@ describe('desktop node commands', () => {
       previewPath: 'outputs/html/art_2.html',
     });
 
-    await expect(handleDesktopNodeCommand('desktop.outputs.append', {
-      repoPath: '/repo',
-      artifactId: 'art_2',
-      htmlChunk: '<section>more</section>',
-    })).resolves.toEqual({
+    await expect(
+      handleDesktopNodeCommand('desktop.outputs.append', {
+        repoPath: '/repo',
+        artifactId: 'art_2',
+        htmlChunk: '<section>more</section>',
+      }),
+    ).resolves.toEqual({
       ok: true,
       artifactId: 'art_2',
       output: {
@@ -267,11 +290,13 @@ describe('desktop node commands', () => {
     });
 
     expect(mockedArtifactService.append).toHaveBeenCalledWith('art_2', '<section>more</section>');
-    expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(expect.objectContaining({
-      artifact,
-      html: '<html>v2</html>',
-      binding: expect.objectContaining({ repoPath: '/repo' }),
-    }));
+    expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(
+      expect.objectContaining({
+        artifact,
+        html: '<html>v2</html>',
+        binding: expect.objectContaining({ repoPath: '/repo' }),
+      }),
+    );
   });
 
   it('handles structured repository read and search commands', async () => {
@@ -286,20 +311,24 @@ describe('desktop node commands', () => {
       },
     });
 
-    await expect(handleDesktopNodeCommand('desktop.repository.read', {
-      repoPath: '/repo',
-      path: 'wiki/index.md',
-    })).resolves.toEqual({
+    await expect(
+      handleDesktopNodeCommand('desktop.repository.read', {
+        repoPath: '/repo',
+        path: 'wiki/index.md',
+      }),
+    ).resolves.toEqual({
       ok: true,
       path: 'wiki/index.md',
       content: '# Index',
     });
 
-    await expect(handleDesktopNodeCommand('desktop.repository.search', {
-      repoPath: '/repo',
-      query: 'Index',
-      directories: ['wiki'],
-    })).resolves.toEqual({
+    await expect(
+      handleDesktopNodeCommand('desktop.repository.search', {
+        repoPath: '/repo',
+        query: 'Index',
+        directories: ['wiki'],
+      }),
+    ).resolves.toEqual({
       ok: true,
       results: [{ path: 'wiki/index.md', line: 1, snippet: 'Index' }],
     });
@@ -317,13 +346,15 @@ describe('desktop node commands', () => {
       hasRequiredTemplate: true,
       permissionDenied: false,
     }));
-    const gitLog = vi.fn(async () => [{
-      hash: 'abcdef',
-      shortHash: 'abcdef',
-      date: '2026-06-25',
-      author: 'OpenClaw',
-      subject: 'Update knowledge page',
-    }]);
+    const gitLog = vi.fn(async () => [
+      {
+        hash: 'abcdef',
+        shortHash: 'abcdef',
+        date: '2026-06-25',
+        author: 'OpenClaw',
+        subject: 'Update knowledge page',
+      },
+    ]);
     const gitCommit = vi.fn(async () => 'abc123 Initial repository state');
     vi.stubGlobal('window', {
       electronAPI: {
@@ -335,9 +366,11 @@ describe('desktop node commands', () => {
       },
     });
 
-    await expect(handleDesktopNodeCommand('desktop.repository.init', {
-      repoPath: '/repo',
-    })).resolves.toEqual({
+    await expect(
+      handleDesktopNodeCommand('desktop.repository.init', {
+        repoPath: '/repo',
+      }),
+    ).resolves.toEqual({
       ok: true,
       details: {
         pathExists: true,
@@ -349,25 +382,31 @@ describe('desktop node commands', () => {
       },
     });
 
-    await expect(handleDesktopNodeCommand('desktop.repository.git.log', {
-      repoPath: '/repo',
-      path: 'wiki/topic.md',
-      limit: 5,
-    })).resolves.toEqual({
+    await expect(
+      handleDesktopNodeCommand('desktop.repository.git.log', {
+        repoPath: '/repo',
+        path: 'wiki/topic.md',
+        limit: 5,
+      }),
+    ).resolves.toEqual({
       ok: true,
-      commits: [{
-        hash: 'abcdef',
-        shortHash: 'abcdef',
-        date: '2026-06-25',
-        author: 'OpenClaw',
-        subject: 'Update knowledge page',
-      }],
+      commits: [
+        {
+          hash: 'abcdef',
+          shortHash: 'abcdef',
+          date: '2026-06-25',
+          author: 'OpenClaw',
+          subject: 'Update knowledge page',
+        },
+      ],
     });
 
-    await expect(handleDesktopNodeCommand('desktop.repository.git.commit', {
-      repoPath: '/repo',
-      message: 'Initial repository state',
-    })).resolves.toEqual({
+    await expect(
+      handleDesktopNodeCommand('desktop.repository.git.commit', {
+        repoPath: '/repo',
+        message: 'Initial repository state',
+      }),
+    ).resolves.toEqual({
       ok: true,
       commit: 'abc123 Initial repository state',
     });
@@ -392,14 +431,16 @@ describe('desktop node commands', () => {
       },
     });
 
-    await expect(handleDesktopNodeCommand('desktop.repository.session-summary.write', {
-      repoPath: '/repo',
-      sessionKey: 'agent:main:demo',
-      title: '需求梳理会话',
-      summary: '明确了 Repository Workbench 的推进方向。',
-      highlights: ['保留 OpenClaw 原生定位', '产物迁移到 outputs'],
-      artifacts: ['outputs/reports/art_1.md'],
-    })).resolves.toEqual({
+    await expect(
+      handleDesktopNodeCommand('desktop.repository.session-summary.write', {
+        repoPath: '/repo',
+        sessionKey: 'agent:main:demo',
+        title: '需求梳理会话',
+        summary: '明确了 Repository Workbench 的推进方向。',
+        highlights: ['保留 OpenClaw 原生定位', '产物迁移到 outputs'],
+        artifacts: ['outputs/reports/art_1.md'],
+      }),
+    ).resolves.toEqual({
       ok: true,
       path: 'runs/session-summaries/agent-main-demo.md',
     });
@@ -417,10 +458,12 @@ describe('desktop node commands', () => {
   });
 
   it('rejects artifact create without title or html', async () => {
-    await expect(handleDesktopNodeCommand('desktop.artifacts.create', {
-      title: '',
-      html: '',
-    })).resolves.toMatchObject({
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.create', {
+        title: '',
+        html: '',
+      }),
+    ).resolves.toMatchObject({
       ok: false,
       error: 'invalid-params',
     });

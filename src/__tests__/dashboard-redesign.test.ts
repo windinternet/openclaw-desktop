@@ -17,14 +17,14 @@ describe('dashboard redesign', () => {
     expect(newSession).toContain('<NewSessionComposer');
     expect(dashboard).not.toContain('NewSessionComposer');
     expect(dashboard).not.toContain('dashboard-floating-composer');
-    expect(dashboard).not.toContain("activeClient.request<{ key?: string; sessionKey?: string }>");
+    expect(dashboard).not.toContain('activeClient.request<{ key?: string; sessionKey?: string }>');
   });
 
   it('keeps the dashboard useful when Gateway is disconnected instead of replacing the page with Empty', () => {
     const dashboard = readFileSync('src/pages/DashboardPage.tsx', 'utf8');
 
     expect(dashboard).not.toContain('!isConnected ? (');
-    expect(dashboard).not.toContain('<Empty description={t(\'dashboard.notConnected\')} />');
+    expect(dashboard).not.toContain("<Empty description={t('dashboard.notConnected')} />");
     expect(dashboard).toContain('renderGatewayStatusSection');
     expect(dashboard).toContain('renderUsageSection');
     expect(dashboard).toContain('renderRecentAssetsSection');
@@ -85,19 +85,33 @@ describe('dashboard redesign', () => {
     const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
     const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
 
-    expect(dashboard).toContain("import { ActivityTrendChart, ModelUsageBarChart, StatusDistributionChart, TokenCompositionChart } from '../components/charts/DashboardVisualCharts'");
+    expect(dashboard).toContain('ActivityTrendChart');
+    expect(dashboard).toContain('ModelUsageBarChart');
+    expect(dashboard).toContain('StatusDistributionChart');
+    expect(dashboard).toContain('TokenCompositionChart');
+    expect(dashboard).toContain("from '../components/charts/DashboardVisualCharts'");
     expect(dashboard).toContain('modelUsageChartData');
     expect(dashboard).toContain('tokenCompositionData');
     expect(dashboard).not.toContain('providerQuotaChartData');
     expect(dashboard).toContain('activityTrendData');
     expect(dashboard).toContain('actionRunStatusData');
     expect(dashboard).toContain('artifactTypeData');
-    expect(dashboard).toContain("<ModelUsageBarChart data={modelUsageChartData} emptyText={t('dashboard.noChartData')} />");
-    expect(dashboard).toContain("<TokenCompositionChart data={tokenCompositionData} emptyText={t('dashboard.noChartData')} />");
+    expect(dashboard).toMatch(
+      /<ModelUsageBarChart\s+data=\{modelUsageChartData\}\s+emptyText=\{t\('dashboard\.noChartData'\)\}\s+\/>/,
+    );
+    expect(dashboard).toMatch(
+      /<TokenCompositionChart\s+data=\{tokenCompositionData\}\s+emptyText=\{t\('dashboard\.noChartData'\)\}\s+\/>/,
+    );
     expect(dashboard).not.toContain('ProviderQuotaBarChart');
-    expect(dashboard).toContain("<ActivityTrendChart data={activityTrendData} emptyText={t('dashboard.noChartData')} />");
-    expect(dashboard).toContain("<StatusDistributionChart data={actionRunStatusData} emptyText={t('dashboard.noChartData')} />");
-    expect(dashboard).toContain("<StatusDistributionChart data={artifactTypeData} emptyText={t('dashboard.noChartData')} />");
+    expect(dashboard).toMatch(
+      /<ActivityTrendChart\s+data=\{activityTrendData\}\s+emptyText=\{t\('dashboard\.noChartData'\)\}\s+\/>/,
+    );
+    expect(dashboard).toMatch(
+      /<StatusDistributionChart\s+data=\{actionRunStatusData\}\s+emptyText=\{t\('dashboard\.noChartData'\)\}\s+\/>/,
+    );
+    expect(dashboard).toMatch(
+      /<StatusDistributionChart\s+data=\{artifactTypeData\}\s+emptyText=\{t\('dashboard\.noChartData'\)\}\s+\/>/,
+    );
     expect(dashboard).toContain('dashboard-chart-panel');
     expect(dashboard).toContain('dashboard-visual-row');
     expect(charts).toContain("import { Bar, Line, Pie } from '@ant-design/charts'");
@@ -171,8 +185,14 @@ describe('dashboard redesign', () => {
     expect(dashboard).toContain('className="dashboard-asset-title"');
     expect(dashboard).toContain('className="dashboard-asset-meta"');
     expect(dashboard).not.toContain('className="dashboard-model-usage-label"');
-    expect(dashboard).not.toContain('<Text ellipsis={{ showTooltip: true }} style={{ fontWeight: 600 }}>{title}</Text>');
-    expect(dashboard).not.toContain('<Text type="tertiary" size="small" ellipsis={{ showTooltip: true }}>{meta}</Text>');
-    expect(dashboard).not.toContain('<Text ellipsis={{ showTooltip: true }} style={{ fontWeight: 600 }}>{row.label}</Text>');
+    expect(dashboard).not.toContain(
+      '<Text ellipsis={{ showTooltip: true }} style={{ fontWeight: 600 }}>{title}</Text>',
+    );
+    expect(dashboard).not.toContain(
+      '<Text type="tertiary" size="small" ellipsis={{ showTooltip: true }}>{meta}</Text>',
+    );
+    expect(dashboard).not.toContain(
+      '<Text ellipsis={{ showTooltip: true }} style={{ fontWeight: 600 }}>{row.label}</Text>',
+    );
   });
 });

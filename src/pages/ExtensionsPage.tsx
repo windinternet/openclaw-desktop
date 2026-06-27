@@ -8,32 +8,32 @@ import {
   getSkillMarketplaceSource,
   useStore,
 } from '../lib';
-import type { OpenClawPluginInfo, SkillInfo, SkillMarketplaceSkill, SkillMarketplaceSourceId, ToolInfo } from '../lib/types';
+import type {
+  OpenClawPluginInfo,
+  SkillInfo,
+  SkillMarketplaceSkill,
+  SkillMarketplaceSourceId,
+  ToolInfo,
+} from '../lib/types';
 
 const { Title, Text } = Typography;
 
 /* ── columns ── */
 
-const SKILL_COLUMNS = (
-  t: (key: string) => string,
-) => [
+const SKILL_COLUMNS = (t: (key: string) => string) => [
   {
     title: t('extensions.name'),
     dataIndex: 'name',
     width: 200,
     render: (_: string, record: SkillInfo) => (
-      <span style={{ fontWeight: 500, fontFamily: 'var(--semi-font-family-mono)' }}>
-        {record.name}
-      </span>
+      <span style={{ fontWeight: 500, fontFamily: 'var(--semi-font-family-mono)' }}>{record.name}</span>
     ),
   },
   {
     title: t('extensions.description'),
     dataIndex: 'description',
     render: (_: string, record: SkillInfo) => (
-      <span style={{ color: 'var(--semi-color-text-1)', fontSize: 13 }}>
-        {record.description || '—'}
-      </span>
+      <span style={{ color: 'var(--semi-color-text-1)', fontSize: 13 }}>{record.description || '—'}</span>
     ),
   },
   {
@@ -56,42 +56,45 @@ const SKILL_COLUMNS = (
     title: t('extensions.status'),
     dataIndex: 'enabled',
     width: 110,
-    render: (_: boolean, record: SkillInfo) => (
-      record.enabled
-        ? <Tag color="green" size="small">{t('extensions.enabled')}</Tag>
-        : <Tag size="small">{t('extensions.disabled')}</Tag>
-    ),
+    render: (_: boolean, record: SkillInfo) =>
+      record.enabled ? (
+        <Tag color="green" size="small">
+          {t('extensions.enabled')}
+        </Tag>
+      ) : (
+        <Tag size="small">{t('extensions.disabled')}</Tag>
+      ),
   },
   {
     title: t('extensions.eligible'),
     dataIndex: 'eligible',
     width: 120,
-    render: (_: boolean, record: SkillInfo) => (
-      record.eligible
-        ? <Tag color="blue" size="small">{t('extensions.eligible')}</Tag>
-        : <Tag color="orange" size="small">{t('extensions.notEligible')}</Tag>
-    ),
+    render: (_: boolean, record: SkillInfo) =>
+      record.eligible ? (
+        <Tag color="blue" size="small">
+          {t('extensions.eligible')}
+        </Tag>
+      ) : (
+        <Tag color="orange" size="small">
+          {t('extensions.notEligible')}
+        </Tag>
+      ),
     filters: [
       { text: t('extensions.eligible'), value: true },
       { text: t('extensions.notEligible'), value: false },
     ],
-    onFilter: (value: boolean, record?: SkillInfo) =>
-      record ? record.eligible === value : true,
+    onFilter: (value: boolean, record?: SkillInfo) => (record ? record.eligible === value : true),
   },
 ];
 
-const TOOL_COLUMNS = (
-  t: (key: string) => string,
-) => [
+const TOOL_COLUMNS = (t: (key: string) => string) => [
   {
     title: t('extensions.name'),
     dataIndex: 'label',
     width: 200,
     render: (_: string, record: ToolInfo) =>
       record ? (
-        <span style={{ fontWeight: 500, fontFamily: 'var(--semi-font-family-mono)' }}>
-          {record.label}
-        </span>
+        <span style={{ fontWeight: 500, fontFamily: 'var(--semi-font-family-mono)' }}>{record.label}</span>
       ) : null,
   },
   {
@@ -99,9 +102,7 @@ const TOOL_COLUMNS = (
     dataIndex: 'description',
     render: (_: string, record: ToolInfo) =>
       record ? (
-        <span style={{ color: 'var(--semi-color-text-1)', fontSize: 13 }}>
-          {record.description || '—'}
-        </span>
+        <span style={{ color: 'var(--semi-color-text-1)', fontSize: 13 }}>{record.description || '—'}</span>
       ) : null,
   },
   {
@@ -121,23 +122,18 @@ const TOOL_COLUMNS = (
       { text: t('extensions.core'), value: 'core' },
       { text: t('extensions.plugin'), value: 'plugin' },
     ],
-    onFilter: (value: string, record?: ToolInfo) =>
-      record ? record.source === value : true,
+    onFilter: (value: string, record?: ToolInfo) => (record ? record.source === value : true),
   },
 ];
 
-const PLUGIN_INVENTORY_COLUMNS = (
-  t: (key: string) => string,
-) => [
+const PLUGIN_INVENTORY_COLUMNS = (t: (key: string) => string) => [
   {
     title: t('extensions.name'),
     dataIndex: 'name',
     width: 260,
     render: (_: string, record: OpenClawPluginInfo) => (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <span style={{ fontWeight: 600, fontFamily: 'var(--semi-font-family-mono)' }}>
-          {record.name || record.id}
-        </span>
+        <span style={{ fontWeight: 600, fontFamily: 'var(--semi-font-family-mono)' }}>{record.name || record.id}</span>
         {record.name && record.name !== record.id && (
           <span style={{ color: 'var(--semi-color-text-2)', fontSize: 12, fontFamily: 'var(--semi-font-family-mono)' }}>
             {record.id}
@@ -153,7 +149,11 @@ const PLUGIN_INVENTORY_COLUMNS = (
     render: (_: string, record: OpenClawPluginInfo) => {
       const status = String(record.status ?? (record.enabled ? 'enabled' : 'disabled'));
       const color = status === 'loaded' || status === 'enabled' ? 'green' : status === 'error' ? 'red' : 'grey';
-      return <Tag color={color} size="small">{status}</Tag>;
+      return (
+        <Tag color={color} size="small">
+          {status}
+        </Tag>
+      );
     },
   },
   {
@@ -169,9 +169,7 @@ const PLUGIN_INVENTORY_COLUMNS = (
     dataIndex: 'version',
     width: 120,
     render: (_: string, record: OpenClawPluginInfo) => (
-      <span style={{ color: 'var(--semi-color-text-2)', fontSize: 12 }}>
-        {record.version || '—'}
-      </span>
+      <span style={{ color: 'var(--semi-color-text-2)', fontSize: 12 }}>{record.version || '—'}</span>
     ),
   },
   {
@@ -193,13 +191,9 @@ const PLUGIN_INVENTORY_COLUMNS = (
       ].filter(Boolean);
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ color: 'var(--semi-color-text-1)', fontSize: 13 }}>
-            {record.description || '—'}
-          </span>
+          <span style={{ color: 'var(--semi-color-text-1)', fontSize: 13 }}>{record.description || '—'}</span>
           {parts.length > 0 && (
-            <span style={{ color: 'var(--semi-color-text-2)', fontSize: 12 }}>
-              {parts.join(' · ')}
-            </span>
+            <span style={{ color: 'var(--semi-color-text-2)', fontSize: 12 }}>{parts.join(' · ')}</span>
           )}
         </div>
       );
@@ -211,12 +205,19 @@ const PLUGIN_INVENTORY_COLUMNS = (
     width: 150,
     render: (_: unknown, record: OpenClawPluginInfo) => {
       const dependencyStatus = record.dependencyStatus;
-      const installed = dependencyStatus && typeof dependencyStatus === 'object'
-        ? (dependencyStatus as Record<string, unknown>).requiredInstalled !== false
-        : true;
-      return installed
-        ? <Tag color="green" size="small">{t('extensions.installed')}</Tag>
-        : <Tag color="red" size="small">{t('extensions.missingDependencies')}</Tag>;
+      const installed =
+        dependencyStatus && typeof dependencyStatus === 'object'
+          ? (dependencyStatus as Record<string, unknown>).requiredInstalled !== false
+          : true;
+      return installed ? (
+        <Tag color="green" size="small">
+          {t('extensions.installed')}
+        </Tag>
+      ) : (
+        <Tag color="red" size="small">
+          {t('extensions.missingDependencies')}
+        </Tag>
+      );
     },
   },
 ];
@@ -236,9 +237,7 @@ const MARKETPLACE_COLUMNS = (
     render: (_: string, record: SkillMarketplaceSkill) => (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <span style={{ fontWeight: 600 }}>{record.name}</span>
-        <span style={{ color: 'var(--semi-color-text-2)', fontSize: 12 }}>
-          {record.slug ?? record.id}
-        </span>
+        <span style={{ color: 'var(--semi-color-text-2)', fontSize: 12 }}>{record.slug ?? record.id}</span>
       </div>
     ),
   },
@@ -246,9 +245,7 @@ const MARKETPLACE_COLUMNS = (
     title: t('extensions.description'),
     dataIndex: 'description',
     render: (_: string, record: SkillMarketplaceSkill) => (
-      <span style={{ color: 'var(--semi-color-text-1)', fontSize: 13 }}>
-        {record.description || '—'}
-      </span>
+      <span style={{ color: 'var(--semi-color-text-1)', fontSize: 13 }}>{record.description || '—'}</span>
     ),
   },
   {
@@ -268,7 +265,9 @@ const MARKETPLACE_COLUMNS = (
     render: (_: boolean, record: SkillMarketplaceSkill) => {
       const reviewed = record.reviewed === true || record.sourceId === 'skillhub';
       return reviewed ? (
-        <Tag color="green" size="small">{t('extensions.reviewed')}</Tag>
+        <Tag color="green" size="small">
+          {t('extensions.reviewed')}
+        </Tag>
       ) : (
         <Tag size="small">{record.safety || t('extensions.community')}</Tag>
       );
@@ -279,9 +278,7 @@ const MARKETPLACE_COLUMNS = (
     dataIndex: 'version',
     width: 100,
     render: (_: string, record: SkillMarketplaceSkill) => (
-      <span style={{ color: 'var(--semi-color-text-2)', fontSize: 12 }}>
-        {record.version || '—'}
-      </span>
+      <span style={{ color: 'var(--semi-color-text-2)', fontSize: 12 }}>{record.version || '—'}</span>
     ),
   },
   {
@@ -291,7 +288,11 @@ const MARKETPLACE_COLUMNS = (
     render: (_: string, record: SkillMarketplaceSkill) => {
       const installed = installedSkillNames.has(record.name) || installedSkillNames.has(record.slug ?? '');
       if (installed) {
-        return <Tag color="green" size="small">{t('extensions.installed')}</Tag>;
+        return (
+          <Tag color="green" size="small">
+            {t('extensions.installed')}
+          </Tag>
+        );
       }
       return (
         <Space spacing={8}>
@@ -306,12 +307,7 @@ const MARKETPLACE_COLUMNS = (
           >
             {t('extensions.install')}
           </Button>
-          <Button
-            icon={<IconExternalOpen />}
-            size="small"
-            theme="borderless"
-            onClick={() => onOpenDetail(record)}
-          />
+          <Button icon={<IconExternalOpen />} size="small" theme="borderless" onClick={() => onOpenDetail(record)} />
         </Space>
       );
     },
@@ -346,7 +342,9 @@ export default function ExtensionsPage({ embedded = false, section }: Extensions
   const [refreshing, setRefreshing] = useState(false);
   const [activeTabKey, setActiveTabKey] = useState<ExtensionsSection>('skills');
   const [eligibleOnly, setEligibleOnly] = useState(false);
-  const [marketplaceSourceId, setMarketplaceSourceId] = useState<SkillMarketplaceSourceId>(DEFAULT_SKILL_MARKETPLACE_SOURCE_ID);
+  const [marketplaceSourceId, setMarketplaceSourceId] = useState<SkillMarketplaceSourceId>(
+    DEFAULT_SKILL_MARKETPLACE_SOURCE_ID,
+  );
   const [marketplaceLoadedSourceId, setMarketplaceLoadedSourceId] = useState<SkillMarketplaceSourceId | null>(null);
   const [marketplaceQuery, setMarketplaceQuery] = useState('');
   const [marketplaceSearching, setMarketplaceSearching] = useState(false);
@@ -388,24 +386,27 @@ export default function ExtensionsPage({ embedded = false, section }: Extensions
     }
   }, []);
 
-  const handleMarketplaceSearch = useCallback(async (query = marketplaceQuery) => {
-    setMarketplaceSearching(true);
-    setMarketplaceHasSearched(true);
-    setMarketplaceLoadedSourceId(marketplaceSourceId);
-    setMarketplaceError(null);
-    try {
-      await searchSkillMarketplace({
-        sourceId: marketplaceSourceId,
-        query,
-        limit: 20,
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t('extensions.marketplaceSearchFailed');
-      setMarketplaceError(message);
-    } finally {
-      setMarketplaceSearching(false);
-    }
-  }, [marketplaceQuery, marketplaceSourceId, searchSkillMarketplace, t]);
+  const handleMarketplaceSearch = useCallback(
+    async (query = marketplaceQuery) => {
+      setMarketplaceSearching(true);
+      setMarketplaceHasSearched(true);
+      setMarketplaceLoadedSourceId(marketplaceSourceId);
+      setMarketplaceError(null);
+      try {
+        await searchSkillMarketplace({
+          sourceId: marketplaceSourceId,
+          query,
+          limit: 20,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : t('extensions.marketplaceSearchFailed');
+        setMarketplaceError(message);
+      } finally {
+        setMarketplaceSearching(false);
+      }
+    },
+    [marketplaceQuery, marketplaceSourceId, searchSkillMarketplace, t],
+  );
 
   useEffect(() => {
     if (
@@ -426,26 +427,34 @@ export default function ExtensionsPage({ embedded = false, section }: Extensions
     section,
   ]);
 
-  const handleMarketplaceKeyDown = useCallback((event: KeyboardEvent) => {
-    if (event.key === 'Enter') {
-      handleMarketplaceSearch();
-    }
-  }, [handleMarketplaceSearch]);
+  const handleMarketplaceKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      if (event.key === 'Enter') {
+        handleMarketplaceSearch();
+      }
+    },
+    [handleMarketplaceSearch],
+  );
 
-  const handleInstallMarketplaceSkill = useCallback(async (skill: SkillMarketplaceSkill) => {
-    setInstallingId(skill.id);
-    try {
-      const result = await installMarketplaceSkill(skill);
-      Toast.success(result.message || t('extensions.installSuccess'));
-    } catch (err) {
-      Toast.error(err instanceof Error ? err.message : t('extensions.installFailed'));
-    } finally {
-      setInstallingId(null);
-    }
-  }, [installMarketplaceSkill, t]);
+  const handleInstallMarketplaceSkill = useCallback(
+    async (skill: SkillMarketplaceSkill) => {
+      setInstallingId(skill.id);
+      try {
+        const result = await installMarketplaceSkill(skill);
+        Toast.success(result.message || t('extensions.installSuccess'));
+      } catch (err) {
+        Toast.error(err instanceof Error ? err.message : t('extensions.installFailed'));
+      } finally {
+        setInstallingId(null);
+      }
+    },
+    [installMarketplaceSkill, t],
+  );
 
   const handleOpenSkillDetail = useCallback((skill: SkillMarketplaceSkill) => {
-    const url = skill.detailUrl || `${getSkillMarketplaceSource(skill.sourceId).detailBaseUrl}/${encodeURIComponent(skill.slug ?? skill.id)}`;
+    const url =
+      skill.detailUrl ||
+      `${getSkillMarketplaceSource(skill.sourceId).detailBaseUrl}/${encodeURIComponent(skill.slug ?? skill.id)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   }, []);
 
@@ -453,18 +462,20 @@ export default function ExtensionsPage({ embedded = false, section }: Extensions
   const skillsTab = (
     <div style={{ paddingTop: 16 }}>
       {skills.length === 0 && !refreshing ? (
-        <Empty
-          title={t('extensions.noSkills')}
-          style={{ padding: '48px 0' }}
-        >
+        <Empty title={t('extensions.noSkills')} style={{ padding: '48px 0' }}>
           {isConnected ? (
-            <Button icon={<IconRefresh />} onClick={handleRefresh} loading={refreshing} theme="solid" type="primary" size="small">
+            <Button
+              icon={<IconRefresh />}
+              onClick={handleRefresh}
+              loading={refreshing}
+              theme="solid"
+              type="primary"
+              size="small"
+            >
               {t('extensions.refresh')}
             </Button>
           ) : (
-            <span style={{ color: 'var(--semi-color-text-2)', fontSize: 13 }}>
-              {t('common.loading')}
-            </span>
+            <span style={{ color: 'var(--semi-color-text-2)', fontSize: 13 }}>{t('common.loading')}</span>
           )}
         </Empty>
       ) : (
@@ -473,13 +484,7 @@ export default function ExtensionsPage({ embedded = false, section }: Extensions
             <Checkbox checked={eligibleOnly} onChange={(e) => setEligibleOnly(e.target.checked ?? false)}>
               {t('extensions.filterEligible')}
             </Checkbox>
-            <Button
-              icon={<IconRefresh />}
-              onClick={handleRefresh}
-              loading={refreshing}
-              size="small"
-              theme="borderless"
-            >
+            <Button icon={<IconRefresh />} onClick={handleRefresh} loading={refreshing} size="small" theme="borderless">
               {t('extensions.refresh')}
             </Button>
           </div>
@@ -502,30 +507,33 @@ export default function ExtensionsPage({ embedded = false, section }: Extensions
   const pluginFallbackGroups = pluginGroups;
   const hasPluginInventory = plugins.length > 0;
 
-  const pluginColumns = useMemo(() => [
-    {
-      title: t('extensions.name'),
-      dataIndex: 'label',
-      width: 260,
-      render: (_: string, record: Record<string, unknown>) => (
-        <span style={{ fontWeight: 500, fontFamily: 'var(--semi-font-family-mono)' }}>
-          {String(record.label ?? record.pluginId ?? '')}
-        </span>
-      ),
-    },
-    {
-      title: t('extensions.description'),
-      dataIndex: 'pluginId',
-      render: (_: string, record: Record<string, unknown>) => {
-        const count = Array.isArray(record.tools) ? record.tools.length : 0;
-        return (
-          <span style={{ color: 'var(--semi-color-text-2)', fontSize: 13 }}>
-            {t('extensions.plugin')} · {count} {t('extensions.tools').toLowerCase()}
+  const pluginColumns = useMemo(
+    () => [
+      {
+        title: t('extensions.name'),
+        dataIndex: 'label',
+        width: 260,
+        render: (_: string, record: Record<string, unknown>) => (
+          <span style={{ fontWeight: 500, fontFamily: 'var(--semi-font-family-mono)' }}>
+            {String(record.label ?? record.pluginId ?? '')}
           </span>
-        );
+        ),
       },
-    },
-  ], [t]);
+      {
+        title: t('extensions.description'),
+        dataIndex: 'pluginId',
+        render: (_: string, record: Record<string, unknown>) => {
+          const count = Array.isArray(record.tools) ? record.tools.length : 0;
+          return (
+            <span style={{ color: 'var(--semi-color-text-2)', fontSize: 13 }}>
+              {t('extensions.plugin')} · {count} {t('extensions.tools').toLowerCase()}
+            </span>
+          );
+        },
+      },
+    ],
+    [t],
+  );
 
   const toolsTab = (
     <div style={{ paddingTop: 16 }}>
@@ -547,18 +555,20 @@ export default function ExtensionsPage({ embedded = false, section }: Extensions
       )}
 
       {plugins.length === 0 && pluginFallbackGroups.length === 0 && !refreshing ? (
-        <Empty
-          title={t('extensions.noTools')}
-          style={{ padding: '48px 0' }}
-        >
+        <Empty title={t('extensions.noTools')} style={{ padding: '48px 0' }}>
           {isConnected ? (
-            <Button icon={<IconRefresh />} onClick={handleRefresh} loading={refreshing} theme="solid" type="primary" size="small">
+            <Button
+              icon={<IconRefresh />}
+              onClick={handleRefresh}
+              loading={refreshing}
+              theme="solid"
+              type="primary"
+              size="small"
+            >
               {t('extensions.refresh')}
             </Button>
           ) : (
-            <span style={{ color: 'var(--semi-color-text-2)', fontSize: 13 }}>
-              {t('common.loading')}
-            </span>
+            <span style={{ color: 'var(--semi-color-text-2)', fontSize: 13 }}>{t('common.loading')}</span>
           )}
         </Empty>
       ) : (
@@ -569,13 +579,7 @@ export default function ExtensionsPage({ embedded = false, section }: Extensions
                 {t('extensions.pluginToolFallback')}
               </Text>
             )}
-            <Button
-              icon={<IconRefresh />}
-              onClick={handleRefresh}
-              loading={refreshing}
-              size="small"
-              theme="borderless"
-            >
+            <Button icon={<IconRefresh />} onClick={handleRefresh} loading={refreshing} size="small" theme="borderless">
               {t('extensions.refresh')}
             </Button>
           </div>
@@ -599,11 +603,15 @@ export default function ExtensionsPage({ embedded = false, section }: Extensions
                       color: 'var(--semi-color-text-2)',
                     }}
                   >
-                    {JSON.stringify({
-                      source: record.source,
-                      rootDir: record.rootDir,
-                      dependencyStatus: record.dependencyStatus,
-                    }, null, 2)}
+                    {JSON.stringify(
+                      {
+                        source: record.source,
+                        rootDir: record.rootDir,
+                        dependencyStatus: record.dependencyStatus,
+                      },
+                      null,
+                      2,
+                    )}
                   </pre>
                 );
               }}
@@ -622,13 +630,7 @@ export default function ExtensionsPage({ embedded = false, section }: Extensions
                 if (!record) return null;
                 const tools = (Array.isArray(record.tools) ? record.tools : []) as ToolInfo[];
                 return (
-                  <Table
-                    columns={TOOL_COLUMNS(t)}
-                    dataSource={tools}
-                    rowKey="id"
-                    size="small"
-                    pagination={false}
-                  />
+                  <Table columns={TOOL_COLUMNS(t)} dataSource={tools} rowKey="id" size="small" pagination={false} />
                 );
               }}
               empty={<Empty title={t('extensions.noTools')} />}
@@ -666,9 +668,15 @@ export default function ExtensionsPage({ embedded = false, section }: Extensions
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                 <span style={{ fontWeight: 600, color: 'var(--semi-color-text-0)' }}>{source.name}</span>
-                {source.recommended && <Tag color="green" size="small">{t('extensions.recommended')}</Tag>}
+                {source.recommended && (
+                  <Tag color="green" size="small">
+                    {t('extensions.recommended')}
+                  </Tag>
+                )}
               </div>
-              <Text type="tertiary" size="small">{source.description}</Text>
+              <Text type="tertiary" size="small">
+                {source.description}
+              </Text>
             </button>
           );
         })}

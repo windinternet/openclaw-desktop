@@ -55,11 +55,7 @@ export default function ChatComposerFrame({
     >
       {before ? <div className="chat-composer-frame__before">{before}</div> : null}
       <div
-        className={classNames(
-          'chat-composer-frame__card',
-          cardClassByVariant[variant],
-          cardClassName,
-        )}
+        className={classNames('chat-composer-frame__card', cardClassByVariant[variant], cardClassName)}
         style={cardStyle}
       >
         {children}

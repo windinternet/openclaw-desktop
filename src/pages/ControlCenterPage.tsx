@@ -21,7 +21,10 @@ export default function ControlCenterPage() {
     marketplace: { title: t('extensions.marketplace'), desc: t('controlCenter.extensionsDesc') },
     tools: { title: t('extensions.tools'), desc: t('controlCenter.extensionsDesc') },
     tuning: { title: t('nav.tuning'), desc: t('controlCenter.tuningDesc') },
-    'repository-protocol': { title: t('controlCenter.repositoryProtocol'), desc: t('controlCenter.repositoryProtocolDesc') },
+    'repository-protocol': {
+      title: t('controlCenter.repositoryProtocol'),
+      desc: t('controlCenter.repositoryProtocolDesc'),
+    },
   }[activeTab] ?? { title: t('nav.controlCenter'), desc: t('controlCenter.pageDesc') };
 
   const taskActions = (
@@ -38,12 +41,7 @@ export default function ControlCenterPage() {
       >
         {t('common.refresh')}
       </Button>
-      <Button
-        icon={<IconPlus />}
-        type="primary"
-        size="small"
-        onClick={() => tasksRef.current?.openAdd()}
-      >
+      <Button icon={<IconPlus />} type="primary" size="small" onClick={() => tasksRef.current?.openAdd()}>
         {t('tasks.add')}
       </Button>
     </Space>
@@ -57,8 +55,12 @@ export default function ControlCenterPage() {
   return (
     <div style={{ height: '100%', overflow: 'auto', padding: '16px 24px 24px' }}>
       <div style={{ marginBottom: 12 }}>
-        <Title heading={3} style={{ margin: 0 }}>{activeMeta.title}</Title>
-        <Text type="tertiary" size="small">{activeMeta.desc}</Text>
+        <Title heading={3} style={{ margin: 0 }}>
+          {activeMeta.title}
+        </Title>
+        <Text type="tertiary" size="small">
+          {activeMeta.desc}
+        </Text>
       </div>
       <Tabs
         activeKey={activeTab}
@@ -66,13 +68,25 @@ export default function ControlCenterPage() {
         type="line"
         tabBarExtraContent={activeTab === 'tasks' ? taskActions : tabActions}
       >
-        <Tabs.TabPane tab={t('nav.tasks')} itemKey="tasks">{activeTab === 'tasks' && <TasksPage ref={tasksRef} embedded />}</Tabs.TabPane>
-        <Tabs.TabPane tab={t('extensions.skills')} itemKey="skills">{activeTab === 'skills' && <ExtensionsPage embedded section="skills" />}</Tabs.TabPane>
-        <Tabs.TabPane tab={t('extensions.marketplace')} itemKey="marketplace">{activeTab === 'marketplace' && <ExtensionsPage embedded section="marketplace" />}</Tabs.TabPane>
-        <Tabs.TabPane tab={t('extensions.tools')} itemKey="tools">{activeTab === 'tools' && <ExtensionsPage embedded section="tools" />}</Tabs.TabPane>
-        <Tabs.TabPane tab={t('nav.tuning')} itemKey="tuning">{activeTab === 'tuning' && <TuningPage embedded />}</Tabs.TabPane>
+        <Tabs.TabPane tab={t('nav.tasks')} itemKey="tasks">
+          {activeTab === 'tasks' && <TasksPage ref={tasksRef} embedded />}
+        </Tabs.TabPane>
+        <Tabs.TabPane tab={t('extensions.skills')} itemKey="skills">
+          {activeTab === 'skills' && <ExtensionsPage embedded section="skills" />}
+        </Tabs.TabPane>
+        <Tabs.TabPane tab={t('extensions.marketplace')} itemKey="marketplace">
+          {activeTab === 'marketplace' && <ExtensionsPage embedded section="marketplace" />}
+        </Tabs.TabPane>
+        <Tabs.TabPane tab={t('extensions.tools')} itemKey="tools">
+          {activeTab === 'tools' && <ExtensionsPage embedded section="tools" />}
+        </Tabs.TabPane>
+        <Tabs.TabPane tab={t('nav.tuning')} itemKey="tuning">
+          {activeTab === 'tuning' && <TuningPage embedded />}
+        </Tabs.TabPane>
         <Tabs.TabPane tab={t('controlCenter.repositoryProtocol')} itemKey="repository-protocol">
-          {activeTab === 'repository-protocol' && <RepositoryProtocolPage embedded onHeaderActionsChange={setTabActions} />}
+          {activeTab === 'repository-protocol' && (
+            <RepositoryProtocolPage embedded onHeaderActionsChange={setTabActions} />
+          )}
         </Tabs.TabPane>
       </Tabs>
     </div>

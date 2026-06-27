@@ -32,11 +32,13 @@ describe('office layout', () => {
       officeAgent('sleeper', 'lounge', 'resting'),
     ]);
 
-    expect(laidOut.map((a) => ({
-      agentId: a.agentId,
-      slotId: a.slotId,
-      position: a.position,
-    }))).toEqual([
+    expect(
+      laidOut.map((a) => ({
+        agentId: a.agentId,
+        slotId: a.slotId,
+        position: a.position,
+      })),
+    ).toEqual([
       { agentId: 'worker', slotId: 'work-1', position: { x: 5.0, y: OFFICE_AGENT_GROUND_Y, z: 1.1 } },
       { agentId: 'speaker', slotId: 'meeting-presenter', position: { x: -1.0, y: OFFICE_AGENT_GROUND_Y, z: 3.8 } },
       { agentId: 'listener', slotId: 'meeting-1', position: { x: -2.4, y: OFFICE_AGENT_GROUND_Y, z: 2.6 } },
@@ -108,12 +110,10 @@ describe('office layout', () => {
     const laidOut = assignOfficeLayout(
       Array.from({ length: 18 }, (_, index) => officeAgent(`lounger-${index + 1}`, 'lounge', 'resting')),
     );
-    const inLounge = laidOut.filter((agent) => (
-      agent.position.x >= -8.55 &&
-      agent.position.x <= -4.85 &&
-      agent.position.z >= 1.65 &&
-      agent.position.z <= 6.18
-    ));
+    const inLounge = laidOut.filter(
+      (agent) =>
+        agent.position.x >= -8.55 && agent.position.x <= -4.85 && agent.position.z >= 1.65 && agent.position.z <= 6.18,
+    );
     const outsideLounge = laidOut.filter((agent) => !inLounge.includes(agent));
 
     expect(inLounge.length).toBeGreaterThan(outsideLounge.length);

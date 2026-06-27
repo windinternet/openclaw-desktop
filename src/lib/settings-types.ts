@@ -21,13 +21,11 @@ export const PRESET_THEME_COLORS: ThemeColor[] = [
 
 export type SupportedLocale = 'zh-CN' | 'en-US';
 export type DefaultHomeView = PrimaryNavKey;
-export const DEFAULT_HOME_VIEW_OPTIONS = NAV_GROUPS
-  .flatMap((group) => group.items)
-  .map((item) => ({
-    value: item.key,
-    route: item.route,
-    labelKey: item.labelKey,
-  }));
+export const DEFAULT_HOME_VIEW_OPTIONS = NAV_GROUPS.flatMap((group) => group.items).map((item) => ({
+  value: item.key,
+  route: item.route,
+  labelKey: item.labelKey,
+}));
 
 export interface AppSettings {
   settingsSchemaVersion?: number;

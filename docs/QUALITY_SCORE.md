@@ -1,98 +1,63 @@
 # 质量评分
 
-> 最后更新: 2026-05-21
-> 基于 OpenAI Harness Engineering 方法论的质量追踪体系
+> 最后更新: 2026-06-28
+> 评分基于当前代码事实，而不是 2026-05-21 的 v0.1.0 基线。
 
 ## 评分框架
 
-每个领域按以下等级评分：
-
 | 等级 | 含义 | 标准 |
 |------|------|------|
-| A | 优秀 | 代码/文档质量经得起审查，自动化完备，无已知 tech debt |
-| B | 良好 | 大部分符合规范，少量轻微问题，自动化基本覆盖 |
-| C | 基础 | 功能可用，但缺乏自动化、测试或文档一致性 |
-| D | 不足 | 存在明显缺陷，需要重构或补充 |
+| A | 优秀 | 自动化完备、文档与代码持续同步、无已知关键 tech debt |
+| B | 良好 | 核心链路可验证，CI 覆盖主要门禁，存在少量非阻断债务 |
+| C | 基础 | 功能可用，但质量门禁、测试或文档一致性存在明显缺口 |
+| D | 不足 | 存在阻断性缺陷，无法可靠构建、测试或交付 |
 
 跨域评分取各领域最低分。
 
-## 当前基线评分
+## 当前评分
 
-> 注：以下为基线评分。项目处于早期阶段（v0.1.0），暂无领域达到 C 以上。
+| 领域 | 评分 | 当前事实 |
+|------|------|----------|
+| docs/ | C+ | 文档体系完整，但此前多个入口仍停留在 v0.1.0；本轮已校准核心入口文档 |
+| src/ | B- | 主功能域已落地，59 个 Vitest 测试文件覆盖 Repository、Office、Dashboard、Gateway、Artifact、Navigation 等 |
+| electron/ | B- | main/preload、Repository/Artifact/Pet handlers 和安全 IPC 已落地；仍缺少专门 Electron 单元测试体系 |
+| config/ | B- | Vite、TypeScript、ESLint、Prettier、Stylelint、Vitest、electron-builder 和 CI 已配置 |
+| 测试覆盖 | B- | `npm test` 当前覆盖 59 个测试文件、412 个测试；仍缺少浏览器/Electron e2e 常规门禁 |
+| CI/CD | B- | GitHub Actions 已有 lint、format、stylelint、typecheck、test、build、doc validation、release workflow |
+| 依赖与性能 | C+ | 依赖明确且可构建；主 renderer bundle 偏大，构建有 chunk size warning |
 
-| 领域 | 评分 | 说明 |
-|------|------|------|
-| docs/ | C | 文档体系已建立，覆盖率尚可，但部分文档缺失，无自动化校验 |
-| src/ | C | React 组件结构初步搭建，缺少测试，状态管理未完全落地 |
-| electron/ | C | main/preload 基础框架就位，contextIsolation 已开启，无单元测试 |
-| config/ (vite, tsconfig) | C | 构建配置简洁可用，缺少生产环境优化 |
-| 测试覆盖 | D | 无测试文件，vitest 已配置但无用例 |
-| CI/CD | D | 无 CI 配置，无自动化检查门禁 |
-| 依赖管理 | C | 依赖版本明确，无已知漏洞，但无定期扫描机制 |
+## 当前门禁
 
-## 领域详情
+本地最低验证：
 
-### docs/ — C
+```bash
+npm run check
+npm run typecheck
+npm test
+npm run build
+```
 
-- 存在：ARCHITECTURE.md, DESIGN.md, FRONTEND.md, PLANS.md, design-docs/, product-specs/
-- 缺失：QUALITY_SCORE.md（本文）, SECURITY.md, exec-plans/, references/
-- 无自动化检查确保文档与实际代码一致
-- 无文档过期检测机制
-- 改进路径：补齐缺失文档 → 添加 doc lint → 建立养护周期
+CI 当前运行：
 
-### src/ — C
+- Node 20 / 22 质量检查。
+- Type check。
+- ESLint。
+- Prettier check。
+- Stylelint。
+- Vitest。
+- Vite/Electron build。
+- AGENTS.md 引用与核心文档链接校验。
 
-- 组件按功能拆分（ChatView, WelcomeView）
-- Semi Design 组件库集成完成
-- Zustand 已安装但尚未创建 store
-- 缺少测试覆盖
-- 目录结构扁平，按计划应扩展为 components/{chat,sidebar,dashboard,...}/ 结构
-- 改进路径：建立 store → 补测试 → 重构目录结构
+## 已知风险
 
-### electron/ — C
-
-- contextIsolation: true, nodeIntegration: false 安全配置就位
-- contextBridge 暴露有限 API
-- 缺少 IPC 通信测试
-- 改进路径：补 IPC 测试 → 完善 preload 类型定义
-
-### config/ — C
-
-- Vite 配置清晰，集成 electron 插件
-- TypeScript strict 模式开启
-- 缺少构建产物大小分析
-- 改进路径：添加 bundle analyze → 优化生产构建
-
-### 测试覆盖 — D
-
-- vitest 已安装（package.json 中有 test/watch 脚本）
-- 零测试文件
-- 无 e2e 测试
-- 改进路径：为核心模块添加单元测试 → 添加组件测试 → 添加 e2e
-
-### CI/CD — D
-
-- 无 GitHub Actions 或其他 CI 配置
-- 无 PR 检查门禁
-- 无自动化发布流程
-- 改进路径：配置 CI（lint + typecheck + test）→ 配置 PR check → 配置自动发布
-
-### 依赖管理 — C
-
-- 依赖版本锁定于 package.json
-- Electron v33 + React 18 + Semi Design 2.74
-- 无 Dependabot 或 Renovate
-- 无 `npm audit` 集成到 CI
-- 改进路径：开启 Dependabot → 集成 audit 到 CI → 添加 SCA 扫描
-
-## 历史追踪
-
-| 日期 | 全局评分 | 变动 | 备注 |
-|------|---------|------|------|
-| 2026-05-21 | C | 基线 | 项目初始化后首次评分 |
+- ESLint 仍有 warning，主要是历史 console、显式 `any` 和 hooks exhaustive-deps。
+- React Compiler 类 hooks 规则当前未作为门禁启用；项目仍是 React 18。
+- 缺少固定的 Playwright/Electron e2e CI。
+- 主 bundle 约 5MB，后续需要 code splitting 或 manual chunks。
+- 文档自动校验目前只覆盖存在性和少量链接，不足以发现“状态过期”。
 
 ## 提升目标
 
-- **短期（1-2 周）**：补齐缺失文档，达到 docs/ 领域 C+ → B-
-- **中期（1 个月）**：为核心模块添加测试，建立 CI 基础流水线
-- **长期（3 个月）**：全局评分达到 B，自动化覆盖所有关键路径
+- **短期**：保持 `npm run check`、`npm run typecheck`、`npm test`、`npm run build` 全部通过。
+- **中期**：把 console / any / hooks warning 分批降到可管理范围，并建立文档过期扫描。
+- **长期**：加入 Electron/CDP e2e 门禁、bundle 预算和发布签名/安全扫描。

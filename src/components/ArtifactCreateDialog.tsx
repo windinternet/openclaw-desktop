@@ -28,7 +28,17 @@ const ALL_TYPE_OPTIONS: { value: ArtifactType; label: string }[] = [
   { value: 'video', label: '🎬 视频' },
 ];
 
-const HTML_TYPES: ArtifactType[] = ['report', 'dashboard', 'analysis', 'checklist', 'code', 'document', 'slide', 'form', 'other'];
+const HTML_TYPES: ArtifactType[] = [
+  'report',
+  'dashboard',
+  'analysis',
+  'checklist',
+  'code',
+  'document',
+  'slide',
+  'form',
+  'other',
+];
 const FILE_TYPES: ArtifactType[] = ['file', 'audio', 'image', 'video'];
 const MEDIA_TYPES: ArtifactType[] = ['audio', 'image', 'video'];
 
@@ -81,9 +91,14 @@ export function ArtifactCreateDialog({ visible, onClose }: Props) {
         icon: getDefaultIcon(type),
         tags: tags.length > 0 ? tags : undefined,
         html: isHtmlType
-          ? (html || '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + title + '</title></head><body><h1>' + title + '</h1></body></html>')
+          ? html ||
+            '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' +
+              title +
+              '</title></head><body><h1>' +
+              title +
+              '</h1></body></html>'
           : undefined,
-        url: isLinkType ? url.trim() : (isMediaType && url ? url.trim() : undefined),
+        url: isLinkType ? url.trim() : isMediaType && url ? url.trim() : undefined,
         command: isAppType ? command.trim() : undefined,
         filePath: isFileType && filePath ? filePath : undefined,
         fileName: isFileType && fileName ? fileName : undefined,
@@ -171,7 +186,13 @@ export function ArtifactCreateDialog({ visible, onClose }: Props) {
         {isHtmlType && (
           <div>
             <div style={labelStyle}>{t('artifact.htmlContent')}</div>
-            <TextArea placeholder={t('artifact.htmlPlaceholder')} value={html} onChange={setHtml} rows={6} maxCount={100000} />
+            <TextArea
+              placeholder={t('artifact.htmlPlaceholder')}
+              value={html}
+              onChange={setHtml}
+              rows={6}
+              maxCount={100000}
+            />
           </div>
         )}
 

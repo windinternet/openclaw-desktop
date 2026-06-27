@@ -156,9 +156,7 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
                         gap: 10,
                         padding: '24px 12px',
                         borderRadius: 12,
-                        border: `2px solid ${
-                          isSelected ? 'var(--semi-color-primary)' : 'var(--semi-color-border)'
-                        }`,
+                        border: `2px solid ${isSelected ? 'var(--semi-color-primary)' : 'var(--semi-color-border)'}`,
                         backgroundColor: isSelected
                           ? 'var(--semi-color-primary-light-default)'
                           : 'var(--semi-color-fill-0)',
@@ -168,10 +166,7 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
                       }}
                     >
                       <span style={{ fontSize: 32, lineHeight: 1 }}>{mode.emoji}</span>
-                      <Text
-                        strong={isSelected}
-                        style={{ color: isSelected ? 'var(--semi-color-primary)' : undefined }}
-                      >
+                      <Text strong={isSelected} style={{ color: isSelected ? 'var(--semi-color-primary)' : undefined }}>
                         {t(mode.labelKey)}
                       </Text>
                     </div>
@@ -277,9 +272,7 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
                         gap: 8,
                         padding: '28px 12px',
                         borderRadius: 12,
-                        border: `2px solid ${
-                          isSelected ? 'var(--semi-color-primary)' : 'var(--semi-color-border)'
-                        }`,
+                        border: `2px solid ${isSelected ? 'var(--semi-color-primary)' : 'var(--semi-color-border)'}`,
                         backgroundColor: isSelected
                           ? 'var(--semi-color-primary-light-default)'
                           : 'var(--semi-color-fill-0)',
@@ -352,20 +345,11 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
           </Button>
 
           {isLastStep ? (
-            <Button
-              theme="solid"
-              type="primary"
-              size="large"
-              onClick={handleFinish}
-            >
+            <Button theme="solid" type="primary" size="large" onClick={handleFinish}>
               {t('wizard.finish')}
             </Button>
           ) : (
-            <Button
-              theme="solid"
-              type="primary"
-              onClick={handleNext}
-            >
+            <Button theme="solid" type="primary" onClick={handleNext}>
               {t('wizard.next')}
             </Button>
           )}

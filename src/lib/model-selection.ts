@@ -22,7 +22,9 @@ export function extractGatewayDefaultModel(config: unknown): string | undefined 
   return undefined;
 }
 
-export async function fetchGatewayDefaultModel(client: GatewayConfigClient | null | undefined): Promise<string | undefined> {
+export async function fetchGatewayDefaultModel(
+  client: GatewayConfigClient | null | undefined,
+): Promise<string | undefined> {
   if (!client) return undefined;
   try {
     return extractGatewayDefaultModel(await client.request('config.get'));
@@ -49,9 +51,11 @@ export function resolvePreferredModel(options: {
     options.models[0]?.id,
   ].filter((value): value is string => typeof value === 'string' && value.length > 0);
 
-  return candidates
-    .map((candidate) => resolveModelValue(candidate, options.models))
-    .find((candidate) => candidate.length > 0) ?? '';
+  return (
+    candidates
+      .map((candidate) => resolveModelValue(candidate, options.models))
+      .find((candidate) => candidate.length > 0) ?? ''
+  );
 }
 
 export function formatModelOptionLabel(model: ModelInfo): string {
@@ -72,7 +76,9 @@ export function resolveModelValue(value: string, models: ModelInfo[], options?: 
   if (exact) return getModelOptionValue(exact);
 
   const tail = value.split('/').pop();
-  const byTail = tail ? models.find((model) => model.id === tail || getModelOptionValue(model).endsWith(`/${tail}`)) : undefined;
+  const byTail = tail
+    ? models.find((model) => model.id === tail || getModelOptionValue(model).endsWith(`/${tail}`))
+    : undefined;
   if (byTail) return getModelOptionValue(byTail);
 
   if (models.length === 0 || options?.preserveUnknown) return value;

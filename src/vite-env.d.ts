@@ -9,7 +9,17 @@ interface Window {
       electron: string;
     };
     discover: {
-      scan: () => Promise<{ url: string; name?: string; version?: string; host?: string; ip?: string; authMode?: string; token?: string }[]>;
+      scan: () => Promise<
+        {
+          url: string;
+          name?: string;
+          version?: string;
+          host?: string;
+          ip?: string;
+          authMode?: string;
+          token?: string;
+        }[]
+      >;
     };
     config: {
       getUserDataPath: () => Promise<string>;
@@ -18,7 +28,9 @@ interface Window {
       show: (params: { title: string; body: string }) => Promise<boolean>;
     };
     marketplace: {
-      search: (params: import('./lib/types').SkillMarketplaceSearchParams) => Promise<import('./lib/types').SkillMarketplaceSkill[]>;
+      search: (
+        params: import('./lib/types').SkillMarketplaceSearchParams,
+      ) => Promise<import('./lib/types').SkillMarketplaceSkill[]>;
     };
     storage: {
       loadAppState: () => Promise<{
@@ -71,15 +83,29 @@ interface Window {
         suggestedKnowledge?: Partial<import('./lib/agentic-repository').KnowledgeRepositoryMapping>;
       }>;
       listTree?: (repoPath: string, maxEntries?: number) => Promise<string[]>;
-      listMarkdown?: (repoPath: string, directory: string) => Promise<import('./lib/repository-knowledge').RepositoryMarkdownFile[]>;
+      listMarkdown?: (
+        repoPath: string,
+        directory: string,
+      ) => Promise<import('./lib/repository-knowledge').RepositoryMarkdownFile[]>;
       readText?: (repoPath: string, relativePath: string) => Promise<string>;
       writeText?: (repoPath: string, relativePath: string, content: string) => Promise<void>;
-      search?: (repoPath: string, query: string, directories: string[]) => Promise<import('./lib/repository-knowledge').RepositorySearchResult[]>;
+      search?: (
+        repoPath: string,
+        query: string,
+        directories: string[],
+      ) => Promise<import('./lib/repository-knowledge').RepositorySearchResult[]>;
       gitStatus?: (repoPath: string) => Promise<string>;
       gitDiff?: (repoPath: string) => Promise<string>;
-      gitLog?: (repoPath: string, relativePath: string, limit?: number) => Promise<import('./lib/repository-knowledge').RepositoryGitLogEntry[]>;
+      gitLog?: (
+        repoPath: string,
+        relativePath: string,
+        limit?: number,
+      ) => Promise<import('./lib/repository-knowledge').RepositoryGitLogEntry[]>;
       gitCommit?: (repoPath: string, message: string) => Promise<string>;
-      watchAgentsFile?: (repoPath: string, cb: (event: { watchId: string; repoPath: string }) => void) => Promise<() => void>;
+      watchAgentsFile?: (
+        repoPath: string,
+        cb: (event: { watchId: string; repoPath: string }) => void,
+      ) => Promise<() => void>;
     };
     device: {
       signChallenge: (params: {
@@ -118,7 +144,11 @@ interface Window {
       saveHtml: (artifactId: string, version: number, html: string) => Promise<void>;
       list: () => Promise<unknown[]>;
       updateIndex: (entries: unknown) => Promise<void>;
-      requestAuth: (artifactId: string, capability: string, detail: string) => Promise<{ granted: boolean; level: string }>;
+      requestAuth: (
+        artifactId: string,
+        capability: string,
+        detail: string,
+      ) => Promise<{ granted: boolean; level: string }>;
       onAuthRequest: (cb: (...args: unknown[]) => void) => void;
       grantAuth: (result: { granted: boolean; level: string }) => void;
     };

@@ -1,12 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  Typography,
-  Tag,
-  Button,
-  Spin,
-  Empty,
-  Space,
-} from '@douyinfe/semi-ui';
+import { Typography, Tag, Button, Spin, Empty, Space } from '@douyinfe/semi-ui';
 import { IconRefresh, IconFile, IconCalendar } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
@@ -75,12 +68,22 @@ export default function MemoryPage() {
 
   const { today, yesterday } = useMemo(() => getDateStrs(), []);
 
-  const todayFiles = useMemo(() => memoryFiles.filter((f) => parseDateFromFilename(f.name) === today), [memoryFiles, today]);
-  const yesterdayFiles = useMemo(() => memoryFiles.filter((f) => parseDateFromFilename(f.name) === yesterday), [memoryFiles, yesterday]);
-  const olderFiles = useMemo(() => memoryFiles.filter((f) => {
-    const d = parseDateFromFilename(f.name);
-    return d !== today && d !== yesterday;
-  }), [memoryFiles, today, yesterday]);
+  const todayFiles = useMemo(
+    () => memoryFiles.filter((f) => parseDateFromFilename(f.name) === today),
+    [memoryFiles, today],
+  );
+  const yesterdayFiles = useMemo(
+    () => memoryFiles.filter((f) => parseDateFromFilename(f.name) === yesterday),
+    [memoryFiles, yesterday],
+  );
+  const olderFiles = useMemo(
+    () =>
+      memoryFiles.filter((f) => {
+        const d = parseDateFromFilename(f.name);
+        return d !== today && d !== yesterday;
+      }),
+    [memoryFiles, today, yesterday],
+  );
 
   // Refresh handler
   const handleRefresh = useCallback(async () => {
@@ -93,45 +96,48 @@ export default function MemoryPage() {
   }, [isConnected, fetchWorkspaceFiles]);
 
   // Toggle expand file content
-  const handleToggleExpand = useCallback(async (file: WorkspaceFile) => {
-    const fileName = file.name;
-    if (expanded.has(fileName)) {
-      setExpanded((prev) => {
-        const next = new Set(prev);
-        next.delete(fileName);
-        return next;
-      });
-      return;
-    }
-
-    // Already have content cached
-    if (contents[fileName]) {
-      setExpanded((prev) => new Set(prev).add(fileName));
-      return;
-    }
-
-    if (!activeClient) return;
-
-    setLoadingContent((prev) => new Set(prev).add(fileName));
-    try {
-      const data = await activeClient.request<WorkspaceFileContent>('agents.files.get', {
-        agentId: 'main',
-        name: fileName,
-      });
-      if (data?.content) {
-        setContents((prev) => ({ ...prev, [fileName]: data.content }));
-        setExpanded((prev) => new Set(prev).add(fileName));
+  const handleToggleExpand = useCallback(
+    async (file: WorkspaceFile) => {
+      const fileName = file.name;
+      if (expanded.has(fileName)) {
+        setExpanded((prev) => {
+          const next = new Set(prev);
+          next.delete(fileName);
+          return next;
+        });
+        return;
       }
-    } catch (err) {
-      console.error('[MemoryPage] read file error:', err);
-    } finally {
-      setLoadingContent((prev) => {
-        const next = new Set(prev);
-        next.delete(fileName);
-        return next;
-      });
-    }
-  }, [activeClient, expanded, contents]);
+
+      // Already have content cached
+      if (contents[fileName]) {
+        setExpanded((prev) => new Set(prev).add(fileName));
+        return;
+      }
+
+      if (!activeClient) return;
+
+      setLoadingContent((prev) => new Set(prev).add(fileName));
+      try {
+        const data = await activeClient.request<WorkspaceFileContent>('agents.files.get', {
+          agentId: 'main',
+          name: fileName,
+        });
+        if (data?.content) {
+          setContents((prev) => ({ ...prev, [fileName]: data.content }));
+          setExpanded((prev) => new Set(prev).add(fileName));
+        }
+      } catch (err) {
+        console.error('[MemoryPage] read file error:', err);
+      } finally {
+        setLoadingContent((prev) => {
+          const next = new Set(prev);
+          next.delete(fileName);
+          return next;
+        });
+      }
+    },
+    [activeClient, expanded, contents],
+  );
 
   const renderMemoryEntry = (file: WorkspaceFile, isToday: boolean) => {
     const dateStr = parseDateFromFilename(file.name);
@@ -145,7 +151,9 @@ export default function MemoryPage() {
         onClick={() => handleToggleExpand(file)}
         role="button"
         tabIndex={0}
-        onKeyDown={(e) => { if (e.key === 'Enter') handleToggleExpand(file); }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') handleToggleExpand(file);
+        }}
         style={{
           marginBottom: 8,
           borderRadius: 8,
@@ -167,11 +175,11 @@ export default function MemoryPage() {
         >
           <Space>
             <IconCalendar size="small" />
-            <Text weight={600}>
-              {dateStr ? formatDateLabel(dateStr) : file.name}
-            </Text>
+            <Text weight={600}>{dateStr ? formatDateLabel(dateStr) : file.name}</Text>
             {isToday && (
-              <Tag color="blue" size="small">{t('common.today')}</Tag>
+              <Tag color="blue" size="small">
+                {t('common.today')}
+              </Tag>
             )}
           </Space>
           <Space>
@@ -186,11 +194,11 @@ export default function MemoryPage() {
               </Text>
             )}
             {!isExpanded && !isLoadingContent && (
-              <Text type="tertiary" size="small">{t('common.clickToView')}</Text>
+              <Text type="tertiary" size="small">
+                {t('common.clickToView')}
+              </Text>
             )}
-            {isLoadingContent && (
-              <Spin size="small" />
-            )}
+            {isLoadingContent && <Spin size="small" />}
           </Space>
         </div>
 
@@ -232,15 +240,12 @@ export default function MemoryPage() {
       {/* ─── Header ─── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
-          <Title heading={3} style={{ marginBottom: 4 }}>{t('nav.memory')}</Title>
+          <Title heading={3} style={{ marginBottom: 4 }}>
+            {t('nav.memory')}
+          </Title>
           <Text type="tertiary">{t('page.memoryDesc')}</Text>
         </div>
-        <Button
-          icon={<IconRefresh />}
-          onClick={handleRefresh}
-          loading={loading}
-          theme="outline"
-        >
+        <Button icon={<IconRefresh />} onClick={handleRefresh} loading={loading} theme="outline">
           {t('common.refresh')}
         </Button>
       </div>
@@ -255,22 +260,30 @@ export default function MemoryPage() {
           backgroundColor: 'var(--semi-color-bg-1)',
         }}
       >
-        <Text weight={600} style={{ display: 'block', marginBottom: 12 }}>{t('memory.overview')}</Text>
+        <Text weight={600} style={{ display: 'block', marginBottom: 12 }}>
+          {t('memory.overview')}
+        </Text>
         <div style={{ display: 'flex', gap: 32 }}>
           <div>
-            <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 4 }}>{t('memory.connectionStatus')}</Text>
+            <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 4 }}>
+              {t('memory.connectionStatus')}
+            </Text>
             <Tag color={isConnected ? 'green' : 'red'}>
               {isConnected ? t('instance.statusConnected') : t('instance.statusDisconnected')}
             </Tag>
           </div>
           <div>
-            <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 4 }}>{t('memory.memoryFiles')}</Text>
+            <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 4 }}>
+              {t('memory.memoryFiles')}
+            </Text>
             <Tag color={memoryFiles.length > 0 ? 'blue' : 'grey'}>
               {t('memory.nFiles', { count: memoryFiles.length })}
             </Tag>
           </div>
           <div>
-            <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 4 }}>{t('memory.todayMemory')}</Text>
+            <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 4 }}>
+              {t('memory.todayMemory')}
+            </Text>
             <Tag color={todayFiles.length > 0 ? 'green' : 'grey'}>
               {todayFiles.length > 0 ? t('memory.nEntries', { count: todayFiles.length }) : t('common.none')}
             </Tag>
@@ -286,16 +299,11 @@ export default function MemoryPage() {
       )}
 
       {/* ─── No Connection ─── */}
-      {!isConnected && !loading && (
-        <Empty description={t('memory.notConnected')} style={{ marginTop: 48 }} />
-      )}
+      {!isConnected && !loading && <Empty description={t('memory.notConnected')} style={{ marginTop: 48 }} />}
 
       {/* ─── No Memory Files ─── */}
       {isConnected && !loading && memoryFiles.length === 0 && (
-        <Empty
-          description={t('memory.noFiles')}
-          style={{ marginTop: 48 }}
-        />
+        <Empty description={t('memory.noFiles')} style={{ marginTop: 48 }} />
       )}
 
       {/* ─── Today's Memory ─── */}
@@ -304,7 +312,9 @@ export default function MemoryPage() {
           <Title heading={5} style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
             <IconCalendar />
             {t('memory.todayMemory')}
-            <Tag size="small" color="blue">{today}</Tag>
+            <Tag size="small" color="blue">
+              {today}
+            </Tag>
           </Title>
           {todayFiles.map((f) => renderMemoryEntry(f, true))}
         </div>

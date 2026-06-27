@@ -5,7 +5,13 @@ export const DESKTOP_COMPANION_PLUGIN_ID = 'openclaw-desktop-companion' as const
 export const DESKTOP_COMPANION_PROTOCOL_VERSION = 2;
 export const DESKTOP_COMPANION_INSTALL_SPEC = 'git:github.com/windinternet/openclaw-desktop-companion@main';
 
-export type DesktopCompanionStatus = 'missing' | 'disabled' | 'incompatible' | 'ready' | 'degraded' | 'approval_required';
+export type DesktopCompanionStatus =
+  | 'missing'
+  | 'disabled'
+  | 'incompatible'
+  | 'ready'
+  | 'degraded'
+  | 'approval_required';
 
 export interface DesktopCompanionInfo {
   status: DesktopCompanionStatus;
@@ -230,7 +236,9 @@ export async function clearDesktopCompanionRepositoryContext(
   client: Pick<GatewayClient, 'request'>,
   bindingId: string,
 ): Promise<DesktopCompanionRepositoryContextResult> {
-  return client.request<DesktopCompanionRepositoryContextResult>('desktopCompanion.repositoryContext.clear', { bindingId });
+  return client.request<DesktopCompanionRepositoryContextResult>('desktopCompanion.repositoryContext.clear', {
+    bindingId,
+  });
 }
 
 export function extractDesktopCompanionApprovalRequestId(message: string): string | null {

@@ -147,10 +147,7 @@ function parseUserMd(markdown: string): GatewayUser | null {
  * @param client 已连接的 GatewayClient（必须已完成 connect 握手）
  * @param agentId 目标 Agent ID，默认 "main"
  */
-export async function fetchUserProfile(
-  client: GatewayClient,
-  agentId: string = 'main',
-): Promise<GatewayUser | null> {
+export async function fetchUserProfile(client: GatewayClient, agentId: string = 'main'): Promise<GatewayUser | null> {
   try {
     // Step 1: 确认 USER.md 是否存在
     const listData = await client.request<{ files?: AgentFileEntry[] } | AgentFileEntry[]>('agents.files.list', {
@@ -164,17 +161,19 @@ export async function fetchUserProfile(
     }
 
     // Step 2: 读取 USER.md 内容
-    const fileData = await client.request<{ file?: { content?: string } } | { content?: string } | string>('agents.files.get', {
-      agentId,
-      name: 'USER.md',
-    });
+    const fileData = await client.request<{ file?: { content?: string } } | { content?: string } | string>(
+      'agents.files.get',
+      {
+        agentId,
+        name: 'USER.md',
+      },
+    );
 
     const content: string | undefined =
       typeof fileData === 'string'
         ? fileData
-        : (fileData as Record<string, unknown>)?.file &&
-          typeof (fileData as Record<string, unknown>).file === 'object'
-          ? ((fileData as Record<string, unknown>).file as Record<string, unknown>)?.content as string | undefined
+        : (fileData as Record<string, unknown>)?.file && typeof (fileData as Record<string, unknown>).file === 'object'
+          ? (((fileData as Record<string, unknown>).file as Record<string, unknown>)?.content as string | undefined)
           : (fileData as { content?: string })?.content;
 
     if (!content) {

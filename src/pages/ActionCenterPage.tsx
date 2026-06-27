@@ -230,16 +230,19 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
     [activeClient, connectionStatus, currentInstanceId, t],
   );
 
-  const headerActions = useMemo(() => (
-    <Space>
-      <Button icon={<IconRefresh />} onClick={loadRuns} loading={loading}>
-        {t('common.refresh')}
-      </Button>
-      <Button icon={<IconDelete />} type="danger" onClick={clearRuns} disabled={runs.length === 0}>
-        {t('actions.clearRecords')}
-      </Button>
-    </Space>
-  ), [clearRuns, loadRuns, loading, runs.length, t]);
+  const headerActions = useMemo(
+    () => (
+      <Space>
+        <Button icon={<IconRefresh />} onClick={loadRuns} loading={loading}>
+          {t('common.refresh')}
+        </Button>
+        <Button icon={<IconDelete />} type="danger" onClick={clearRuns} disabled={runs.length === 0}>
+          {t('actions.clearRecords')}
+        </Button>
+      </Space>
+    ),
+    [clearRuns, loadRuns, loading, runs.length, t],
+  );
 
   useEffect(() => {
     if (!embedded) return undefined;
@@ -343,7 +346,9 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
                           loading={resyncLoadingId === selectedRun.id}
                           onClick={() => handleResync(selectedRun)}
                         >
-                          {selectedRun.status === 'running' || selectedRun.status === 'awaiting_approval' ? t('actions.refreshState') : t('actions.resync')}
+                          {selectedRun.status === 'running' || selectedRun.status === 'awaiting_approval'
+                            ? t('actions.refreshState')
+                            : t('actions.resync')}
                         </Button>
                         {(selectedRun.status === 'running' || selectedRun.status === 'awaiting_approval') && (
                           <Button
@@ -448,7 +453,11 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
                                   approval.risk === 'high' ? 'red' : approval.risk === 'medium' ? 'orange' : 'blue'
                                 }
                               >
-                                {approval.risk === 'high' ? t('auth.highRisk') : approval.risk === 'medium' ? t('auth.medRisk') : t('auth.lowRisk')}
+                                {approval.risk === 'high'
+                                  ? t('auth.highRisk')
+                                  : approval.risk === 'medium'
+                                    ? t('auth.medRisk')
+                                    : t('auth.lowRisk')}
                               </Tag>
                               <Tag
                                 color={

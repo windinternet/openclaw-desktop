@@ -1,24 +1,8 @@
 import { forwardRef, useImperativeHandle, useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { CSSProperties, DragEvent } from 'react';
-import {
-  Card,
-  Tag,
-  Button,
-  Modal,
-  Form,
-  Typography,
-  Space,
-  Toast,
-  Tooltip,
-} from '@douyinfe/semi-ui';
-import {
-  IconPlus,
-  IconDelete,
-  IconHandle,
-  IconAlertCircle,
-  IconServer,
-} from '@douyinfe/semi-icons';
+import { Card, Tag, Button, Modal, Form, Typography, Space, Toast, Tooltip } from '@douyinfe/semi-ui';
+import { IconPlus, IconDelete, IconHandle, IconAlertCircle, IconServer } from '@douyinfe/semi-icons';
 import { useStore } from '../lib';
 import type { AgentInfo } from '../lib/types';
 import type { KanbanCard, KanbanColumn } from '../lib/types';
@@ -320,9 +304,7 @@ function normalizeColumns(columns: KanbanColumn[] | null): KanbanColumn[] {
   const columnMap = new Map(columns.map((c) => [c.id, c]));
   return COLUMN_DEFS.map((def) => {
     const existing = columnMap.get(def.id);
-    return existing
-      ? { ...existing, title: def.title }
-      : { id: def.id, title: def.title, cards: [] };
+    return existing ? { ...existing, title: def.title } : { id: def.id, title: def.title, cards: [] };
   });
 }
 
@@ -389,9 +371,7 @@ function KanbanCardItem({ card, agentName, onDelete, onDragStart }: KanbanCardIt
         </div>
 
         {/* Title */}
-        <Text style={visualStyle.title}>
-          {card.title}
-        </Text>
+        <Text style={visualStyle.title}>{card.title}</Text>
 
         {/* Footer: priority + agent + date */}
         <div
@@ -438,7 +418,10 @@ export interface KanbanPageHandle {
   getCardCount(): number;
 }
 
-const KanbanPage = forwardRef<KanbanPageHandle, { embedded?: boolean }>(function KanbanPage({ embedded: _embedded = false }, ref) {
+const KanbanPage = forwardRef<KanbanPageHandle, { embedded?: boolean }>(function KanbanPage(
+  { embedded: _embedded = false },
+  ref,
+) {
   const { t } = useTranslation();
   const agents = useStore((s) => s.agents);
   const currentInstanceId = useStore((s) => s.currentInstanceId);
@@ -489,14 +472,11 @@ const KanbanPage = forwardRef<KanbanPageHandle, { embedded?: boolean }>(function
 
   // ── Drag & Drop handlers ─────────────────────────────────────────
 
-  const handleDragStart = useCallback(
-    (e: DragEvent, cardId: string, sourceStatus: string) => {
-      dragSourceRef.current = { cardId, sourceStatus };
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', cardId);
-    },
-    [],
-  );
+  const handleDragStart = useCallback((e: DragEvent, cardId: string, sourceStatus: string) => {
+    dragSourceRef.current = { cardId, sourceStatus };
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', cardId);
+  }, []);
 
   const handleDragOver = useCallback((e: DragEvent, status: string) => {
     e.preventDefault();
@@ -508,40 +488,37 @@ const KanbanPage = forwardRef<KanbanPageHandle, { embedded?: boolean }>(function
     setDragOverStatus(null);
   }, []);
 
-  const handleDrop = useCallback(
-    (e: DragEvent, targetStatus: string) => {
-      e.preventDefault();
-      setDragOverStatus(null);
+  const handleDrop = useCallback((e: DragEvent, targetStatus: string) => {
+    e.preventDefault();
+    setDragOverStatus(null);
 
-      const source = dragSourceRef.current;
-      if (!source) return;
-      if (source.sourceStatus === targetStatus) return;
+    const source = dragSourceRef.current;
+    if (!source) return;
+    if (source.sourceStatus === targetStatus) return;
 
-      setColumns((prev) => {
-        const newCols = prev.map((col) => ({
-          ...col,
-          cards: [...col.cards],
-        }));
+    setColumns((prev) => {
+      const newCols = prev.map((col) => ({
+        ...col,
+        cards: [...col.cards],
+      }));
 
-        const sourceCol = newCols.find((c) => c.id === source.sourceStatus);
-        const targetCol = newCols.find((c) => c.id === targetStatus);
-        if (!sourceCol || !targetCol) return prev;
+      const sourceCol = newCols.find((c) => c.id === source.sourceStatus);
+      const targetCol = newCols.find((c) => c.id === targetStatus);
+      if (!sourceCol || !targetCol) return prev;
 
-        const cardIndex = sourceCol.cards.findIndex((c) => c.id === source.cardId);
-        if (cardIndex === -1) return prev;
+      const cardIndex = sourceCol.cards.findIndex((c) => c.id === source.cardId);
+      if (cardIndex === -1) return prev;
 
-        const [movedCard] = sourceCol.cards.splice(cardIndex, 1);
-        movedCard.status = targetStatus as KanbanCard['status'];
-        movedCard.updatedAt = Date.now();
-        targetCol.cards.push(movedCard);
+      const [movedCard] = sourceCol.cards.splice(cardIndex, 1);
+      movedCard.status = targetStatus as KanbanCard['status'];
+      movedCard.updatedAt = Date.now();
+      targetCol.cards.push(movedCard);
 
-        return newCols;
-      });
+      return newCols;
+    });
 
-      dragSourceRef.current = null;
-    },
-    [],
-  );
+    dragSourceRef.current = null;
+  }, []);
 
   const handleDragEnd = useCallback(() => {
     setDragOverStatus(null);
@@ -550,15 +527,18 @@ const KanbanPage = forwardRef<KanbanPageHandle, { embedded?: boolean }>(function
 
   // ── Card CRUD ────────────────────────────────────────────────────
 
-  const handleDeleteCard = useCallback((cardId: string) => {
-    setColumns((prev) =>
-      prev.map((col) => ({
-        ...col,
-        cards: col.cards.filter((c) => c.id !== cardId),
-      })),
-    );
-    Toast.success(t('kanban.cardDeleted'));
-  }, [t]);
+  const handleDeleteCard = useCallback(
+    (cardId: string) => {
+      setColumns((prev) =>
+        prev.map((col) => ({
+          ...col,
+          cards: col.cards.filter((c) => c.id !== cardId),
+        })),
+      );
+      Toast.success(t('kanban.cardDeleted'));
+    },
+    [t],
+  );
 
   const handleAddCard = useCallback(
     (values: Record<string, unknown>) => {
@@ -578,11 +558,7 @@ const KanbanPage = forwardRef<KanbanPageHandle, { embedded?: boolean }>(function
       };
 
       setColumns((prev) =>
-        prev.map((col) =>
-          col.id === addTargetColumn
-            ? { ...col, cards: [...col.cards, newCard] }
-            : col,
-        ),
+        prev.map((col) => (col.id === addTargetColumn ? { ...col, cards: [...col.cards, newCard] } : col)),
       );
       setAddModalVisible(false);
       Toast.success(t('kanban.cardAdded'));
@@ -603,9 +579,13 @@ const KanbanPage = forwardRef<KanbanPageHandle, { embedded?: boolean }>(function
     return agentNameString(agent?.name) || agent?.id;
   };
 
-  useImperativeHandle(ref, () => ({
-    getCardCount: () => columns.reduce((sum, col) => sum + col.cards.length, 0),
-  }), [columns]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      getCardCount: () => columns.reduce((sum, col) => sum + col.cards.length, 0),
+    }),
+    [columns],
+  );
 
   const cardCounts = columns.reduce(
     (acc, col) => {
@@ -668,68 +648,66 @@ const KanbanPage = forwardRef<KanbanPageHandle, { embedded?: boolean }>(function
           );
 
           return (
-          <Card
-            key={col.id}
-            bordered={columnStyle.bordered}
-            shadows={columnStyle.shadows}
-            title={columnTitle}
-            headerExtraContent={
-              <Button
-                icon={<IconPlus />}
-                size="small"
-                theme="borderless"
-                type="primary"
-                onClick={() => openAddModal(col.id)}
-                style={{ borderRadius: 6 }}
-              />
-            }
-            style={columnStyle.card}
-            headerStyle={columnStyle.header}
-            bodyStyle={columnStyle.body}
-          >
-            <div
-              onDragOver={(e) => handleDragOver(e, col.id)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, col.id)}
-              style={{
-                ...getColumnStyle(col.id),
-                border: getColumnBorder(col.id),
-                overflow: 'auto',
-                outline: dragOverStatus === col.id
-                  ? `2px dashed ${getColumnAccent(col.id)}`
-                  : 'none',
-                outlineOffset: -2,
-              }}
+            <Card
+              key={col.id}
+              bordered={columnStyle.bordered}
+              shadows={columnStyle.shadows}
+              title={columnTitle}
+              headerExtraContent={
+                <Button
+                  icon={<IconPlus />}
+                  size="small"
+                  theme="borderless"
+                  type="primary"
+                  onClick={() => openAddModal(col.id)}
+                  style={{ borderRadius: 6 }}
+                />
+              }
+              style={columnStyle.card}
+              headerStyle={columnStyle.header}
+              bodyStyle={columnStyle.body}
             >
-              {col.cards.length === 0 ? (
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    height: 120,
-                    opacity: 0.4,
-                    gap: 4,
-                  }}
-                >
-                  <Text type="tertiary" size="small">
-                    {t('kanban.dragHere')}
-                  </Text>
-                </div>
-              ) : (
-                col.cards.map((card) => (
-                  <KanbanCardItem
-                    key={card.id}
-                    card={card}
-                    agentName={getAgentName(card.agentId)}
-                    onDelete={handleDeleteCard}
-                    onDragStart={handleDragStart}
-                  />
-                ))
-              )}
-            </div>
-          </Card>
+              <div
+                onDragOver={(e) => handleDragOver(e, col.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, col.id)}
+                style={{
+                  ...getColumnStyle(col.id),
+                  border: getColumnBorder(col.id),
+                  overflow: 'auto',
+                  outline: dragOverStatus === col.id ? `2px dashed ${getColumnAccent(col.id)}` : 'none',
+                  outlineOffset: -2,
+                }}
+              >
+                {col.cards.length === 0 ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: 120,
+                      opacity: 0.4,
+                      gap: 4,
+                    }}
+                  >
+                    <Text type="tertiary" size="small">
+                      {t('kanban.dragHere')}
+                    </Text>
+                  </div>
+                ) : (
+                  col.cards.map((card) => (
+                    <KanbanCardItem
+                      key={card.id}
+                      card={card}
+                      agentName={getAgentName(card.agentId)}
+                      onDelete={handleDeleteCard}
+                      onDragStart={handleDragStart}
+                    />
+                  ))
+                )}
+              </div>
+            </Card>
           );
         })}
       </div>
@@ -751,27 +729,28 @@ const KanbanPage = forwardRef<KanbanPageHandle, { embedded?: boolean }>(function
             rules={[{ required: true, message: t('kanban.cardTitleRequired') }]}
             style={{ width: '100%' }}
           />
-          <Form.Select
-            field="priority"
-            label={t('kanban.cardPriority')}
-            style={{ width: '100%' }}
-            initValue="medium"
-          >
+          <Form.Select field="priority" label={t('kanban.cardPriority')} style={{ width: '100%' }} initValue="medium">
             <Form.Select.Option value="high">
               <Space>
-                <Tag color="red" size="small">{t('kanban.priorityHigh')}</Tag>
+                <Tag color="red" size="small">
+                  {t('kanban.priorityHigh')}
+                </Tag>
                 <span>{t('kanban.priorityHigh')}</span>
               </Space>
             </Form.Select.Option>
             <Form.Select.Option value="medium">
               <Space>
-                <Tag color="orange" size="small">{t('kanban.priorityMedium')}</Tag>
+                <Tag color="orange" size="small">
+                  {t('kanban.priorityMedium')}
+                </Tag>
                 <span>{t('kanban.priorityMedium')}</span>
               </Space>
             </Form.Select.Option>
             <Form.Select.Option value="low">
               <Space>
-                <Tag color="grey" size="small">{t('kanban.priorityLow')}</Tag>
+                <Tag color="grey" size="small">
+                  {t('kanban.priorityLow')}
+                </Tag>
                 <span>{t('kanban.priorityLow')}</span>
               </Space>
             </Form.Select.Option>

@@ -31,9 +31,11 @@ function createClient(request: GatewayClient['request']): GatewayClient {
 
 describe('desktop companion detection', () => {
   it('returns missing when the companion RPC is unavailable', async () => {
-    const client = createClient(vi.fn(async () => {
-      throw new Error('Unknown method: desktopCompanion.status');
-    }) as GatewayClient['request']);
+    const client = createClient(
+      vi.fn(async () => {
+        throw new Error('Unknown method: desktopCompanion.status');
+      }) as GatewayClient['request'],
+    );
 
     await expect(detectDesktopCompanion(client)).resolves.toMatchObject({
       status: 'missing',
@@ -43,13 +45,15 @@ describe('desktop companion detection', () => {
   });
 
   it('returns ready for a compatible companion status payload', async () => {
-    const client = createClient(vi.fn(async () => ({
-      ok: true,
-      pluginId: 'openclaw-desktop-companion',
-      version: '0.1.0',
-      protocolVersion: 2,
-      capabilities: ['artifacts', 'outputs', 'repository', 'repository-context'],
-    })) as GatewayClient['request']);
+    const client = createClient(
+      vi.fn(async () => ({
+        ok: true,
+        pluginId: 'openclaw-desktop-companion',
+        version: '0.1.0',
+        protocolVersion: 2,
+        capabilities: ['artifacts', 'outputs', 'repository', 'repository-context'],
+      })) as GatewayClient['request'],
+    );
 
     await expect(detectDesktopCompanion(client)).resolves.toEqual({
       status: 'ready',
@@ -73,24 +77,29 @@ describe('desktop companion detection', () => {
     const source = readFileSync('src/pages/MainPage.tsx', 'utf8');
 
     expect(source).toContain('detectDesktopCompanionForInstance(currentId)');
-    expect(source).toContain('connectionStatus !== \'connected\'');
+    expect(source).toContain("connectionStatus !== 'connected'");
     expect(source).toContain('OpenClaw Desktop Companion 未安装或未启用');
-    expect(source).toContain('openclaw plugins install {DESKTOP_COMPANION_INSTALL_SPEC}');
-    expect(source).toContain('openclaw plugins enable {DESKTOP_COMPANION_PLUGIN_ID}');
+    expect(source).toContain('openclaw plugins install');
+    expect(source).toContain('DESKTOP_COMPANION_INSTALL_SPEC');
+    expect(source).toContain('openclaw plugins enable');
+    expect(source).toContain('DESKTOP_COMPANION_PLUGIN_ID');
   });
 
   it('creates a Gateway session for fallback companion installation', async () => {
     const request = vi.fn(async (method: string, params?: unknown) => {
       if (method === 'sessions.create') {
-        expect(params).toEqual(expect.objectContaining({
-          agentId: 'main',
-          key: expect.stringMatching(/^agent:main:desktop-companion-install:/),
-          label: expect.stringContaining('安装 OpenClaw Desktop Companion'),
-        }));
+        expect(params).toEqual(
+          expect.objectContaining({
+            agentId: 'main',
+            key: expect.stringMatching(/^agent:main:desktop-companion-install:/),
+            label: expect.stringContaining('安装 OpenClaw Desktop Companion'),
+          }),
+        );
         expect(params).not.toEqual(expect.objectContaining({ title: expect.anything() }));
         return { key: 'session:desktop-companion-install' };
       }
-      if (method === 'chat.send') return { runId: 'run_1', status: 'accepted', sessionKey: 'session:desktop-companion-install' };
+      if (method === 'chat.send')
+        return { runId: 'run_1', status: 'accepted', sessionKey: 'session:desktop-companion-install' };
       throw new Error(`unexpected method ${method}`);
     });
     const client = createClient(request as GatewayClient['request']);
@@ -100,16 +109,26 @@ describe('desktop companion detection', () => {
       runId: 'run_1',
     });
 
-    expect(request).toHaveBeenNthCalledWith(1, 'sessions.create', expect.objectContaining({
-      agentId: 'main',
-      key: expect.stringMatching(/^agent:main:desktop-companion-install:/),
-      label: expect.stringContaining('安装 OpenClaw Desktop Companion'),
-    }));
-    expect(request).toHaveBeenNthCalledWith(2, 'chat.send', expect.objectContaining({
-      sessionKey: 'session:desktop-companion-install',
-      message: expect.stringContaining('openclaw plugins install git:github.com/windinternet/openclaw-desktop-companion@main'),
-      idempotencyKey: expect.stringContaining('desktop-companion-install:'),
-    }));
+    expect(request).toHaveBeenNthCalledWith(
+      1,
+      'sessions.create',
+      expect.objectContaining({
+        agentId: 'main',
+        key: expect.stringMatching(/^agent:main:desktop-companion-install:/),
+        label: expect.stringContaining('安装 OpenClaw Desktop Companion'),
+      }),
+    );
+    expect(request).toHaveBeenNthCalledWith(
+      2,
+      'chat.send',
+      expect.objectContaining({
+        sessionKey: 'session:desktop-companion-install',
+        message: expect.stringContaining(
+          'openclaw plugins install git:github.com/windinternet/openclaw-desktop-companion@main',
+        ),
+        idempotencyKey: expect.stringContaining('desktop-companion-install:'),
+      }),
+    );
   });
 
   it('extracts and approves a pending Desktop node pairing request', async () => {
@@ -180,12 +199,14 @@ describe('desktop companion detection', () => {
   });
 
   it('throws readable errors for failed companion plugin management responses', async () => {
-    const client = createClient(vi.fn(async () => ({
-      ok: false,
-      action: 'reinstall',
-      error: 'cli-exit-nonzero',
-      message: 'install failed',
-    })) as GatewayClient['request']);
+    const client = createClient(
+      vi.fn(async () => ({
+        ok: false,
+        action: 'reinstall',
+        error: 'cli-exit-nonzero',
+        message: 'install failed',
+      })) as GatewayClient['request'],
+    );
 
     await expect(reinstallDesktopCompanion(client)).rejects.toThrow('install failed');
   });

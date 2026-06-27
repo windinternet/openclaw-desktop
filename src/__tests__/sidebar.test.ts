@@ -6,9 +6,9 @@ describe('Sidebar session list', () => {
     const source = readFileSync('src/components/Sidebar.tsx', 'utf8');
 
     // activity state indicators use sessionActivityStates map
-    expect(source).toContain("sessionActivityStates");
+    expect(source).toContain('sessionActivityStates');
     expect(source).toContain("actState === 'generating'");
-    expect(source).toContain("clearSessionActivityState");
+    expect(source).toContain('clearSessionActivityState');
     expect(source).toContain('session-spinner');
   });
 
@@ -56,7 +56,9 @@ describe('Sidebar session list', () => {
 
     expect(sidebarSource).toContain('const SIDEBAR_MACOS_TOP_INSET = 30;');
     expect(sidebarSource).toContain('const SIDEBAR_LINUX_TOP_INSET = 12;');
-    expect(sidebarSource).toContain('const sidebarTopInset = isMacOS ? SIDEBAR_MACOS_TOP_INSET : SIDEBAR_LINUX_TOP_INSET;');
+    expect(sidebarSource).toContain(
+      'const sidebarTopInset = isMacOS ? SIDEBAR_MACOS_TOP_INSET : SIDEBAR_LINUX_TOP_INSET;',
+    );
     expect(sidebarSource).toContain("style={{ flex: 1, paddingTop: sidebarTopInset, boxSizing: 'border-box' }}");
     expect(sidebarSource).toContain("WebkitAppRegion: 'drag'");
     expect(mainPageSource).not.toContain('paddingTop: isMacOS ? 30 : 0');
@@ -93,7 +95,7 @@ describe('Sidebar session list', () => {
     const source = readFileSync('src/components/Sidebar.tsx', 'utf8');
 
     expect(source).toContain("const SIDEBAR_AVATAR_FALLBACK_BG = 'rgb(var(--semi-blue-5))';");
-    expect(source).toContain("backgroundColor: SIDEBAR_AVATAR_FALLBACK_BG");
+    expect(source).toContain('backgroundColor: SIDEBAR_AVATAR_FALLBACK_BG');
     expect(source).not.toContain("backgroundColor: currentInstance.avatarUrl ? 'transparent'");
     expect(source).not.toContain("backgroundColor: currentInstance?.avatarUrl ? 'transparent'");
   });
@@ -112,7 +114,9 @@ describe('Sidebar session list', () => {
 
     expect(source).toContain('const INSTANCE_DRAWER_MACOS_TOP_INSET = 30;');
     expect(source).toContain("window.electronAPI?.platform === 'darwin'");
-    expect(source).toContain('const headerPaddingTop = isMacOS ? INSTANCE_DRAWER_MACOS_TOP_INSET + 16 : INSTANCE_DRAWER_LINUX_TOP_INSET + 16;');
+    expect(source).toContain(
+      'const headerPaddingTop = isMacOS ? INSTANCE_DRAWER_MACOS_TOP_INSET + 16 : INSTANCE_DRAWER_LINUX_TOP_INSET + 16;',
+    );
     expect(source).toContain('padding: `${headerPaddingTop}px 20px 16px`');
   });
 });

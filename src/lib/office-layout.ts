@@ -8,7 +8,7 @@ export interface MovementProfile {
 }
 
 export interface OfficeCollisionVolume {
-  height: number;       // top-surface Y; actor above this can pass over / land on
+  height: number; // top-surface Y; actor above this can pass over / land on
   id: string;
   x: number;
   z: number;
@@ -187,7 +187,7 @@ function resolveLeisurePlacement(
     position: {
       x: clamp(-7 + ((seed % 100) / 100 - 0.5), OFFICE_FREE_ROAM_BOUNDS.minX, OFFICE_FREE_ROAM_BOUNDS.maxX),
       y: OFFICE_AGENT_GROUND_Y,
-      z: clamp(3.4 + ((((seed >> 8) % 100) / 100) - 0.5), OFFICE_FREE_ROAM_BOUNDS.minZ, OFFICE_FREE_ROAM_BOUNDS.maxZ),
+      z: clamp(3.4 + (((seed >> 8) % 100) / 100 - 0.5), OFFICE_FREE_ROAM_BOUNDS.minZ, OFFICE_FREE_ROAM_BOUNDS.maxZ),
     },
   };
 }

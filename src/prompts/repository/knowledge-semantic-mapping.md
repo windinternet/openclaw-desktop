@@ -3,6 +3,7 @@
 这种模式要解决的问题是：如果只把文档作为 RAG/上传文件来临时检索，模型每次回答都要重新从原始材料里拼接知识，知识不会累积。更好的模式是让 LLM 把资料逐步编译成一个持久、互相链接、可维护的 Markdown Wiki。新资料加入后，LLM 不只是索引它，而是把关键信息整合进已有页面、更新相关主题/实体页、标记新旧说法的冲突、补充交叉引用，让知识层随时间变厚。
 
 判断标准不是固定目录名，而是仓库是否存在这些方法论角色：
+
 - Raw sources：原始资料/事实源，如文章、PDF、笔记、数据、图片等。它们是 source of truth，默认只读，不由 LLM 随意改写。
 - Wiki：LLM/Agent 维护的 Markdown 知识层，包含主题页、实体页、摘要页、比较页、综合分析页、概览页等。用户主要阅读它，LLM 负责整理、更新、交叉引用和保持一致。
 - Schema / rules：AGENTS.md、README、CLAUDE.md、GEMINI.md 或类似规则文件，说明 wiki 的结构、命名、写作规范、摄入资料、回答问题、维护索引和日志的工作流。
@@ -25,6 +26,7 @@
 {{excerpts}}
 
 请严格输出 ai-action JSON：
+
 ```ai-action
 {"version":1,"kind":"completed","summary":"已识别知识库映射","result":{"isKnowledgeRepository":true,"confidence":"low|medium|high","mapping":{"sourceRoot":"...","wikiRoot":"...","indexPath":"...","logPath":"...","schemaPath":"...","mapsRoot":"..."}}}
 ```

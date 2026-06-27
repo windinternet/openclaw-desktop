@@ -23,14 +23,7 @@ export interface PetEvent {
 }
 
 /** 宠物动画状态 */
-export type PetAnimationState =
-  | 'idle'
-  | 'walk'
-  | 'hop'
-  | 'drag'
-  | 'react'
-  | 'sit'
-  | 'sleep';
+export type PetAnimationState = 'idle' | 'walk' | 'hop' | 'drag' | 'react' | 'sit' | 'sleep';
 
 /** 宠物持久化状态 */
 export interface PetPersistedState {

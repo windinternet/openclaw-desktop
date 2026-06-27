@@ -389,11 +389,10 @@ describe('AI Action Center session rules', () => {
       lastAssistantResponse: responseText,
     };
     const client: GatewayRequestStub = {
-      request: async <T>() => ({
-        messages: [
-          { role: 'assistant', content: [{ type: 'text', text: responseText }] },
-        ],
-      }) as T,
+      request: async <T>() =>
+        ({
+          messages: [{ role: 'assistant', content: [{ type: 'text', text: responseText }] }],
+        }) as T,
     };
 
     const updated = await syncAiActionRunWithGateway(client, previouslyStuck);

@@ -48,9 +48,7 @@ function stringArrayValue(value: unknown): string[] {
 }
 
 function artifactTypeValue(value: unknown): ArtifactType {
-  return typeof value === 'string' && ARTIFACT_TYPES.has(value as ArtifactType)
-    ? value as ArtifactType
-    : 'other';
+  return typeof value === 'string' && ARTIFACT_TYPES.has(value as ArtifactType) ? (value as ArtifactType) : 'other';
 }
 
 function invalidParams(message: string): { ok: false; error: 'invalid-params'; message: string } {
@@ -62,11 +60,13 @@ function repositoryApi() {
 }
 
 function slugPathSegment(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'session';
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'session'
+  );
 }
 
 function buildSessionSummaryMarkdown(params: {
@@ -103,11 +103,7 @@ function buildSessionSummaryMarkdown(params: {
   return lines.join('\n');
 }
 
-async function mirrorRepositoryOutput(params: {
-  repoPath: string;
-  gatewayInstanceId?: string;
-  artifactId: string;
-}) {
+async function mirrorRepositoryOutput(params: { repoPath: string; gatewayInstanceId?: string; artifactId: string }) {
   const artifact = await artifactPersistence.loadMeta(params.artifactId);
   if (!artifact) return null;
   const html = await artifactPersistence.loadHtml(params.artifactId, artifact.currentVersion);

@@ -559,7 +559,10 @@ function SessionHeader({
             percent: formatPercent(insight.contextUsageRatio, t),
           })}
         >
-          <div className="session-detail-context-progress" style={{ height: 4, background: 'var(--semi-color-fill-0)' }}>
+          <div
+            className="session-detail-context-progress"
+            style={{ height: 4, background: 'var(--semi-color-fill-0)' }}
+          >
             <div
               style={{
                 height: '100%',
@@ -640,193 +643,193 @@ function SessionSidePanel({
   );
 
   const contentNode = (
-      <Tabs
-        activeKey={activeKey}
-        onChange={(key) => onTabChange(String(key))}
-        size="small"
-        style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
-        tabBarStyle={{ padding: '0 16px' }}
-        contentStyle={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '12px 16px 16px' }}
-      >
-        <Tabs.TabPane tab={t('chat.sidePanel.overview')} itemKey="overview">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <section>
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>
-                {t('chat.insight.contextWindow')}
-              </Text>
-              <Progress
-                percent={contextPercent}
-                showInfo
-                size="small"
-                stroke={
-                  insight.contextUsageRatio && insight.contextUsageRatio > 0.8
-                    ? 'var(--semi-color-warning)'
-                    : 'var(--semi-color-primary)'
-                }
-              />
-              <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 6 }}>
-                {t('chat.insight.tokensUsed', {
-                  used: formatNumber(insight.usedContextTokens, t),
-                  limit: formatNumber(insight.contextLimit, t),
-                  percent: formatPercent(insight.contextUsageRatio, t),
-                })}
-              </Text>
-              <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>
-                {contextSourceLabel(insight.contextSource, t)}
-                {insight.contextFresh === false ? t('chat.insight.dataMayBeDelayed') : ''}
-              </Text>
-            </section>
+    <Tabs
+      activeKey={activeKey}
+      onChange={(key) => onTabChange(String(key))}
+      size="small"
+      style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+      tabBarStyle={{ padding: '0 16px' }}
+      contentStyle={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '12px 16px 16px' }}
+    >
+      <Tabs.TabPane tab={t('chat.sidePanel.overview')} itemKey="overview">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <section>
+            <Text strong style={{ display: 'block', marginBottom: 8 }}>
+              {t('chat.insight.contextWindow')}
+            </Text>
+            <Progress
+              percent={contextPercent}
+              showInfo
+              size="small"
+              stroke={
+                insight.contextUsageRatio && insight.contextUsageRatio > 0.8
+                  ? 'var(--semi-color-warning)'
+                  : 'var(--semi-color-primary)'
+              }
+            />
+            <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 6 }}>
+              {t('chat.insight.tokensUsed', {
+                used: formatNumber(insight.usedContextTokens, t),
+                limit: formatNumber(insight.contextLimit, t),
+                percent: formatPercent(insight.contextUsageRatio, t),
+              })}
+            </Text>
+            <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>
+              {contextSourceLabel(insight.contextSource, t)}
+              {insight.contextFresh === false ? t('chat.insight.dataMayBeDelayed') : ''}
+            </Text>
+          </section>
 
+          <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <Metric
+              label={t('chat.insight.remainingContext')}
+              value={formatNumber(insight.remainingContextTokens, t)}
+            />
+            <Metric label={t('chat.insight.inputTokens')} value={formatNumber(insight.inputTokens, t)} />
+            <Metric label={t('chat.insight.outputTokens')} value={formatNumber(insight.outputTokens, t)} />
+            <Metric
+              label={t('chat.insight.cacheTokens')}
+              value={formatNumber(sumOptionalNumbers(insight.cacheReadTokens, insight.cacheWriteTokens), t)}
+            />
+            <Metric label={t('chat.insight.messages')} value={formatNumber(insight.messageCount, t)} />
+            <Metric label={t('chat.insight.toolCalls')} value={formatNumber(insight.toolCallCount, t)} />
+            <Metric label={t('chat.insight.userMessages')} value={formatNumber(insight.userMessageCount, t)} />
+            <Metric label={t('chat.insight.agentReplies')} value={formatNumber(insight.assistantMessageCount, t)} />
+          </section>
+
+          {(insight.contextModel || insight.contextStatus) && (
             <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <Metric
-                label={t('chat.insight.remainingContext')}
-                value={formatNumber(insight.remainingContextTokens, t)}
-              />
-              <Metric label={t('chat.insight.inputTokens')} value={formatNumber(insight.inputTokens, t)} />
-              <Metric label={t('chat.insight.outputTokens')} value={formatNumber(insight.outputTokens, t)} />
-              <Metric
-                label={t('chat.insight.cacheTokens')}
-                value={formatNumber(sumOptionalNumbers(insight.cacheReadTokens, insight.cacheWriteTokens), t)}
-              />
-              <Metric label={t('chat.insight.messages')} value={formatNumber(insight.messageCount, t)} />
-              <Metric label={t('chat.insight.toolCalls')} value={formatNumber(insight.toolCallCount, t)} />
-              <Metric label={t('chat.insight.userMessages')} value={formatNumber(insight.userMessageCount, t)} />
-              <Metric label={t('chat.insight.agentReplies')} value={formatNumber(insight.assistantMessageCount, t)} />
+              <Metric label={t('chat.insight.model')} value={insight.contextModel || t('common.unknown')} />
+              <Metric label={t('chat.insight.status')} value={insight.contextStatus || t('common.unknown')} />
             </section>
-
-            {(insight.contextModel || insight.contextStatus) && (
-              <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <Metric label={t('chat.insight.model')} value={insight.contextModel || t('common.unknown')} />
-                <Metric label={t('chat.insight.status')} value={insight.contextStatus || t('common.unknown')} />
-              </section>
-            )}
-
-            <section>
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>
-                {t('chat.insight.sessionArtifacts')}
-              </Text>
-              <Metric label={t('chat.insight.identifiedArtifacts')} value={formatNumber(artifacts.length, t)} />
-            </section>
-
-            <section>
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>
-                {t('chat.insight.futureInsights')}
-              </Text>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <FutureItem label={t('chat.insight.sessionSummary')} />
-                <FutureItem label={t('chat.insight.keyFacts')} />
-                <FutureItem label={t('chat.insight.todoList')} />
-              </div>
-            </section>
-          </div>
-        </Tabs.TabPane>
-
-        <Tabs.TabPane tab={t('chat.sidePanel.tools')} itemKey="tool">
-          {selectedTool ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                  <IconWrench size="small" />
-                  <Text strong ellipsis={{ showTooltip: true }} style={{ minWidth: 0 }}>
-                    {selectedTool.item.name}
-                  </Text>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Tag color={toolStatusColor(selectedTool.item.status)} size="small">
-                    {selectedTool.item.status ?? 'unknown'}
-                  </Tag>
-                  <Button
-                    aria-label={t('chat.sidePanel.clearToolDetail')}
-                    icon={<IconClose size="small" />}
-                    size="small"
-                    theme="borderless"
-                    onClick={onClearTool}
-                  />
-                </div>
-              </div>
-
-              <section>
-                <Text strong size="small" style={{ display: 'block', marginBottom: 6 }}>
-                  {t('chat.tool.arguments')}
-                </Text>
-                <DetailCodeBlock value={selectedTool.item.arguments} t={t} />
-              </section>
-
-              <section>
-                <Text strong size="small" style={{ display: 'block', marginBottom: 6 }}>
-                  {t('chat.tool.result')}
-                </Text>
-                <DetailCodeBlock value={selectedTool.item.toolResult} t={t} />
-              </section>
-
-              <section>
-                <Text strong size="small" style={{ display: 'block', marginBottom: 6 }}>
-                  {t('chat.tool.rawStructure')}
-                </Text>
-                <DetailCodeBlock value={selectedTool.item.raw ?? selectedTool.item} t={t} />
-              </section>
-            </div>
-          ) : (
-            <div style={{ paddingTop: 32, textAlign: 'center', color: 'var(--semi-color-text-2)' }}>
-              <IconWrench />
-              <Text type="tertiary" style={{ display: 'block', marginTop: 8 }}>
-                {t('chat.tool.clickToView')}
-              </Text>
-            </div>
           )}
-        </Tabs.TabPane>
 
-        <Tabs.TabPane tab={t('chat.sidePanel.artifacts')} itemKey="artifact">
-          {artifacts.length > 0 ? (
+          <section>
+            <Text strong style={{ display: 'block', marginBottom: 8 }}>
+              {t('chat.insight.sessionArtifacts')}
+            </Text>
+            <Metric label={t('chat.insight.identifiedArtifacts')} value={formatNumber(artifacts.length, t)} />
+          </section>
+
+          <section>
+            <Text strong style={{ display: 'block', marginBottom: 8 }}>
+              {t('chat.insight.futureInsights')}
+            </Text>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {artifacts.map((artifact) => (
-                <button
-                  key={artifact.id}
-                  type="button"
-                  onClick={() => onOpenArtifact(artifact)}
-                  style={{
-                    width: '100%',
-                    border: '1px solid var(--semi-color-border)',
-                    borderRadius: 6,
-                    background: 'var(--semi-color-bg-0)',
-                    color: 'var(--semi-color-text-0)',
-                    padding: 10,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                  }}
-                >
-                  <span style={{ fontSize: 20, flex: '0 0 auto' }}>{artifact.icon}</span>
-                  <span style={{ minWidth: 0, flex: 1 }}>
-                    <Text strong ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>
-                      {artifact.title}
-                    </Text>
-                    <Text type="tertiary" size="small">
-                      v{artifact.currentVersion} · {new Date(artifact.updatedAt).toLocaleString()}
-                    </Text>
-                  </span>
-                  <Tag color="orange" size="small">
-                    {artifact.type}
-                  </Tag>
-                  <IconPlay size="small" />
-                </button>
-              ))}
+              <FutureItem label={t('chat.insight.sessionSummary')} />
+              <FutureItem label={t('chat.insight.keyFacts')} />
+              <FutureItem label={t('chat.insight.todoList')} />
             </div>
-          ) : (
-            <Empty image={<IconAppCenter />} description={t('chat.artifact.noArtifacts')} />
-          )}
-        </Tabs.TabPane>
+          </section>
+        </div>
+      </Tabs.TabPane>
 
-        <Tabs.TabPane tab={t('chat.sidePanel.insights')} itemKey="insight">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <InsightPlaceholder title={t('chat.insight.sessionSummary')} desc={t('chat.insight.sessionSummaryDesc')} />
-            <InsightPlaceholder title={t('chat.insight.keyFacts')} desc={t('chat.insight.keyFactsDesc')} />
-            <InsightPlaceholder title={t('chat.insight.todoList')} desc={t('chat.insight.todoListDesc')} />
+      <Tabs.TabPane tab={t('chat.sidePanel.tools')} itemKey="tool">
+        {selectedTool ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                <IconWrench size="small" />
+                <Text strong ellipsis={{ showTooltip: true }} style={{ minWidth: 0 }}>
+                  {selectedTool.item.name}
+                </Text>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Tag color={toolStatusColor(selectedTool.item.status)} size="small">
+                  {selectedTool.item.status ?? 'unknown'}
+                </Tag>
+                <Button
+                  aria-label={t('chat.sidePanel.clearToolDetail')}
+                  icon={<IconClose size="small" />}
+                  size="small"
+                  theme="borderless"
+                  onClick={onClearTool}
+                />
+              </div>
+            </div>
+
+            <section>
+              <Text strong size="small" style={{ display: 'block', marginBottom: 6 }}>
+                {t('chat.tool.arguments')}
+              </Text>
+              <DetailCodeBlock value={selectedTool.item.arguments} t={t} />
+            </section>
+
+            <section>
+              <Text strong size="small" style={{ display: 'block', marginBottom: 6 }}>
+                {t('chat.tool.result')}
+              </Text>
+              <DetailCodeBlock value={selectedTool.item.toolResult} t={t} />
+            </section>
+
+            <section>
+              <Text strong size="small" style={{ display: 'block', marginBottom: 6 }}>
+                {t('chat.tool.rawStructure')}
+              </Text>
+              <DetailCodeBlock value={selectedTool.item.raw ?? selectedTool.item} t={t} />
+            </section>
           </div>
-        </Tabs.TabPane>
-      </Tabs>
+        ) : (
+          <div style={{ paddingTop: 32, textAlign: 'center', color: 'var(--semi-color-text-2)' }}>
+            <IconWrench />
+            <Text type="tertiary" style={{ display: 'block', marginTop: 8 }}>
+              {t('chat.tool.clickToView')}
+            </Text>
+          </div>
+        )}
+      </Tabs.TabPane>
+
+      <Tabs.TabPane tab={t('chat.sidePanel.artifacts')} itemKey="artifact">
+        {artifacts.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {artifacts.map((artifact) => (
+              <button
+                key={artifact.id}
+                type="button"
+                onClick={() => onOpenArtifact(artifact)}
+                style={{
+                  width: '100%',
+                  border: '1px solid var(--semi-color-border)',
+                  borderRadius: 6,
+                  background: 'var(--semi-color-bg-0)',
+                  color: 'var(--semi-color-text-0)',
+                  padding: 10,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <span style={{ fontSize: 20, flex: '0 0 auto' }}>{artifact.icon}</span>
+                <span style={{ minWidth: 0, flex: 1 }}>
+                  <Text strong ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>
+                    {artifact.title}
+                  </Text>
+                  <Text type="tertiary" size="small">
+                    v{artifact.currentVersion} · {new Date(artifact.updatedAt).toLocaleString()}
+                  </Text>
+                </span>
+                <Tag color="orange" size="small">
+                  {artifact.type}
+                </Tag>
+                <IconPlay size="small" />
+              </button>
+            ))}
+          </div>
+        ) : (
+          <Empty image={<IconAppCenter />} description={t('chat.artifact.noArtifacts')} />
+        )}
+      </Tabs.TabPane>
+
+      <Tabs.TabPane tab={t('chat.sidePanel.insights')} itemKey="insight">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <InsightPlaceholder title={t('chat.insight.sessionSummary')} desc={t('chat.insight.sessionSummaryDesc')} />
+          <InsightPlaceholder title={t('chat.insight.keyFacts')} desc={t('chat.insight.keyFactsDesc')} />
+          <InsightPlaceholder title={t('chat.insight.todoList')} desc={t('chat.insight.todoListDesc')} />
+        </div>
+      </Tabs.TabPane>
+    </Tabs>
   );
 
   if (!visible) return null;
@@ -2161,7 +2164,12 @@ export default function SessionChatPage() {
     return stripGeneratedSessionLabelSuffix(rawTitle, activeSessionKey);
   }, [activeSession, activeSessionKey]);
   const sessionHeaderModelName =
-    currentModel?.alias || currentModel?.name || currentModel?.id || chatModel || defaultChatModel || t('common.unknown');
+    currentModel?.alias ||
+    currentModel?.name ||
+    currentModel?.id ||
+    chatModel ||
+    defaultChatModel ||
+    t('common.unknown');
 
   const sessionInsight = useMemo(
     () => deriveSessionInsight(chats, currentModel, sessionContextSnapshot),

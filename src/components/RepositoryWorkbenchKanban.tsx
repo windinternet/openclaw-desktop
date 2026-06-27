@@ -47,16 +47,51 @@ export default function RepositoryWorkbenchKanban({ binding }: { binding: Reposi
     if (taskGroups.length > 0) {
       const groupById = new Map(taskGroups.map((group) => [group.id, group]));
       return [
-        { key: 'current', title: groupById.get('current')?.title ?? t('workbench.activeWork'), color: 'blue', items: groupById.get('current')?.items ?? [] },
-        { key: 'next', title: groupById.get('next')?.title ?? t('workbench.somedayWork'), color: 'orange', items: groupById.get('next')?.items ?? [] },
-        { key: 'done', title: groupById.get('done')?.title ?? t('workbench.completedWork'), color: 'green', items: groupById.get('done')?.items ?? [] },
+        {
+          key: 'current',
+          title: groupById.get('current')?.title ?? t('workbench.activeWork'),
+          color: 'blue',
+          items: groupById.get('current')?.items ?? [],
+        },
+        {
+          key: 'next',
+          title: groupById.get('next')?.title ?? t('workbench.somedayWork'),
+          color: 'orange',
+          items: groupById.get('next')?.items ?? [],
+        },
+        {
+          key: 'done',
+          title: groupById.get('done')?.title ?? t('workbench.completedWork'),
+          color: 'green',
+          items: groupById.get('done')?.items ?? [],
+        },
       ];
     }
     return [
-      { key: 'active', title: t('workbench.activeWork'), color: 'blue', items: filesToTaskItems(snapshot?.activeWork ?? []) },
-      { key: 'plans', title: t('workbench.activePlans'), color: 'orange', items: filesToTaskItems(snapshot?.activePlans ?? []) },
-      { key: 'someday', title: t('workbench.somedayWork'), color: 'grey', items: filesToTaskItems(snapshot?.somedayWork ?? []) },
-      { key: 'done', title: t('workbench.completedWork'), color: 'green', items: filesToTaskItems([...(snapshot?.completedWork ?? []), ...(snapshot?.completedPlans ?? [])], true) },
+      {
+        key: 'active',
+        title: t('workbench.activeWork'),
+        color: 'blue',
+        items: filesToTaskItems(snapshot?.activeWork ?? []),
+      },
+      {
+        key: 'plans',
+        title: t('workbench.activePlans'),
+        color: 'orange',
+        items: filesToTaskItems(snapshot?.activePlans ?? []),
+      },
+      {
+        key: 'someday',
+        title: t('workbench.somedayWork'),
+        color: 'grey',
+        items: filesToTaskItems(snapshot?.somedayWork ?? []),
+      },
+      {
+        key: 'done',
+        title: t('workbench.completedWork'),
+        color: 'green',
+        items: filesToTaskItems([...(snapshot?.completedWork ?? []), ...(snapshot?.completedPlans ?? [])], true),
+      },
     ];
   }, [snapshot, t]);
 
@@ -66,52 +101,63 @@ export default function RepositoryWorkbenchKanban({ binding }: { binding: Reposi
   };
 
   if (loading) {
-    return <div style={{ padding: 48, display: 'flex', justifyContent: 'center' }}><Spin /></div>;
+    return (
+      <div style={{ padding: 48, display: 'flex', justifyContent: 'center' }}>
+        <Spin />
+      </div>
+    );
   }
 
   return (
     <div style={{ display: 'grid', gridTemplateRows: 'minmax(360px, auto) auto', gap: 16, paddingTop: 12 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(240px, 1fr))', gap: 16, overflowX: 'auto' }}>
+      <div
+        style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(240px, 1fr))', gap: 16, overflowX: 'auto' }}
+      >
         {columns.map((column) => (
           <Card
             key={column.key}
-            title={(
+            title={
               <Space>
                 <Text strong>{column.title}</Text>
-                <Tag color={column.color} size="small">{column.items.length}</Tag>
+                <Tag color={column.color} size="small">
+                  {column.items.length}
+                </Tag>
               </Space>
-            )}
+            }
             bodyStyle={{ minHeight: 300, display: 'flex', flexDirection: 'column', gap: 10 }}
           >
             {column.items.length === 0 ? (
               <Empty description={t('common.noData')} />
-            ) : column.items.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => void openPreview(item)}
-                style={{
-                  border: '1px solid var(--semi-color-border)',
-                  background: selectedPath === item.sourcePath ? 'var(--semi-color-primary-light-default)' : 'var(--semi-color-bg-1)',
-                  borderRadius: 8,
-                  padding: 12,
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                }}
-              >
-                <Text strong ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>{item.text}</Text>
-              </button>
-            ))}
+            ) : (
+              column.items.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => void openPreview(item)}
+                  style={{
+                    border: '1px solid var(--semi-color-border)',
+                    background:
+                      selectedPath === item.sourcePath
+                        ? 'var(--semi-color-primary-light-default)'
+                        : 'var(--semi-color-bg-1)',
+                    borderRadius: 8,
+                    padding: 12,
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Text strong ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>
+                    {item.text}
+                  </Text>
+                </button>
+              ))
+            )}
           </Card>
         ))}
       </div>
 
       <Card title={t('workbench.preview')} bodyStyle={{ maxHeight: 420, overflow: 'auto' }}>
-        {preview ? (
-          <MarkdownView content={preview} />
-        ) : (
-          <Empty description={t('workbench.previewEmpty')} />
-        )}
+        {preview ? <MarkdownView content={preview} /> : <Empty description={t('workbench.previewEmpty')} />}
       </Card>
     </div>
   );

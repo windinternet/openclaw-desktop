@@ -61,7 +61,17 @@ export const artifactService = {
     const id = generateArtifactId();
 
     let html: string | null = null;
-    const isHtmlType = ['report', 'dashboard', 'analysis', 'checklist', 'code', 'document', 'slide', 'form', 'other'].includes(params.type);
+    const isHtmlType = [
+      'report',
+      'dashboard',
+      'analysis',
+      'checklist',
+      'code',
+      'document',
+      'slide',
+      'form',
+      'other',
+    ].includes(params.type);
 
     if (isHtmlType) {
       if (params.templateId) {

@@ -2,7 +2,11 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { Button, Card, Empty, Space, Spin, Tabs, Tag, Typography } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
 import { loadRepositoryBinding } from '../lib/agentic-repository-store';
-import { loadRepositoryProtocolSnapshot, type RepositoryProtocolDocument, type RepositoryProtocolSnapshot } from '../lib/repository-protocol';
+import {
+  loadRepositoryProtocolSnapshot,
+  type RepositoryProtocolDocument,
+  type RepositoryProtocolSnapshot,
+} from '../lib/repository-protocol';
 import { useStore } from '../lib/store';
 
 const { Title, Text } = Typography;
@@ -19,14 +23,17 @@ export default function RepositoryProtocolPage({ embedded = false, onHeaderActio
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'empty' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
 
-  const permissionItems = useMemo(() => [
-    t('controlCenter.localFiles'),
-    t('controlCenter.repositoryReadWrite'),
-    t('controlCenter.gatewayTools'),
-    t('controlCenter.companionCommands'),
-    t('controlCenter.network'),
-    t('controlCenter.execution'),
-  ], [t]);
+  const permissionItems = useMemo(
+    () => [
+      t('controlCenter.localFiles'),
+      t('controlCenter.repositoryReadWrite'),
+      t('controlCenter.gatewayTools'),
+      t('controlCenter.companionCommands'),
+      t('controlCenter.network'),
+      t('controlCenter.execution'),
+    ],
+    [t],
+  );
 
   const load = useCallback(async () => {
     if (!currentInstanceId) {
@@ -55,9 +62,7 @@ export default function RepositoryProtocolPage({ embedded = false, onHeaderActio
     void load();
   }, [load]);
 
-  const headerActions = useMemo(() => (
-    <Button onClick={load}>{t('common.refresh')}</Button>
-  ), [load, t]);
+  const headerActions = useMemo(() => <Button onClick={load}>{t('common.refresh')}</Button>, [load, t]);
 
   useEffect(() => {
     if (!embedded) return undefined;
@@ -70,33 +75,48 @@ export default function RepositoryProtocolPage({ embedded = false, onHeaderActio
       {!embedded && (
         <Space align="center" style={{ justifyContent: 'space-between', width: '100%', marginBottom: 16 }}>
           <div>
-            <Title heading={3} style={{ marginTop: 0, marginBottom: 4 }}>{t('controlCenter.repositoryProtocol')}</Title>
+            <Title heading={3} style={{ marginTop: 0, marginBottom: 4 }}>
+              {t('controlCenter.repositoryProtocol')}
+            </Title>
             <Text type="tertiary">{t('controlCenter.repositoryProtocolDesc')}</Text>
           </div>
           {headerActions}
         </Space>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginBottom: 16 }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap: 16,
+          marginBottom: 16,
+        }}
+      >
         <Card>
           <Space vertical align="start">
             <Tag color="green">OpenClaw</Tag>
             <Text strong>{t('controlCenter.runtimeLayer')}</Text>
-            <Text type="tertiary" size="small">{t('controlCenter.runtimeLayerDesc')}</Text>
+            <Text type="tertiary" size="small">
+              {t('controlCenter.runtimeLayerDesc')}
+            </Text>
           </Space>
         </Card>
         <Card>
           <Space vertical align="start">
             <Tag color="blue">Repository</Tag>
             <Text strong>{t('controlCenter.repositoryLayer')}</Text>
-            <Text type="tertiary" size="small">{t('controlCenter.repositoryLayerDesc')}</Text>
+            <Text type="tertiary" size="small">
+              {t('controlCenter.repositoryLayerDesc')}
+            </Text>
           </Space>
         </Card>
         <Card>
           <Space vertical align="start">
             <Text strong>{t('controlCenter.permissionOverview')}</Text>
             <Space wrap>
-              {permissionItems.map((item) => <Tag key={item}>{item}</Tag>)}
+              {permissionItems.map((item) => (
+                <Tag key={item}>{item}</Tag>
+              ))}
             </Space>
           </Space>
         </Card>
@@ -104,9 +124,18 @@ export default function RepositoryProtocolPage({ embedded = false, onHeaderActio
 
       {status === 'loading' && <Spin />}
       {status === 'error' && <Empty title={t('common.failed')} description={error ?? t('common.unknown')} />}
-      {status === 'empty' && <Empty title={t('repositoryGate.status.repo_unbound')} description={t('repositoryGate.hint.repo_unbound')} />}
+      {status === 'empty' && (
+        <Empty title={t('repositoryGate.status.repo_unbound')} description={t('repositoryGate.hint.repo_unbound')} />
+      )}
       {status === 'ready' && snapshot && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 320px) minmax(0, 1fr)', gap: 16, alignItems: 'start' }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(220px, 320px) minmax(0, 1fr)',
+            gap: 16,
+            alignItems: 'start',
+          }}
+        >
           <Card title={t('controlCenter.pathMappings')}>
             <Space vertical align="start" style={{ width: '100%' }}>
               {snapshot.pathMappings.map((item) => (

@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
-import { buildOutputMarkdown, createRepositoryOutput, mirrorArtifactToReadyRepositoryOutput } from '../lib/repository-outputs';
+import {
+  buildOutputMarkdown,
+  createRepositoryOutput,
+  mirrorArtifactToReadyRepositoryOutput,
+} from '../lib/repository-outputs';
 import type { ArtifactMeta } from '../lib/artifact-types';
 
 describe('repository outputs', () => {
@@ -11,7 +15,9 @@ describe('repository outputs', () => {
   it('builds a repository output markdown record from an artifact', () => {
     expect(buildOutputMarkdown(createArtifact(), 'outputs/html/art_1.html')).toContain('# Quarterly Report');
     expect(buildOutputMarkdown(createArtifact(), 'outputs/html/art_1.html')).toContain('artifactId: art_1');
-    expect(buildOutputMarkdown(createArtifact(), 'outputs/html/art_1.html')).toContain('preview: outputs/html/art_1.html');
+    expect(buildOutputMarkdown(createArtifact(), 'outputs/html/art_1.html')).toContain(
+      'preview: outputs/html/art_1.html',
+    );
   });
 
   it('writes output markdown, html preview, and updates outputs index', async () => {
@@ -36,8 +42,16 @@ describe('repository outputs', () => {
     expect(result.outputPath).toBe('outputs/reports/art_1.md');
     expect(result.previewPath).toBe('outputs/html/art_1.html');
     expect(writeText).toHaveBeenCalledWith('/repo', 'outputs/html/art_1.html', '<html>ok</html>');
-    expect(writeText).toHaveBeenCalledWith('/repo', 'outputs/reports/art_1.md', expect.stringContaining('# Quarterly Report'));
-    expect(writeText).toHaveBeenCalledWith('/repo', 'outputs/index.md', expect.stringContaining('outputs/reports/art_1.md'));
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'outputs/reports/art_1.md',
+      expect.stringContaining('# Quarterly Report'),
+    );
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'outputs/index.md',
+      expect.stringContaining('outputs/reports/art_1.md'),
+    );
   });
 
   it('mirrors artifacts through the current ready repository binding', async () => {
@@ -76,11 +90,13 @@ describe('repository outputs', () => {
       },
     });
 
-    await expect(mirrorArtifactToReadyRepositoryOutput('inst-1', createArtifact(), '<html>ok</html>')).resolves.toEqual({
-      outputId: 'art_1',
-      outputPath: 'outputs/reports/art_1.md',
-      previewPath: 'outputs/html/art_1.html',
-    });
+    await expect(mirrorArtifactToReadyRepositoryOutput('inst-1', createArtifact(), '<html>ok</html>')).resolves.toEqual(
+      {
+        outputId: 'art_1',
+        outputPath: 'outputs/reports/art_1.md',
+        previewPath: 'outputs/html/art_1.html',
+      },
+    );
 
     expect(loadInstanceData).toHaveBeenCalledWith('inst-1', 'agentic-repository-binding');
     expect(writeText).toHaveBeenCalledWith('/repo', 'outputs/html/art_1.html', '<html>ok</html>');
@@ -106,7 +122,9 @@ describe('repository outputs', () => {
       },
     });
 
-    await expect(mirrorArtifactToReadyRepositoryOutput('inst-1', createArtifact(), '<html>ok</html>')).resolves.toBeNull();
+    await expect(
+      mirrorArtifactToReadyRepositoryOutput('inst-1', createArtifact(), '<html>ok</html>'),
+    ).resolves.toBeNull();
     expect(writeText).not.toHaveBeenCalled();
   });
 });

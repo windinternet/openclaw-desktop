@@ -130,27 +130,72 @@ export function buildGatewayUsageParams(now = new Date()): {
 function parseTotals(value: unknown): GatewayUsageTotals {
   const record = isRecord(value) ? value : {};
   const usage = isRecord(record.usage) ? record.usage : {};
-  const inputTokens = numberValue(record.inputTokens ?? record.input_tokens ?? record.input ?? usage.inputTokens ?? usage.input_tokens ?? usage.input) ?? 0;
-  const outputTokens = numberValue(record.outputTokens ?? record.output_tokens ?? record.output ?? usage.outputTokens ?? usage.output_tokens ?? usage.output) ?? 0;
-  const cacheReadTokens = numberValue(record.cacheReadTokens ?? record.cache_read_tokens ?? record.cacheRead ?? record.cache_read ?? usage.cacheReadTokens ?? usage.cache_read_tokens ?? usage.cacheRead ?? usage.cache_read) ?? 0;
-  const cacheWriteTokens = numberValue(record.cacheWriteTokens ?? record.cache_write_tokens ?? record.cacheWrite ?? record.cache_write ?? usage.cacheWriteTokens ?? usage.cache_write_tokens ?? usage.cacheWrite ?? usage.cache_write) ?? 0;
-  const totalTokens = numberValue(record.totalTokens ?? record.total_tokens ?? record.tokens ?? record.total ?? usage.totalTokens ?? usage.total_tokens ?? usage.tokens ?? usage.total)
-    ?? inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens;
+  const inputTokens =
+    numberValue(
+      record.inputTokens ??
+        record.input_tokens ??
+        record.input ??
+        usage.inputTokens ??
+        usage.input_tokens ??
+        usage.input,
+    ) ?? 0;
+  const outputTokens =
+    numberValue(
+      record.outputTokens ??
+        record.output_tokens ??
+        record.output ??
+        usage.outputTokens ??
+        usage.output_tokens ??
+        usage.output,
+    ) ?? 0;
+  const cacheReadTokens =
+    numberValue(
+      record.cacheReadTokens ??
+        record.cache_read_tokens ??
+        record.cacheRead ??
+        record.cache_read ??
+        usage.cacheReadTokens ??
+        usage.cache_read_tokens ??
+        usage.cacheRead ??
+        usage.cache_read,
+    ) ?? 0;
+  const cacheWriteTokens =
+    numberValue(
+      record.cacheWriteTokens ??
+        record.cache_write_tokens ??
+        record.cacheWrite ??
+        record.cache_write ??
+        usage.cacheWriteTokens ??
+        usage.cache_write_tokens ??
+        usage.cacheWrite ??
+        usage.cache_write,
+    ) ?? 0;
+  const totalTokens =
+    numberValue(
+      record.totalTokens ??
+        record.total_tokens ??
+        record.tokens ??
+        record.total ??
+        usage.totalTokens ??
+        usage.total_tokens ??
+        usage.tokens ??
+        usage.total,
+    ) ?? inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens;
   const estimatedCostUsd = numberValue(
-    record.estimatedCostUsd
-    ?? record.estimated_cost_usd
-    ?? record.totalCost
-    ?? record.total_cost
-    ?? record.costUsd
-    ?? record.cost_usd
-    ?? record.cost
-    ?? usage.estimatedCostUsd
-    ?? usage.estimated_cost_usd
-    ?? usage.totalCost
-    ?? usage.total_cost
-    ?? usage.costUsd
-    ?? usage.cost_usd
-    ?? usage.cost,
+    record.estimatedCostUsd ??
+      record.estimated_cost_usd ??
+      record.totalCost ??
+      record.total_cost ??
+      record.costUsd ??
+      record.cost_usd ??
+      record.cost ??
+      usage.estimatedCostUsd ??
+      usage.estimated_cost_usd ??
+      usage.totalCost ??
+      usage.total_cost ??
+      usage.costUsd ??
+      usage.cost_usd ??
+      usage.cost,
   );
 
   return {
@@ -177,11 +222,9 @@ function addTotals(a: GatewayUsageTotals, b: GatewayUsageTotals): GatewayUsageTo
 
 function findModel(models: ModelInfo[], modelRef: string): ModelInfo | undefined {
   const tail = modelRef.includes('/') ? modelRef.split('/').pop() : modelRef;
-  return models.find((model) => (
-    model.id === modelRef
-    || `${model.provider}/${model.id}` === modelRef
-    || model.id === tail
-  ));
+  return models.find(
+    (model) => model.id === modelRef || `${model.provider}/${model.id}` === modelRef || model.id === tail,
+  );
 }
 
 function canonicalModelRef(models: ModelInfo[], modelRef: string, provider?: string): string {
@@ -208,9 +251,12 @@ function normalizeModelRows(raw: GatewayUsageRawData): GatewayUsageModelRow[] {
   const sessions = normalizeSessionRows(raw.sessions);
   const rows = new Map<string, GatewayUsageModelRow>();
 
-  const costModelRows =
-    arrayValue(costRecord.byModel ?? costRecord.by_model ?? costRecord.models ?? costRecord.modelUsage ?? costRecord.model_usage);
-  const aggregateModelRows = arrayValue(aggregates.byModel ?? aggregates.by_model ?? aggregates.models ?? aggregates.modelUsage ?? aggregates.model_usage);
+  const costModelRows = arrayValue(
+    costRecord.byModel ?? costRecord.by_model ?? costRecord.models ?? costRecord.modelUsage ?? costRecord.model_usage,
+  );
+  const aggregateModelRows = arrayValue(
+    aggregates.byModel ?? aggregates.by_model ?? aggregates.models ?? aggregates.modelUsage ?? aggregates.model_usage,
+  );
 
   for (const item of [...costModelRows, ...aggregateModelRows]) {
     if (!isRecord(item)) continue;
@@ -273,8 +319,9 @@ function normalizeProviderQuotas(status: unknown): GatewayUsageQuota[] {
       if (!provider) return null;
       const remaining = numberValue(item.remaining ?? item.remainingQuota ?? item.remaining_quota);
       const total = numberValue(item.total ?? item.totalQuota ?? item.total_quota ?? item.limit);
-      const percentLeft = numberValue(item.percentLeft ?? item.percent_left ?? item.leftPercent ?? item.left_percent)
-        ?? (remaining !== undefined && total ? (remaining / total) * 100 : undefined);
+      const percentLeft =
+        numberValue(item.percentLeft ?? item.percent_left ?? item.leftPercent ?? item.left_percent) ??
+        (remaining !== undefined && total ? (remaining / total) * 100 : undefined);
       return {
         provider,
         label: stringValue(item.label) ?? provider,
@@ -289,16 +336,16 @@ function normalizeProviderQuotas(status: unknown): GatewayUsageQuota[] {
 }
 
 function limitTrend(points: GatewayUsageTrendPoint[], count = 7): GatewayUsageTrendPoint[] {
-  return [...points]
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(-count);
+  return [...points].sort((a, b) => a.date.localeCompare(b.date)).slice(-count);
 }
 
 function normalizeTrend(cost: unknown, sessionsValue?: unknown): GatewayUsageTrendPoint[] {
   const record = isRecord(cost) ? cost : {};
   const sessionsRecord = isRecord(sessionsValue) ? sessionsValue : {};
   const aggregates = isRecord(sessionsRecord.aggregates) ? sessionsRecord.aggregates : {};
-  const costTrend = arrayValue(record.byDay ?? record.by_day ?? record.days ?? record.daily ?? record.timeseries ?? record.series)
+  const costTrend = arrayValue(
+    record.byDay ?? record.by_day ?? record.days ?? record.daily ?? record.timeseries ?? record.series,
+  )
     .filter(isRecord)
     .map((item): GatewayUsageTrendPoint | null => {
       const date = stringValue(item.date ?? item.day ?? item.bucket);
@@ -343,7 +390,14 @@ function normalizeSessionRows(sessionsValue: unknown): GatewayUsageSessionRow[] 
           if (!model) return undefined;
           return provider && !model.includes('/') ? `${provider}/${model}` : model;
         })(),
-        updatedAt: numberValue(item.updatedAt ?? item.updated_at ?? item.lastInteractionAt ?? item.last_interaction_at ?? item.createdAt ?? item.created_at),
+        updatedAt: numberValue(
+          item.updatedAt ??
+            item.updated_at ??
+            item.lastInteractionAt ??
+            item.last_interaction_at ??
+            item.createdAt ??
+            item.created_at,
+        ),
       };
     })
     .filter((item): item is GatewayUsageSessionRow => item !== null)
@@ -357,13 +411,17 @@ function normalizeTotals(cost: unknown, sessions: GatewayUsageSessionRow[]): Gat
   return sessions.reduce(addTotals, { ...EMPTY_TOTALS });
 }
 
-export function normalizeGatewayUsageDashboard(raw: GatewayUsageRawData & { errors?: string[] }): GatewayUsageDashboard {
+export function normalizeGatewayUsageDashboard(
+  raw: GatewayUsageRawData & { errors?: string[] },
+): GatewayUsageDashboard {
   const recentSessions = normalizeSessionRows(raw.sessions);
   const totals = normalizeTotals(raw.cost, recentSessions);
   const modelRows = normalizeModelRows(raw);
   const providerQuotas = normalizeProviderQuotas(raw.status);
   const trend = normalizeTrend(raw.cost, raw.sessions);
-  const available = Boolean(raw.status || raw.cost || raw.sessions || modelRows.length || recentSessions.length || providerQuotas.length);
+  const available = Boolean(
+    raw.status || raw.cost || raw.sessions || modelRows.length || recentSessions.length || providerQuotas.length,
+  );
 
   return {
     available,
@@ -376,7 +434,11 @@ export function normalizeGatewayUsageDashboard(raw: GatewayUsageRawData & { erro
   };
 }
 
-async function safeRequest(client: GatewayUsageClient, method: string, params?: unknown): Promise<{ method: string; value?: unknown; error?: boolean }> {
+async function safeRequest(
+  client: GatewayUsageClient,
+  method: string,
+  params?: unknown,
+): Promise<{ method: string; value?: unknown; error?: boolean }> {
   try {
     return { method, value: await client.request(method, params) };
   } catch {

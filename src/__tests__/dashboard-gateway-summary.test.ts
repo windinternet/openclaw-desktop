@@ -19,11 +19,7 @@ describe('dashboard gateway summary', () => {
         sessions: { count: 45 },
         tasks: { total: 9, active: 0, failures: 1 },
       },
-      agents: [
-        { id: 'main' },
-        { id: 'architect' },
-        { id: 'developer' },
-      ],
+      agents: [{ id: 'main' }, { id: 'architect' }, { id: 'developer' }],
     });
 
     expect(summary.healthStatus).toBe('ok');

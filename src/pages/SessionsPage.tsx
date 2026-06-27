@@ -11,14 +11,18 @@ export default function SessionsPage() {
 
   return (
     <div style={{ height: '100%', overflow: 'auto', padding: 24 }}>
-      <Title heading={3} style={{ marginTop: 0 }}>{t('nav.sessions')}</Title>
+      <Title heading={3} style={{ marginTop: 0 }}>
+        {t('nav.sessions')}
+      </Title>
       <Text type="tertiary">{t('sessions.pageDesc')}</Text>
       <Space align="start" wrap style={{ marginTop: 20 }}>
         <Card style={{ width: 280 }} bodyStyle={{ minHeight: 132 }}>
           <Space vertical align="start" style={{ width: '100%' }}>
             <IconPlusCircle size="extra-large" />
             <Text strong>{t('nav.newSession')}</Text>
-            <Text type="tertiary" size="small">{t('sessions.newSessionDesc')}</Text>
+            <Text type="tertiary" size="small">
+              {t('sessions.newSessionDesc')}
+            </Text>
             <Button theme="solid" type="primary" onClick={() => navigate('/new-session')}>
               {t('nav.newSession')}
             </Button>
@@ -28,7 +32,9 @@ export default function SessionsPage() {
           <Space vertical align="start" style={{ width: '100%' }}>
             <IconSearch size="extra-large" />
             <Text strong>{t('nav.search')}</Text>
-            <Text type="tertiary" size="small">{t('sessions.searchDesc')}</Text>
+            <Text type="tertiary" size="small">
+              {t('sessions.searchDesc')}
+            </Text>
             <Button onClick={() => navigate('/search')}>{t('nav.search')}</Button>
           </Space>
         </Card>

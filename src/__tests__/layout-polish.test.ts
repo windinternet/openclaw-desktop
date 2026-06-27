@@ -8,7 +8,7 @@ describe('chat configuration selects', () => {
 
     for (const source of [chat, newSession]) {
       expect(source).toContain('configureSelectProps');
-      expect(source).toContain('position: \'top\'');
+      expect(source).toContain("position: 'top'");
       expect(source).toContain('{...configureSelectProps}');
     }
   });
@@ -58,14 +58,24 @@ describe('chat configuration selects', () => {
 
   it('provides global cursor fallbacks for Electron interactive regions', () => {
     const css = readFileSync('src/styles/global.css', 'utf8');
+    const compactCss = css.replace(/\s+/g, ' ');
+    const normalizedCss = compactCss.replace(/'/g, '"');
 
     expect(css).toContain('/* ── Electron Cursor Fallbacks');
-    expect(css).toContain(':where(button, a[href], [role="button"], .semi-button, .semi-navigation-item, .semi-select, .semi-tabs-tab, .semi-checkbox, .semi-radio, .semi-switch, .semi-upload-add)');
-    expect(css).toContain(':where(button, a[href], [role="button"], .semi-button, .semi-navigation-item, .semi-select, .semi-tabs-tab, .semi-checkbox, .semi-radio, .semi-switch, .semi-upload-add) *');
-    expect(css).toContain(':where(input, textarea, select, [contenteditable="true"], .ProseMirror, .semi-input, .semi-input-textarea, .semi-aiChatInput-editor-content) *');
+    expect(normalizedCss).toContain(
+      ':where( button, a[href], [role="button"], .semi-button, .semi-navigation-item, .semi-select, .semi-tabs-tab, .semi-checkbox, .semi-radio, .semi-switch, .semi-upload-add )',
+    );
+    expect(normalizedCss).toContain(
+      ':where( button, a[href], [role="button"], .semi-button, .semi-navigation-item, .semi-select, .semi-tabs-tab, .semi-checkbox, .semi-radio, .semi-switch, .semi-upload-add ) *',
+    );
+    expect(normalizedCss).toContain(
+      ':where( input, textarea, [contenteditable="true"], .ProseMirror, .semi-input, .semi-input-textarea, .semi-aiChatInput-editor-content ) *',
+    );
     expect(css).toContain('-webkit-app-region: no-drag;');
     expect(css).toContain('cursor: pointer !important;');
-    expect(css).toContain(':where(input, textarea, [contenteditable="true"], .ProseMirror, .semi-input, .semi-input-textarea, .semi-aiChatInput-editor-content)');
+    expect(normalizedCss).toContain(
+      ':where( input, textarea, [contenteditable="true"], .ProseMirror, .semi-input, .semi-input-textarea, .semi-aiChatInput-editor-content )',
+    );
     expect(css).toContain('cursor: text !important;');
   });
 });
@@ -78,7 +88,7 @@ describe('3D office layout', () => {
     expect(collaboration).toContain('collaboration-tabs');
     expect(collaboration).toContain('semi-tabs-pane-motion-overlay');
     expect(collaboration).toContain('office-tab-body');
-    expect(collaboration).toContain('height: \'100%\'');
+    expect(collaboration).toContain("height: '100%'");
     expect(collaboration).toContain('<Office3DPage embedded />');
   });
 

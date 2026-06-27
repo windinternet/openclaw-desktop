@@ -35,10 +35,7 @@ export const SKILL_MARKETPLACE_SOURCES: SkillMarketplaceSource[] = [
 ];
 
 export function getSkillMarketplaceSource(sourceId: SkillMarketplaceSourceId): SkillMarketplaceSource {
-  return (
-    SKILL_MARKETPLACE_SOURCES.find((source) => source.id === sourceId) ??
-    SKILL_MARKETPLACE_SOURCES[0]
-  );
+  return SKILL_MARKETPLACE_SOURCES.find((source) => source.id === sourceId) ?? SKILL_MARKETPLACE_SOURCES[0];
 }
 
 function normalizeLimit(limit?: number): number {
@@ -86,13 +83,15 @@ export async function fetchSkillMarketplaceSkills(
     throw new Error(`Marketplace API request failed: ${response.status}`);
   }
 
-  const data = (await response.json()) as SkillMarketplaceSearchResponse | {
-    code?: number;
-    message?: string;
-    data?: {
-      skills?: unknown[];
-    };
-  };
+  const data = (await response.json()) as
+    | SkillMarketplaceSearchResponse
+    | {
+        code?: number;
+        message?: string;
+        data?: {
+          skills?: unknown[];
+        };
+      };
 
   if (params.sourceId === 'skillhub') {
     if (typeof data === 'object' && data !== null && 'code' in data && data.code !== 0) {
@@ -139,10 +138,7 @@ function readSourceId(value: unknown, fallback: SkillMarketplaceSourceId): Skill
   return value === 'clawhub' || value === 'skillhub' ? value : fallback;
 }
 
-function normalizeSkill(
-  item: unknown,
-  fallbackSourceId: SkillMarketplaceSourceId,
-): SkillMarketplaceSkill | null {
+function normalizeSkill(item: unknown, fallbackSourceId: SkillMarketplaceSourceId): SkillMarketplaceSkill | null {
   if (typeof item !== 'object' || item === null) return null;
 
   const record = item as Record<string, unknown>;
@@ -150,9 +146,10 @@ function normalizeSkill(
   const name = readString(record, ['name', 'displayName', 'title', 'slug', 'id']);
   if (!id || !name) return null;
 
-  const sourceId = fallbackSourceId === 'skillhub'
-    ? fallbackSourceId
-    : readSourceId(record.sourceId ?? record.source, fallbackSourceId);
+  const sourceId =
+    fallbackSourceId === 'skillhub'
+      ? fallbackSourceId
+      : readSourceId(record.sourceId ?? record.source, fallbackSourceId);
   const slug = readString(record, ['slug']);
   const detailUrl = readString(record, ['detailUrl', 'url']);
 
@@ -171,7 +168,9 @@ function normalizeSkill(
     reviewed: readBoolean(record, ['reviewed', 'approved', 'securityReviewed']),
     safety: readString(record, ['safety', 'securityStatus', 'reviewStatus']),
     installSpec: readString(record, ['installSpec', 'package', 'spec', 'homepage']),
-    detailUrl: detailUrl ?? (slug ? `${getSkillMarketplaceSource(sourceId).detailBaseUrl}/${encodeURIComponent(slug)}` : undefined),
+    detailUrl:
+      detailUrl ??
+      (slug ? `${getSkillMarketplaceSource(sourceId).detailBaseUrl}/${encodeURIComponent(slug)}` : undefined),
   };
 }
 

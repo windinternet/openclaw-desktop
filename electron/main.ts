@@ -584,11 +584,6 @@ function openWindowsTerminal(command: string): void {
   }
 }
 
-function findTerminal(): string | null {
-  if (isWin) return findWindowsTerminal()
-  return findUnixTerminal()
-}
-
 function openTerminal(command: string): void {
   if (isWin) {
     openWindowsTerminal(command)

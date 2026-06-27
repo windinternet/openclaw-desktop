@@ -80,12 +80,15 @@ describe('repository context companion sync', () => {
     const result = await syncRepositoryContextWithCompanion(client, 'inst-1');
 
     expect(readText).toHaveBeenCalledWith('/repo', 'AGENTS.md');
-    expect(setDesktopCompanionRepositoryContextMock).toHaveBeenCalledWith(client, expect.objectContaining({
-      instanceId: 'inst-1',
-      bindingId: binding.id,
-      repoPath: '/repo',
-      agentsMdContent: '# AGENTS.md\n\n- Follow repo rules.',
-    }));
+    expect(setDesktopCompanionRepositoryContextMock).toHaveBeenCalledWith(
+      client,
+      expect.objectContaining({
+        instanceId: 'inst-1',
+        bindingId: binding.id,
+        repoPath: '/repo',
+        agentsMdContent: '# AGENTS.md\n\n- Follow repo rules.',
+      }),
+    );
     expect(result).toMatchObject({
       status: 'synced',
       companionStatus: 'ready',
@@ -163,9 +166,11 @@ describe('repository context companion sync', () => {
       gatewayInstanceId: 'inst-1',
       repoPath: '/repo',
     });
-    stubRepositoryReadText(vi.fn(async () => {
-      throw new Error('permission denied');
-    }));
+    stubRepositoryReadText(
+      vi.fn(async () => {
+        throw new Error('permission denied');
+      }),
+    );
     loadRepositoryBindingMock.mockResolvedValue(binding);
     detectDesktopCompanionMock.mockResolvedValue({
       status: 'ready',
@@ -179,9 +184,12 @@ describe('repository context companion sync', () => {
 
     const result = await syncRepositoryContextWithCompanion(client, 'inst-1');
 
-    expect(setDesktopCompanionRepositoryContextMock).toHaveBeenCalledWith(client, expect.objectContaining({
-      agentsMdContent: '仓库根目录 AGENTS.md 暂不可读。',
-    }));
+    expect(setDesktopCompanionRepositoryContextMock).toHaveBeenCalledWith(
+      client,
+      expect.objectContaining({
+        agentsMdContent: '仓库根目录 AGENTS.md 暂不可读。',
+      }),
+    );
     expect(result).toMatchObject({
       status: 'synced',
       warning: expect.stringContaining('permission denied'),

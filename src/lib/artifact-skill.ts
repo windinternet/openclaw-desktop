@@ -60,9 +60,15 @@ Wrap your artifact in an \`<artifact>\` XML block with a JSON header and HTML bo
 
 export async function writeArtifactSkill(client: GatewayClient): Promise<void> {
   // 优先通过 IPC 直接写本地文件（Gateway 在本地时最可靠）
-  const api = (window as unknown as { electronAPI?: { artifact?: {
-    writeSkill: (dummy: string, content: string) => Promise<void>;
-  } } }).electronAPI?.artifact;
+  const api = (
+    window as unknown as {
+      electronAPI?: {
+        artifact?: {
+          writeSkill: (dummy: string, content: string) => Promise<void>;
+        };
+      };
+    }
+  ).electronAPI?.artifact;
 
   if (api) {
     try {

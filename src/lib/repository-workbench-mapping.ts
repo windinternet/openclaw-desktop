@@ -10,6 +10,7 @@ import { renderPromptTemplate } from './prompt-template';
 
 const MAX_SEMANTIC_SLOT_PATHS = 120;
 const MAX_PATHS_PER_SLOT = 20;
+const UNSAFE_PATH_PATTERN = new RegExp(String.raw`[\s\x00-\x1f\x7f]`);
 
 export interface WorkbenchStructureSignal {
   path: string;
@@ -31,7 +32,8 @@ export function buildWorkbenchSemanticMappingPrompt(options: {
   return renderPromptTemplate(workbenchSemanticMappingTemplate, {
     repoPath: options.repoPath,
     tree: options.tree.map((item) => `- ${item}`).join('\n') || '- （空）',
-    structureSignals: options.structureSignals.map((item) => `- ${item.path}: ${item.hints.join(', ')}`).join('\n') || '- （无）',
+    structureSignals:
+      options.structureSignals.map((item) => `- ${item.path}: ${item.hints.join(', ')}`).join('\n') || '- （无）',
   });
 }
 
@@ -208,7 +210,7 @@ export function isSafeSemanticSlotPath(value: string): boolean {
     normalized !== '.' &&
     !normalized.startsWith('/') &&
     !normalized.startsWith('./') &&
-    !/[\s\u0000-\u001f\u007f]/.test(normalized) &&
+    !UNSAFE_PATH_PATTERN.test(normalized) &&
     !normalized.includes('..') &&
     !normalized.includes('\\') &&
     segments.every((segment) => segment.length > 0 && segment !== '.')

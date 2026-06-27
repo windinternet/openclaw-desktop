@@ -1,7 +1,15 @@
 import { useTranslation } from 'react-i18next';
 import type { TagColor } from '@douyinfe/semi-ui/lib/es/tag';
 import { SideSheet, Button, Tag, Popconfirm, Typography, Toast } from '@douyinfe/semi-ui';
-import { IconServer, IconPlus, IconDeleteStroked, IconLink, IconPause, IconRefresh, IconSync } from '@douyinfe/semi-icons';
+import {
+  IconServer,
+  IconPlus,
+  IconDeleteStroked,
+  IconLink,
+  IconPause,
+  IconRefresh,
+  IconSync,
+} from '@douyinfe/semi-icons';
 import type { DesktopCompanionStatus } from '../lib/desktop-companion';
 import { useStore } from '../lib';
 
@@ -87,8 +95,8 @@ export default function InstanceDrawer({ visible, onClose, onAddInstance }: Inst
             const companionStatusInfo = COMPANION_STATUS_CONFIG[companionStatus];
             const companionDetail = companionInfo?.message || companionInfo?.version;
             const companionManaging = Boolean(runtime?.companionPluginManaging);
-            const canManageCompanion = status === 'connected'
-              && (companionStatus === 'ready' || companionStatus === 'degraded');
+            const canManageCompanion =
+              status === 'connected' && (companionStatus === 'ready' || companionStatus === 'degraded');
             const runCompanionAction = async (action: 'reinstall' | 'uninstall') => {
               try {
                 if (action === 'reinstall') {
@@ -128,12 +136,8 @@ export default function InstanceDrawer({ visible, onClose, onAddInstance }: Inst
                   borderRadius: 6,
                   cursor: 'pointer',
                   outline: 'none',
-                  backgroundColor: isCurrent
-                    ? 'var(--semi-color-primary-light-default)'
-                    : 'transparent',
-                  borderLeft: isCurrent
-                    ? '3px solid var(--semi-color-primary)'
-                    : '3px solid transparent',
+                  backgroundColor: isCurrent ? 'var(--semi-color-primary-light-default)' : 'transparent',
+                  borderLeft: isCurrent ? '3px solid var(--semi-color-primary)' : '3px solid transparent',
                   transition: 'background-color 0.15s',
                 }}
                 onMouseEnter={(e) => {
@@ -150,9 +154,7 @@ export default function InstanceDrawer({ visible, onClose, onAddInstance }: Inst
                 <IconServer
                   size="small"
                   style={{
-                    color: isCurrent
-                      ? 'var(--semi-color-primary)'
-                      : 'var(--semi-color-text-2)',
+                    color: isCurrent ? 'var(--semi-color-primary)' : 'var(--semi-color-text-2)',
                     flexShrink: 0,
                   }}
                 />
@@ -162,19 +164,12 @@ export default function InstanceDrawer({ visible, onClose, onAddInstance }: Inst
                     style={{
                       display: 'block',
                       fontWeight: isCurrent ? 600 : 400,
-                      color: isCurrent
-                        ? 'var(--semi-color-primary)'
-                        : 'var(--semi-color-text-0)',
+                      color: isCurrent ? 'var(--semi-color-primary)' : 'var(--semi-color-text-0)',
                     }}
                   >
                     {inst.name}
                   </Text>
-                  <Text
-                    type="tertiary"
-                    size="small"
-                    ellipsis
-                    style={{ display: 'block', marginTop: 2 }}
-                  >
+                  <Text type="tertiary" size="small" ellipsis style={{ display: 'block', marginTop: 2 }}>
                     {inst.gatewayUrl}
                   </Text>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, minWidth: 0 }}>
@@ -284,7 +279,11 @@ export default function InstanceDrawer({ visible, onClose, onAddInstance }: Inst
                     icon={status === 'connected' || status === 'connecting' ? <IconPause /> : <IconLink />}
                     size="small"
                     theme="borderless"
-                    title={status === 'connected' || status === 'connecting' ? t('instance.disconnect') : t('instance.connect')}
+                    title={
+                      status === 'connected' || status === 'connecting'
+                        ? t('instance.disconnect')
+                        : t('instance.connect')
+                    }
                     onClick={(e) => {
                       e.stopPropagation();
                       if (status === 'connected' || status === 'connecting') {
@@ -294,7 +293,10 @@ export default function InstanceDrawer({ visible, onClose, onAddInstance }: Inst
                       }
                     }}
                   />
-                  <Popconfirm title={t('instance.deleteConfirm')} onConfirm={() => useStore.getState().removeInstance(inst.id)}>
+                  <Popconfirm
+                    title={t('instance.deleteConfirm')}
+                    onConfirm={() => useStore.getState().removeInstance(inst.id)}
+                  >
                     <Button
                       icon={<IconDeleteStroked />}
                       size="small"

@@ -101,35 +101,39 @@ describe('desktop bridge instance connections', () => {
   it('declares artifact, repository, and output capabilities when connecting as a Gateway node', async () => {
     await connectDesktopBridgeToGateway(instanceA);
 
-    expect(createGatewayClient).toHaveBeenCalledWith(expect.objectContaining({
-      clientId: 'openclaw-tui',
-      caps: ['desktop', 'desktop.artifacts', 'desktop.repository', 'desktop.outputs'],
-      commands: [
-        'desktop.artifacts.create',
-        'desktop.artifacts.open',
-        'desktop.artifacts.update',
-        'desktop.artifacts.append',
-        'desktop.repository.status',
-        'desktop.repository.init',
-        'desktop.repository.read',
-        'desktop.repository.write',
-        'desktop.repository.search',
-        'desktop.repository.git.status',
-        'desktop.repository.git.diff',
-        'desktop.repository.git.log',
-        'desktop.repository.git.commit',
-        'desktop.repository.session-summary.write',
-        'desktop.outputs.create',
-        'desktop.outputs.open',
-        'desktop.outputs.update',
-        'desktop.outputs.append',
-        'desktop.notify',
-      ],
-      permissions: { 'desktop.artifacts': true, 'desktop.repository': true, 'desktop.outputs': true },
-    }));
-    expect(createGatewayClient).toHaveBeenCalledWith(expect.not.objectContaining({
-      capabilities: expect.any(Array),
-    }));
+    expect(createGatewayClient).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clientId: 'openclaw-tui',
+        caps: ['desktop', 'desktop.artifacts', 'desktop.repository', 'desktop.outputs'],
+        commands: [
+          'desktop.artifacts.create',
+          'desktop.artifacts.open',
+          'desktop.artifacts.update',
+          'desktop.artifacts.append',
+          'desktop.repository.status',
+          'desktop.repository.init',
+          'desktop.repository.read',
+          'desktop.repository.write',
+          'desktop.repository.search',
+          'desktop.repository.git.status',
+          'desktop.repository.git.diff',
+          'desktop.repository.git.log',
+          'desktop.repository.git.commit',
+          'desktop.repository.session-summary.write',
+          'desktop.outputs.create',
+          'desktop.outputs.open',
+          'desktop.outputs.update',
+          'desktop.outputs.append',
+          'desktop.notify',
+        ],
+        permissions: { 'desktop.artifacts': true, 'desktop.repository': true, 'desktop.outputs': true },
+      }),
+    );
+    expect(createGatewayClient).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        capabilities: expect.any(Array),
+      }),
+    );
   });
 
   it('connects before registering local bridge event handlers', async () => {

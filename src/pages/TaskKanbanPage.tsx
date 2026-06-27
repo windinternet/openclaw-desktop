@@ -76,20 +76,10 @@ export default function TaskKanbanPage({ embedded = false }: TaskKanbanPageProps
           tabBarExtraContent={
             activeTab === 'tasks' ? (
               <Space>
-                <Button
-                  icon={<IconRefresh />}
-                  size="small"
-                  loading={taskRefreshing}
-                  onClick={handleTasksRefresh}
-                >
+                <Button icon={<IconRefresh />} size="small" loading={taskRefreshing} onClick={handleTasksRefresh}>
                   {t('common.refresh')}
                 </Button>
-                <Button
-                  icon={<IconPlus />}
-                  type="primary"
-                  size="small"
-                  onClick={() => tasksRef.current?.openAdd()}
-                >
+                <Button icon={<IconPlus />} type="primary" size="small" onClick={() => tasksRef.current?.openAdd()}>
                   {t('tasks.add')}
                 </Button>
               </Space>

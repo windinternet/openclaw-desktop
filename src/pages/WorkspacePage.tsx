@@ -1,20 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  Table,
-  Button,
-  Select,
-  Tag,
-  Typography,
-  Space,
-  Toast,
-  Spin,
-  Empty,
-} from '@douyinfe/semi-ui';
-import {
-  IconRefresh,
-  IconFile,
-  IconFolderStroked,
-} from '@douyinfe/semi-icons';
+import { Table, Button, Select, Tag, Typography, Space, Toast, Spin, Empty } from '@douyinfe/semi-ui';
+import { IconRefresh, IconFile, IconFolderStroked } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
 import type { WorkspaceFile, WorkspaceFileContent } from '../lib/types';
@@ -46,12 +32,40 @@ function isTextFile(name: string): boolean {
   const ext = name.split('.').pop()?.toLowerCase();
   if (!ext) return true;
   const textExts = new Set([
-    'md', 'txt', 'json', 'yaml', 'yml', 'toml', 'xml',
-    'js', 'ts', 'jsx', 'tsx', 'py', 'rb', 'go', 'rs', 'java',
-    'sh', 'bash', 'zsh', 'env', 'cfg', 'conf', 'ini',
-    'css', 'scss', 'less', 'html', 'svg',
-    'gitignore', 'dockerignore', 'editorconfig',
-    'log', 'out', 'mdx',
+    'md',
+    'txt',
+    'json',
+    'yaml',
+    'yml',
+    'toml',
+    'xml',
+    'js',
+    'ts',
+    'jsx',
+    'tsx',
+    'py',
+    'rb',
+    'go',
+    'rs',
+    'java',
+    'sh',
+    'bash',
+    'zsh',
+    'env',
+    'cfg',
+    'conf',
+    'ini',
+    'css',
+    'scss',
+    'less',
+    'html',
+    'svg',
+    'gitignore',
+    'dockerignore',
+    'editorconfig',
+    'log',
+    'out',
+    'mdx',
   ]);
   return textExts.has(ext);
 }
@@ -152,15 +166,12 @@ export default function WorkspacePage() {
     }
   }, [connectionStatus, selectedAgent, loadFiles]);
 
-  const handleAgentChange = useCallback(
-    (value: string | number | (string | number)[] | undefined) => {
-      const agentId = String(value ?? 'main');
-      setSelectedAgent(agentId);
-      setSelectedFile(null);
-      setFileContent(null);
-    },
-    [],
-  );
+  const handleAgentChange = useCallback((value: string | number | (string | number)[] | undefined) => {
+    const agentId = String(value ?? 'main');
+    setSelectedAgent(agentId);
+    setSelectedFile(null);
+    setFileContent(null);
+  }, []);
 
   const handleRefresh = useCallback(() => {
     setFileContent(null);
@@ -318,11 +329,7 @@ export default function WorkspacePage() {
     if (isMarkdown(selectedFile.name) && fileContent) {
       const html = renderMarkdown(fileContent);
       return (
-        <div
-          style={viewerStyle}
-          className="workspace-markdown-viewer"
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
+        <div style={viewerStyle} className="workspace-markdown-viewer" dangerouslySetInnerHTML={{ __html: html }} />
       );
     }
 

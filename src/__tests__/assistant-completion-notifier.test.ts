@@ -108,11 +108,14 @@ describe('assistant completion notifier', () => {
 
   it('includes the instance name in system notifications', async () => {
     const show = vi.fn(async () => true);
-    vi.stubGlobal('Audio', class {
-      play() {
-        return Promise.resolve();
-      }
-    });
+    vi.stubGlobal(
+      'Audio',
+      class {
+        play() {
+          return Promise.resolve();
+        }
+      },
+    );
     vi.stubGlobal('window', {
       location: { hash: '#/dashboard' },
       electronAPI: { notifications: { show } },

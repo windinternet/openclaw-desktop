@@ -10,12 +10,16 @@ export interface ToolDefinition {
 export const ARTIFACT_TOOLS: ToolDefinition[] = [
   {
     name: 'desktop.artifact.generate',
-    description: '生成 HTML 产物。当用户要求生成报告、分析、仪表盘、清单等输出时使用。模板路径：指定 templateId + data 渲染模板。自由路径：不指定 templateId，直接提供 html。',
+    description:
+      '生成 HTML 产物。当用户要求生成报告、分析、仪表盘、清单等输出时使用。模板路径：指定 templateId + data 渲染模板。自由路径：不指定 templateId，直接提供 html。',
     inputSchema: {
       type: 'object',
       properties: {
         title: { type: 'string', description: '产物标题' },
-        type: { type: 'string', enum: ['report', 'dashboard', 'analysis', 'checklist', 'code', 'document', 'slide', 'form', 'other'] },
+        type: {
+          type: 'string',
+          enum: ['report', 'dashboard', 'analysis', 'checklist', 'code', 'document', 'slide', 'form', 'other'],
+        },
         icon: { type: 'string', description: 'emoji 图标' },
         description: { type: 'string' },
         tags: { type: 'array', items: { type: 'string' } },

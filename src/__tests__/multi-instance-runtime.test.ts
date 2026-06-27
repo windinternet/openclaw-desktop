@@ -8,32 +8,34 @@ interface MockGatewayClient extends GatewayClient {
   disconnect: ReturnType<typeof vi.fn>;
 }
 
-const { clients, responses, createGatewayClient, connectDesktopBridgeToGateway, disconnectDesktopBridge } = vi.hoisted(() => {
-  const hoistedClients = new Map<string, MockGatewayClient>();
-  const hoistedResponses = new Map<string, Map<string, unknown>>();
-  const hoistedCreateGatewayClient = vi.fn((options: GatewayClientOptions) => {
-    const client = {
-      options,
-      connect: vi.fn(async () => ({ server: { version: options.url } })),
-      disconnect: vi.fn(),
-      getStatus: vi.fn(() => 'connected'),
-      request: vi.fn(async (method: string) => hoistedResponses.get(options.url)?.get(method) ?? {}),
-      testConnection: vi.fn(),
-      onStatusChange: options.onStatusChange ?? null,
-      onRetry: options.onRetry ?? null,
-      onEvent: options.onEvent ?? null,
-    } as unknown as MockGatewayClient;
-    hoistedClients.set(options.url, client);
-    return client;
-  });
-  return {
-    clients: hoistedClients,
-    responses: hoistedResponses,
-    createGatewayClient: hoistedCreateGatewayClient,
-    connectDesktopBridgeToGateway: vi.fn(async () => ({})),
-    disconnectDesktopBridge: vi.fn(),
-  };
-});
+const { clients, responses, createGatewayClient, connectDesktopBridgeToGateway, disconnectDesktopBridge } = vi.hoisted(
+  () => {
+    const hoistedClients = new Map<string, MockGatewayClient>();
+    const hoistedResponses = new Map<string, Map<string, unknown>>();
+    const hoistedCreateGatewayClient = vi.fn((options: GatewayClientOptions) => {
+      const client = {
+        options,
+        connect: vi.fn(async () => ({ server: { version: options.url } })),
+        disconnect: vi.fn(),
+        getStatus: vi.fn(() => 'connected'),
+        request: vi.fn(async (method: string) => hoistedResponses.get(options.url)?.get(method) ?? {}),
+        testConnection: vi.fn(),
+        onStatusChange: options.onStatusChange ?? null,
+        onRetry: options.onRetry ?? null,
+        onEvent: options.onEvent ?? null,
+      } as unknown as MockGatewayClient;
+      hoistedClients.set(options.url, client);
+      return client;
+    });
+    return {
+      clients: hoistedClients,
+      responses: hoistedResponses,
+      createGatewayClient: hoistedCreateGatewayClient,
+      connectDesktopBridgeToGateway: vi.fn(async () => ({})),
+      disconnectDesktopBridge: vi.fn(),
+    };
+  },
+);
 
 vi.mock('../lib/gateway', () => ({
   createGatewayClient,
@@ -76,11 +78,14 @@ describe('multi-instance gateway runtime', () => {
   });
 
   beforeEach(() => {
-    vi.stubGlobal('Audio', class {
-      play() {
-        return Promise.resolve();
-      }
-    });
+    vi.stubGlobal(
+      'Audio',
+      class {
+        play() {
+          return Promise.resolve();
+        }
+      },
+    );
     clients.clear();
     responses.clear();
     createGatewayClient.mockClear();
@@ -169,7 +174,10 @@ describe('multi-instance gateway runtime', () => {
     await useStore.getState().connectToGateway(instanceB.id);
     await useStore.getState().fetchSessions(instanceB.id);
 
-    responses.set(instanceA.gatewayUrl, new Map([['sessions.list', { sessions: [{ key: 'session-a2', title: 'A2' }] }]]));
+    responses.set(
+      instanceA.gatewayUrl,
+      new Map([['sessions.list', { sessions: [{ key: 'session-a2', title: 'A2' }] }]]),
+    );
     await useStore.getState().fetchSessions(instanceA.id);
 
     expect(useStore.getState().instanceRuntimes[instanceA.id].sessions).toEqual([{ key: 'session-a2', title: 'A2' }]);
@@ -253,7 +261,9 @@ describe('multi-instance gateway runtime', () => {
     const firstActivityAt = useStore.getState().instances.find((item) => item.id === instanceA.id)?.lastActivityAt;
     clients.get(instanceA.gatewayUrl)?.options.onEvent?.(event);
 
-    expect(useStore.getState().instances.find((item) => item.id === instanceA.id)?.lastActivityAt).toBe(firstActivityAt);
+    expect(useStore.getState().instances.find((item) => item.id === instanceA.id)?.lastActivityAt).toBe(
+      firstActivityAt,
+    );
   });
 
   it('clears unread activity when entering an instance but keeps its summary', () => {
