@@ -749,6 +749,8 @@
     "runtimeBridgeCount": "{{count}} bridge call",
     "reuseRecords": "Reuse records",
     "reuseRecordCount": "{{count}} reuse record",
+    "executionRecords": "Execution records",
+    "executionRecordCount": "{{count}} execution record",
     "importFileHint": "When a local file path is provided, a copy is imported into Artifact storage.",
     "originalFilePath": "Original path",
     "fileSize": "File size",

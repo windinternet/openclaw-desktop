@@ -473,6 +473,36 @@ export default function ArtifactDetailPage() {
                   </div>
                 </div>
               )}
+              {meta.executionEvents && meta.executionEvents.length > 0 && (
+                <div>
+                  <Text type="tertiary">{t('artifact.executionRecords')}: </Text>
+                  <Tag
+                    size="small"
+                    color={meta.executionEvents[meta.executionEvents.length - 1].status === 'failed' ? 'red' : 'green'}
+                    type="light"
+                  >
+                    {meta.executionEvents[meta.executionEvents.length - 1].status}
+                  </Tag>
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <Text type="tertiary" size="small">
+                      {t('artifact.executionRecordCount', { count: meta.executionEvents.length })}
+                    </Text>
+                    {meta.executionEvents
+                      .slice(-3)
+                      .reverse()
+                      .map((event) => (
+                        <Text key={event.id} size="small" type="secondary">
+                          {event.status}
+                          {event.runner ? ` · ${event.runner}` : ''}
+                          {event.command ? ` · ${event.command}` : ''}
+                          {event.resultSummary ? ` · ${event.resultSummary}` : ''}
+                          {event.error ? ` · ${event.error}` : ''}
+                          {event.repositoryOutputPath ? ` · ${event.repositoryOutputPath}` : ''}
+                        </Text>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </Card>

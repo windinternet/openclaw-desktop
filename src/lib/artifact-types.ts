@@ -96,8 +96,23 @@ export interface ArtifactRuntimeBridgeEvent {
   endedAt: number;
 }
 
-export type ArtifactReuseContext = 'chat' | 'workflow' | 'agent_team' | 'manual' | 'mcp_tool' | 'action_run' | 'repository';
+export type ArtifactReuseContext =
+  | 'chat'
+  | 'workflow'
+  | 'agent_team'
+  | 'manual'
+  | 'mcp_tool'
+  | 'action_run'
+  | 'repository';
 export type ArtifactReuseStatus = 'used' | 'succeeded' | 'failed' | 'cancelled';
+export type ArtifactExecutionStatus =
+  | 'approval_required'
+  | 'approved'
+  | 'denied'
+  | 'running'
+  | 'succeeded'
+  | 'failed'
+  | 'cancelled';
 
 export interface ArtifactReuseEvent {
   id: string;
@@ -109,6 +124,26 @@ export interface ArtifactReuseEvent {
   sourceName?: string;
   purpose?: string;
   resultSummary?: string;
+}
+
+export interface ArtifactExecutionEvent {
+  id: string;
+  status: ArtifactExecutionStatus;
+  artifactVersion: number;
+  requestedAt: number;
+  startedAt?: number;
+  endedAt?: number;
+  sourceId?: string;
+  sourceName?: string;
+  runner?: string;
+  command?: string;
+  approvalTitle?: string;
+  approvalRisk?: string;
+  approvalReason?: string;
+  outputArtifactId?: string;
+  repositoryOutputPath?: string;
+  resultSummary?: string;
+  error?: string;
 }
 
 export interface ArtifactMeta {
@@ -143,6 +178,7 @@ export interface ArtifactMeta {
   authEvents?: ArtifactRuntimeAuthEvent[];
   bridgeEvents?: ArtifactRuntimeBridgeEvent[];
   reuseEvents?: ArtifactReuseEvent[];
+  executionEvents?: ArtifactExecutionEvent[];
 }
 
 export interface VersionEntry {

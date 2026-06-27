@@ -20,6 +20,7 @@ export const DESKTOP_NODE_COMMANDS = [
   'desktop.artifacts.search',
   'desktop.artifacts.describe',
   'desktop.artifacts.reuse.record',
+  'desktop.artifacts.execution.record',
   'desktop.artifacts.open',
   'desktop.artifacts.update',
   'desktop.artifacts.append',

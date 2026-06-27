@@ -648,6 +648,133 @@ describe('desktop node commands', () => {
     });
   });
 
+  it('records executable artifact run facts without executing commands and mirrors the updated output', async () => {
+    mockedArtifactPersistence.loadMeta.mockResolvedValue({
+      id: 'art_script',
+      title: '部署脚本',
+      icon: '📎',
+      type: 'file',
+      source: { type: 'action_run', id: 'run_create' },
+      tags: ['deploy'],
+      currentVersion: 3,
+      status: 'draft',
+      createdAt: 1,
+      updatedAt: 2,
+      reuseKind: 'script',
+      command: 'npm run deploy',
+      contentSummary: 'Script · deploy.sh',
+    });
+    mockedArtifactPersistence.loadHtml.mockResolvedValue(null);
+    mockedCreateRepositoryOutput.mockResolvedValue({
+      outputId: 'art_script',
+      outputPath: 'outputs/files/art_script.md',
+    });
+
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.execution.record', {
+        repoPath: '/repo',
+        gatewayInstanceId: 'inst-1',
+        artifactId: 'art_script',
+        status: 'succeeded',
+        sourceId: 'run_exec',
+        sourceName: '部署生产',
+        runner: 'Gateway Agent',
+        command: 'npm run deploy -- --dry-run',
+        approvalTitle: '运行部署脚本',
+        approvalRisk: 'high',
+        approvalReason: '会调用本地命令，需要用户审批',
+        outputArtifactId: 'art_output',
+        repositoryOutputPath: 'outputs/runs/exec_1.md',
+        resultSummary: '生成 3 个发布命令',
+        requestedAt: 10,
+        startedAt: 12,
+        endedAt: 30,
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      artifactId: 'art_script',
+      event: expect.objectContaining({
+        status: 'succeeded',
+        sourceId: 'run_exec',
+        artifactVersion: 3,
+        command: 'npm run deploy -- --dry-run',
+        approvalRisk: 'high',
+        resultSummary: '生成 3 个发布命令',
+      }),
+      output: {
+        outputId: 'art_script',
+        path: 'outputs/files/art_script.md',
+        previewPath: undefined,
+      },
+    });
+
+    expect(mockedArtifactService.update).toHaveBeenCalledWith('art_script', {
+      executionEvents: [
+        expect.objectContaining({
+          status: 'succeeded',
+          sourceId: 'run_exec',
+          sourceName: '部署生产',
+          runner: 'Gateway Agent',
+          command: 'npm run deploy -- --dry-run',
+          approvalTitle: '运行部署脚本',
+          approvalRisk: 'high',
+          approvalReason: '会调用本地命令，需要用户审批',
+          outputArtifactId: 'art_output',
+          repositoryOutputPath: 'outputs/runs/exec_1.md',
+          resultSummary: '生成 3 个发布命令',
+          artifactVersion: 3,
+          requestedAt: 10,
+          startedAt: 12,
+          endedAt: 30,
+        }),
+      ],
+    });
+    expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(
+      expect.objectContaining({
+        artifact: expect.objectContaining({
+          id: 'art_script',
+          executionEvents: [
+            expect.objectContaining({
+              sourceId: 'run_exec',
+              status: 'succeeded',
+            }),
+          ],
+        }),
+        binding: expect.objectContaining({ repoPath: '/repo', gatewayInstanceId: 'inst-1' }),
+      }),
+    );
+  });
+
+  it('rejects execution records for non-executable reusable artifact kinds', async () => {
+    mockedArtifactPersistence.loadMeta.mockResolvedValue({
+      id: 'art_template',
+      title: '周报模板',
+      icon: '📎',
+      type: 'file',
+      source: { type: 'manual' },
+      tags: [],
+      currentVersion: 1,
+      status: 'draft',
+      createdAt: 1,
+      updatedAt: 2,
+      reuseKind: 'template',
+    });
+
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.execution.record', {
+        artifactId: 'art_template',
+        status: 'succeeded',
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      error: 'not-executable-artifact',
+      artifactId: 'art_template',
+      reuseKind: 'template',
+    });
+
+    expect(mockedArtifactService.update).not.toHaveBeenCalled();
+  });
+
   it('updates and mirrors a repository output through artifact compatibility', async () => {
     const artifact = {
       id: 'art_2',

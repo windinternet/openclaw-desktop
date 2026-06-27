@@ -1,4 +1,5 @@
 import type {
+  ArtifactExecutionStatus,
   ArtifactExternalFormat,
   ArtifactMeta,
   ArtifactReuseContext,
@@ -10,6 +11,7 @@ import { artifactService, type GenerateParams } from './artifact-service';
 import { artifactPersistence } from './artifact-persistence';
 import { buildArtifactPreviewCard, buildArtifactSearchText } from './artifact-display';
 import { buildArtifactReuseReference } from './artifact-reference';
+import { recordArtifactExecutionEvent } from './artifact-execution-record';
 import { recordArtifactReuseEvent } from './artifact-reuse-record';
 import { buildArtifactVersionHistory } from './artifact-version-history';
 import { createDefaultRepositoryBinding, getRepositoryGateStatus } from './agentic-repository';
@@ -73,6 +75,16 @@ const ARTIFACT_REUSE_CONTEXTS = new Set<ArtifactReuseContext>([
   'repository',
 ]);
 const ARTIFACT_REUSE_STATUSES = new Set<ArtifactReuseStatus>(['used', 'succeeded', 'failed', 'cancelled']);
+const ARTIFACT_EXECUTION_STATUSES = new Set<ArtifactExecutionStatus>([
+  'approval_required',
+  'approved',
+  'denied',
+  'running',
+  'succeeded',
+  'failed',
+  'cancelled',
+]);
+const ARTIFACT_EXECUTABLE_REUSE_KINDS = new Set<ArtifactReuseKind>(['tool', 'script', 'workflow']);
 const ARTIFACT_STATUSES = new Set<ArtifactMeta['status']>(['draft', 'published', 'archived']);
 
 const HTML_ARTIFACT_TYPES = new Set<ArtifactType>([
@@ -142,6 +154,12 @@ function artifactReuseStatusValue(value: unknown): ArtifactReuseStatus {
   return typeof value === 'string' && ARTIFACT_REUSE_STATUSES.has(value as ArtifactReuseStatus)
     ? (value as ArtifactReuseStatus)
     : 'used';
+}
+
+function artifactExecutionStatusValue(value: unknown): ArtifactExecutionStatus {
+  return typeof value === 'string' && ARTIFACT_EXECUTION_STATUSES.has(value as ArtifactExecutionStatus)
+    ? (value as ArtifactExecutionStatus)
+    : 'approval_required';
 }
 
 function artifactStatusValue(value: unknown): ArtifactMeta['status'] | undefined {
@@ -238,6 +256,7 @@ async function recordRepositoryOutput(artifactId: string, output: RepositoryOutp
 
 function buildArtifactSearchResult(artifact: ArtifactMeta) {
   const reference = buildArtifactReuseReference(artifact);
+  const lastExecutionEvent = artifact.executionEvents?.[artifact.executionEvents.length - 1];
   return {
     id: artifact.id,
     title: artifact.title,
@@ -257,6 +276,8 @@ function buildArtifactSearchResult(artifact: ArtifactMeta) {
     url: artifact.url,
     command: artifact.command,
     previewCard: buildArtifactPreviewCard(artifact),
+    executionEventCount: artifact.executionEvents?.length ?? 0,
+    lastExecutionEvent,
     updatedAt: artifact.updatedAt,
     reference: reference.markdown,
   };
@@ -604,6 +625,7 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
     if (!artifact) return { ok: false, error: 'not-found', artifactId };
     const reference = buildArtifactReuseReference(artifact);
     const lastReuseEvent = artifact.reuseEvents?.[artifact.reuseEvents.length - 1];
+    const lastExecutionEvent = artifact.executionEvents?.[artifact.executionEvents.length - 1];
     const versions = buildArtifactVersionHistory(artifact);
     const latestVersion = versions[versions.length - 1];
     return {
@@ -622,6 +644,8 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
         reuseKind: artifact.reuseKind,
         reuseEventCount: artifact.reuseEvents?.length ?? 0,
         lastReuseEvent,
+        executionEventCount: artifact.executionEvents?.length ?? 0,
+        lastExecutionEvent,
         repositoryOutputPath: artifact.repositoryOutputPath,
         repositoryPreviewPath: artifact.repositoryPreviewPath,
         fileName: artifact.fileName,
@@ -656,6 +680,79 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
     const persistedArtifact = await artifactPersistence.loadMeta(artifactId);
     const outputArtifact = persistedArtifact
       ? { ...persistedArtifact, reuseEvents: updatedArtifact.reuseEvents }
+      : updatedArtifact;
+
+    const repoPath = stringValue(params.repoPath);
+    let output: RepositoryOutputResult | null = null;
+    if (repoPath) {
+      const html = await artifactPersistence.loadHtml(artifactId, outputArtifact.currentVersion);
+      output = await createRepositoryOutput({
+        binding: createDefaultRepositoryBinding({
+          gatewayInstanceId: stringValue(params.gatewayInstanceId) ?? 'desktop-node',
+          repoPath,
+        }),
+        artifact: outputArtifact,
+        html: html ?? undefined,
+      });
+      await recordRepositoryOutput(artifactId, output);
+    }
+
+    return {
+      ok: true,
+      artifactId,
+      event,
+      ...(output
+        ? {
+            output: {
+              outputId: output.outputId,
+              path: output.outputPath,
+              previewPath: output.previewPath,
+            },
+          }
+        : {}),
+    };
+  }
+
+  if (command === 'desktop.artifacts.execution.record') {
+    const artifactId = stringValue(params.artifactId);
+    if (!artifactId) return invalidParams('artifactId is required');
+    const artifact = await artifactPersistence.loadMeta(artifactId);
+    if (!artifact) return { ok: false, error: 'not-found', artifactId };
+    if (!artifact.reuseKind || !ARTIFACT_EXECUTABLE_REUSE_KINDS.has(artifact.reuseKind)) {
+      return {
+        ok: false,
+        error: 'not-executable-artifact',
+        artifactId,
+        reuseKind: artifact.reuseKind,
+      };
+    }
+
+    const requestedAt = numberValue(params.requestedAt) ?? Date.now();
+    const updatedArtifact = recordArtifactExecutionEvent(artifact, {
+      status: artifactExecutionStatusValue(params.status),
+      sourceId: stringValue(params.sourceId),
+      sourceName: stringValue(params.sourceName),
+      runner: stringValue(params.runner),
+      command: stringValue(params.command) ?? artifact.command,
+      approvalTitle: stringValue(params.approvalTitle),
+      approvalRisk: stringValue(params.approvalRisk),
+      approvalReason: stringValue(params.approvalReason),
+      outputArtifactId: stringValue(params.outputArtifactId),
+      repositoryOutputPath: stringValue(params.repositoryOutputPath),
+      resultSummary: stringValue(params.resultSummary),
+      error: stringValue(params.error),
+      requestedAt,
+      startedAt: numberValue(params.startedAt),
+      endedAt: numberValue(params.endedAt),
+    });
+    const event = updatedArtifact.executionEvents?.[updatedArtifact.executionEvents.length - 1];
+
+    await artifactService.update(artifactId, {
+      executionEvents: updatedArtifact.executionEvents,
+    });
+    const persistedArtifact = await artifactPersistence.loadMeta(artifactId);
+    const outputArtifact = persistedArtifact
+      ? { ...persistedArtifact, executionEvents: updatedArtifact.executionEvents }
       : updatedArtifact;
 
     const repoPath = stringValue(params.repoPath);

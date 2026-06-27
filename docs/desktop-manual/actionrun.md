@@ -55,3 +55,5 @@ ActionRun 的结果可以是：
 文件型 `<artifact>` 可以显式携带 `filePath`、`fileName`、`mimeType`、`fileSize`、`externalFormat`、`contentSummary`、`reuseKind` 和 `importFile`。当 `importFile: true` 时，Desktop 会导入本地文件；仓库绑定就绪时会把产物元数据镜像到 `outputs/files/` 并让 ActionRun 摘要链接该 output。`reuseKind` 可标记 `asset`、`template`、`tool`、`script` 或 `workflow`，用于后续复用和审计分类，不代表自动获得执行权限。
 
 当 ActionRun 复用已有产物时，可以调用 `desktop.artifacts.reuse.record` 写入上下文、用途、状态、结果摘要和来源信息；仓库路径就绪时可同时刷新对应 Repository output。该记录用于追踪“用了哪个既有成果做了什么”，不代表 Desktop 直接执行该产物。
+
+当 ActionRun 通过外部审批通道使用了 `tool`、`script` 或 `workflow` 类产物时，可以调用 `desktop.artifacts.execution.record` 归档审批、runner、命令文本、状态、结果摘要和输出线索。该命令只记录执行事实，不执行命令，也不绕过 ActionRun 审批。

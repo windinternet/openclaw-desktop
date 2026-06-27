@@ -43,6 +43,8 @@ export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string
   const lastRuntimeBridge = runtimeBridgeEvents[runtimeBridgeEvents.length - 1];
   const reuseEvents = artifact.reuseEvents ?? [];
   const lastReuseEvent = reuseEvents[reuseEvents.length - 1];
+  const executionEvents = artifact.executionEvents ?? [];
+  const lastExecutionEvent = executionEvents[executionEvents.length - 1];
   const versions = buildArtifactVersionHistory(artifact);
   const latestVersion = versions[versions.length - 1];
   const previewCard = buildArtifactPreviewCard(artifact);
@@ -94,6 +96,24 @@ export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string
     lastReuseEvent?.resultSummary ? `reuseLastResult: ${lastReuseEvent.resultSummary}` : undefined,
     lastReuseEvent ? `reuseLastArtifactVersion: ${lastReuseEvent.artifactVersion}` : undefined,
     lastReuseEvent ? `reuseLastAt: ${new Date(lastReuseEvent.usedAt).toISOString()}` : undefined,
+    executionEvents.length > 0 ? `executionEventCount: ${executionEvents.length}` : undefined,
+    lastExecutionEvent ? `executionLastStatus: ${lastExecutionEvent.status}` : undefined,
+    lastExecutionEvent?.sourceId ? `executionLastSourceId: ${lastExecutionEvent.sourceId}` : undefined,
+    lastExecutionEvent?.sourceName ? `executionLastSourceName: ${lastExecutionEvent.sourceName}` : undefined,
+    lastExecutionEvent?.runner ? `executionLastRunner: ${lastExecutionEvent.runner}` : undefined,
+    lastExecutionEvent?.command ? `executionLastCommand: ${lastExecutionEvent.command}` : undefined,
+    lastExecutionEvent?.approvalTitle ? `executionLastApprovalTitle: ${lastExecutionEvent.approvalTitle}` : undefined,
+    lastExecutionEvent?.approvalRisk ? `executionLastApprovalRisk: ${lastExecutionEvent.approvalRisk}` : undefined,
+    lastExecutionEvent?.resultSummary ? `executionLastResult: ${lastExecutionEvent.resultSummary}` : undefined,
+    lastExecutionEvent?.error ? `executionLastError: ${lastExecutionEvent.error}` : undefined,
+    lastExecutionEvent?.outputArtifactId
+      ? `executionLastOutputArtifact: ${lastExecutionEvent.outputArtifactId}`
+      : undefined,
+    lastExecutionEvent?.repositoryOutputPath
+      ? `executionLastRepositoryOutput: ${lastExecutionEvent.repositoryOutputPath}`
+      : undefined,
+    lastExecutionEvent ? `executionLastArtifactVersion: ${lastExecutionEvent.artifactVersion}` : undefined,
+    lastExecutionEvent?.endedAt ? `executionLastAt: ${new Date(lastExecutionEvent.endedAt).toISOString()}` : undefined,
     artifact.fileName ? `fileName: ${artifact.fileName}` : undefined,
     artifact.filePath ? `filePath: ${artifact.filePath}` : undefined,
     artifact.originalFilePath ? `originalFilePath: ${artifact.originalFilePath}` : undefined,
@@ -156,6 +176,8 @@ export async function mirrorArtifactToReadyRepositoryOutput(
 
 function buildOutputIndexEntry(artifact: ArtifactMeta, outputPath: string, previewPath?: string): string {
   const previewCard = buildArtifactPreviewCard(artifact);
+  const executionCount = artifact.executionEvents?.length ?? 0;
+  const lastExecutionEvent = artifact.executionEvents?.[executionCount - 1];
   return [
     `- [${artifact.title}](${outputPath}) (\`${artifact.id}\`, ${artifact.type}, ${artifact.status})`,
     `  - artifact: artifact://${artifact.id}`,
@@ -166,6 +188,7 @@ function buildOutputIndexEntry(artifact: ArtifactMeta, outputPath: string, previ
     artifact.contentSummary ? `  - summary: ${artifact.contentSummary}` : undefined,
     `  - previewCard: ${previewCard.thumbnailLabel} · ${previewCard.actionLabel}`,
     artifact.reuseKind ? `  - reuseKind: ${artifact.reuseKind}` : undefined,
+    lastExecutionEvent ? `  - execution: ${executionCount} events, last ${lastExecutionEvent.status}` : undefined,
     artifact.tags.length > 0 ? `  - tags: ${artifact.tags.join(', ')}` : undefined,
   ]
     .filter((line): line is string => typeof line === 'string')

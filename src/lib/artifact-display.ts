@@ -89,6 +89,20 @@ export function buildArtifactSearchText(artifact: ArtifactMeta): string {
     previewCard.location,
     previewCard.actionLabel,
     previewCard.safetyNote,
+    ...(artifact.executionEvents ?? []).flatMap((event) => [
+      event.status,
+      event.sourceId,
+      event.sourceName,
+      event.runner,
+      event.command,
+      event.approvalTitle,
+      event.approvalRisk,
+      event.approvalReason,
+      event.outputArtifactId,
+      event.repositoryOutputPath,
+      event.resultSummary,
+      event.error,
+    ]),
   ];
 
   return dedupe(fields.filter((field): field is string => Boolean(field?.trim())))

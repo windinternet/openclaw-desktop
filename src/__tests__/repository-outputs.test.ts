@@ -84,6 +84,44 @@ describe('repository outputs', () => {
     expect(markdown).toContain('reuseLastArtifactVersion: 3');
   });
 
+  it('includes executable artifact run summaries in repository output markdown', () => {
+    const markdown = buildOutputMarkdown({
+      ...createArtifact(),
+      reuseKind: 'script',
+      executionEvents: [
+        {
+          id: 'exec_1',
+          status: 'succeeded',
+          artifactVersion: 3,
+          requestedAt: 10,
+          startedAt: 12,
+          endedAt: 30,
+          sourceId: 'run_exec',
+          sourceName: '部署生产',
+          runner: 'Gateway Agent',
+          command: 'npm run deploy -- --dry-run',
+          approvalTitle: '运行部署脚本',
+          approvalRisk: 'high',
+          approvalReason: '会调用本地命令，需要用户审批',
+          outputArtifactId: 'art_output',
+          repositoryOutputPath: 'outputs/runs/exec_1.md',
+          resultSummary: '生成 3 个发布命令',
+        },
+      ],
+    });
+
+    expect(markdown).toContain('executionEventCount: 1');
+    expect(markdown).toContain('executionLastStatus: succeeded');
+    expect(markdown).toContain('executionLastSourceId: run_exec');
+    expect(markdown).toContain('executionLastRunner: Gateway Agent');
+    expect(markdown).toContain('executionLastCommand: npm run deploy -- --dry-run');
+    expect(markdown).toContain('executionLastApprovalRisk: high');
+    expect(markdown).toContain('executionLastResult: 生成 3 个发布命令');
+    expect(markdown).toContain('executionLastOutputArtifact: art_output');
+    expect(markdown).toContain('executionLastRepositoryOutput: outputs/runs/exec_1.md');
+    expect(markdown).toContain('executionLastArtifactVersion: 3');
+  });
+
   it('includes artifact version history summaries in repository output markdown', () => {
     const markdown = buildOutputMarkdown({
       ...createArtifact(),

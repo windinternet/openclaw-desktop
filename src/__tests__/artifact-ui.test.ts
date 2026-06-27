@@ -26,6 +26,9 @@ describe('artifact UI metadata', () => {
     expect(detailPage).toContain("t('artifact.runtimeBridge')");
     expect(detailPage).toContain('reuseEvents');
     expect(detailPage).toContain("t('artifact.reuseRecords')");
+    expect(detailPage).toContain('executionEvents');
+    expect(detailPage).toContain("t('artifact.executionRecords')");
+    expect(detailPage).toContain("t('artifact.executionRecordCount'");
     expect(detailPage).toContain('buildArtifactVersionHistory');
     expect(detailPage).toContain("t('artifact.currentVersion')");
     expect(listPage).toContain('contentSummary');
@@ -58,6 +61,8 @@ describe('artifact UI metadata', () => {
     expect(zh.artifact.runtimeBridge).toBeTruthy();
     expect(zh.artifact.reuseRecords).toBeTruthy();
     expect(zh.artifact.reuseRecordCount).toBeTruthy();
+    expect(zh.artifact.executionRecords).toBeTruthy();
+    expect(zh.artifact.executionRecordCount).toBeTruthy();
     expect(zh.artifact.currentVersion).toBeTruthy();
     expect(zh.artifact.contentSummary).toBeTruthy();
     expect(zh.artifact.externalFormat).toBeTruthy();
@@ -74,6 +79,8 @@ describe('artifact UI metadata', () => {
     expect(en.artifact.runtimeBridge).toBeTruthy();
     expect(en.artifact.reuseRecords).toBeTruthy();
     expect(en.artifact.reuseRecordCount).toBeTruthy();
+    expect(en.artifact.executionRecords).toBeTruthy();
+    expect(en.artifact.executionRecordCount).toBeTruthy();
     expect(en.artifact.currentVersion).toBeTruthy();
     expect(en.artifact.contentSummary).toBeTruthy();
     expect(en.artifact.externalFormat).toBeTruthy();

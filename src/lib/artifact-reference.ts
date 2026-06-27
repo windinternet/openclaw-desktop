@@ -8,6 +8,7 @@ export interface ArtifactReuseReference {
 export function buildArtifactReuseReference(artifact: ArtifactMeta): ArtifactReuseReference {
   const uri = `artifact://${artifact.id}`;
   const lastReuseEvent = artifact.reuseEvents?.[artifact.reuseEvents.length - 1];
+  const lastExecutionEvent = artifact.executionEvents?.[artifact.executionEvents.length - 1];
   const lines = [
     `- [${artifact.title}](${uri})`,
     `  - artifactId: ${artifact.id}`,
@@ -20,6 +21,8 @@ export function buildArtifactReuseReference(artifact: ArtifactMeta): ArtifactReu
     artifact.repositoryPreviewPath ? `  - repositoryPreview: ${artifact.repositoryPreviewPath}` : undefined,
     artifact.reuseEvents?.length ? `  - reuseEvents: ${artifact.reuseEvents.length}` : undefined,
     lastReuseEvent ? `  - lastReuse: ${lastReuseEvent.context}/${lastReuseEvent.status}` : undefined,
+    artifact.executionEvents?.length ? `  - executionEvents: ${artifact.executionEvents.length}` : undefined,
+    lastExecutionEvent ? `  - lastExecution: ${lastExecutionEvent.status}` : undefined,
     artifact.fileName ? `  - fileName: ${artifact.fileName}` : undefined,
     artifact.filePath ? `  - filePath: ${artifact.filePath}` : undefined,
     artifact.url ? `  - url: ${artifact.url}` : undefined,
