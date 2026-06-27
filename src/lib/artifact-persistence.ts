@@ -6,6 +6,11 @@ interface ArtifactApi {
   getHtml: (artifactId: string, version?: number) => Promise<string | null>;
   saveMeta: (artifactId: string, meta: ArtifactMeta) => Promise<void>;
   saveHtml: (artifactId: string, version: number, html: string) => Promise<void>;
+  importFile: (
+    artifactId: string,
+    sourcePath: string,
+    preferredFileName?: string,
+  ) => Promise<Pick<ArtifactMeta, 'filePath' | 'fileName' | 'fileSize' | 'mimeType'>>;
   list: () => Promise<ArtifactMeta[]>;
   updateIndex: (entries: ArtifactMeta[]) => Promise<void>;
 }
@@ -31,6 +36,14 @@ export const artifactPersistence = {
 
   async saveHtml(artifactId: string, version: number, html: string): Promise<void> {
     await getApi().saveHtml(artifactId, version, html);
+  },
+
+  async importFile(
+    artifactId: string,
+    sourcePath: string,
+    preferredFileName?: string,
+  ): Promise<Pick<ArtifactMeta, 'filePath' | 'fileName' | 'fileSize' | 'mimeType'>> {
+    return getApi().importFile(artifactId, sourcePath, preferredFileName);
   },
 
   async loadHtml(artifactId: string, version?: number): Promise<string | null> {

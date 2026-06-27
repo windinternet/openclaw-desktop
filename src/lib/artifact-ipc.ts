@@ -13,6 +13,7 @@ export const ARTIFACT_IPC = {
   LIST: 'artifact:list',
   SAVE_META: 'artifact:saveMeta',
   SAVE_HTML: 'artifact:saveHtml',
+  IMPORT_FILE: 'artifact:importFile',
   UPDATE_INDEX: 'artifact:updateIndex',
   WRITE_SKILL: 'artifact:writeSkill',
 } as const;

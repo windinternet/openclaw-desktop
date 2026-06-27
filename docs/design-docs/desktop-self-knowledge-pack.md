@@ -97,7 +97,7 @@ Skill 应包含：
 - 如何输出 `<artifact>` 结构化块。
 - HTML 产物必须自包含、可视化、可交互，不依赖外部 CDN。
 - Desktop 会为保存后的 HTML 产物记录 `htmlAudit`，暴露非自包含资源和需审批能力。
-- 文件型产物可以通过 `filePath` 或 `url` 表示，并交给系统文件处理器或外部 URL 处理器打开。
+- 文件型产物可以通过 `filePath` 或 `url` 表示；本地文件可复制导入 Artifact storage，并交给系统文件处理器打开。
 
 Skill 不应包含：
 

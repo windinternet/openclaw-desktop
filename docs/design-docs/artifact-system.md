@@ -20,12 +20,13 @@
 - HTML 产物生成和追加时会记录 `htmlAudit`，标记自包含状态、审批需求和检查项。
 - Repository output markdown 会沉淀 HTML 审计摘要，Artifacts UI 会显示非自包含和需审批提示。
 - 文件、图片、音频、视频等非 HTML 产物可记录 `filePath` 或 `url`，打开时交给系统文件处理器或外部 URL 处理器。
+- 手动创建文件型产物时，填写本地 `filePath` 会复制一份到 Artifact storage，并记录 `originalFilePath`。
 
 仍需继续收口：
 
 - 继续扩展非 AI 魔法创建入口的 ActionRun 产物自动关联，并在 ActionRun 摘要中补充仓库输出路径。
 - 继续补齐 HTML 产物运行时审批闭环，让 `htmlAudit` 与实际 Desktop Bridge 授权记录互相印证。
-- 补 Office 文件型产物的导入复制、缩略图/摘要预览和更细的来源记录。
+- 补 Office 文件型产物的缩略图/摘要预览和更细的来源记录。
 - 把可复用资产、模板、工具、脚本提升为一等管理对象。
 
 ## 1. 定位
@@ -68,7 +69,8 @@ link / app / file / audio / image / video
 
 - `filePath` 指向本地文件时，Desktop 交给操作系统默认应用打开。
 - `url` 指向外部媒体或文件时，Desktop 交给外部链接处理器打开。
-- Word / Excel / PPT 等 Office 成果先作为 `file` 产物记录，后续再补仓库内复制、摘要、缩略图和原生预览。
+- 手动创建文件型产物时，Desktop 可以把本地文件复制到 Artifact storage，`filePath` 指向副本，`originalFilePath` 保留原始位置。
+- Word / Excel / PPT 等 Office 成果先作为 `file` 产物记录，后续再补摘要、缩略图和原生预览。
 
 ## 3. HTML 特色能力
 

@@ -71,6 +71,7 @@ export interface ArtifactMeta {
   url?: string;
   command?: string;
   filePath?: string;
+  originalFilePath?: string;
   fileName?: string;
   fileSize?: number;
   mimeType?: string;

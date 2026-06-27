@@ -142,6 +142,16 @@ interface Window {
       getHtml: (artifactId: string, version?: number) => Promise<string | null>;
       saveMeta: (artifactId: string, meta: unknown) => Promise<void>;
       saveHtml: (artifactId: string, version: number, html: string) => Promise<void>;
+      importFile: (
+        artifactId: string,
+        sourcePath: string,
+        preferredFileName?: string,
+      ) => Promise<{
+        filePath: string;
+        fileName: string;
+        fileSize: number;
+        mimeType?: string;
+      }>;
       list: () => Promise<unknown[]>;
       updateIndex: (entries: unknown) => Promise<void>;
       requestAuth: (

@@ -107,4 +107,30 @@ describe('artifact metadata', () => {
     expect(markdown).toContain('htmlRequiresApproval: true');
     expect(markdown).toContain('htmlIssueCount: 1');
   });
+
+  it('serializes imported file metadata into repository output markdown', () => {
+    const markdown = buildOutputMarkdown({
+      id: 'art_file',
+      title: '路线图 PPT',
+      icon: '📎',
+      type: 'file',
+      source: { type: 'manual' },
+      tags: [],
+      currentVersion: 1,
+      status: 'draft',
+      createdAt: 1,
+      updatedAt: 1,
+      fileName: 'roadmap.pptx',
+      filePath: '/user-data/storage/artifacts/art_file/files/roadmap.pptx',
+      originalFilePath: '/Users/deepin/Documents/roadmap.pptx',
+      fileSize: 4096,
+      mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    });
+
+    expect(markdown).toContain('fileName: roadmap.pptx');
+    expect(markdown).toContain('filePath: /user-data/storage/artifacts/art_file/files/roadmap.pptx');
+    expect(markdown).toContain('originalFilePath: /Users/deepin/Documents/roadmap.pptx');
+    expect(markdown).toContain('fileSize: 4096');
+    expect(markdown).toContain('mimeType: application/vnd.openxmlformats-officedocument.presentationml.presentation');
+  });
 });

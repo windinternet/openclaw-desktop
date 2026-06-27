@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, protocol, shell } from 'electron'
 import path from 'node:path'
-import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { readFileSync, existsSync, mkdirSync, writeFileSync, copyFileSync, statSync } from 'node:fs'
 import os from 'node:os'
 import { ARTIFACT_IPC } from '../src/lib/artifact-ipc'
 import { decideArtifactOpenTarget } from '../src/lib/artifact-open-target'
@@ -21,6 +21,10 @@ function metaPath(artifactId: string): string {
 
 function htmlPath(artifactId: string, version: number): string {
   return path.join(artifactDir(artifactId), `v${version}.html`)
+}
+
+function filesDir(artifactId: string): string {
+  return path.join(artifactDir(artifactId), 'files')
 }
 
 function indexPath(): string {
@@ -71,6 +75,40 @@ function readMeta(artifactId: string): ArtifactMeta | null {
   const fp = metaPath(artifactId)
   if (!existsSync(fp)) return null
   return JSON.parse(readFileSync(fp, 'utf-8'))
+}
+
+function sanitizeFileName(fileName: string): string {
+  const invalid = new Set(['<', '>', ':', '"', '/', '\\', '|', '?', '*'])
+  const base = path
+    .basename(fileName)
+    .split('')
+    .map((char) => (invalid.has(char) || char.charCodeAt(0) < 32 ? '_' : char))
+    .join('')
+    .trim()
+  return base || 'artifact-file'
+}
+
+function detectMimeType(fileName: string): string | undefined {
+  const ext = path.extname(fileName).toLowerCase()
+  const known: Record<string, string> = {
+    '.doc': 'application/msword',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.xls': 'application/vnd.ms-excel',
+    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    '.ppt': 'application/vnd.ms-powerpoint',
+    '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    '.pdf': 'application/pdf',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.mp3': 'audio/mpeg',
+    '.wav': 'audio/wav',
+    '.mp4': 'video/mp4',
+    '.mov': 'video/quicktime',
+  }
+  return known[ext]
 }
 
 export function registerArtifactIpcHandlers(): void {
@@ -135,6 +173,28 @@ export function registerArtifactIpcHandlers(): void {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
     writeFileSync(htmlPath(artifactId, version), html)
   })
+
+  ipcMain.handle(
+    ARTIFACT_IPC.IMPORT_FILE,
+    async (_event, artifactId: string, sourcePath: string, preferredFileName?: string) => {
+      const stat = statSync(sourcePath)
+      if (!stat.isFile()) throw new Error('Source path is not a file')
+
+      const dir = filesDir(artifactId)
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+
+      const fileName = sanitizeFileName(preferredFileName || sourcePath)
+      const targetPath = path.join(dir, fileName)
+      copyFileSync(sourcePath, targetPath)
+
+      return {
+        filePath: targetPath,
+        fileName,
+        fileSize: stat.size,
+        mimeType: detectMimeType(fileName),
+      }
+    },
+  )
 
   ipcMain.handle(ARTIFACT_IPC.UPDATE_INDEX, async (_event, entries: unknown) => {
     const root = artifactsRoot()

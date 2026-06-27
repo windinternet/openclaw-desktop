@@ -243,10 +243,28 @@ export default function ArtifactDetailPage() {
                   <Text>{meta.fileName}</Text>
                 </div>
               )}
+              {meta.fileSize !== undefined && (
+                <div>
+                  <Text type="tertiary">{t('artifact.fileSize')}: </Text>
+                  <Text>{meta.fileSize}</Text>
+                </div>
+              )}
+              {meta.mimeType && (
+                <div>
+                  <Text type="tertiary">MIME: </Text>
+                  <Text>{meta.mimeType}</Text>
+                </div>
+              )}
               {meta.filePath && (
                 <div>
                   <Text type="tertiary">路径: </Text>
                   <Text copyable>{meta.filePath}</Text>
+                </div>
+              )}
+              {meta.originalFilePath && (
+                <div>
+                  <Text type="tertiary">{t('artifact.originalFilePath')}: </Text>
+                  <Text copyable>{meta.originalFilePath}</Text>
                 </div>
               )}
               {meta.repositoryOutputPath && (

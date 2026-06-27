@@ -102,6 +102,7 @@ export function ArtifactCreateDialog({ visible, onClose }: Props) {
         command: isAppType ? command.trim() : undefined,
         filePath: isFileType && filePath ? filePath : undefined,
         fileName: isFileType && fileName ? fileName : undefined,
+        importFile: isFileType && Boolean(filePath),
         source: { type: 'manual' },
       });
       Toast.success(t('artifact.created'));
@@ -172,6 +173,9 @@ export function ArtifactCreateDialog({ visible, onClose }: Props) {
             <div>
               <div style={labelStyle}>文件路径</div>
               <Input placeholder="选择或输入文件路径" value={filePath} onChange={setFilePath} />
+              <div style={{ marginTop: 4, fontSize: 12, color: 'var(--semi-color-text-2)' }}>
+                {t('artifact.importFileHint')}
+              </div>
             </div>
           </>
         )}

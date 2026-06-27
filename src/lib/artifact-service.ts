@@ -55,6 +55,7 @@ export interface GenerateParams {
   fileName?: string;
   fileSize?: number;
   mimeType?: string;
+  importFile?: boolean;
 }
 
 export const artifactService = {
@@ -85,6 +86,11 @@ export const artifactService = {
       }
     }
 
+    const importedFile =
+      params.importFile && params.filePath
+        ? await artifactPersistence.importFile(id, params.filePath, params.fileName)
+        : undefined;
+
     const now = Date.now();
     const meta: ArtifactMeta = {
       id,
@@ -101,10 +107,11 @@ export const artifactService = {
       updatedAt: now,
       url: params.url,
       command: params.command,
-      filePath: params.filePath,
-      fileName: params.fileName,
-      fileSize: params.fileSize,
-      mimeType: params.mimeType,
+      filePath: importedFile?.filePath ?? params.filePath,
+      originalFilePath: importedFile ? params.filePath : undefined,
+      fileName: importedFile?.fileName ?? params.fileName,
+      fileSize: importedFile?.fileSize ?? params.fileSize,
+      mimeType: importedFile?.mimeType ?? params.mimeType,
       htmlAudit: html === null ? undefined : auditArtifactHtml(html),
     };
 
