@@ -104,6 +104,7 @@ Skill 应包含：
 - 普通聊天里已完成的 assistant 消息可以包含一个或多个 `<artifact>` 块；Desktop 会逐个保存为 `source: chat` 的 Artifact，仓库绑定就绪时镜像到 Repository `outputs/`。
 - 文件型产物可以通过 `filePath` 或 `url` 表示；本地文件可复制导入 Artifact storage，并交给系统文件处理器打开。
 - 非 HTML / Office / 文件 / 链接 / 应用入口产物会生成预览卡片，包含 format label、thumbnail label、summary、location、primary action 和 safety note；Artifacts UI、`desktop.artifacts.search`、`desktop.artifacts.describe` 和 Repository output markdown 会暴露同一份线索。
+- 文件型、Office、PDF、媒体、链接、应用入口和命令型产物可通过 `desktop.artifacts.inspect` 写入 `fileInspection`，记录格式、来源类型、打开方式、预览状态、摘要、路径和限制；这是文件检查事实，不读取内容、不渲染 Office、不执行命令、不授予权限。
 - ActionRun 文件型 `<artifact>` header 可以携带 `filePath / fileName / fileSize / mimeType / externalFormat / contentSummary / reuseKind / importFile`；`importFile: true` 表示允许导入本地文件，仓库绑定就绪时会镜像到 `outputs/files/`。
 - 可复用资产、模板、工具、脚本和工作流应通过 `reuseKind: asset / template / tool / script / workflow` 标记；该字段用于分类和追踪，不代表可以绕过审批直接执行。
 - 既有产物可用稳定引用 `artifact://<artifactId>` 继续复用；Gateway 可调用 `desktop.artifacts.describe` 获取标题、类型、摘要、预览卡片、来源、仓库 output / preview 和文件或 URL 线索。

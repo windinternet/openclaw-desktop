@@ -512,6 +512,107 @@ describe('desktop node commands', () => {
     expect(mockedArtifactPersistence.list).toHaveBeenCalledOnce();
   });
 
+  it('inspects file artifacts into durable metadata and mirrors the updated output', async () => {
+    mockedArtifactPersistence.loadMeta.mockResolvedValue({
+      id: 'art_file',
+      title: '路线图 PPT',
+      icon: '📎',
+      type: 'file',
+      source: { type: 'manual' },
+      tags: ['roadmap'],
+      currentVersion: 1,
+      status: 'draft',
+      createdAt: 1,
+      updatedAt: 2,
+      fileName: 'roadmap.pptx',
+      filePath: '/artifact-storage/art_file/files/roadmap.pptx',
+      originalFilePath: '/Users/deepin/Documents/roadmap.pptx',
+      fileSize: 4096,
+      mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      externalFormat: 'powerpoint',
+      contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+    });
+    mockedArtifactPersistence.loadHtml.mockResolvedValue(null);
+    mockedCreateRepositoryOutput.mockResolvedValue({
+      outputId: 'art_file',
+      outputPath: 'outputs/files/art_file.md',
+    });
+
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.inspect', {
+        repoPath: '/repo',
+        gatewayInstanceId: 'inst-1',
+        artifactId: 'art_file',
+        inspectedAt: 50,
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      artifactId: 'art_file',
+      inspection: expect.objectContaining({
+        inspectedAt: 50,
+        format: 'powerpoint',
+        sourceKind: 'imported_file',
+        openBehavior: 'open_file',
+        previewStatus: 'external_app',
+        summary: 'PowerPoint · roadmap.pptx · 4 KB',
+        storedPath: '/artifact-storage/art_file/files/roadmap.pptx',
+        originalPath: '/Users/deepin/Documents/roadmap.pptx',
+        limitations: ['native-preview-missing', 'thumbnail-missing', 'content-extraction-missing'],
+      }),
+      output: {
+        outputId: 'art_file',
+        path: 'outputs/files/art_file.md',
+        previewPath: undefined,
+      },
+    });
+
+    expect(mockedArtifactService.update).toHaveBeenCalledWith('art_file', {
+      fileInspection: expect.objectContaining({
+        inspectedAt: 50,
+        format: 'powerpoint',
+        previewStatus: 'external_app',
+      }),
+    });
+    expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(
+      expect.objectContaining({
+        artifact: expect.objectContaining({
+          id: 'art_file',
+          fileInspection: expect.objectContaining({ format: 'powerpoint' }),
+        }),
+        binding: expect.objectContaining({ repoPath: '/repo', gatewayInstanceId: 'inst-1' }),
+      }),
+    );
+  });
+
+  it('does not write file inspection records for pure HTML artifacts', async () => {
+    mockedArtifactPersistence.loadMeta.mockResolvedValue({
+      id: 'art_report',
+      title: '季度报告',
+      icon: '📊',
+      type: 'report',
+      source: { type: 'manual' },
+      tags: [],
+      currentVersion: 1,
+      status: 'draft',
+      createdAt: 1,
+      updatedAt: 2,
+      contentSummary: 'HTML · 可交互报告',
+    });
+
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.inspect', {
+        artifactId: 'art_report',
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      error: 'not-file-like-artifact',
+      artifactId: 'art_report',
+      type: 'report',
+    });
+
+    expect(mockedArtifactService.update).not.toHaveBeenCalled();
+  });
+
   it('limits artifact search results while reporting the full filtered count', async () => {
     mockedArtifactPersistence.list.mockResolvedValue([
       {

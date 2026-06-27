@@ -23,6 +23,12 @@ export function buildArtifactReuseReference(artifact: ArtifactMeta): ArtifactReu
     lastReuseEvent ? `  - lastReuse: ${lastReuseEvent.context}/${lastReuseEvent.status}` : undefined,
     artifact.executionEvents?.length ? `  - executionEvents: ${artifact.executionEvents.length}` : undefined,
     lastExecutionEvent ? `  - lastExecution: ${lastExecutionEvent.status}` : undefined,
+    artifact.fileInspection
+      ? `  - fileInspection: ${artifact.fileInspection.sourceKind}/${artifact.fileInspection.previewStatus}`
+      : undefined,
+    artifact.fileInspection?.limitations.length
+      ? `  - fileInspectionLimitations: ${artifact.fileInspection.limitations.join(', ')}`
+      : undefined,
     artifact.fileName ? `  - fileName: ${artifact.fileName}` : undefined,
     artifact.filePath ? `  - filePath: ${artifact.filePath}` : undefined,
     artifact.url ? `  - url: ${artifact.url}` : undefined,

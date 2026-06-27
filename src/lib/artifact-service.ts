@@ -1,6 +1,7 @@
 import type { ArtifactMeta, ArtifactType, ArtifactSource } from './artifact-types';
 import { artifactPersistence } from './artifact-persistence';
 import { auditArtifactHtml } from './artifact-html-audit';
+import { buildArtifactFileInspection, shouldInspectArtifactFile } from './artifact-file-inspection';
 import { buildArtifactValueSummary, inferArtifactExternalFormat } from './artifact-value-summary';
 import {
   artifactVersionCreator,
@@ -154,6 +155,9 @@ export const artifactService = {
       htmlAudit: html === null ? undefined : auditArtifactHtml(html),
     };
     meta.versions = [createInitialArtifactVersion(meta)];
+    if (shouldInspectArtifactFile(meta)) {
+      meta.fileInspection = buildArtifactFileInspection(meta, now);
+    }
 
     await artifactPersistence.saveMeta(id, meta);
     if (html !== null) {

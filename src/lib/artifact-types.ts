@@ -33,6 +33,37 @@ export type ArtifactExternalFormat =
 
 export type ArtifactReuseKind = 'asset' | 'template' | 'tool' | 'script' | 'workflow';
 
+export type ArtifactFileInspectionSourceKind =
+  | 'imported_file'
+  | 'local_file'
+  | 'external_url'
+  | 'command'
+  | 'metadata_only';
+export type ArtifactFileInspectionOpenBehavior =
+  | 'preview_html'
+  | 'open_file'
+  | 'open_link'
+  | 'copy_command'
+  | 'view_detail';
+export type ArtifactFileInspectionPreviewStatus = 'native_preview' | 'external_app' | 'metadata_only';
+
+export interface ArtifactFileInspection {
+  inspectedAt: number;
+  format: ArtifactExternalFormat;
+  sourceKind: ArtifactFileInspectionSourceKind;
+  openBehavior: ArtifactFileInspectionOpenBehavior;
+  previewStatus: ArtifactFileInspectionPreviewStatus;
+  summary: string;
+  fileName?: string;
+  fileSize?: number;
+  mimeType?: string;
+  storedPath?: string;
+  originalPath?: string;
+  url?: string;
+  command?: string;
+  limitations: string[];
+}
+
 export interface ArtifactSource {
   type: 'chat' | 'workflow' | 'agent_team' | 'manual' | 'mcp_tool' | 'action_run';
   id?: string;
@@ -171,6 +202,7 @@ export interface ArtifactMeta {
   mimeType?: string;
   externalFormat?: ArtifactExternalFormat;
   contentSummary?: string;
+  fileInspection?: ArtifactFileInspection;
   reuseKind?: ArtifactReuseKind;
   repositoryOutputPath?: string;
   repositoryPreviewPath?: string;

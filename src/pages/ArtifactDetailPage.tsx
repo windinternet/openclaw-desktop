@@ -284,6 +284,27 @@ export default function ArtifactDetailPage() {
                   )}
                 </div>
               </div>
+              {meta.fileInspection && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div>
+                    <Text type="tertiary">{t('artifact.fileInspection')}: </Text>
+                    <Tag size="small">{meta.fileInspection.format}</Tag>
+                    <Tag size="small" type="light">
+                      {meta.fileInspection.sourceKind}
+                    </Tag>
+                    <Tag size="small" type="light">
+                      {meta.fileInspection.previewStatus}
+                    </Tag>
+                  </div>
+                  <Text type="secondary">{meta.fileInspection.summary}</Text>
+                  {meta.fileInspection.limitations.length > 0 && (
+                    <div>
+                      <Text type="tertiary">{t('artifact.fileInspectionLimitations')}: </Text>
+                      <Text>{meta.fileInspection.limitations.join(', ')}</Text>
+                    </div>
+                  )}
+                </div>
+              )}
               {meta.reuseKind && (
                 <div>
                   <Text type="tertiary">{t('artifact.reuseKind')}: </Text>

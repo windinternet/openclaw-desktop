@@ -71,6 +71,8 @@ export function buildDesktopSelfKnowledgeSkillContent(): string {
     '',
     'When an ActionRun produces a file-like Artifact block, its JSON header may include `filePath`, `fileName`, `fileSize`, `mimeType`, `externalFormat`, `contentSummary`, `reuseKind`, and `importFile`. Use `importFile: true` only when the ActionRun is allowed to import that local file. If a repository binding is ready, Desktop mirrors the resulting file Artifact metadata into `outputs/files/` and links it from the ActionRun summary.',
     '',
+    'For file-like, Office, PDF, media, link, app, or command Artifacts, Gateway can call `desktop.artifacts.inspect` with `artifactId` and optional `repoPath`. This records file inspection facts only: format, source kind, open behavior, preview status, summary, paths, and current limitations. It does not read file contents, render Office files, execute commands, or grant permissions.',
+    '',
     'When an Artifact should be reusable, set `reuseKind` to `asset`, `template`, `tool`, `script`, or `workflow`. Desktop preserves this in Artifact metadata, Repository output markdown, `artifact://` references, Desktop node descriptions, and Workbench outputs grouping. This is classification and traceability; permissions and execution still require explicit Desktop capabilities and approval.',
     '',
     'When Gateway or ActionRun reuses an existing Artifact, call `desktop.artifacts.reuse.record` with `artifactId`, `context`, `status`, `purpose`, `resultSummary`, optional source metadata, and optional `repoPath` to mirror the updated Repository output. This records reuse/audit facts only; it does not execute tools, open files, or grant permissions.',

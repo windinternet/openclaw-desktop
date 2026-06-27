@@ -52,6 +52,16 @@ describe('artifact file import', () => {
         mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
         externalFormat: 'powerpoint',
         contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+        fileInspection: expect.objectContaining({
+          format: 'powerpoint',
+          sourceKind: 'imported_file',
+          openBehavior: 'open_file',
+          previewStatus: 'external_app',
+          summary: 'PowerPoint · roadmap.pptx · 4 KB',
+          storedPath: '/user-data/storage/artifacts/art_1/files/roadmap.pptx',
+          originalPath: '/Users/deepin/Documents/roadmap.pptx',
+          limitations: ['native-preview-missing', 'thumbnail-missing', 'content-extraction-missing'],
+        }),
       }),
     );
     expect(mockedPersistence.saveMeta).toHaveBeenCalledWith(
@@ -61,6 +71,11 @@ describe('artifact file import', () => {
         originalFilePath: '/Users/deepin/Documents/roadmap.pptx',
         externalFormat: 'powerpoint',
         contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+        fileInspection: expect.objectContaining({
+          format: 'powerpoint',
+          sourceKind: 'imported_file',
+          previewStatus: 'external_app',
+        }),
       }),
     );
   });

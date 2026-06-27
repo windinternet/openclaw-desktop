@@ -751,6 +751,8 @@
     "reuseRecordCount": "{{count}} 条复用记录",
     "executionRecords": "执行记录",
     "executionRecordCount": "{{count}} 条执行记录",
+    "fileInspection": "文件检查",
+    "fileInspectionLimitations": "检查限制",
     "importFileHint": "填写本地文件路径后，创建时会复制一份到 Artifact 本地存储。",
     "originalFilePath": "原始路径",
     "fileSize": "文件大小",

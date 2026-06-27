@@ -18,6 +18,7 @@ export const DESKTOP_NODE_CAPS = ['desktop', 'desktop.artifacts', 'desktop.repos
 export const DESKTOP_NODE_COMMANDS = [
   'desktop.artifacts.create',
   'desktop.artifacts.search',
+  'desktop.artifacts.inspect',
   'desktop.artifacts.describe',
   'desktop.artifacts.reuse.record',
   'desktop.artifacts.execution.prepare',

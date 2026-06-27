@@ -25,10 +25,29 @@ describe('repository outputs', () => {
       ...createArtifact(),
       externalFormat: 'excel',
       contentSummary: 'Excel · budget.xlsx · 12 KB',
+      fileInspection: {
+        inspectedAt: 20,
+        format: 'excel',
+        sourceKind: 'imported_file',
+        openBehavior: 'open_file',
+        previewStatus: 'external_app',
+        summary: 'Excel · budget.xlsx · 12 KB',
+        fileName: 'budget.xlsx',
+        fileSize: 12288,
+        storedPath: '/artifact-storage/art_1/files/budget.xlsx',
+        originalPath: '/Users/deepin/Documents/budget.xlsx',
+        limitations: ['native-preview-missing', 'thumbnail-missing', 'content-extraction-missing'],
+      },
     });
 
     expect(markdown).toContain('externalFormat: excel');
     expect(markdown).toContain('contentSummary: Excel · budget.xlsx · 12 KB');
+    expect(markdown).toContain('fileInspectionFormat: excel');
+    expect(markdown).toContain('fileInspectionSource: imported_file');
+    expect(markdown).toContain('fileInspectionPreview: external_app');
+    expect(markdown).toContain(
+      'fileInspectionLimitations: native-preview-missing, thumbnail-missing, content-extraction-missing',
+    );
     expect(markdown).toContain('previewCardFormat: Excel');
     expect(markdown).toContain('previewCardSummary: Excel · budget.xlsx · 12 KB');
     expect(markdown).toContain('previewCardAction: open_file');

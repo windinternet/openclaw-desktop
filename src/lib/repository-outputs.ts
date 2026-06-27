@@ -66,6 +66,17 @@ export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string
     artifact.source.name ? `sourceName: ${artifact.source.name}` : undefined,
     artifact.externalFormat ? `externalFormat: ${artifact.externalFormat}` : undefined,
     artifact.contentSummary ? `contentSummary: ${artifact.contentSummary}` : undefined,
+    artifact.fileInspection ? `fileInspectionFormat: ${artifact.fileInspection.format}` : undefined,
+    artifact.fileInspection ? `fileInspectionSource: ${artifact.fileInspection.sourceKind}` : undefined,
+    artifact.fileInspection ? `fileInspectionOpen: ${artifact.fileInspection.openBehavior}` : undefined,
+    artifact.fileInspection ? `fileInspectionPreview: ${artifact.fileInspection.previewStatus}` : undefined,
+    artifact.fileInspection ? `fileInspectionSummary: ${artifact.fileInspection.summary}` : undefined,
+    artifact.fileInspection?.limitations.length
+      ? `fileInspectionLimitations: ${artifact.fileInspection.limitations.join(', ')}`
+      : undefined,
+    artifact.fileInspection
+      ? `fileInspectionAt: ${new Date(artifact.fileInspection.inspectedAt).toISOString()}`
+      : undefined,
     `previewCardFormat: ${previewCard.formatLabel}`,
     `previewCardThumbnail: ${previewCard.thumbnailLabel}`,
     `previewCardSummary: ${previewCard.summary}`,
@@ -186,6 +197,9 @@ function buildOutputIndexEntry(artifact: ArtifactMeta, outputPath: string, previ
     previewPath ? `  - preview: ${previewPath}` : undefined,
     artifact.externalFormat ? `  - format: ${artifact.externalFormat}` : undefined,
     artifact.contentSummary ? `  - summary: ${artifact.contentSummary}` : undefined,
+    artifact.fileInspection
+      ? `  - inspection: ${artifact.fileInspection.sourceKind}, ${artifact.fileInspection.previewStatus}`
+      : undefined,
     `  - previewCard: ${previewCard.thumbnailLabel} · ${previewCard.actionLabel}`,
     artifact.reuseKind ? `  - reuseKind: ${artifact.reuseKind}` : undefined,
     lastExecutionEvent ? `  - execution: ${executionCount} events, last ${lastExecutionEvent.status}` : undefined,

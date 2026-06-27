@@ -29,6 +29,9 @@ describe('artifact UI metadata', () => {
     expect(detailPage).toContain('executionEvents');
     expect(detailPage).toContain("t('artifact.executionRecords')");
     expect(detailPage).toContain("t('artifact.executionRecordCount'");
+    expect(detailPage).toContain('fileInspection');
+    expect(detailPage).toContain("t('artifact.fileInspection')");
+    expect(detailPage).toContain("t('artifact.fileInspectionLimitations')");
     expect(detailPage).toContain('buildArtifactVersionHistory');
     expect(detailPage).toContain("t('artifact.currentVersion')");
     expect(listPage).toContain('contentSummary');
@@ -63,6 +66,8 @@ describe('artifact UI metadata', () => {
     expect(zh.artifact.reuseRecordCount).toBeTruthy();
     expect(zh.artifact.executionRecords).toBeTruthy();
     expect(zh.artifact.executionRecordCount).toBeTruthy();
+    expect(zh.artifact.fileInspection).toBeTruthy();
+    expect(zh.artifact.fileInspectionLimitations).toBeTruthy();
     expect(zh.artifact.currentVersion).toBeTruthy();
     expect(zh.artifact.contentSummary).toBeTruthy();
     expect(zh.artifact.externalFormat).toBeTruthy();
@@ -81,6 +86,8 @@ describe('artifact UI metadata', () => {
     expect(en.artifact.reuseRecordCount).toBeTruthy();
     expect(en.artifact.executionRecords).toBeTruthy();
     expect(en.artifact.executionRecordCount).toBeTruthy();
+    expect(en.artifact.fileInspection).toBeTruthy();
+    expect(en.artifact.fileInspectionLimitations).toBeTruthy();
     expect(en.artifact.currentVersion).toBeTruthy();
     expect(en.artifact.contentSummary).toBeTruthy();
     expect(en.artifact.externalFormat).toBeTruthy();

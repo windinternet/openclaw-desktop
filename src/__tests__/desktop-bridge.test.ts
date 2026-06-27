@@ -108,6 +108,7 @@ describe('desktop bridge instance connections', () => {
         commands: [
           'desktop.artifacts.create',
           'desktop.artifacts.search',
+          'desktop.artifacts.inspect',
           'desktop.artifacts.describe',
           'desktop.artifacts.reuse.record',
           'desktop.artifacts.execution.prepare',
