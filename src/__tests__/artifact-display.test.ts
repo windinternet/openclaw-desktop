@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { ArtifactMeta } from '../lib/artifact-types';
-import { buildArtifactDisplayLine, buildArtifactOutputDescription, buildArtifactSearchText } from '../lib/artifact-display';
+import {
+  buildArtifactDisplayLine,
+  buildArtifactOutputDescription,
+  buildArtifactPreviewCard,
+  buildArtifactSearchText,
+} from '../lib/artifact-display';
 
 function createArtifact(overrides: Partial<ArtifactMeta> = {}): ArtifactMeta {
   return {
@@ -95,5 +100,17 @@ describe('artifact display helpers', () => {
         }),
       ),
     ).toBe('Link · example.com');
+  });
+
+  it('builds a stable preview card for Office and file-like artifacts', () => {
+    expect(buildArtifactPreviewCard(createArtifact())).toEqual({
+      formatLabel: 'PowerPoint',
+      thumbnailLabel: 'PPT',
+      summary: 'PowerPoint · roadmap.pptx · 4 KB',
+      location: 'outputs/files/art_file.md',
+      primaryAction: 'open_file',
+      actionLabel: '查看文件',
+      safetyNote: '本地文件通过系统默认应用打开，不会在 Desktop 内静默执行。',
+    });
   });
 });

@@ -29,6 +29,9 @@ describe('repository outputs', () => {
 
     expect(markdown).toContain('externalFormat: excel');
     expect(markdown).toContain('contentSummary: Excel · budget.xlsx · 12 KB');
+    expect(markdown).toContain('previewCardFormat: Excel');
+    expect(markdown).toContain('previewCardSummary: Excel · budget.xlsx · 12 KB');
+    expect(markdown).toContain('previewCardAction: open_file');
   });
 
   it('includes Desktop Bridge call summaries in repository output markdown', () => {
@@ -142,12 +145,9 @@ describe('repository outputs', () => {
   it('refreshes existing output index entries with value metadata', async () => {
     const writeText = vi.fn();
     const readText = vi.fn(async () =>
-      [
-        '# Outputs',
-        '- [Roadmap Deck](outputs/files/art_file.md)',
-        '- [Other](outputs/reports/art_other.md)',
-        '',
-      ].join('\n'),
+      ['# Outputs', '- [Roadmap Deck](outputs/files/art_file.md)', '- [Other](outputs/reports/art_other.md)', ''].join(
+        '\n',
+      ),
     );
     vi.stubGlobal('window', {
       electronAPI: {

@@ -18,11 +18,13 @@ Artifacts 是 OpenClaw Desktop 的 P0 价值沉淀层。只要一个结果对用
 
 为了让非 HTML 产物不只是路径，Desktop 会为链接、应用入口、Office 文件、PDF、媒体和普通文件记录 `externalFormat` 与 `contentSummary`。这些字段会进入 Artifact UI 和 Repository output markdown，用于搜索、识别、复用和长期审计。
 
+Desktop 会为非 HTML、Office、文件、链接和应用入口产物生成一份最小预览卡片。预览卡片包含格式标签、缩略标签、摘要、位置、主动作和安全说明；Artifacts 列表、详情页、`desktop.artifacts.search`、`desktop.artifacts.describe` 和 Repository output markdown 会读取同一份线索。当前预览卡片不是 Office 原生渲染，也不会执行命令；文件仍通过系统默认应用打开，命令入口只复制给用户确认。
+
 Artifact 会记录版本历史。新建产物会产生 v1，HTML 追加会产生新版本；详情页、Desktop node command `desktop.artifacts.describe` 和 Repository output markdown 会展示版本数量和最新版本信息。旧产物如果只有 `currentVersion`，Desktop 会生成兼容历史用于展示，不会丢失原有记录。
 
 每个 Artifact 都有稳定引用 `artifact://<artifactId>`。详情页可以复制一段可复用 Markdown 引用，包含标题、类型、价值摘要、来源、仓库 output / preview 路径以及文件或 URL 线索。Gateway 也可以通过 Desktop node command `desktop.artifacts.describe` 读取同一份引用，用于在普通聊天或 ActionRun 中继续使用已有产物。
 
-如果 Gateway 或 ActionRun 不知道具体 `artifactId`，应先调用 `desktop.artifacts.search`。该命令可以按 `query`、`type`、`externalFormat`、`reuseKind`、`sourceType`、`status` 和 `limit` 搜索已有产物，返回 `artifact://` URI、价值摘要、来源、仓库 output / preview、文件或 URL 线索和可复用 Markdown 引用。搜索只读索引，不打开文件、不执行命令，也不授予额外权限。
+如果 Gateway 或 ActionRun 不知道具体 `artifactId`，应先调用 `desktop.artifacts.search`。该命令可以按 `query`、`type`、`externalFormat`、`reuseKind`、`sourceType`、`status` 和 `limit` 搜索已有产物，返回 `artifact://` URI、价值摘要、预览卡片、来源、仓库 output / preview、文件或 URL 线索和可复用 Markdown 引用。搜索只读索引，不打开文件、不执行命令，也不授予额外权限。
 
 Gateway 通过 Desktop node command `desktop.artifacts.create` 或 `desktop.outputs.create` 创建产物时，也可以提供 `url`、`command`、`filePath`、`fileName`、`fileSize`、`mimeType`、`externalFormat`、`contentSummary`、`reuseKind` 和 `importFile`。这两条入口会把这些字段传入 Artifact storage；`desktop.outputs.create` 还会把产物镜像到 Repository `outputs/`。
 

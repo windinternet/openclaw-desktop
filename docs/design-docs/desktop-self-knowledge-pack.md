@@ -103,13 +103,14 @@ Skill 应包含：
 - Artifact 会记录版本历史；新建产物是 v1，HTML 追加会增加版本，`desktop.artifacts.describe` 和 Repository output markdown 会暴露版本数量与最新版本信息。
 - 普通聊天里已完成的 assistant 消息可以包含一个或多个 `<artifact>` 块；Desktop 会逐个保存为 `source: chat` 的 Artifact，仓库绑定就绪时镜像到 Repository `outputs/`。
 - 文件型产物可以通过 `filePath` 或 `url` 表示；本地文件可复制导入 Artifact storage，并交给系统文件处理器打开。
+- 非 HTML / Office / 文件 / 链接 / 应用入口产物会生成预览卡片，包含 format label、thumbnail label、summary、location、primary action 和 safety note；Artifacts UI、`desktop.artifacts.search`、`desktop.artifacts.describe` 和 Repository output markdown 会暴露同一份线索。
 - ActionRun 文件型 `<artifact>` header 可以携带 `filePath / fileName / fileSize / mimeType / externalFormat / contentSummary / reuseKind / importFile`；`importFile: true` 表示允许导入本地文件，仓库绑定就绪时会镜像到 `outputs/files/`。
 - 可复用资产、模板、工具、脚本和工作流应通过 `reuseKind: asset / template / tool / script / workflow` 标记；该字段用于分类和追踪，不代表可以绕过审批直接执行。
-- 既有产物可用稳定引用 `artifact://<artifactId>` 继续复用；Gateway 可调用 `desktop.artifacts.describe` 获取标题、类型、摘要、来源、仓库 output / preview 和文件或 URL 线索。
-- 不知道具体 `artifactId` 时，Gateway 应先调用 `desktop.artifacts.search`，用 `query / type / externalFormat / reuseKind / sourceType / status / limit` 查找已有产物；返回项包含 `artifact://` URI、价值摘要、来源、仓库 output / preview、文件或 URL 线索和可复用 Markdown 引用。搜索不打开文件、不执行命令、不授予权限。
+- 既有产物可用稳定引用 `artifact://<artifactId>` 继续复用；Gateway 可调用 `desktop.artifacts.describe` 获取标题、类型、摘要、预览卡片、来源、仓库 output / preview 和文件或 URL 线索。
+- 不知道具体 `artifactId` 时，Gateway 应先调用 `desktop.artifacts.search`，用 `query / type / externalFormat / reuseKind / sourceType / status / limit` 查找已有产物；返回项包含 `artifact://` URI、价值摘要、预览卡片、来源、仓库 output / preview、文件或 URL 线索和可复用 Markdown 引用。搜索不打开文件、不执行命令、不授予权限。
 - 复用既有产物后，Gateway、ActionRun 或 MCP 工具应调用 `desktop.artifacts.reuse.record` 写入 `context / status / purpose / resultSummary / sourceId / sourceName / usedAt`；这是复用事实和审计记录，不执行脚本、不打开文件、不授予额外权限。
 - Gateway 可通过 `desktop.artifacts.create` 或 `desktop.outputs.create` 创建非 HTML 产物，并传入 `url / command / filePath / fileName / fileSize / mimeType / externalFormat / contentSummary / reuseKind / importFile`；需要同时沉淀到 Repository `outputs/` 时使用 `desktop.outputs.create`。
-- Repository `outputs/index.md` 是可扫读的 Artifact 目录；条目会暴露 `artifact://` 引用、来源、更新时间、预览、格式、摘要、复用分类和标签，详细审计以单个产物 markdown 为准。
+- Repository `outputs/index.md` 是可扫读的 Artifact 目录；条目会暴露 `artifact://` 引用、来源、更新时间、预览、格式、摘要、预览卡片、复用分类和标签，详细审计以单个产物 markdown 为准。
 - Artifacts 列表搜索、Dashboard 最近产物和 Workbench outputs 会展示价值摘要、`externalFormat`、`reuseKind`、来源、更新时间、标签以及 Repository output / preview 线索，检查系统状态时应把这些作为关键成果入口。
 - 终态 ActionRun 的 `lastAssistantResponse` 如果包含 `<artifact>` 块，Desktop 会自动保存为 `source: action_run` 的 Artifact，并把 Artifact id 回写到 ActionRun。
 - ActionRun 产生产物后，仓库 run 摘要会尽量写入产物标题、类型、Artifact 引用和 Repository output / preview 路径。
@@ -150,14 +151,14 @@ Skill 不应包含：
 
 ## 5. 关键用户意图路由
 
-| 用户意图 | Desktop Pack 应指导 Gateway 做什么 |
-|---|---|
+| 用户意图                   | Desktop Pack 应指导 Gateway 做什么                                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | “帮我整理这份资料到知识库” | 先确认是否有 Repository Context；读取 sources/wiki 规则；通过 Desktop repository tools 追加资料或发起 Knowledge ActionRun |
-| “生成一个可交互报告” | 使用 Artifact 协议生成 HTML 产物；保持自包含；必要时请求写入 outputs 审批；保存后可查看 `htmlAudit` |
-| “检查我的工作系统状态” | 读取 Workbench / Knowledge / ActionRun / Artifacts 摘要，不把 Gateway 健康状态当成唯一答案 |
-| “继续上次那件事” | 优先查 Workbench 当前事项、active plans 和 recent ActionRuns，再决定是否进入普通聊天或 ActionRun |
-| “帮我改仓库文件” | 先读 Repository Context 和仓库 `AGENTS.md`；列出计划和风险；写入前请求审批 |
-| “这个技能是怎么工作的” | 若可用，展示 Skill 的步骤、输入、输出、权限和审批点；流程可视化属于 P1/P2 |
+| “生成一个可交互报告”       | 使用 Artifact 协议生成 HTML 产物；保持自包含；必要时请求写入 outputs 审批；保存后可查看 `htmlAudit`                       |
+| “检查我的工作系统状态”     | 读取 Workbench / Knowledge / ActionRun / Artifacts 摘要，不把 Gateway 健康状态当成唯一答案                                |
+| “继续上次那件事”           | 优先查 Workbench 当前事项、active plans 和 recent ActionRuns，再决定是否进入普通聊天或 ActionRun                          |
+| “帮我改仓库文件”           | 先读 Repository Context 和仓库 `AGENTS.md`；列出计划和风险；写入前请求审批                                                |
+| “这个技能是怎么工作的”     | 若可用，展示 Skill 的步骤、输入、输出、权限和审批点；流程可视化属于 P1/P2                                                 |
 
 ## 6. 验收标准
 

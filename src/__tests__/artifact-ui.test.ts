@@ -31,9 +31,14 @@ describe('artifact UI metadata', () => {
     expect(listPage).toContain('contentSummary');
     expect(listPage).toContain('externalFormat');
     expect(listPage).toContain('buildArtifactDisplayLine');
+    expect(listPage).toContain('buildArtifactPreviewCard');
     expect(listPage).toContain('buildArtifactSearchText');
     expect(listPage).toContain('formatArtifactSource');
     expect(listPage).toContain('a.reuseKind');
+    expect(listPage).toContain('previewCard.thumbnailLabel');
+    expect(listPage).toContain('previewCard.actionLabel');
+    expect(detailPage).toContain('buildArtifactPreviewCard');
+    expect(detailPage).toContain('previewCard.safetyNote');
     expect(detailPage).toContain('meta.reuseKind');
     expect(detailPage).toContain("t('artifact.reuseKind')");
     expect(detailPage).toContain('contentSummary');

@@ -7,6 +7,7 @@ import { useStore } from '../lib';
 import type { ArtifactMeta } from '../lib/artifact-types';
 import { buildArtifactReuseReference } from '../lib/artifact-reference';
 import { buildArtifactVersionHistory } from '../lib/artifact-version-history';
+import { buildArtifactPreviewCard } from '../lib/artifact-display';
 
 const { Text, Title } = Typography;
 
@@ -68,6 +69,7 @@ export default function ArtifactDetailPage() {
     Toast.success(t('artifact.referenceCopied'));
   };
   const versions = buildArtifactVersionHistory(meta).slice().reverse();
+  const previewCard = buildArtifactPreviewCard(meta);
 
   return (
     <div style={{ padding: 24, height: '100%', overflow: 'auto' }}>
@@ -234,6 +236,54 @@ export default function ArtifactDetailPage() {
                   <Tag size="small">{meta.externalFormat}</Tag>
                 </div>
               )}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '56px minmax(0, 1fr)',
+                  gap: 12,
+                  alignItems: 'center',
+                  padding: '10px 0',
+                }}
+              >
+                <div
+                  style={{
+                    width: 56,
+                    height: 42,
+                    borderRadius: 6,
+                    background: 'var(--semi-color-fill-0)',
+                    border: '1px solid var(--semi-color-border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 12,
+                    fontWeight: 700,
+                  }}
+                >
+                  {previewCard.thumbnailLabel}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <Text strong>
+                    {previewCard.formatLabel} · {previewCard.actionLabel}
+                  </Text>
+                  <div>
+                    <Text type="secondary">{previewCard.summary}</Text>
+                  </div>
+                  {previewCard.location && (
+                    <div>
+                      <Text type="tertiary" copyable>
+                        {previewCard.location}
+                      </Text>
+                    </div>
+                  )}
+                  {previewCard.safetyNote && (
+                    <div>
+                      <Text type="tertiary" size="small">
+                        {previewCard.safetyNote}
+                      </Text>
+                    </div>
+                  )}
+                </div>
+              </div>
               {meta.reuseKind && (
                 <div>
                   <Text type="tertiary">{t('artifact.reuseKind')}: </Text>

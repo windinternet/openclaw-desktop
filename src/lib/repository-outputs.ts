@@ -2,6 +2,7 @@ import type { ArtifactMeta } from './artifact-types';
 import type { RepositoryBinding } from './agentic-repository';
 import { loadRepositoryBinding } from './agentic-repository-store';
 import { buildArtifactVersionHistory } from './artifact-version-history';
+import { buildArtifactPreviewCard } from './artifact-display';
 
 export interface CreateRepositoryOutputParams {
   binding: RepositoryBinding;
@@ -44,6 +45,7 @@ export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string
   const lastReuseEvent = reuseEvents[reuseEvents.length - 1];
   const versions = buildArtifactVersionHistory(artifact);
   const latestVersion = versions[versions.length - 1];
+  const previewCard = buildArtifactPreviewCard(artifact);
 
   return [
     `# ${artifact.title}`,
@@ -62,6 +64,12 @@ export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string
     artifact.source.name ? `sourceName: ${artifact.source.name}` : undefined,
     artifact.externalFormat ? `externalFormat: ${artifact.externalFormat}` : undefined,
     artifact.contentSummary ? `contentSummary: ${artifact.contentSummary}` : undefined,
+    `previewCardFormat: ${previewCard.formatLabel}`,
+    `previewCardThumbnail: ${previewCard.thumbnailLabel}`,
+    `previewCardSummary: ${previewCard.summary}`,
+    previewCard.location ? `previewCardLocation: ${previewCard.location}` : undefined,
+    `previewCardAction: ${previewCard.primaryAction}`,
+    previewCard.safetyNote ? `previewCardSafety: ${previewCard.safetyNote}` : undefined,
     artifact.reuseKind ? `reuseKind: ${artifact.reuseKind}` : undefined,
     artifact.htmlAudit ? `htmlSelfContained: ${artifact.htmlAudit.selfContained}` : undefined,
     artifact.htmlAudit ? `htmlRequiresApproval: ${artifact.htmlAudit.requiresApproval}` : undefined,
@@ -147,6 +155,7 @@ export async function mirrorArtifactToReadyRepositoryOutput(
 }
 
 function buildOutputIndexEntry(artifact: ArtifactMeta, outputPath: string, previewPath?: string): string {
+  const previewCard = buildArtifactPreviewCard(artifact);
   return [
     `- [${artifact.title}](${outputPath}) (\`${artifact.id}\`, ${artifact.type}, ${artifact.status})`,
     `  - artifact: artifact://${artifact.id}`,
@@ -155,6 +164,7 @@ function buildOutputIndexEntry(artifact: ArtifactMeta, outputPath: string, previ
     previewPath ? `  - preview: ${previewPath}` : undefined,
     artifact.externalFormat ? `  - format: ${artifact.externalFormat}` : undefined,
     artifact.contentSummary ? `  - summary: ${artifact.contentSummary}` : undefined,
+    `  - previewCard: ${previewCard.thumbnailLabel} · ${previewCard.actionLabel}`,
     artifact.reuseKind ? `  - reuseKind: ${artifact.reuseKind}` : undefined,
     artifact.tags.length > 0 ? `  - tags: ${artifact.tags.join(', ')}` : undefined,
   ]

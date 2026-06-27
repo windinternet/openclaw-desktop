@@ -52,7 +52,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('desktop.artifacts.describe');
     expect(skillContent).toContain('desktop.outputs.create');
     expect(skillContent).toContain('Repository `outputs/index.md`');
-    expect(skillContent).toContain('artifact URI, source, updated time, preview, format, summary, reuse kind, and tags');
+    expect(skillContent).toContain(
+      'artifact URI, source, updated time, preview, format, summary, preview card, reuse kind, and tags',
+    );
     expect(skillContent).toContain('externalFormat');
     expect(skillContent).toContain('reuseKind');
     expect(skillContent).toContain('asset`, `template`, `tool`, `script`, or `workflow`');
@@ -60,10 +62,16 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('desktop.artifacts.reuse.record');
     expect(skillContent).toContain('records reuse/audit facts only');
     expect(skillContent).toContain('does not execute tools, open files, or grant permissions');
-    expect(skillContent).toContain('Artifacts list search, Dashboard recent Artifacts, and Workbench outputs surface value summaries');
+    expect(skillContent).toContain(
+      'Artifacts list search, Dashboard recent Artifacts, and Workbench outputs surface value summaries',
+    );
     expect(skillContent).toContain('Repository output / preview clues');
     expect(skillContent).toContain('system file handler');
     expect(skillContent).toContain('imported into Artifact storage');
+    expect(skillContent).toContain('Artifact preview card');
+    expect(skillContent).toContain('format label, thumbnail label, summary, location, primary action, and safety note');
+    expect(skillContent).toContain('preview cards');
+    expect(skillContent).toContain('Repository output markdown expose this preview card');
     expect(skillContent).toContain('contentSummary');
     expect(skillContent).toContain('externalFormat');
     expect(skillContent).not.toContain(OPENCLAW_REPOSITORY_CONTEXT_START);

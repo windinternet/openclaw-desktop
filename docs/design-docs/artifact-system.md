@@ -30,6 +30,7 @@
 - 文件、图片、音频、视频等非 HTML 产物可记录 `filePath` 或 `url`，打开时交给系统文件处理器或外部 URL 处理器。
 - 手动创建文件型产物时，填写本地 `filePath` 会复制一份到 Artifact storage，并记录 `originalFilePath`。
 - 非 HTML 产物会记录 `externalFormat` 和 `contentSummary`，用于把 Word、Excel、PPT、PDF、链接、应用入口和媒体文件从“路径”提升为可搜索、可复用、可沉淀的价值对象。
+- 非 HTML / Office / 文件型产物已具备最小预览卡片契约：Desktop 会根据 `externalFormat`、`contentSummary`、仓库路径、文件/链接/命令线索生成 format label、thumbnail label、summary、location、primary action 和 safety note；Artifacts UI、Desktop node `search/describe` 和 Repository output markdown 会暴露同一份线索。
 - ActionRun 生成文件型 `<artifact>` block 时，可以通过 `filePath / fileName / mimeType / fileSize / externalFormat / contentSummary / importFile` 传递非 HTML 产物元数据；`importFile: true` 会把本地文件复制到 Artifact storage。
 - ActionRun 自动保存的新产物会在仓库绑定就绪时尝试镜像到 Repository `outputs/`；文件型产物的 markdown 记录写入 `outputs/files/`，并回写 `repositoryOutputPath` 供 ActionRun 摘要引用。
 - Artifact 详情页可以复制稳定复用引用 `artifact://<artifactId>`；Desktop node command `desktop.artifacts.describe` 可返回同一份引用摘要，供 Gateway 普通聊天或 ActionRun 继续使用已有产物。
@@ -42,9 +43,9 @@
 
 仍需继续收口：
 
-- 继续补齐非 HTML ActionRun 产物的 Office 原生预览、缩略图和更细的动作入口。
+- 继续补齐非 HTML ActionRun 产物的 Office 原生预览和真实缩略图；当前已有预览卡片契约和动作/安全说明，但还不是文件内容级渲染。
 - 继续扩展 HTML 产物 Desktop Bridge 的命令执行策略；网络请求和导出已具备最小审批/记录能力，但命令执行仍不能静默开放，必须继续走更严格的审批与运行记录设计。
-- 补 Office 文件型产物的缩略图/摘要预览和更细的来源记录。
+- 补 Office 文件型产物的真实缩略图、内容摘要抽取和更细的来源记录；当前预览卡片只提供格式、摘要、位置、主动作和安全说明。
 - 继续补齐可复用资产的版本策略、权限边界、执行类审批、运行结果归档和更细动作入口。
 
 ## 1. 定位

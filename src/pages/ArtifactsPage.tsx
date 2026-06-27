@@ -5,7 +5,12 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../lib';
 import type { ArtifactMeta } from '../lib/artifact-types';
-import { buildArtifactDisplayLine, buildArtifactSearchText, formatArtifactSource } from '../lib/artifact-display';
+import {
+  buildArtifactDisplayLine,
+  buildArtifactPreviewCard,
+  buildArtifactSearchText,
+  formatArtifactSource,
+} from '../lib/artifact-display';
 import { ArtifactCreateDialog } from '../components/ArtifactCreateDialog';
 import { ArtifactAICreateDrawer } from '../components/ArtifactAICreateDrawer';
 
@@ -164,202 +169,271 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
         <Empty title={t('artifact.empty')} description={t('artifact.emptyDesc')} />
       ) : viewMode === 'card' ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
-          {filteredArtifacts.map((a: ArtifactMeta) => (
-            <div key={a.id} onClick={() => handleOpenArtifact(a)} style={{ cursor: 'pointer' }}>
-              <Card
-                title={
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 20 }}>{a.icon}</span>
-                    <span
+          {filteredArtifacts.map((a: ArtifactMeta) => {
+            const previewCard = buildArtifactPreviewCard(a);
+            return (
+              <div key={a.id} onClick={() => handleOpenArtifact(a)} style={{ cursor: 'pointer' }}>
+                <Card
+                  title={
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 20 }}>{a.icon}</span>
+                      <span
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 600,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {a.title}
+                      </span>
+                    </div>
+                  }
+                  headerExtraContent={
+                    <Tag
+                      size="small"
+                      color={a.status === 'published' ? 'green' : a.status === 'draft' ? 'orange' : 'grey'}
+                      type="light"
+                    >
+                      {statusText(a.status)}
+                    </Tag>
+                  }
+                >
+                  <div style={{ fontSize: 12, color: 'var(--semi-color-text-2)', marginBottom: 8 }}>
+                    v{a.currentVersion} · {formatTime(a.updatedAt)}
+                  </div>
+                  {(a.externalFormat ||
+                    a.reuseKind ||
+                    a.repositoryOutputPath ||
+                    a.htmlAudit?.selfContained === false ||
+                    a.htmlAudit?.requiresApproval) && (
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: a.description ? 8 : 0 }}>
+                      {a.externalFormat && (
+                        <Tag size="small" color="blue" type="light">
+                          {a.externalFormat}
+                        </Tag>
+                      )}
+                      {a.reuseKind && (
+                        <Tag size="small" color="violet" type="light">
+                          {a.reuseKind}
+                        </Tag>
+                      )}
+                      {a.repositoryOutputPath && (
+                        <Tag size="small" color="green" type="light">
+                          {t('artifact.repositoryOutput')}
+                        </Tag>
+                      )}
+                      {a.htmlAudit?.selfContained === false && (
+                        <Tag size="small" color="red" type="light">
+                          {t('artifact.htmlNotSelfContained')}
+                        </Tag>
+                      )}
+                      {a.htmlAudit?.requiresApproval && (
+                        <Tag size="small" color="orange" type="light">
+                          {t('artifact.htmlApprovalRequired')}
+                        </Tag>
+                      )}
+                    </div>
+                  )}
+                  {a.description && (
+                    <div
                       style={{
-                        fontSize: 14,
-                        fontWeight: 600,
+                        fontSize: 13,
+                        color: 'var(--semi-color-text-1)',
+                        lineHeight: 1.5,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
                         overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
                       }}
                     >
-                      {a.title}
-                    </span>
-                  </div>
-                }
-                headerExtraContent={
-                  <Tag
-                    size="small"
-                    color={a.status === 'published' ? 'green' : a.status === 'draft' ? 'orange' : 'grey'}
-                    type="light"
-                  >
-                    {statusText(a.status)}
-                  </Tag>
-                }
-              >
-                <div style={{ fontSize: 12, color: 'var(--semi-color-text-2)', marginBottom: 8 }}>
-                  v{a.currentVersion} · {formatTime(a.updatedAt)}
-                </div>
-                {(a.externalFormat ||
-                  a.reuseKind ||
-                  a.repositoryOutputPath ||
-                  a.htmlAudit?.selfContained === false ||
-                  a.htmlAudit?.requiresApproval) && (
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: a.description ? 8 : 0 }}>
-                    {a.externalFormat && (
-                      <Tag size="small" color="blue" type="light">
-                        {a.externalFormat}
-                      </Tag>
-                    )}
-                    {a.reuseKind && (
-                      <Tag size="small" color="violet" type="light">
-                        {a.reuseKind}
-                      </Tag>
-                    )}
-                    {a.repositoryOutputPath && (
-                      <Tag size="small" color="green" type="light">
-                        {t('artifact.repositoryOutput')}
-                      </Tag>
-                    )}
-                    {a.htmlAudit?.selfContained === false && (
-                      <Tag size="small" color="red" type="light">
-                        {t('artifact.htmlNotSelfContained')}
-                      </Tag>
-                    )}
-                    {a.htmlAudit?.requiresApproval && (
-                      <Tag size="small" color="orange" type="light">
-                        {t('artifact.htmlApprovalRequired')}
-                      </Tag>
-                    )}
-                  </div>
-                )}
-                {a.description && (
+                      {a.description}
+                    </div>
+                  )}
                   <div
                     style={{
-                      fontSize: 13,
-                      color: 'var(--semi-color-text-1)',
-                      lineHeight: 1.5,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
+                      display: 'grid',
+                      gridTemplateColumns: '44px minmax(0, 1fr)',
+                      gap: 10,
+                      alignItems: 'center',
+                      padding: '10px 0',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 44,
+                        height: 34,
+                        borderRadius: 6,
+                        background: 'var(--semi-color-fill-0)',
+                        border: '1px solid var(--semi-color-border)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: 'var(--semi-color-text-1)',
+                      }}
+                    >
+                      {previewCard.thumbnailLabel}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {previewCard.formatLabel} · {previewCard.actionLabel}
+                      </div>
+                      <div
+                        title={previewCard.summary}
+                        style={{
+                          fontSize: 12,
+                          color: 'var(--semi-color-text-2)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {previewCard.summary}
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    title={a.contentSummary ?? buildArtifactDisplayLine(a)}
+                    style={{
+                      fontSize: 12,
+                      color: 'var(--semi-color-text-2)',
+                      marginBottom: 4,
                       overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
                     }}
                   >
-                    {a.description}
+                    {buildArtifactDisplayLine(a)}
                   </div>
-                )}
-                <div
-                  title={a.contentSummary ?? buildArtifactDisplayLine(a)}
-                  style={{
-                    fontSize: 12,
-                    color: 'var(--semi-color-text-2)',
-                    marginBottom: 4,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {buildArtifactDisplayLine(a)}
-                </div>
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
-                  <Tag size="small" color="grey" type="light">
-                    {formatArtifactSource(a)}
-                  </Tag>
-                </div>
-                {a.tags.length > 0 && (
-                  <div
-                    style={{
-                      marginTop: 8,
-                      display: 'flex',
-                      gap: 4,
-                      flexWrap: 'wrap',
-                    }}
-                  >
-                    {a.tags.map((tag) => (
-                      <Tag key={tag} size="small" color="blue" type="light">
-                        {tag}
-                      </Tag>
-                    ))}
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+                    <Tag size="small" color="grey" type="light">
+                      {formatArtifactSource(a)}
+                    </Tag>
                   </div>
-                )}
-              </Card>
-            </div>
-          ))}
+                  {a.tags.length > 0 && (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        display: 'flex',
+                        gap: 4,
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      {a.tags.map((tag) => (
+                        <Tag key={tag} size="small" color="blue" type="light">
+                          {tag}
+                        </Tag>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              </div>
+            );
+          })}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {filteredArtifacts.map((a: ArtifactMeta) => (
-            <div
-              key={a.id}
-              onClick={() => handleOpenArtifact(a)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '10px 16px',
-                borderRadius: 6,
-                cursor: 'pointer',
-                gap: 12,
-                background: 'var(--semi-color-bg-0)',
-                border: '1px solid var(--semi-color-border)',
-              }}
-            >
-              <span style={{ fontSize: 20 }}>{a.icon}</span>
-              <span style={{ flex: 1, minWidth: 0 }} title={a.contentSummary ?? buildArtifactDisplayLine(a)}>
-                <div style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {a.title}
-                </div>
-                <Text
-                  type="tertiary"
-                  size="small"
-                  ellipsis={{
-                    showTooltip: true,
+          {filteredArtifacts.map((a: ArtifactMeta) => {
+            const previewCard = buildArtifactPreviewCard(a);
+            return (
+              <div
+                key={a.id}
+                onClick={() => handleOpenArtifact(a)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '10px 16px',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  gap: 12,
+                  background: 'var(--semi-color-bg-0)',
+                  border: '1px solid var(--semi-color-border)',
+                }}
+              >
+                <span
+                  style={{
+                    width: 42,
+                    flex: '0 0 42px',
+                    textAlign: 'center',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: 'var(--semi-color-text-1)',
                   }}
                 >
-                  {buildArtifactDisplayLine(a)}
+                  {previewCard.thumbnailLabel}
+                </span>
+                <span style={{ flex: 1, minWidth: 0 }} title={a.contentSummary ?? buildArtifactDisplayLine(a)}>
+                  <div style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {a.title}
+                  </div>
+                  <Text
+                    type="tertiary"
+                    size="small"
+                    ellipsis={{
+                      showTooltip: true,
+                    }}
+                  >
+                    {buildArtifactDisplayLine(a)}
+                  </Text>
+                </span>
+                <Tag size="small" color="blue" type="light">
+                  {a.type}
+                </Tag>
+                {a.externalFormat && (
+                  <Tag size="small" color="cyan" type="light">
+                    {a.externalFormat}
+                  </Tag>
+                )}
+                {a.reuseKind && (
+                  <Tag size="small" color="violet" type="light">
+                    {a.reuseKind}
+                  </Tag>
+                )}
+                <Tag size="small" color="grey" type="light">
+                  {formatArtifactSource(a)}
+                </Tag>
+                {a.repositoryOutputPath && (
+                  <Tag size="small" color="green" type="light">
+                    {t('artifact.repositoryOutput')}
+                  </Tag>
+                )}
+                {a.htmlAudit?.selfContained === false && (
+                  <Tag size="small" color="red" type="light">
+                    {t('artifact.htmlNotSelfContained')}
+                  </Tag>
+                )}
+                {a.htmlAudit?.requiresApproval && (
+                  <Tag size="small" color="orange" type="light">
+                    {t('artifact.htmlApprovalRequired')}
+                  </Tag>
+                )}
+                <Text type="tertiary" size="small">
+                  v{a.currentVersion}
                 </Text>
-              </span>
-              <Tag size="small" color="blue" type="light">
-                {a.type}
-              </Tag>
-              {a.externalFormat && (
-                <Tag size="small" color="cyan" type="light">
-                  {a.externalFormat}
+                <Text type="tertiary" size="small">
+                  {formatTime(a.updatedAt)}
+                </Text>
+                <Tag
+                  size="small"
+                  color={a.status === 'published' ? 'green' : a.status === 'draft' ? 'orange' : 'grey'}
+                  type="light"
+                >
+                  {statusText(a.status)}
                 </Tag>
-              )}
-              {a.reuseKind && (
-                <Tag size="small" color="violet" type="light">
-                  {a.reuseKind}
-                </Tag>
-              )}
-              <Tag size="small" color="grey" type="light">
-                {formatArtifactSource(a)}
-              </Tag>
-              {a.repositoryOutputPath && (
-                <Tag size="small" color="green" type="light">
-                  {t('artifact.repositoryOutput')}
-                </Tag>
-              )}
-              {a.htmlAudit?.selfContained === false && (
-                <Tag size="small" color="red" type="light">
-                  {t('artifact.htmlNotSelfContained')}
-                </Tag>
-              )}
-              {a.htmlAudit?.requiresApproval && (
-                <Tag size="small" color="orange" type="light">
-                  {t('artifact.htmlApprovalRequired')}
-                </Tag>
-              )}
-              <Text type="tertiary" size="small">
-                v{a.currentVersion}
-              </Text>
-              <Text type="tertiary" size="small">
-                {formatTime(a.updatedAt)}
-              </Text>
-              <Tag
-                size="small"
-                color={a.status === 'published' ? 'green' : a.status === 'draft' ? 'orange' : 'grey'}
-                type="light"
-              >
-                {statusText(a.status)}
-              </Tag>
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
 

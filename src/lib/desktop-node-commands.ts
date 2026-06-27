@@ -8,7 +8,7 @@ import type {
 } from './artifact-types';
 import { artifactService, type GenerateParams } from './artifact-service';
 import { artifactPersistence } from './artifact-persistence';
-import { buildArtifactSearchText } from './artifact-display';
+import { buildArtifactPreviewCard, buildArtifactSearchText } from './artifact-display';
 import { buildArtifactReuseReference } from './artifact-reference';
 import { recordArtifactReuseEvent } from './artifact-reuse-record';
 import { buildArtifactVersionHistory } from './artifact-version-history';
@@ -256,6 +256,7 @@ function buildArtifactSearchResult(artifact: ArtifactMeta) {
     fileName: artifact.fileName,
     url: artifact.url,
     command: artifact.command,
+    previewCard: buildArtifactPreviewCard(artifact),
     updatedAt: artifact.updatedAt,
     reference: reference.markdown,
   };
@@ -625,6 +626,7 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
         repositoryPreviewPath: artifact.repositoryPreviewPath,
         fileName: artifact.fileName,
         url: artifact.url,
+        previewCard: buildArtifactPreviewCard(artifact),
       },
       reference: reference.markdown,
     };
