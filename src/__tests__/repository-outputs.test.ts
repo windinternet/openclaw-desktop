@@ -53,6 +53,34 @@ describe('repository outputs', () => {
     expect(markdown).toContain('runtimeBridgeLastResult: read 42 bytes');
   });
 
+  it('includes reusable artifact usage summaries in repository output markdown', () => {
+    const markdown = buildOutputMarkdown({
+      ...createArtifact(),
+      reuseKind: 'script',
+      reuseEvents: [
+        {
+          id: 'reuse_1',
+          context: 'action_run',
+          sourceId: 'run_use',
+          sourceName: '部署生产',
+          purpose: '复用部署脚本生成发布步骤',
+          status: 'succeeded',
+          resultSummary: '生成 3 个发布命令',
+          artifactVersion: 3,
+          usedAt: 20,
+        },
+      ],
+    });
+
+    expect(markdown).toContain('reuseEventCount: 1');
+    expect(markdown).toContain('reuseLastContext: action_run');
+    expect(markdown).toContain('reuseLastSourceId: run_use');
+    expect(markdown).toContain('reuseLastStatus: succeeded');
+    expect(markdown).toContain('reuseLastPurpose: 复用部署脚本生成发布步骤');
+    expect(markdown).toContain('reuseLastResult: 生成 3 个发布命令');
+    expect(markdown).toContain('reuseLastArtifactVersion: 3');
+  });
+
   it('writes output markdown, html preview, and updates outputs index', async () => {
     const writeText = vi.fn();
     const readText = vi.fn(async () => '# Outputs\n');

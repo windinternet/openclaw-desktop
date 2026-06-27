@@ -337,6 +337,7 @@ desktopCompanion.plugin.uninstall
 ```text
 desktop.artifacts.create
 desktop.artifacts.describe
+desktop.artifacts.reuse.record
 desktop.artifacts.open
 desktop.artifacts.update
 desktop.artifacts.append

@@ -746,6 +746,8 @@
     "runtimeAuthCount": "{{count}} 条授权记录",
     "runtimeBridge": "Bridge 调用",
     "runtimeBridgeCount": "{{count}} 条调用记录",
+    "reuseRecords": "复用记录",
+    "reuseRecordCount": "{{count}} 条复用记录",
     "importFileHint": "填写本地文件路径后，创建时会复制一份到 Artifact 本地存储。",
     "originalFilePath": "原始路径",
     "fileSize": "文件大小",

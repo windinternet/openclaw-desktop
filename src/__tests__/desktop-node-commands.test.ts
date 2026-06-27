@@ -368,6 +368,17 @@ describe('desktop node commands', () => {
       updatedAt: 1,
       contentSummary: 'HTML · 交互式报告',
       reuseKind: 'workflow',
+      reuseEvents: [
+        {
+          id: 'reuse_1',
+          context: 'action_run',
+          sourceId: 'run_use',
+          status: 'succeeded',
+          purpose: '复用报告模板',
+          artifactVersion: 1,
+          usedAt: 20,
+        },
+      ],
       repositoryOutputPath: 'outputs/reports/art_2.md',
       repositoryPreviewPath: 'outputs/html/art_2.html',
     });
@@ -384,10 +395,96 @@ describe('desktop node commands', () => {
         type: 'report',
         uri: 'artifact://art_2',
         reuseKind: 'workflow',
+        reuseEventCount: 1,
+        lastReuseEvent: expect.objectContaining({ context: 'action_run', status: 'succeeded' }),
         repositoryOutputPath: 'outputs/reports/art_2.md',
         repositoryPreviewPath: 'outputs/html/art_2.html',
       }),
       reference: expect.stringContaining('[成果](artifact://art_2)'),
+    });
+  });
+
+  it('records reusable artifact usage and mirrors the updated output when repoPath is provided', async () => {
+    mockedArtifactPersistence.loadMeta.mockResolvedValue({
+      id: 'art_script',
+      title: '部署脚本',
+      icon: '📎',
+      type: 'file',
+      source: { type: 'action_run', id: 'run_create' },
+      tags: ['deploy'],
+      currentVersion: 3,
+      status: 'draft',
+      createdAt: 1,
+      updatedAt: 2,
+      reuseKind: 'script',
+      contentSummary: 'Script · deploy.sh',
+    });
+    mockedArtifactPersistence.loadHtml.mockResolvedValue(null);
+    mockedCreateRepositoryOutput.mockResolvedValue({
+      outputId: 'art_script',
+      outputPath: 'outputs/files/art_script.md',
+    });
+
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.reuse.record', {
+        repoPath: '/repo',
+        gatewayInstanceId: 'inst-1',
+        artifactId: 'art_script',
+        context: 'action_run',
+        sourceId: 'run_use',
+        sourceName: '部署生产',
+        purpose: '复用部署脚本生成发布步骤',
+        status: 'succeeded',
+        resultSummary: '生成 3 个发布命令',
+        usedAt: 20,
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      artifactId: 'art_script',
+      event: expect.objectContaining({
+        context: 'action_run',
+        sourceId: 'run_use',
+        status: 'succeeded',
+        artifactVersion: 3,
+      }),
+      output: {
+        outputId: 'art_script',
+        path: 'outputs/files/art_script.md',
+        previewPath: undefined,
+      },
+    });
+
+    expect(mockedArtifactService.update).toHaveBeenCalledWith('art_script', {
+      reuseEvents: [
+        expect.objectContaining({
+          context: 'action_run',
+          sourceId: 'run_use',
+          sourceName: '部署生产',
+          purpose: '复用部署脚本生成发布步骤',
+          status: 'succeeded',
+          resultSummary: '生成 3 个发布命令',
+          artifactVersion: 3,
+          usedAt: 20,
+        }),
+      ],
+    });
+    expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(
+      expect.objectContaining({
+        artifact: expect.objectContaining({
+          id: 'art_script',
+          reuseEvents: [
+            expect.objectContaining({
+              sourceId: 'run_use',
+              status: 'succeeded',
+            }),
+          ],
+        }),
+        binding: expect.objectContaining({ repoPath: '/repo', gatewayInstanceId: 'inst-1' }),
+      }),
+    );
+    expect(mockedArtifactService.update).toHaveBeenCalledWith('art_script', {
+      repositoryOutputPath: 'outputs/files/art_script.md',
+      repositoryPreviewPath: undefined,
     });
   });
 

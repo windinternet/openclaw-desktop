@@ -20,11 +20,13 @@ Artifacts 是 OpenClaw Desktop 的 P0 价值沉淀层。只要一个结果对用
 
 每个 Artifact 都有稳定引用 `artifact://<artifactId>`。详情页可以复制一段可复用 Markdown 引用，包含标题、类型、价值摘要、来源、仓库 output / preview 路径以及文件或 URL 线索。Gateway 也可以通过 Desktop node command `desktop.artifacts.describe` 读取同一份引用，用于在普通聊天或 ActionRun 中继续使用已有产物。
 
-Gateway 通过 Desktop node command `desktop.artifacts.create` 或 `desktop.outputs.create` 创建产物时，也可以提供 `url`、`command`、`filePath`、`fileName`、`fileSize`、`mimeType`、`externalFormat`、`contentSummary` 和 `importFile`。这两条入口会把这些字段传入 Artifact storage；`desktop.outputs.create` 还会把产物镜像到 Repository `outputs/`。
+Gateway 通过 Desktop node command `desktop.artifacts.create` 或 `desktop.outputs.create` 创建产物时，也可以提供 `url`、`command`、`filePath`、`fileName`、`fileSize`、`mimeType`、`externalFormat`、`contentSummary`、`reuseKind` 和 `importFile`。这两条入口会把这些字段传入 Artifact storage；`desktop.outputs.create` 还会把产物镜像到 Repository `outputs/`。
 
 Dashboard 最近产物会展示价值摘要、Repository output / preview 线索、来源和更新时间。Workbench 的 outputs 视图会优先用 `externalFormat` 与价值摘要展示对话产物，所以 PPT、PDF、链接、应用和媒体等结果能作为关键成果被用户快速识别，而不是只作为泛化文件路径存在。
 
 当一个产物可被复用为资产、模板、工具、脚本或工作流时，可以设置 `reuseKind` 为 `asset`、`template`、`tool`、`script` 或 `workflow`。`reuseKind` 会进入 Artifact metadata、Repository output markdown、`artifact://` 复用引用、Desktop node command 描述结果和 Workbench outputs 分类，用于把可复用成果从普通文件中区分出来。
+
+复用发生后，Gateway、ActionRun 或 MCP 工具可以调用 `desktop.artifacts.reuse.record`，写入 `context`、`status`、`purpose`、`resultSummary`、`sourceId`、`sourceName` 和 `usedAt`。传入 `repoPath` 时，Desktop 会用新的复用记录刷新 Repository output markdown。该命令只记录复用事实和审计线索，不执行脚本、不打开文件，也不放宽任何权限边界。
 
 ## HTML 特色能力
 
@@ -77,4 +79,4 @@ Desktop Bridge 的实际调用结果会写入 `bridgeEvents`。该记录包含 m
 
 仓库绑定就绪时，Desktop 可以把产物镜像到 `outputs/`。Markdown 元数据适合审计和 Agent 阅读；HTML 文件适合用户预览和交付。
 
-如果产物来自 ActionRun，ActionRun 的仓库摘要会尽量反向列出这些产物的标题、类型、Artifact 引用、Repository output 路径和 HTML preview 路径，让“非聊天式 AI 操作 -> 结果 -> 产物 -> 仓库沉淀”形成可追踪链路。文件型产物会镜像为 `outputs/files/<artifactId>.md`，其中包含来源、格式、摘要、可复用资产分类和文件路径审计信息。
+如果产物来自 ActionRun，ActionRun 的仓库摘要会尽量反向列出这些产物的标题、类型、Artifact 引用、Repository output 路径和 HTML preview 路径，让“非聊天式 AI 操作 -> 结果 -> 产物 -> 仓库沉淀”形成可追踪链路。文件型产物会镜像为 `outputs/files/<artifactId>.md`，其中包含来源、格式、摘要、可复用资产分类、复用记录摘要和文件路径审计信息。

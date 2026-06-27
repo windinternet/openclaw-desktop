@@ -33,13 +33,14 @@
 - Desktop node command `desktop.artifacts.create` 和 `desktop.outputs.create` 已支持非 HTML 产物字段，包括 `url / command / filePath / fileName / fileSize / mimeType / externalFormat / contentSummary / importFile`；Gateway 普通聊天创建文件、链接、应用和媒体产物时也能进入同一套价值摘要、文件导入和 outputs 镜像链路。
 - Dashboard 最近产物会展示价值摘要、Repository output / preview 线索、来源和更新时间；Workbench outputs 视图会优先用 `externalFormat` 与价值摘要展示对话产物，让 PPT、PDF、链接、应用和媒体不再只显示为泛化 `file`。
 - Artifact meta 已支持 `reuseKind: asset / template / tool / script / workflow`，用于把可复用资产、模板、工具、脚本和工作流从普通文件或 HTML 产物中稳定标记出来；该字段会进入 `<artifact>` block 解析、Desktop node 创建/描述、Repository output markdown、`artifact://` 复用引用和 Workbench outputs 分类。
+- Artifact meta 已支持 `reuseEvents`，用于记录某个产物被聊天、ActionRun、工作流、团队、仓库或 MCP 工具复用的事实、状态、用途、结果摘要和当时版本；Desktop node command `desktop.artifacts.reuse.record` 可写入该记录，并可在 `repoPath` 就绪时重新镜像 Repository output markdown。
 
 仍需继续收口：
 
 - 继续补齐非 HTML ActionRun 产物的 Office 原生预览、缩略图和更细的动作入口。
 - 继续扩展 HTML 产物 Desktop Bridge 的网络请求、导出和命令执行策略；这些能力仍不能静默执行，必须继续走审批与记录。
 - 补 Office 文件型产物的缩略图/摘要预览和更细的来源记录。
-- 继续补齐可复用资产的版本策略、权限边界、运行记录、复用入口和更细动作。
+- 继续补齐可复用资产的版本策略、权限边界、执行类审批、运行结果归档和更细动作入口。
 
 ## 1. 定位
 
@@ -191,7 +192,7 @@ Artifact 应记录：
 - `script`：脚本。
 - `workflow`：工作流。
 
-这些分类会进入本地 Artifact meta、Repository output markdown、`artifact://` 引用、Desktop node command 描述结果和 Workbench outputs 分类。后续再在此基础上补权限、运行记录、版本策略和复用入口。
+这些分类会进入本地 Artifact meta、Repository output markdown、`artifact://` 引用、Desktop node command 描述结果和 Workbench outputs 分类。复用发生后，调用方可以通过 `desktop.artifacts.reuse.record` 写入 `reuseEvents`，记录上下文、来源、用途、状态、结果摘要、复用时间和当时 Artifact 版本。后续再在此基础上补权限、版本策略、执行结果归档和更细复用入口。
 
 ## 7. P0 验收标准
 
@@ -202,6 +203,7 @@ Artifact 应记录：
 5. HTML 产物规则能通过 Desktop Self-Knowledge Pack 注入 Gateway。
 6. 用户能从 Dashboard / Workbench 看到最近产物和关键成果，并能读到价值摘要、来源和 Repository output / preview 线索。
 7. 可复用资产、模板、工具、脚本和工作流能通过 `reuseKind` 被保存、镜像、描述、引用和分类展示。
+8. Artifact 复用事实能通过 `reuseEvents` 被记录、描述、在详情页展示，并进入 Repository output markdown。
 
 ## 8. 非目标
 

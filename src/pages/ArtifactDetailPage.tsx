@@ -385,6 +385,34 @@ export default function ArtifactDetailPage() {
                   </div>
                 </div>
               )}
+              {meta.reuseEvents && meta.reuseEvents.length > 0 && (
+                <div>
+                  <Text type="tertiary">{t('artifact.reuseRecords')}: </Text>
+                  <Tag
+                    size="small"
+                    color={meta.reuseEvents[meta.reuseEvents.length - 1].status === 'failed' ? 'red' : 'green'}
+                    type="light"
+                  >
+                    {meta.reuseEvents[meta.reuseEvents.length - 1].status}
+                  </Tag>
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <Text type="tertiary" size="small">
+                      {t('artifact.reuseRecordCount', { count: meta.reuseEvents.length })}
+                    </Text>
+                    {meta.reuseEvents
+                      .slice(-3)
+                      .reverse()
+                      .map((event) => (
+                        <Text key={event.id} size="small" type="secondary">
+                          {event.context} · {event.status}
+                          {event.sourceName ? ` · ${event.sourceName}` : ''}
+                          {event.purpose ? ` · ${event.purpose}` : ''}
+                          {event.resultSummary ? ` · ${event.resultSummary}` : ''}
+                        </Text>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </Card>

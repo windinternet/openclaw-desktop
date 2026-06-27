@@ -24,6 +24,8 @@ describe('artifact UI metadata', () => {
     expect(detailPage).toContain("t('artifact.runtimeAuth')");
     expect(detailPage).toContain('bridgeEvents');
     expect(detailPage).toContain("t('artifact.runtimeBridge')");
+    expect(detailPage).toContain('reuseEvents');
+    expect(detailPage).toContain("t('artifact.reuseRecords')");
     expect(listPage).toContain('contentSummary');
     expect(listPage).toContain('externalFormat');
     expect(detailPage).toContain('contentSummary');
@@ -41,6 +43,8 @@ describe('artifact UI metadata', () => {
     expect(zh.artifact.fileSize).toBeTruthy();
     expect(zh.artifact.runtimeAuth).toBeTruthy();
     expect(zh.artifact.runtimeBridge).toBeTruthy();
+    expect(zh.artifact.reuseRecords).toBeTruthy();
+    expect(zh.artifact.reuseRecordCount).toBeTruthy();
     expect(zh.artifact.contentSummary).toBeTruthy();
     expect(zh.artifact.externalFormat).toBeTruthy();
     expect(zh.artifact.copyReference).toBeTruthy();
@@ -53,6 +57,8 @@ describe('artifact UI metadata', () => {
     expect(en.artifact.fileSize).toBeTruthy();
     expect(en.artifact.runtimeAuth).toBeTruthy();
     expect(en.artifact.runtimeBridge).toBeTruthy();
+    expect(en.artifact.reuseRecords).toBeTruthy();
+    expect(en.artifact.reuseRecordCount).toBeTruthy();
     expect(en.artifact.contentSummary).toBeTruthy();
     expect(en.artifact.externalFormat).toBeTruthy();
     expect(en.artifact.copyReference).toBeTruthy();

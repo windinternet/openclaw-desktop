@@ -42,6 +42,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('reuseKind');
     expect(skillContent).toContain('asset`, `template`, `tool`, `script`, or `workflow`');
     expect(skillContent).toContain('classification and traceability');
+    expect(skillContent).toContain('desktop.artifacts.reuse.record');
+    expect(skillContent).toContain('records reuse/audit facts only');
+    expect(skillContent).toContain('does not execute tools, open files, or grant permissions');
     expect(skillContent).toContain('Dashboard recent Artifacts and Workbench outputs surface value summaries');
     expect(skillContent).toContain('Repository output / preview clues');
     expect(skillContent).toContain('system file handler');

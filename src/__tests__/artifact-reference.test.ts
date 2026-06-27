@@ -21,6 +21,17 @@ describe('artifact reusable references', () => {
       repositoryOutputPath: 'outputs/files/art_roadmap.md',
       filePath: '/artifact-storage/art_roadmap/files/roadmap.pptx',
       originalFilePath: '/Users/deepin/Documents/roadmap.pptx',
+      reuseEvents: [
+        {
+          id: 'reuse_1',
+          context: 'action_run',
+          sourceId: 'run_use',
+          status: 'succeeded',
+          purpose: '生成季度路线图',
+          artifactVersion: 1,
+          usedAt: 20,
+        },
+      ],
     } satisfies ArtifactMeta);
 
     expect(reference.uri).toBe('artifact://art_roadmap');
@@ -29,6 +40,8 @@ describe('artifact reusable references', () => {
     expect(reference.markdown).toContain('reuseKind: template');
     expect(reference.markdown).toContain('summary: PowerPoint · roadmap.pptx · 4 KB');
     expect(reference.markdown).toContain('repositoryOutput: outputs/files/art_roadmap.md');
+    expect(reference.markdown).toContain('reuseEvents: 1');
+    expect(reference.markdown).toContain('lastReuse: action_run/succeeded');
     expect(reference.markdown).toContain('source: action_run/action-file weekly_review');
     expect(reference.markdown).toContain('filePath: /artifact-storage/art_roadmap/files/roadmap.pptx');
   });

@@ -96,6 +96,21 @@ export interface ArtifactRuntimeBridgeEvent {
   endedAt: number;
 }
 
+export type ArtifactReuseContext = 'chat' | 'workflow' | 'agent_team' | 'manual' | 'mcp_tool' | 'action_run' | 'repository';
+export type ArtifactReuseStatus = 'used' | 'succeeded' | 'failed' | 'cancelled';
+
+export interface ArtifactReuseEvent {
+  id: string;
+  context: ArtifactReuseContext;
+  status: ArtifactReuseStatus;
+  artifactVersion: number;
+  usedAt: number;
+  sourceId?: string;
+  sourceName?: string;
+  purpose?: string;
+  resultSummary?: string;
+}
+
 export interface ArtifactMeta {
   id: string;
   title: string;
@@ -126,6 +141,7 @@ export interface ArtifactMeta {
   htmlAudit?: ArtifactHtmlAudit;
   authEvents?: ArtifactRuntimeAuthEvent[];
   bridgeEvents?: ArtifactRuntimeBridgeEvent[];
+  reuseEvents?: ArtifactReuseEvent[];
 }
 
 export interface VersionEntry {

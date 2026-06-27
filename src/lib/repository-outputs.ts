@@ -39,6 +39,8 @@ export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string
   const lastRuntimeAuth = runtimeAuthEvents[runtimeAuthEvents.length - 1];
   const runtimeBridgeEvents = artifact.bridgeEvents ?? [];
   const lastRuntimeBridge = runtimeBridgeEvents[runtimeBridgeEvents.length - 1];
+  const reuseEvents = artifact.reuseEvents ?? [];
+  const lastReuseEvent = reuseEvents[reuseEvents.length - 1];
 
   return [
     `# ${artifact.title}`,
@@ -68,6 +70,15 @@ export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string
     lastRuntimeBridge?.resultSummary ? `runtimeBridgeLastResult: ${lastRuntimeBridge.resultSummary}` : undefined,
     lastRuntimeBridge?.error ? `runtimeBridgeLastError: ${lastRuntimeBridge.error}` : undefined,
     lastRuntimeBridge ? `runtimeBridgeLastAt: ${new Date(lastRuntimeBridge.endedAt).toISOString()}` : undefined,
+    reuseEvents.length > 0 ? `reuseEventCount: ${reuseEvents.length}` : undefined,
+    lastReuseEvent ? `reuseLastContext: ${lastReuseEvent.context}` : undefined,
+    lastReuseEvent?.sourceId ? `reuseLastSourceId: ${lastReuseEvent.sourceId}` : undefined,
+    lastReuseEvent?.sourceName ? `reuseLastSourceName: ${lastReuseEvent.sourceName}` : undefined,
+    lastReuseEvent ? `reuseLastStatus: ${lastReuseEvent.status}` : undefined,
+    lastReuseEvent?.purpose ? `reuseLastPurpose: ${lastReuseEvent.purpose}` : undefined,
+    lastReuseEvent?.resultSummary ? `reuseLastResult: ${lastReuseEvent.resultSummary}` : undefined,
+    lastReuseEvent ? `reuseLastArtifactVersion: ${lastReuseEvent.artifactVersion}` : undefined,
+    lastReuseEvent ? `reuseLastAt: ${new Date(lastReuseEvent.usedAt).toISOString()}` : undefined,
     artifact.fileName ? `fileName: ${artifact.fileName}` : undefined,
     artifact.filePath ? `filePath: ${artifact.filePath}` : undefined,
     artifact.originalFilePath ? `originalFilePath: ${artifact.originalFilePath}` : undefined,
