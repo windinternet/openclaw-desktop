@@ -408,7 +408,7 @@ describe('repository workbench', () => {
     expect(panel).toContain('renderTasksView');
     expect(panel).toContain('renderOutputsView');
     expect(panel).toContain('buildArtifactOutputDescription(artifact)');
-    expect(panel).toContain('typeKey: artifact.externalFormat ?? artifact.type');
+    expect(panel).toContain('typeKey: artifact.reuseKind ?? artifact.externalFormat ?? artifact.type');
     expect(panel).toContain('snapshot?.semanticSections');
     expect(panel).toContain('section.confidence');
     expect(panel).toContain('section.reason');

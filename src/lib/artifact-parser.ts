@@ -1,4 +1,10 @@
-import type { ArtifactExternalFormat, ArtifactType, ArtifactMeta, ArtifactSource } from './artifact-types';
+import type {
+  ArtifactExternalFormat,
+  ArtifactType,
+  ArtifactMeta,
+  ArtifactReuseKind,
+  ArtifactSource,
+} from './artifact-types';
 import { artifactService, getDefaultIcon } from './artifact-service';
 
 export interface ParsedArtifact {
@@ -16,6 +22,7 @@ export interface ParsedArtifact {
   mimeType?: string;
   externalFormat?: ArtifactExternalFormat;
   contentSummary?: string;
+  reuseKind?: ArtifactReuseKind;
   importFile?: boolean;
 }
 
@@ -63,6 +70,7 @@ function parseArtifactBlock(headerText: string, bodyText: string): ParsedArtifac
       mimeType: header.mimeType ? String(header.mimeType) : undefined,
       externalFormat: isValidExternalFormat(header.externalFormat) ? header.externalFormat : undefined,
       contentSummary: header.contentSummary ? String(header.contentSummary) : undefined,
+      reuseKind: isValidReuseKind(header.reuseKind) ? header.reuseKind : undefined,
       importFile: header.importFile === true,
     };
   } catch {
@@ -91,6 +99,7 @@ export async function saveArtifactFromChat(
     mimeType: parsed.mimeType,
     externalFormat: parsed.externalFormat,
     contentSummary: parsed.contentSummary,
+    reuseKind: parsed.reuseKind,
     importFile: parsed.importFile,
     source: { type: sourceType, id: sourceId, name: sourceName },
   });
@@ -135,6 +144,11 @@ function isValidExternalFormat(format: unknown): format is ArtifactExternalForma
     'unknown',
   ];
   return typeof format === 'string' && validFormats.includes(format);
+}
+
+function isValidReuseKind(kind: unknown): kind is ArtifactReuseKind {
+  const validKinds = ['asset', 'template', 'tool', 'script', 'workflow'];
+  return typeof kind === 'string' && validKinds.includes(kind);
 }
 
 function numberValue(value: unknown): number | undefined {

@@ -95,6 +95,7 @@ describe('desktop node commands', () => {
       mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
       externalFormat: 'powerpoint',
       contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+      reuseKind: 'template',
     });
 
     await expect(
@@ -109,6 +110,7 @@ describe('desktop node commands', () => {
         mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
         externalFormat: 'powerpoint',
         contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+        reuseKind: 'template',
         importFile: true,
       }),
     ).resolves.toEqual({
@@ -132,6 +134,7 @@ describe('desktop node commands', () => {
         mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
         externalFormat: 'powerpoint',
         contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+        reuseKind: 'template',
         importFile: true,
         source: { type: 'mcp_tool', name: 'desktop.artifacts.create' },
       }),
@@ -364,6 +367,7 @@ describe('desktop node commands', () => {
       createdAt: 1,
       updatedAt: 1,
       contentSummary: 'HTML · 交互式报告',
+      reuseKind: 'workflow',
       repositoryOutputPath: 'outputs/reports/art_2.md',
       repositoryPreviewPath: 'outputs/html/art_2.html',
     });
@@ -379,6 +383,7 @@ describe('desktop node commands', () => {
         title: '成果',
         type: 'report',
         uri: 'artifact://art_2',
+        reuseKind: 'workflow',
         repositoryOutputPath: 'outputs/reports/art_2.md',
         repositoryPreviewPath: 'outputs/html/art_2.html',
       }),

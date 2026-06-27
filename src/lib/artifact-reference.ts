@@ -11,6 +11,7 @@ export function buildArtifactReuseReference(artifact: ArtifactMeta): ArtifactReu
     `- [${artifact.title}](${uri})`,
     `  - artifactId: ${artifact.id}`,
     `  - type: ${artifact.type}`,
+    artifact.reuseKind ? `  - reuseKind: ${artifact.reuseKind}` : undefined,
     artifact.externalFormat ? `  - format: ${artifact.externalFormat}` : undefined,
     artifact.contentSummary ? `  - summary: ${artifact.contentSummary}` : undefined,
     `  - source: ${formatSource(artifact)}`,

@@ -15,6 +15,7 @@ describe('artifact reusable references', () => {
       status: 'draft',
       createdAt: 1,
       updatedAt: 2,
+      reuseKind: 'template',
       externalFormat: 'powerpoint',
       contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
       repositoryOutputPath: 'outputs/files/art_roadmap.md',
@@ -25,6 +26,7 @@ describe('artifact reusable references', () => {
     expect(reference.uri).toBe('artifact://art_roadmap');
     expect(reference.markdown).toContain('[路线图 PPT](artifact://art_roadmap)');
     expect(reference.markdown).toContain('type: file');
+    expect(reference.markdown).toContain('reuseKind: template');
     expect(reference.markdown).toContain('summary: PowerPoint · roadmap.pptx · 4 KB');
     expect(reference.markdown).toContain('repositoryOutput: outputs/files/art_roadmap.md');
     expect(reference.markdown).toContain('source: action_run/action-file weekly_review');

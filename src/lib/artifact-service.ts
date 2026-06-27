@@ -58,6 +58,7 @@ export interface GenerateParams {
   mimeType?: string;
   externalFormat?: ArtifactMeta['externalFormat'];
   contentSummary?: string;
+  reuseKind?: ArtifactMeta['reuseKind'];
   importFile?: boolean;
 }
 
@@ -144,6 +145,7 @@ export const artifactService = {
       mimeType,
       externalFormat,
       contentSummary,
+      reuseKind: params.reuseKind,
       htmlAudit: html === null ? undefined : auditArtifactHtml(html),
     };
 

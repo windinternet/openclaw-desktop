@@ -1,4 +1,4 @@
-import type { ArtifactExternalFormat, ArtifactType } from './artifact-types';
+import type { ArtifactExternalFormat, ArtifactReuseKind, ArtifactType } from './artifact-types';
 import { artifactService, type GenerateParams } from './artifact-service';
 import { artifactPersistence } from './artifact-persistence';
 import { buildArtifactReuseReference } from './artifact-reference';
@@ -44,6 +44,8 @@ const ARTIFACT_EXTERNAL_FORMATS = new Set<ArtifactExternalFormat>([
   'unknown',
 ]);
 
+const ARTIFACT_REUSE_KINDS = new Set<ArtifactReuseKind>(['asset', 'template', 'tool', 'script', 'workflow']);
+
 const HTML_ARTIFACT_TYPES = new Set<ArtifactType>([
   'report',
   'dashboard',
@@ -88,6 +90,12 @@ function artifactTypeValue(value: unknown): ArtifactType {
 function artifactExternalFormatValue(value: unknown): ArtifactExternalFormat | undefined {
   return typeof value === 'string' && ARTIFACT_EXTERNAL_FORMATS.has(value as ArtifactExternalFormat)
     ? (value as ArtifactExternalFormat)
+    : undefined;
+}
+
+function artifactReuseKindValue(value: unknown): ArtifactReuseKind | undefined {
+  return typeof value === 'string' && ARTIFACT_REUSE_KINDS.has(value as ArtifactReuseKind)
+    ? (value as ArtifactReuseKind)
     : undefined;
 }
 
@@ -187,6 +195,7 @@ function buildArtifactGenerateParams(params: Record<string, unknown>, command: s
     mimeType: stringValue(params.mimeType),
     externalFormat: artifactExternalFormatValue(params.externalFormat),
     contentSummary: stringValue(params.contentSummary),
+    reuseKind: artifactReuseKindValue(params.reuseKind),
     importFile: booleanValue(params.importFile),
     source: { type: 'mcp_tool', name: command },
   };
@@ -489,6 +498,7 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
         status: artifact.status,
         externalFormat: artifact.externalFormat,
         contentSummary: artifact.contentSummary,
+        reuseKind: artifact.reuseKind,
         repositoryOutputPath: artifact.repositoryOutputPath,
         repositoryPreviewPath: artifact.repositoryPreviewPath,
         fileName: artifact.fileName,

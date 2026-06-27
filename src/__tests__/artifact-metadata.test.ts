@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ArtifactMeta, ArtifactSource } from '../lib/artifact-types';
-import { saveArtifactFromChat } from '../lib/artifact-parser';
+import { parseArtifactFromText, saveArtifactFromChat } from '../lib/artifact-parser';
 import { buildOutputMarkdown } from '../lib/repository-outputs';
 import { artifactService } from '../lib/artifact-service';
 
@@ -169,5 +169,43 @@ describe('artifact metadata', () => {
     expect(markdown).toContain('originalFilePath: /Users/deepin/Documents/roadmap.pptx');
     expect(markdown).toContain('fileSize: 4096');
     expect(markdown).toContain('mimeType: application/vnd.openxmlformats-officedocument.presentationml.presentation');
+  });
+
+  it('preserves reusable asset kind from artifact blocks into metadata and repository output markdown', async () => {
+    const parsed = parseArtifactFromText(`<artifact>
+{"title":"部署脚本","type":"file","reuseKind":"script","fileName":"deploy.sh","externalFormat":"code","contentSummary":"Script · deploy.sh"}
+</artifact>`);
+
+    expect(parsed?.reuseKind).toBe('script');
+
+    await saveArtifactFromChat(parsed!, 'action_run', 'run_script');
+
+    expect(mockedArtifactService.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: '部署脚本',
+        reuseKind: 'script',
+        source: { type: 'action_run', id: 'run_script', name: undefined },
+      }),
+    );
+
+    const markdown = buildOutputMarkdown({
+      id: 'art_script',
+      title: '部署脚本',
+      icon: '📎',
+      type: 'file',
+      source: { type: 'action_run', id: 'run_script' },
+      tags: [],
+      currentVersion: 1,
+      status: 'draft',
+      createdAt: 1,
+      updatedAt: 2,
+      reuseKind: 'script',
+      fileName: 'deploy.sh',
+      externalFormat: 'code',
+      contentSummary: 'Script · deploy.sh',
+    } satisfies ArtifactMeta);
+
+    expect(markdown).toContain('reuseKind: script');
+    expect(markdown).toContain('contentSummary: Script · deploy.sh');
   });
 });

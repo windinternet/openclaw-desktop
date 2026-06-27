@@ -31,6 +31,8 @@ export type ArtifactExternalFormat =
   | 'file'
   | 'unknown';
 
+export type ArtifactReuseKind = 'asset' | 'template' | 'tool' | 'script' | 'workflow';
+
 export interface ArtifactSource {
   type: 'chat' | 'workflow' | 'agent_team' | 'manual' | 'mcp_tool' | 'action_run';
   id?: string;
@@ -118,6 +120,7 @@ export interface ArtifactMeta {
   mimeType?: string;
   externalFormat?: ArtifactExternalFormat;
   contentSummary?: string;
+  reuseKind?: ArtifactReuseKind;
   repositoryOutputPath?: string;
   repositoryPreviewPath?: string;
   htmlAudit?: ArtifactHtmlAudit;

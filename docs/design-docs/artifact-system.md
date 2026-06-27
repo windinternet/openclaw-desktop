@@ -32,13 +32,14 @@
 - Artifact 详情页可以复制稳定复用引用 `artifact://<artifactId>`；Desktop node command `desktop.artifacts.describe` 可返回同一份引用摘要，供 Gateway 普通聊天或 ActionRun 继续使用已有产物。
 - Desktop node command `desktop.artifacts.create` 和 `desktop.outputs.create` 已支持非 HTML 产物字段，包括 `url / command / filePath / fileName / fileSize / mimeType / externalFormat / contentSummary / importFile`；Gateway 普通聊天创建文件、链接、应用和媒体产物时也能进入同一套价值摘要、文件导入和 outputs 镜像链路。
 - Dashboard 最近产物会展示价值摘要、Repository output / preview 线索、来源和更新时间；Workbench outputs 视图会优先用 `externalFormat` 与价值摘要展示对话产物，让 PPT、PDF、链接、应用和媒体不再只显示为泛化 `file`。
+- Artifact meta 已支持 `reuseKind: asset / template / tool / script / workflow`，用于把可复用资产、模板、工具、脚本和工作流从普通文件或 HTML 产物中稳定标记出来；该字段会进入 `<artifact>` block 解析、Desktop node 创建/描述、Repository output markdown、`artifact://` 复用引用和 Workbench outputs 分类。
 
 仍需继续收口：
 
 - 继续补齐非 HTML ActionRun 产物的 Office 原生预览、缩略图和更细的动作入口。
 - 继续扩展 HTML 产物 Desktop Bridge 的网络请求、导出和命令执行策略；这些能力仍不能静默执行，必须继续走审批与记录。
 - 补 Office 文件型产物的缩略图/摘要预览和更细的来源记录。
-- 把可复用资产、模板、工具、脚本提升为一等管理对象。
+- 继续补齐可复用资产的版本策略、权限边界、运行记录、复用入口和更细动作。
 
 ## 1. 定位
 
@@ -182,7 +183,15 @@ Artifact 应记录：
 - 检查清单 -> 项目检查模板。
 - Prompt 片段 -> 可复用 Skill 或提示词模板。
 
-第一版不必把所有产物都变成工具。更重要的是让每个产物都有清晰来源、版本和保存位置。
+第一版不必把所有产物都变成工具。更重要的是让每个产物都有清晰来源、版本和保存位置。当前第一版通过 `reuseKind` 标记可复用资产类别：
+
+- `asset`：可复用资产。
+- `template`：模板。
+- `tool`：工具。
+- `script`：脚本。
+- `workflow`：工作流。
+
+这些分类会进入本地 Artifact meta、Repository output markdown、`artifact://` 引用、Desktop node command 描述结果和 Workbench outputs 分类。后续再在此基础上补权限、运行记录、版本策略和复用入口。
 
 ## 7. P0 验收标准
 
@@ -192,6 +201,7 @@ Artifact 应记录：
 4. 仓库绑定就绪时，产物可以镜像到 Repository `outputs/`。
 5. HTML 产物规则能通过 Desktop Self-Knowledge Pack 注入 Gateway。
 6. 用户能从 Dashboard / Workbench 看到最近产物和关键成果，并能读到价值摘要、来源和 Repository output / preview 线索。
+7. 可复用资产、模板、工具、脚本和工作流能通过 `reuseKind` 被保存、镜像、描述、引用和分类展示。
 
 ## 8. 非目标
 

@@ -39,6 +39,7 @@ export function buildArtifactDisplayLine(artifact: ArtifactMeta, dateLabel?: str
   const value = buildArtifactOutputDescription(artifact);
   const parts = [
     value,
+    artifact.reuseKind,
     artifact.repositoryOutputPath,
     artifact.repositoryPreviewPath,
     formatArtifactSource(artifact),

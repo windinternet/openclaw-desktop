@@ -24,10 +24,10 @@ function createArtifact(overrides: Partial<ArtifactMeta> = {}): ArtifactMeta {
 
 describe('artifact display helpers', () => {
   it('builds a compact value line with summary, repository output, source, and date', () => {
-    const line = buildArtifactDisplayLine(createArtifact(), '2026-06-28');
+    const line = buildArtifactDisplayLine(createArtifact({ reuseKind: 'template' }), '2026-06-28');
 
     expect(line).toBe(
-      'PowerPoint · roadmap.pptx · 4 KB · outputs/files/art_file.md · action_run/run-1 · 2026-06-28',
+      'PowerPoint · roadmap.pptx · 4 KB · template · outputs/files/art_file.md · action_run/run-1 · 2026-06-28',
     );
   });
 

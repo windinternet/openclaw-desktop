@@ -53,6 +53,7 @@ export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string
     artifact.source.name ? `sourceName: ${artifact.source.name}` : undefined,
     artifact.externalFormat ? `externalFormat: ${artifact.externalFormat}` : undefined,
     artifact.contentSummary ? `contentSummary: ${artifact.contentSummary}` : undefined,
+    artifact.reuseKind ? `reuseKind: ${artifact.reuseKind}` : undefined,
     artifact.htmlAudit ? `htmlSelfContained: ${artifact.htmlAudit.selfContained}` : undefined,
     artifact.htmlAudit ? `htmlRequiresApproval: ${artifact.htmlAudit.requiresApproval}` : undefined,
     artifact.htmlAudit ? `htmlIssueCount: ${artifact.htmlAudit.issues.length}` : undefined,
