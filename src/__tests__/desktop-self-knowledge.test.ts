@@ -34,6 +34,10 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('htmlAudit');
     expect(skillContent).toContain('runtime authorization records');
     expect(skillContent).toContain('runtime bridge call records');
+    expect(skillContent).toContain('artifactBridge.fetch');
+    expect(skillContent).toContain('requires `network.fetch` approval');
+    expect(skillContent).toContain('Direct browser `fetch()` remains blocked by CSP');
+    expect(skillContent).toContain('artifactBridge.exec()` remains unsupported');
     expect(skillContent).toContain('artifactBridge.exportAs');
     expect(skillContent).toContain('requires `export` approval');
     expect(skillContent).toContain('must not be used for silent file writes');

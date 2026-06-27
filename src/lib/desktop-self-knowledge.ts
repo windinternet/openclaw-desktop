@@ -89,6 +89,8 @@ export function buildDesktopSelfKnowledgeSkillContent(): string {
     '',
     'Desktop records an `htmlAudit` summary for saved HTML Artifacts. It marks whether the HTML is self-contained, whether runtime approval is required, and which external resources or Desktop Bridge capabilities were detected. Desktop also writes runtime authorization records and runtime bridge call records back to Artifact metadata when a user grants, denies, or runs Desktop Bridge access.',
     '',
+    'HTML Artifacts can call `artifactBridge.fetch(url, init)` for HTTP(S) network data. Desktop requires `network.fetch` approval first, proxies the request from the main process, returns a structured status/header/body result, and records the call in `bridgeEvents`. Direct browser `fetch()` remains blocked by CSP. `artifactBridge.exec()` remains unsupported and must not be treated as an available command execution path.',
+    '',
     'HTML Artifacts can call `artifactBridge.exportAs(typeOrOptions, content, fileName)` to export HTML, text, Markdown, or JSON through the Desktop save dialog. This requires `export` approval and records the result in `bridgeEvents`; it must not be used for silent file writes.',
     '',
     'When producing a rich Artifact from chat or ActionRun, use this shape:',

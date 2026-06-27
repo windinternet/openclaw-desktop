@@ -3,6 +3,7 @@ import path from 'node:path'
 import { readFileSync, existsSync, mkdirSync, writeFileSync, copyFileSync, statSync } from 'node:fs'
 import os from 'node:os'
 import { ARTIFACT_IPC } from '../src/lib/artifact-ipc'
+import { buildArtifactBridgeFetchResponse, resolveArtifactBridgeFetchRequest } from '../src/lib/artifact-bridge-fetch'
 import { decideArtifactOpenTarget } from '../src/lib/artifact-open-target'
 import { resolveArtifactExportRequest } from '../src/lib/artifact-export'
 import { recordArtifactAuthDecision, recordArtifactBridgeCallResult } from '../src/lib/artifact-runtime-auth'
@@ -406,9 +407,22 @@ async function executeArtifactBridgeCall(
         resultSummary: `exported ${exportRequest.bytes} bytes`,
       }
     }
-    case 'fetch':
+    case 'fetch': {
+      const fetchRequest = resolveArtifactBridgeFetchRequest(params)
+      await requireArtifactBridgeAuthorization(context.artifactId, 'network.fetch', detail ?? fetchRequest.url)
+      const response = await fetch(fetchRequest.url, {
+        method: fetchRequest.method,
+        headers: fetchRequest.headers,
+        body: fetchRequest.body,
+      })
+      const result = await buildArtifactBridgeFetchResponse(response, fetchRequest.maxBytes)
+      return {
+        result,
+        resultSummary: `network ${result.status} ${result.bytes} bytes${result.truncated ? ' truncated' : ''}`,
+      }
+    }
     case 'exec':
-      throw new ArtifactBridgeUnsupportedError(`Artifact bridge method ${method} is not implemented yet`)
+      throw new ArtifactBridgeUnsupportedError('Artifact bridge method exec is not implemented yet')
     default:
       throw new ArtifactBridgeUnsupportedError(`Unknown artifact bridge method: ${method}`)
   }

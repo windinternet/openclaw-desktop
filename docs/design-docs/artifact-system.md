@@ -24,7 +24,7 @@
 - HTML 产物生成和追加时会记录 `htmlAudit`，标记自包含状态、审批需求和检查项。
 - HTML 产物运行时授权决策会回写到 Artifact meta 的 `authEvents`，记录能力、目标、授权结果、授权级别和请求/决策时间。
 - HTML 产物预览窗口通过专用 preload 暴露受控 `window.artifactBridge`，Bridge 调用会进入主进程执行链路。
-- Desktop Bridge 当前支持 HTML 产物读取自身 meta / HTML 版本、经审批读取本地文本文件、写入本地文本文件、导出 HTML / 文本 / Markdown / JSON 文件和发送系统通知。
+- Desktop Bridge 当前支持 HTML 产物读取自身 meta / HTML 版本、经审批代理 `artifactBridge.fetch` 的 HTTP(S) 网络请求、读取本地文本文件、写入本地文本文件、导出 HTML / 文本 / Markdown / JSON 文件和发送系统通知；命令执行接口仍保持未实现，不会静默开放。
 - HTML 产物 Desktop Bridge 调用结果会回写到 Artifact meta 的 `bridgeEvents`，记录 method、detail、status、resultSummary、error 和起止时间。
 - Repository output markdown 会沉淀 HTML 审计摘要，Artifacts UI 会显示非自包含和需审批提示。
 - 文件、图片、音频、视频等非 HTML 产物可记录 `filePath` 或 `url`，打开时交给系统文件处理器或外部 URL 处理器。
@@ -43,7 +43,7 @@
 仍需继续收口：
 
 - 继续补齐非 HTML ActionRun 产物的 Office 原生预览、缩略图和更细的动作入口。
-- 继续扩展 HTML 产物 Desktop Bridge 的网络请求和命令执行策略；导出已具备最小保存能力，但仍不能静默执行，必须继续走审批与记录。
+- 继续扩展 HTML 产物 Desktop Bridge 的命令执行策略；网络请求和导出已具备最小审批/记录能力，但命令执行仍不能静默开放，必须继续走更严格的审批与运行记录设计。
 - 补 Office 文件型产物的缩略图/摘要预览和更细的来源记录。
 - 继续补齐可复用资产的版本策略、权限边界、执行类审批、运行结果归档和更细动作入口。
 
@@ -118,7 +118,9 @@ HTML 产物约束：
 - Desktop 会记录 `htmlAudit`，用于标记非自包含资源和需要审批的运行能力。
 - Desktop 会记录 `authEvents`，用于保存运行时 Desktop Bridge 授权或拒绝记录。
 - Desktop 会记录 `bridgeEvents`，用于保存运行时 Desktop Bridge 调用结果。
+- HTML 产物可以通过 `artifactBridge.fetch(url, init)` 请求 HTTP(S) 网络数据；Desktop 会先请求 `network.fetch` 授权，再由主进程代理请求并把状态码、响应摘要和裁剪后的文本结果写入 `bridgeEvents`。直连 `fetch()` 仍被 CSP 阻止。
 - HTML 产物可以通过 `artifactBridge.exportAs(typeOrOptions, content, fileName)` 请求导出 HTML、文本、Markdown 或 JSON；Desktop 会先请求授权，再打开系统保存对话框并记录执行结果。
+- `artifactBridge.exec()` 仍保持未实现，不作为 P0 默认命令执行入口。
 - 可以镜像到 Repository `outputs/html/`。
 
 ## 4. 与 Repository outputs 的关系

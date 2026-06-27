@@ -55,6 +55,8 @@ Desktop 保存或追加 HTML 产物时会记录 `htmlAudit`：
 
 Desktop Bridge 的实际调用结果会写入 `bridgeEvents`。该记录包含 method、detail、status、resultSummary、error、startedAt 和 endedAt，用于把“已审批”继续连接到“执行了什么、成功还是失败、结果摘要是什么”。当前 HTML 预览窗口通过专用 preload 暴露受控 `window.artifactBridge`，主进程只接受来自 Artifact preview window 的调用。
 
+HTML 产物可以通过 `artifactBridge.fetch(url, init)` 请求 HTTP(S) 网络数据。Desktop 会先请求 `network.fetch` 授权，再由主进程代理请求，并把状态码、响应摘要和裁剪后的文本结果记录到 `bridgeEvents`。普通直连 `fetch()` 仍会被 CSP 阻止；`artifactBridge.exec()` 仍保持未实现，不能作为默认命令执行入口。
+
 HTML 产物可以通过 `artifactBridge.exportAs(typeOrOptions, content, fileName)` 请求导出 HTML、文本、Markdown 或 JSON。Desktop 会先请求 `export` 授权，再打开系统保存对话框；用户确认路径后才写入文件，并把成功、取消或失败记录到 `bridgeEvents`。该能力用于交付和保存副本，不允许 HTML 产物静默写入任意文件。
 
 ## Artifact block

@@ -31,4 +31,16 @@ describe('artifact runtime authorization recording', () => {
     expect(source).toContain('writeFileSync(result.filePath, exportRequest.content');
     expect(source).toContain('resultSummary: `exported ${exportRequest.bytes} bytes`');
   });
+
+  it('implements fetch through network authorization while keeping shell exec unsupported', () => {
+    const source = readFileSync('electron/artifact-handlers.ts', 'utf8');
+
+    expect(source).toContain("case 'fetch'");
+    expect(source).toContain('resolveArtifactBridgeFetchRequest(params)');
+    expect(source).toContain("requireArtifactBridgeAuthorization(context.artifactId, 'network.fetch'");
+    expect(source).toContain('await fetch(fetchRequest.url');
+    expect(source).toContain('buildArtifactBridgeFetchResponse(response');
+    expect(source).toContain("case 'exec':");
+    expect(source).toContain('Artifact bridge method exec is not implemented yet');
+  });
 });
