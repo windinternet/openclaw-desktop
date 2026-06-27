@@ -289,4 +289,162 @@ describe('AI ActionRun repository summaries', () => {
       expect.stringContaining('[交互式复盘报告](outputs/reports/art_1.md) (`art_1`, report)'),
     );
   });
+
+  it('auto-saves artifact blocks from completed ActionRun responses and records artifact ids', async () => {
+    const saveInstanceData = vi.fn();
+    const loadInstanceData = vi.fn(async (_instanceId: string, key: string) => {
+      if (key === AI_ACTION_RUNS_STORAGE_KEY) return [];
+      return null;
+    });
+    const artifactList = vi.fn(async () => []);
+    const saveMeta = vi.fn();
+    const saveHtml = vi.fn();
+    const updateIndex = vi.fn();
+    vi.stubGlobal('window', {
+      electronAPI: {
+        artifact: {
+          list: artifactList,
+          saveMeta,
+          saveHtml,
+          updateIndex,
+        },
+        storage: {
+          loadInstanceData,
+          saveInstanceData,
+        },
+      },
+    });
+
+    await upsertAiActionRun(
+      'instance-1',
+      createRun({
+        id: 'action-100',
+        type: 'weekly_review',
+        sourcePage: 'action-center',
+        status: 'done',
+        input: '生成复盘报告',
+        resultSummary: '复盘报告已生成',
+        lastAssistantResponse:
+          '```ai-action\n{"kind":"completed","summary":"复盘报告已生成"}\n```\n<artifact>\n{"title":"复盘报告","type":"report","tags":["review"]}\n<!doctype html><html><body>ok</body></html>\n</artifact>',
+      }),
+    );
+
+    expect(saveMeta).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        title: '复盘报告',
+        type: 'report',
+        source: { type: 'action_run', id: 'action-100', name: 'weekly_review' },
+      }),
+    );
+    const savedArtifact = saveMeta.mock.calls[0][1] as ArtifactMeta;
+    expect(saveHtml).toHaveBeenCalledWith(savedArtifact.id, 1, '<!doctype html><html><body>ok</body></html>');
+    expect(saveInstanceData).toHaveBeenCalledWith(
+      'instance-1',
+      AI_ACTION_RUNS_STORAGE_KEY,
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'action-100',
+          artifactIds: [savedArtifact.id],
+        }),
+      ]),
+    );
+  });
+
+  it('reuses existing ActionRun artifacts instead of saving duplicate artifact blocks', async () => {
+    const saveInstanceData = vi.fn();
+    const loadInstanceData = vi.fn(async (_instanceId: string, key: string) => {
+      if (key === AI_ACTION_RUNS_STORAGE_KEY) return [];
+      return null;
+    });
+    const saveMeta = vi.fn();
+    vi.stubGlobal('window', {
+      electronAPI: {
+        artifact: {
+          list: vi.fn(async () => [
+            createArtifact({
+              id: 'art_existing',
+              title: '复盘报告',
+              source: { type: 'action_run', id: 'action-100', name: 'weekly_review' },
+            }),
+          ]),
+          saveMeta,
+          saveHtml: vi.fn(),
+          updateIndex: vi.fn(),
+        },
+        storage: {
+          loadInstanceData,
+          saveInstanceData,
+        },
+      },
+    });
+
+    await upsertAiActionRun(
+      'instance-1',
+      createRun({
+        id: 'action-100',
+        type: 'weekly_review',
+        sourcePage: 'action-center',
+        status: 'done',
+        input: '生成复盘报告',
+        resultSummary: '复盘报告已生成',
+        lastAssistantResponse:
+          '<artifact>\n{"title":"复盘报告","type":"report"}\n<!doctype html><html><body>ok</body></html>\n</artifact>',
+      }),
+    );
+
+    expect(saveMeta).not.toHaveBeenCalled();
+    expect(saveInstanceData).toHaveBeenCalledWith(
+      'instance-1',
+      AI_ACTION_RUNS_STORAGE_KEY,
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'action-100',
+          artifactIds: ['art_existing'],
+        }),
+      ]),
+    );
+  });
+
+  it('keeps saving completed ActionRuns when artifact storage is unavailable', async () => {
+    const saveInstanceData = vi.fn();
+    const loadInstanceData = vi.fn(async (_instanceId: string, key: string) => {
+      if (key === AI_ACTION_RUNS_STORAGE_KEY) return [];
+      return null;
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        storage: {
+          loadInstanceData,
+          saveInstanceData,
+        },
+      },
+    });
+
+    await upsertAiActionRun(
+      'instance-1',
+      createRun({
+        id: 'action-101',
+        type: 'weekly_review',
+        sourcePage: 'action-center',
+        status: 'done',
+        input: '生成复盘报告',
+        resultSummary: '复盘报告已生成',
+        lastAssistantResponse:
+          '<artifact>\n{"title":"复盘报告","type":"report"}\n<!doctype html><html><body>ok</body></html>\n</artifact>',
+      }),
+    );
+
+    expect(saveInstanceData).toHaveBeenCalledWith(
+      'instance-1',
+      AI_ACTION_RUNS_STORAGE_KEY,
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'action-101',
+        }),
+      ]),
+    );
+    const savedRuns = saveInstanceData.mock.calls[0][2] as AiActionRun[];
+    expect(savedRuns[0]).not.toHaveProperty('artifactIds');
+  });
 });

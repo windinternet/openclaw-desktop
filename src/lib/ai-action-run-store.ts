@@ -15,6 +15,7 @@ import {
 import { fetchGatewayAgents } from './gateway-agents';
 import { loadRepositoryBinding } from './agentic-repository-store';
 import { artifactPersistence } from './artifact-persistence';
+import { parseArtifactsFromText, saveArtifactFromChat } from './artifact-parser';
 import { loadInstanceData, saveInstanceDataAwaited } from './local-persistence';
 import type { ArtifactMeta } from './artifact-types';
 import type { AgentTeamProfile, AiActionRun, AiActionRunStatus } from './types';
@@ -33,11 +34,14 @@ export async function saveAiActionRuns(instanceId: string, runs: AiActionRun[]):
 }
 
 export async function upsertAiActionRun(instanceId: string, run: AiActionRun): Promise<AiActionRun[]> {
+  const runWithArtifacts = await saveArtifactsFromTerminalAiActionRun(run);
   const runs = await loadAiActionRuns(instanceId);
-  const exists = runs.some((item) => item.id === run.id);
-  const nextRuns = exists ? runs.map((item) => (item.id === run.id ? run : item)) : [run, ...runs];
+  const exists = runs.some((item) => item.id === runWithArtifacts.id);
+  const nextRuns = exists
+    ? runs.map((item) => (item.id === runWithArtifacts.id ? runWithArtifacts : item))
+    : [runWithArtifacts, ...runs];
   await saveAiActionRuns(instanceId, nextRuns);
-  await mirrorTerminalAiActionRunToRepository(instanceId, run);
+  await mirrorTerminalAiActionRunToRepository(instanceId, runWithArtifacts);
   return nextRuns;
 }
 
@@ -132,6 +136,54 @@ async function loadRunArtifacts(artifactIds: string[] | undefined): Promise<Arti
   );
 
   return artifacts.filter((artifact): artifact is ArtifactMeta => artifact !== null);
+}
+
+async function saveArtifactsFromTerminalAiActionRun(run: AiActionRun): Promise<AiActionRun> {
+  if (run.status !== 'done' || !run.lastAssistantResponse) return run;
+
+  const parsedArtifacts = parseArtifactsFromText(run.lastAssistantResponse);
+  if (parsedArtifacts.length === 0) return run;
+
+  try {
+    const existingArtifactIds = new Set(run.artifactIds ?? []);
+    const existingArtifacts = await listExistingActionRunArtifacts(run.id);
+    const existingByTitle = new Map(existingArtifacts.map((artifact) => [artifact.title, artifact]));
+
+    for (const parsed of parsedArtifacts) {
+      const existing = existingByTitle.get(parsed.title);
+      if (existing) {
+        existingArtifactIds.add(existing.id);
+        continue;
+      }
+
+      const artifact = await saveArtifactFromChat(parsed, 'action_run', run.id, run.type);
+      existingArtifactIds.add(artifact.id);
+      existingByTitle.set(artifact.title, artifact);
+    }
+
+    const artifactIds = Array.from(existingArtifactIds);
+    if (arraysEqual(artifactIds, run.artifactIds ?? [])) return run;
+    return {
+      ...run,
+      artifactIds,
+      updatedAt: Date.now(),
+    };
+  } catch {
+    return run;
+  }
+}
+
+async function listExistingActionRunArtifacts(actionRunId: string): Promise<ArtifactMeta[]> {
+  try {
+    const artifacts = await artifactPersistence.list();
+    return artifacts.filter((artifact) => artifact.source.type === 'action_run' && artifact.source.id === actionRunId);
+  } catch {
+    return [];
+  }
+}
+
+function arraysEqual(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 export async function reconcileGatewayAgentCreationRun(

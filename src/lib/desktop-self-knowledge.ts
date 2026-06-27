@@ -55,7 +55,7 @@ export function buildDesktopSelfKnowledgeSkillContent(): string {
     '- Desktop needs a model to plan, execute, summarize, or produce structured results.',
     '- The operation needs explicit approval, such as repository writes, local file writes, local command execution, Artifact generation, or Desktop Bridge calls.',
     '',
-    'When serving an ActionRun, report important state through an `ai-action` JSON block when the host expects structured status. High-risk or write operations must move through an approval state first. If the ActionRun produces Artifacts, Desktop can mirror the run summary with Artifact titles, types, Artifact references, and Repository output / preview paths.',
+    'When serving an ActionRun, report important state through an `ai-action` JSON block when the host expects structured status. High-risk or write operations must move through an approval state first. If a completed ActionRun response contains `<artifact>` blocks, Desktop saves them as `source: action_run`, records their Artifact ids on the run, and can mirror the run summary with Artifact titles, types, Artifact references, and Repository output / preview paths.',
     '',
     '## Artifacts',
     '',

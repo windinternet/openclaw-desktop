@@ -1,22 +1,40 @@
 import type { ArtifactType, ArtifactMeta, ArtifactSource } from './artifact-types';
 import { artifactService, getDefaultIcon } from './artifact-service';
 
-interface ParsedArtifact {
+export interface ParsedArtifact {
   title: string;
   type: ArtifactType;
   icon: string;
   description?: string;
   tags: string[];
   html: string;
+  url?: string;
+  command?: string;
+  filePath?: string;
+  fileName?: string;
+  mimeType?: string;
 }
 
 export function parseArtifactFromText(text: string): ParsedArtifact | null {
-  const match = text.match(/<artifact>\s*(\{[\s\S]*?\})\s*([\s\S]*?)<\/artifact>/i);
-  if (!match) return null;
+  return parseArtifactsFromText(text)[0] ?? null;
+}
 
+export function parseArtifactsFromText(text: string): ParsedArtifact[] {
+  const artifacts: ParsedArtifact[] = [];
+  const matches = text.matchAll(/<artifact>\s*(\{[\s\S]*?\})\s*([\s\S]*?)<\/artifact>/gi);
+
+  for (const match of matches) {
+    const parsed = parseArtifactBlock(match[1], match[2]);
+    if (parsed) artifacts.push(parsed);
+  }
+
+  return artifacts;
+}
+
+function parseArtifactBlock(headerText: string, bodyText: string): ParsedArtifact | null {
   try {
-    const header = JSON.parse(match[1].trim());
-    const html = match[2].trim();
+    const header = JSON.parse(headerText.trim());
+    const html = bodyText.trim();
 
     if (!header.title) return null;
     const htmlTypes = ['report', 'dashboard', 'analysis', 'checklist', 'code', 'document', 'slide', 'form', 'other'];
@@ -33,6 +51,11 @@ export function parseArtifactFromText(text: string): ParsedArtifact | null {
       description: header.description ? String(header.description) : undefined,
       tags: Array.isArray(header.tags) ? header.tags.map(String) : [],
       html,
+      url: header.url ? String(header.url) : undefined,
+      command: header.command ? String(header.command) : undefined,
+      filePath: header.filePath ? String(header.filePath) : undefined,
+      fileName: header.fileName ? String(header.fileName) : undefined,
+      mimeType: header.mimeType ? String(header.mimeType) : undefined,
     };
   } catch {
     return null;
@@ -52,6 +75,11 @@ export async function saveArtifactFromChat(
     description: parsed.description,
     tags: parsed.tags,
     html: parsed.html,
+    url: parsed.url,
+    command: parsed.command,
+    filePath: parsed.filePath,
+    fileName: parsed.fileName,
+    mimeType: parsed.mimeType,
     source: { type: sourceType, id: sourceId, name: sourceName },
   });
 }

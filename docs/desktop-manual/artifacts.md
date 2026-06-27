@@ -61,6 +61,8 @@ Desktop Bridge 的实际调用结果会写入 `bridgeEvents`。该记录包含 m
 </artifact>
 ```
 
+聊天和 ActionRun 都可以携带 `<artifact>` 块。终态 ActionRun 的 `lastAssistantResponse` 如果包含这些块，Desktop 会自动保存为 `source: action_run` 的 Artifact，并把 Artifact id 回写到对应 ActionRun。
+
 ## Repository outputs
 
 仓库绑定就绪时，Desktop 可以把产物镜像到 `outputs/`。Markdown 元数据适合审计和 Agent 阅读；HTML 文件适合用户预览和交付。

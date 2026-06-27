@@ -17,6 +17,7 @@
 - Artifacts 页面和详情页会展示仓库输出状态与路径。
 - AI 魔法创建保存产物时会以 `action_run` 作为来源，并把产物 ID 回写到对应 ActionRun。
 - ActionRun 仓库摘要会尽量解析本次运行生成的 Artifact meta，列出产物标题、类型、Artifact 引用和 Repository output / preview 路径；读取不到 meta 时退回产物 ID。
+- 终态 ActionRun 的 `lastAssistantResponse` 如果包含 `<artifact>` block，Desktop 会自动保存为 `source: action_run` 的 Artifact，并把 Artifact id 回写到 ActionRun。
 - HTML 产物生成和追加时会记录 `htmlAudit`，标记自包含状态、审批需求和检查项。
 - HTML 产物运行时授权决策会回写到 Artifact meta 的 `authEvents`，记录能力、目标、授权结果、授权级别和请求/决策时间。
 - HTML 产物预览窗口通过专用 preload 暴露受控 `window.artifactBridge`，Bridge 调用会进入主进程执行链路。
@@ -29,7 +30,7 @@
 
 仍需继续收口：
 
-- 继续扩展非 AI 魔法创建入口的 ActionRun 产物自动关联。
+- 继续补齐非 HTML ActionRun 产物的文件导入、预览摘要和后续复用动作。
 - 继续扩展 HTML 产物 Desktop Bridge 的网络请求、导出和命令执行策略；这些能力仍不能静默执行，必须继续走审批与记录。
 - 补 Office 文件型产物的缩略图/摘要预览和更细的来源记录。
 - 把可复用资产、模板、工具、脚本提升为一等管理对象。
