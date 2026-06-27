@@ -265,6 +265,34 @@ export default function ArtifactDetailPage() {
                   </Text>
                 </div>
               )}
+              {meta.htmlAudit && (
+                <div>
+                  <Text type="tertiary">{t('artifact.htmlAudit')}: </Text>
+                  <Tag size="small" color={meta.htmlAudit.selfContained ? 'green' : 'red'} type="light">
+                    {meta.htmlAudit.selfContained
+                      ? t('artifact.htmlSelfContained')
+                      : t('artifact.htmlNotSelfContained')}
+                  </Tag>
+                  {meta.htmlAudit.requiresApproval && (
+                    <Tag size="small" color="orange" type="light" style={{ marginLeft: 4 }}>
+                      {t('artifact.htmlApprovalRequired')}
+                    </Tag>
+                  )}
+                  {meta.htmlAudit.issues.length > 0 && (
+                    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <Text type="tertiary" size="small">
+                        {t('artifact.htmlIssueCount', { count: meta.htmlAudit.issues.length })}
+                      </Text>
+                      {meta.htmlAudit.issues.slice(0, 6).map((issue) => (
+                        <Text key={`${issue.code}-${issue.detail ?? ''}`} size="small" type="secondary">
+                          {issue.message}
+                          {issue.detail ? `: ${issue.detail}` : ''}
+                        </Text>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </Card>

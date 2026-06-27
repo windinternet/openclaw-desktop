@@ -65,6 +65,8 @@ export function buildDesktopSelfKnowledgeSkillContent(): string {
     '',
     'HTML 产物 are a distinctive Desktop capability: they can be beautiful, visual, interactive, and operational. HTML Artifacts should be 完整自包含, use inline CSS and necessary JavaScript, avoid external CDNs by default, and request approval before using local files, network, commands, or Desktop Bridge.',
     '',
+    'Desktop records an `htmlAudit` summary for saved HTML Artifacts. It marks whether the HTML is self-contained, whether runtime approval is required, and which external resources or Desktop Bridge capabilities were detected.',
+    '',
     'When producing a rich Artifact from chat or ActionRun, use this shape:',
     '',
     '```text',

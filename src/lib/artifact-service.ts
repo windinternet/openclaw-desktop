@@ -1,5 +1,6 @@
 import type { ArtifactMeta, ArtifactType, ArtifactSource } from './artifact-types';
 import { artifactPersistence } from './artifact-persistence';
+import { auditArtifactHtml } from './artifact-html-audit';
 
 let _idCounter = 0;
 
@@ -104,6 +105,7 @@ export const artifactService = {
       fileName: params.fileName,
       fileSize: params.fileSize,
       mimeType: params.mimeType,
+      htmlAudit: html === null ? undefined : auditArtifactHtml(html),
     };
 
     await artifactPersistence.saveMeta(id, meta);
@@ -129,6 +131,7 @@ export const artifactService = {
     await artifactPersistence.saveHtml(artifactId, newVersion, newHtml);
 
     meta.currentVersion = newVersion;
+    meta.htmlAudit = auditArtifactHtml(newHtml);
     meta.updatedAt = Date.now();
     await artifactPersistence.saveMeta(artifactId, meta);
 

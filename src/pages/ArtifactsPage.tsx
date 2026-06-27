@@ -216,15 +216,28 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
                 <div style={{ fontSize: 12, color: 'var(--semi-color-text-2)', marginBottom: 8 }}>
                   v{a.currentVersion} · {formatTime(a.updatedAt)}
                 </div>
-                {a.repositoryOutputPath && (
-                  <Tag size="small" color="green" type="light">
-                    {t('artifact.repositoryOutput')}
-                  </Tag>
+                {(a.repositoryOutputPath || a.htmlAudit?.selfContained === false || a.htmlAudit?.requiresApproval) && (
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: a.description ? 8 : 0 }}>
+                    {a.repositoryOutputPath && (
+                      <Tag size="small" color="green" type="light">
+                        {t('artifact.repositoryOutput')}
+                      </Tag>
+                    )}
+                    {a.htmlAudit?.selfContained === false && (
+                      <Tag size="small" color="red" type="light">
+                        {t('artifact.htmlNotSelfContained')}
+                      </Tag>
+                    )}
+                    {a.htmlAudit?.requiresApproval && (
+                      <Tag size="small" color="orange" type="light">
+                        {t('artifact.htmlApprovalRequired')}
+                      </Tag>
+                    )}
+                  </div>
                 )}
                 {a.description && (
                   <div
                     style={{
-                      marginTop: a.repositoryOutputPath ? 8 : 0,
                       fontSize: 13,
                       color: 'var(--semi-color-text-1)',
                       lineHeight: 1.5,
@@ -289,6 +302,16 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
               {a.repositoryOutputPath && (
                 <Tag size="small" color="green" type="light">
                   {t('artifact.repositoryOutput')}
+                </Tag>
+              )}
+              {a.htmlAudit?.selfContained === false && (
+                <Tag size="small" color="red" type="light">
+                  {t('artifact.htmlNotSelfContained')}
+                </Tag>
+              )}
+              {a.htmlAudit?.requiresApproval && (
+                <Tag size="small" color="orange" type="light">
+                  {t('artifact.htmlApprovalRequired')}
                 </Tag>
               )}
               <Text type="tertiary" size="small">

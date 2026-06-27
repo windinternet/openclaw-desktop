@@ -13,9 +13,17 @@ describe('artifact UI metadata', () => {
     expect(detailPage).toContain('repositoryOutputPath');
     expect(detailPage).toContain('repositoryPreviewPath');
     expect(detailPage).toContain("t('artifact.repositoryPreview')");
+    expect(listPage).toContain('htmlAudit');
+    expect(listPage).toContain("t('artifact.htmlApprovalRequired')");
+    expect(detailPage).toContain("t('artifact.htmlAudit')");
+    expect(detailPage).toContain("t('artifact.htmlSelfContained')");
     expect(zh.artifact.repositoryOutput).toBeTruthy();
     expect(zh.artifact.repositoryPreview).toBeTruthy();
+    expect(zh.artifact.htmlAudit).toBeTruthy();
+    expect(zh.artifact.htmlApprovalRequired).toBeTruthy();
     expect(en.artifact.repositoryOutput).toBeTruthy();
     expect(en.artifact.repositoryPreview).toBeTruthy();
+    expect(en.artifact.htmlAudit).toBeTruthy();
+    expect(en.artifact.htmlApprovalRequired).toBeTruthy();
   });
 });

@@ -27,6 +27,7 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('<artifact>');
     expect(skillContent).toContain('HTML 产物');
     expect(skillContent).toContain('完整自包含');
+    expect(skillContent).toContain('htmlAudit');
     expect(skillContent).not.toContain(OPENCLAW_REPOSITORY_CONTEXT_START);
     expect(skillContent).not.toContain(OPENCLAW_REPOSITORY_CONTEXT_END);
   });

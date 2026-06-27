@@ -25,6 +25,14 @@ HTML 产物要求：
 - 默认不依赖外部 CDN。
 - 需要本地能力、网络、文件读写或命令执行时，必须走 Desktop Bridge 和审批。
 
+Desktop 保存或追加 HTML 产物时会记录 `htmlAudit`：
+
+- `selfContained` 标记是否发现外部脚本、样式、图片、媒体、iframe、CSS 外部资源或直接网络请求。
+- `requiresApproval` 标记是否发现网络、本地文件、命令执行、导出、通知等 Desktop Bridge 能力。
+- `issues` 记录可展示给用户和 Agent 阅读的检查项。
+
+`htmlAudit` 是审计事实，不会替代人工判断；有价值的 HTML 仍可以保存，但非自包含或需审批的风险会在 Desktop UI 和 Repository output markdown 中暴露。
+
 ## Artifact block
 
 当 Gateway Agent 在聊天或 ActionRun 中生成富交互产物时，应使用 `<artifact>` 块：
@@ -48,4 +56,3 @@ HTML 产物要求：
 ## Repository outputs
 
 仓库绑定就绪时，Desktop 可以把产物镜像到 `outputs/`。Markdown 元数据适合审计和 Agent 阅读；HTML 文件适合用户预览和交付。
-

@@ -21,6 +21,38 @@ export interface ArtifactSource {
   name?: string;
 }
 
+export type ArtifactHtmlAuditSeverity = 'warning' | 'danger';
+
+export type ArtifactHtmlAuditIssueCode =
+  | 'external-script'
+  | 'external-stylesheet'
+  | 'external-image'
+  | 'external-media'
+  | 'external-frame'
+  | 'external-css-import'
+  | 'external-css-url'
+  | 'direct-network'
+  | 'bridge-network-fetch'
+  | 'bridge-file-read'
+  | 'bridge-file-write'
+  | 'bridge-shell-exec'
+  | 'bridge-export'
+  | 'bridge-notification';
+
+export interface ArtifactHtmlAuditIssue {
+  code: ArtifactHtmlAuditIssueCode;
+  severity: ArtifactHtmlAuditSeverity;
+  message: string;
+  detail?: string;
+}
+
+export interface ArtifactHtmlAudit {
+  selfContained: boolean;
+  requiresApproval: boolean;
+  issues: ArtifactHtmlAuditIssue[];
+  checkedAt: number;
+}
+
 export interface ArtifactMeta {
   id: string;
   title: string;
@@ -44,6 +76,7 @@ export interface ArtifactMeta {
   mimeType?: string;
   repositoryOutputPath?: string;
   repositoryPreviewPath?: string;
+  htmlAudit?: ArtifactHtmlAudit;
 }
 
 export interface VersionEntry {

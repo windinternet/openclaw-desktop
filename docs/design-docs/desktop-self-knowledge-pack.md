@@ -96,6 +96,7 @@ Skill 应包含：
 - 如何输出 `ai-action` 结构化块。
 - 如何输出 `<artifact>` 结构化块。
 - HTML 产物必须自包含、可视化、可交互，不依赖外部 CDN。
+- Desktop 会为保存后的 HTML 产物记录 `htmlAudit`，暴露非自包含资源和需审批能力。
 
 Skill 不应包含：
 
@@ -136,7 +137,7 @@ Skill 不应包含：
 | 用户意图 | Desktop Pack 应指导 Gateway 做什么 |
 |---|---|
 | “帮我整理这份资料到知识库” | 先确认是否有 Repository Context；读取 sources/wiki 规则；通过 Desktop repository tools 追加资料或发起 Knowledge ActionRun |
-| “生成一个可交互报告” | 使用 Artifact 协议生成 HTML 产物；保持自包含；必要时请求写入 outputs 审批 |
+| “生成一个可交互报告” | 使用 Artifact 协议生成 HTML 产物；保持自包含；必要时请求写入 outputs 审批；保存后可查看 `htmlAudit` |
 | “检查我的工作系统状态” | 读取 Workbench / Knowledge / ActionRun / Artifacts 摘要，不把 Gateway 健康状态当成唯一答案 |
 | “继续上次那件事” | 优先查 Workbench 当前事项、active plans 和 recent ActionRuns，再决定是否进入普通聊天或 ActionRun |
 | “帮我改仓库文件” | 先读 Repository Context 和仓库 `AGENTS.md`；列出计划和风险；写入前请求审批 |

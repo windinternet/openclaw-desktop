@@ -73,4 +73,38 @@ describe('artifact metadata', () => {
     expect(markdown).toContain('sourceId: run_1');
     expect(markdown).toContain('sourceName: Knowledge digest');
   });
+
+  it('serializes HTML audit summary into repository output markdown', () => {
+    const markdown = buildOutputMarkdown(
+      {
+        id: 'art_1',
+        title: '交互报告',
+        icon: '📊',
+        type: 'report',
+        source: { type: 'action_run', id: 'run_1' },
+        tags: [],
+        currentVersion: 1,
+        status: 'draft',
+        createdAt: 1,
+        updatedAt: 1,
+        htmlAudit: {
+          selfContained: false,
+          requiresApproval: true,
+          checkedAt: 1,
+          issues: [
+            {
+              code: 'bridge-shell-exec',
+              severity: 'danger',
+              message: '使用命令执行能力',
+            },
+          ],
+        },
+      },
+      'outputs/html/art_1.html',
+    );
+
+    expect(markdown).toContain('htmlSelfContained: false');
+    expect(markdown).toContain('htmlRequiresApproval: true');
+    expect(markdown).toContain('htmlIssueCount: 1');
+  });
 });

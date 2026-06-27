@@ -17,11 +17,13 @@
 - Artifacts 页面和详情页会展示仓库输出状态与路径。
 - AI 魔法创建保存产物时会以 `action_run` 作为来源，并把产物 ID 回写到对应 ActionRun。
 - ActionRun 仓库摘要会列出本次运行生成的产物 ID。
+- HTML 产物生成和追加时会记录 `htmlAudit`，标记自包含状态、审批需求和检查项。
+- Repository output markdown 会沉淀 HTML 审计摘要，Artifacts UI 会显示非自包含和需审批提示。
 
 仍需继续收口：
 
 - 继续扩展非 AI 魔法创建入口的 ActionRun 产物自动关联，并在 ActionRun 摘要中补充仓库输出路径。
-- 为 HTML 产物补更严格的安全/自包含检查。
+- 继续补齐 HTML 产物运行时审批闭环，让 `htmlAudit` 与实际 Desktop Bridge 授权记录互相印证。
 - 补 Office 文件型产物的导入、预览和来源记录。
 - 把可复用资产、模板、工具、脚本提升为一等管理对象。
 
@@ -85,6 +87,7 @@ HTML 产物约束：
 - 内联 CSS 和必要的 JS。
 - 默认不依赖外部 CDN。
 - 需要本地能力、网络、文件读写或命令执行时必须走 Desktop Bridge 和审批。
+- Desktop 会记录 `htmlAudit`，用于标记非自包含资源和需要审批的运行能力。
 - 可以镜像到 Repository `outputs/html/`。
 
 ## 4. 与 Repository outputs 的关系
