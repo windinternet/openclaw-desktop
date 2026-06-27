@@ -18,6 +18,7 @@
 - AI 魔法创建保存产物时会以 `action_run` 作为来源，并把产物 ID 回写到对应 ActionRun。
 - ActionRun 仓库摘要会尽量解析本次运行生成的 Artifact meta，列出产物标题、类型、Artifact 引用和 Repository output / preview 路径；读取不到 meta 时退回产物 ID。
 - 终态 ActionRun 的 `lastAssistantResponse` 如果包含 `<artifact>` block，Desktop 会自动保存为 `source: action_run` 的 Artifact，并把 Artifact id 回写到 ActionRun。
+- 普通聊天中已完成的 assistant 消息如果包含一个或多个 `<artifact>` block，Desktop 会逐个解析并保存为 `source: chat` 的 Artifact；仓库绑定就绪时同样走 Repository `outputs/` 镜像并回写 output / preview 路径。
 - Artifact meta 已支持 `versions` 版本历史；生成产物会记录 v1，HTML 追加会记录新版本，旧数据会按 `currentVersion` 生成兼容历史用于展示和输出。
 - HTML 产物生成和追加时会记录 `htmlAudit`，标记自包含状态、审批需求和检查项。
 - HTML 产物运行时授权决策会回写到 Artifact meta 的 `authEvents`，记录能力、目标、授权结果、授权级别和请求/决策时间。
@@ -209,6 +210,7 @@ Artifact 应记录：
 7. 可复用资产、模板、工具、脚本和工作流能通过 `reuseKind` 被保存、镜像、描述、引用和分类展示。
 8. Artifact 复用事实能通过 `reuseEvents` 被记录、描述、在详情页展示，并进入 Repository output markdown。
 9. Artifact 版本历史能在创建和追加时记录，并在详情页、Desktop node 描述和 Repository output markdown 中可见。
+10. 普通聊天里一个或多个 `<artifact>` block 都能进入 Artifact storage，并在仓库就绪时镜像到 Repository outputs。
 
 ## 8. 非目标
 

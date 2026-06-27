@@ -25,6 +25,8 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('Repository Context 和仓库 `AGENTS.md`');
     expect(skillContent).toContain('ActionRun 是 OpenClaw Desktop 在普通聊天之外调用大模型的通用操作单元');
     expect(skillContent).toContain('completed ActionRun response contains `<artifact>` blocks');
+    expect(skillContent).toContain('Ordinary completed chat assistant messages with `<artifact>` blocks');
+    expect(skillContent).toContain('Desktop saves every parsed Artifact');
     expect(skillContent).toContain('Repository output / preview paths');
     expect(skillContent).toContain('<artifact>');
     expect(skillContent).toContain('HTML 产物');

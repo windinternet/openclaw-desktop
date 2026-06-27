@@ -75,7 +75,7 @@ HTML 产物可以通过 `artifactBridge.exportAs(typeOrOptions, content, fileNam
 </artifact>
 ```
 
-聊天和 ActionRun 都可以携带 `<artifact>` 块。终态 ActionRun 的 `lastAssistantResponse` 如果包含这些块，Desktop 会自动保存为 `source: action_run` 的 Artifact，并把 Artifact id 回写到对应 ActionRun。
+聊天和 ActionRun 都可以携带 `<artifact>` 块。普通聊天中已完成的 assistant 消息如果包含一个或多个 `<artifact>` 块，Desktop 会逐个解析并保存为 `source: chat` 的 Artifact；仓库绑定就绪时会走同一条 Repository `outputs/` 镜像路径并回写 output / preview 路径。终态 ActionRun 的 `lastAssistantResponse` 如果包含这些块，Desktop 会自动保存为 `source: action_run` 的 Artifact，并把 Artifact id 回写到对应 ActionRun。
 
 文件、链接、应用和媒体等非 HTML 产物也可以使用 `<artifact>` 块。文件型产物可在 JSON header 中提供 `filePath`、`fileName`、`fileSize`、`mimeType`、`externalFormat`、`contentSummary`、`reuseKind` 和 `importFile`。当 `importFile: true` 时，Desktop 会把本地文件复制进 Artifact storage，并通过 `originalFilePath` 保留来源路径。
 
@@ -83,4 +83,4 @@ HTML 产物可以通过 `artifactBridge.exportAs(typeOrOptions, content, fileNam
 
 仓库绑定就绪时，Desktop 可以把产物镜像到 `outputs/`。Markdown 元数据适合审计和 Agent 阅读；HTML 文件适合用户预览和交付。
 
-如果产物来自 ActionRun，ActionRun 的仓库摘要会尽量反向列出这些产物的标题、类型、Artifact 引用、Repository output 路径和 HTML preview 路径，让“非聊天式 AI 操作 -> 结果 -> 产物 -> 仓库沉淀”形成可追踪链路。文件型产物会镜像为 `outputs/files/<artifactId>.md`，其中包含来源、格式、摘要、版本历史摘要、可复用资产分类、复用记录摘要和文件路径审计信息。
+普通聊天和 ActionRun 自动保存的产物都会优先进入 Artifact storage；仓库绑定就绪时，Desktop 会把它们镜像为 Repository outputs。若产物来自 ActionRun，ActionRun 的仓库摘要会尽量反向列出这些产物的标题、类型、Artifact 引用、Repository output 路径和 HTML preview 路径，让“非聊天式 AI 操作 -> 结果 -> 产物 -> 仓库沉淀”形成可追踪链路。文件型产物会镜像为 `outputs/files/<artifactId>.md`，其中包含来源、格式、摘要、版本历史摘要、可复用资产分类、复用记录摘要和文件路径审计信息。

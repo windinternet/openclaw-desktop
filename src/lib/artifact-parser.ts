@@ -5,7 +5,7 @@ import type {
   ArtifactReuseKind,
   ArtifactSource,
 } from './artifact-types';
-import { artifactService, getDefaultIcon } from './artifact-service';
+import { artifactService, getDefaultIcon, type GenerateParams } from './artifact-service';
 
 export interface ParsedArtifact {
   title: string;
@@ -84,7 +84,18 @@ export async function saveArtifactFromChat(
   sourceId?: string,
   sourceName?: string,
 ): Promise<ArtifactMeta> {
-  return artifactService.generate({
+  return artifactService.generate(
+    buildArtifactGenerateParamsFromParsedArtifact(parsed, sourceType, sourceId, sourceName),
+  );
+}
+
+export function buildArtifactGenerateParamsFromParsedArtifact(
+  parsed: ParsedArtifact,
+  sourceType: ArtifactSource['type'] = 'chat',
+  sourceId?: string,
+  sourceName?: string,
+): GenerateParams {
+  return {
     title: parsed.title,
     type: parsed.type,
     icon: parsed.icon,
@@ -102,7 +113,7 @@ export async function saveArtifactFromChat(
     reuseKind: parsed.reuseKind,
     importFile: parsed.importFile,
     source: { type: sourceType, id: sourceId, name: sourceName },
-  });
+  };
 }
 
 function isValidArtifactType(type: unknown): type is ArtifactType {

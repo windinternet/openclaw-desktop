@@ -63,6 +63,8 @@ export function buildDesktopSelfKnowledgeSkillContent(): string {
     '',
     'Artifact forms include reports, dashboards, analyses, checklists, code, documents, slides, forms, links, apps, files, audio, images, videos, Word, Excel, PPT, HTML, tools, scripts, templates, and workflows.',
     '',
+    'Ordinary completed chat assistant messages with `<artifact>` blocks are scanned by Desktop. Desktop saves every parsed Artifact as `source: chat`, and when the current repository binding is ready it mirrors the Artifact markdown and HTML preview into Repository `outputs/`.',
+    '',
     'File-like Artifacts may carry `filePath` or `url`. Local file Artifacts can be imported into Artifact storage; imported copies keep `originalFilePath` for traceability and open through the system file handler. URL-backed media or file Artifacts open through the external URL handler. Word, Excel, PPT, PDF, links, apps, and other external results should carry `externalFormat` and `contentSummary` so they remain searchable, reusable, and understandable even before native in-app preview exists.',
     '',
     'Artifacts keep version history. New Artifacts start as v1, HTML appends create new versions, and `desktop.artifacts.describe` plus Repository output markdown expose the version count and latest version metadata. This is audit history, not a full diff or restore system.',

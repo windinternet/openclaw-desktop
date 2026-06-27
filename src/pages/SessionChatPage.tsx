@@ -29,7 +29,7 @@ import type {
 } from '@douyinfe/semi-ui/lib/es/aiChatDialogue/interface';
 import { useStore } from '../lib';
 import ChatComposerFrame from '../components/ChatComposerFrame';
-import { saveArtifactFromChat } from '../lib/artifact-parser';
+import { buildArtifactGenerateParamsFromParsedArtifact } from '../lib/artifact-parser';
 import { collectChatArtifactCandidates, filterArtifactsForSessionKeys } from '../lib/session-artifacts';
 import { stripGeneratedSessionLabelSuffix } from '../lib/session-label';
 import type { ArtifactMeta } from '../lib/artifact-types';
@@ -960,6 +960,7 @@ export default function SessionChatPage() {
   const sessions = useStore((s) => s.sessions);
   const artifacts = useStore((s) => s.artifacts);
   const fetchArtifacts = useStore((s) => s.fetchArtifacts);
+  const generateArtifact = useStore((s) => s.generateArtifact);
   const openArtifactWindow = useStore((s) => s.openArtifactWindow);
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const currentInstance = useStore((s) => s.instances.find((instance) => instance.id === s.currentInstanceId) ?? null);
@@ -1265,13 +1266,18 @@ export default function SessionChatPage() {
       if (savedArtifactKeysRef.current.has(candidate.key)) continue;
 
       savedArtifactKeysRef.current.add(candidate.key);
-      void saveArtifactFromChat(candidate.parsed, 'chat', candidate.sourceSessionKey, candidate.sourceMessageId)
-        .then(() => fetchArtifacts())
-        .catch(() => {
-          savedArtifactKeysRef.current.delete(candidate.key);
-        });
+      void generateArtifact(
+        buildArtifactGenerateParamsFromParsedArtifact(
+          candidate.parsed,
+          'chat',
+          candidate.sourceSessionKey,
+          candidate.sourceMessageId,
+        ),
+      ).catch(() => {
+        savedArtifactKeysRef.current.delete(candidate.key);
+      });
     }
-  }, [artifacts, chats, fetchArtifacts]);
+  }, [artifacts, chats, generateArtifact]);
 
   /* ── 加载历史消息 ── */
   useEffect(() => {

@@ -1,8 +1,8 @@
 import type { ArtifactMeta } from './artifact-types';
-import { parseArtifactFromText } from './artifact-parser';
+import { parseArtifactsFromText, type ParsedArtifact } from './artifact-parser';
 import { extractSessionMessageText } from './session-content';
 
-export type ParsedChatArtifact = NonNullable<ReturnType<typeof parseArtifactFromText>>;
+export type ParsedChatArtifact = ParsedArtifact;
 
 export interface ChatArtifactCandidate {
   key: string;
@@ -37,16 +37,15 @@ export function collectChatArtifactCandidates(chats: ChatArtifactCandidateSource
     const text = extractSessionMessageText(chat.content);
     if (!text || text === '[object Object]') continue;
 
-    const parsed = parseArtifactFromText(text);
-    if (!parsed) continue;
-
     const sourceMessageId = chat.runId || chat.id;
-    candidates.push({
-      key: `${chat.sourceSessionKey}:${sourceMessageId}:${parsed.title}`,
-      sourceSessionKey: chat.sourceSessionKey,
-      sourceMessageId,
-      parsed,
-    });
+    for (const parsed of parseArtifactsFromText(text)) {
+      candidates.push({
+        key: `${chat.sourceSessionKey}:${sourceMessageId}:${parsed.title}`,
+        sourceSessionKey: chat.sourceSessionKey,
+        sourceMessageId,
+        parsed,
+      });
+    }
   }
 
   return candidates;
