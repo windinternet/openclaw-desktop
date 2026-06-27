@@ -351,6 +351,125 @@ describe('AI ActionRun repository summaries', () => {
     );
   });
 
+  it('imports and mirrors file artifact blocks from completed ActionRun responses', async () => {
+    const savedMetas = new Map<string, ArtifactMeta>();
+    const writeText = vi.fn();
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'outputs/index.md') return '# Outputs\n';
+      if (relativePath === 'runs/action-runs/index.md') return '# Action Runs\n';
+      return '';
+    });
+    const saveInstanceData = vi.fn();
+    const loadInstanceData = vi.fn(async (_instanceId: string, key: string) => {
+      if (key === AI_ACTION_RUNS_STORAGE_KEY) return [];
+      if (key === AGENTIC_REPOSITORY_STORAGE_KEY) {
+        return {
+          id: 'repo_instance-1',
+          name: 'Repo',
+          location: 'desktop-local',
+          repoPath: '/repo',
+          gatewayInstanceId: 'instance-1',
+          status: 'repo_ready',
+          paths: {
+            sources: 'sources',
+            wiki: 'wiki',
+            work: 'work',
+            plans: 'plans',
+            runs: 'runs',
+            outputs: 'outputs',
+            reviews: 'reviews',
+            schemas: 'schemas',
+          },
+        };
+      }
+      return null;
+    });
+    const importFile = vi.fn(async () => ({
+      filePath: '/artifact-storage/art_file/files/roadmap.pptx',
+      fileName: 'roadmap.pptx',
+      fileSize: 4096,
+      mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    }));
+    const saveMeta = vi.fn(async (artifactId: string, meta: ArtifactMeta) => {
+      savedMetas.set(artifactId, meta);
+    });
+    const listArtifacts = vi.fn(async () => Array.from(savedMetas.values()));
+    vi.stubGlobal('window', {
+      electronAPI: {
+        artifact: {
+          list: listArtifacts,
+          getMeta: vi.fn(async (artifactId: string) => savedMetas.get(artifactId) ?? null),
+          saveMeta,
+          saveHtml: vi.fn(),
+          importFile,
+          updateIndex: vi.fn(async (entries: ArtifactMeta[]) => {
+            savedMetas.clear();
+            for (const entry of entries) savedMetas.set(entry.id, entry);
+          }),
+        },
+        storage: {
+          loadInstanceData,
+          saveInstanceData,
+        },
+        repository: {
+          readText,
+          writeText,
+        },
+      },
+    });
+
+    await upsertAiActionRun(
+      'instance-1',
+      createRun({
+        id: 'action-file',
+        type: 'weekly_review',
+        sourcePage: 'action-center',
+        status: 'done',
+        input: '生成路线图 PPT',
+        resultSummary: '路线图 PPT 已生成',
+        lastAssistantResponse: [
+          '<artifact>',
+          JSON.stringify({
+            title: '路线图 PPT',
+            type: 'file',
+            filePath: '/Users/deepin/Documents/roadmap.pptx',
+            fileName: 'roadmap.pptx',
+            mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            importFile: true,
+          }),
+          '</artifact>',
+        ].join('\n'),
+      }),
+    );
+
+    const savedArtifact = Array.from(savedMetas.values()).find((artifact) => artifact.title === '路线图 PPT');
+    expect(savedArtifact).toEqual(
+      expect.objectContaining({
+        type: 'file',
+        source: { type: 'action_run', id: 'action-file', name: 'weekly_review' },
+        filePath: '/artifact-storage/art_file/files/roadmap.pptx',
+        originalFilePath: '/Users/deepin/Documents/roadmap.pptx',
+        externalFormat: 'powerpoint',
+        contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+      }),
+    );
+    expect(importFile).toHaveBeenCalledWith(
+      savedArtifact?.id,
+      '/Users/deepin/Documents/roadmap.pptx',
+      'roadmap.pptx',
+    );
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      `outputs/files/${savedArtifact?.id}.md`,
+      expect.stringContaining('contentSummary: PowerPoint · roadmap.pptx · 4 KB'),
+    );
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'runs/action-runs/action-file.md',
+      expect.stringContaining(`[路线图 PPT](outputs/files/${savedArtifact?.id}.md)`),
+    );
+  });
+
   it('reuses existing ActionRun artifacts instead of saving duplicate artifact blocks', async () => {
     const saveInstanceData = vi.fn();
     const loadInstanceData = vi.fn(async (_instanceId: string, key: string) => {

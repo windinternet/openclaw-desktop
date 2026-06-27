@@ -27,10 +27,12 @@
 - 文件、图片、音频、视频等非 HTML 产物可记录 `filePath` 或 `url`，打开时交给系统文件处理器或外部 URL 处理器。
 - 手动创建文件型产物时，填写本地 `filePath` 会复制一份到 Artifact storage，并记录 `originalFilePath`。
 - 非 HTML 产物会记录 `externalFormat` 和 `contentSummary`，用于把 Word、Excel、PPT、PDF、链接、应用入口和媒体文件从“路径”提升为可搜索、可复用、可沉淀的价值对象。
+- ActionRun 生成文件型 `<artifact>` block 时，可以通过 `filePath / fileName / mimeType / fileSize / externalFormat / contentSummary / importFile` 传递非 HTML 产物元数据；`importFile: true` 会把本地文件复制到 Artifact storage。
+- ActionRun 自动保存的新产物会在仓库绑定就绪时尝试镜像到 Repository `outputs/`；文件型产物的 markdown 记录写入 `outputs/files/`，并回写 `repositoryOutputPath` 供 ActionRun 摘要引用。
 
 仍需继续收口：
 
-- 继续补齐非 HTML ActionRun 产物的文件导入、预览摘要和后续复用动作。
+- 继续补齐非 HTML ActionRun 产物的 Office 原生预览、缩略图和后续复用动作。
 - 继续扩展 HTML 产物 Desktop Bridge 的网络请求、导出和命令执行策略；这些能力仍不能静默执行，必须继续走审批与记录。
 - 补 Office 文件型产物的缩略图/摘要预览和更细的来源记录。
 - 把可复用资产、模板、工具、脚本提升为一等管理对象。

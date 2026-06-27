@@ -1,4 +1,4 @@
-import type { ArtifactType, ArtifactMeta, ArtifactSource } from './artifact-types';
+import type { ArtifactExternalFormat, ArtifactType, ArtifactMeta, ArtifactSource } from './artifact-types';
 import { artifactService, getDefaultIcon } from './artifact-service';
 
 export interface ParsedArtifact {
@@ -12,7 +12,11 @@ export interface ParsedArtifact {
   command?: string;
   filePath?: string;
   fileName?: string;
+  fileSize?: number;
   mimeType?: string;
+  externalFormat?: ArtifactExternalFormat;
+  contentSummary?: string;
+  importFile?: boolean;
 }
 
 export function parseArtifactFromText(text: string): ParsedArtifact | null {
@@ -55,7 +59,11 @@ function parseArtifactBlock(headerText: string, bodyText: string): ParsedArtifac
       command: header.command ? String(header.command) : undefined,
       filePath: header.filePath ? String(header.filePath) : undefined,
       fileName: header.fileName ? String(header.fileName) : undefined,
+      fileSize: numberValue(header.fileSize),
       mimeType: header.mimeType ? String(header.mimeType) : undefined,
+      externalFormat: isValidExternalFormat(header.externalFormat) ? header.externalFormat : undefined,
+      contentSummary: header.contentSummary ? String(header.contentSummary) : undefined,
+      importFile: header.importFile === true,
     };
   } catch {
     return null;
@@ -79,7 +87,11 @@ export async function saveArtifactFromChat(
     command: parsed.command,
     filePath: parsed.filePath,
     fileName: parsed.fileName,
+    fileSize: parsed.fileSize,
     mimeType: parsed.mimeType,
+    externalFormat: parsed.externalFormat,
+    contentSummary: parsed.contentSummary,
+    importFile: parsed.importFile,
     source: { type: sourceType, id: sourceId, name: sourceName },
   });
 }
@@ -103,4 +115,30 @@ function isValidArtifactType(type: unknown): type is ArtifactType {
     'video',
   ];
   return typeof type === 'string' && validTypes.includes(type);
+}
+
+function isValidExternalFormat(format: unknown): format is ArtifactExternalFormat {
+  const validFormats = [
+    'html',
+    'link',
+    'app',
+    'word',
+    'excel',
+    'powerpoint',
+    'pdf',
+    'image',
+    'audio',
+    'video',
+    'text',
+    'code',
+    'file',
+    'unknown',
+  ];
+  return typeof format === 'string' && validFormats.includes(format);
+}
+
+function numberValue(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric : undefined;
 }

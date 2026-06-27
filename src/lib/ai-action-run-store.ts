@@ -16,6 +16,10 @@ import { fetchGatewayAgents } from './gateway-agents';
 import { loadRepositoryBinding } from './agentic-repository-store';
 import { artifactPersistence } from './artifact-persistence';
 import { parseArtifactsFromText, saveArtifactFromChat } from './artifact-parser';
+import {
+  buildArtifactRepositoryOutputUpdates,
+  mirrorArtifactToReadyRepositoryOutput,
+} from './repository-outputs';
 import { loadInstanceData, saveInstanceDataAwaited } from './local-persistence';
 import type { ArtifactMeta } from './artifact-types';
 import type { AgentTeamProfile, AiActionRun, AiActionRunStatus } from './types';
@@ -34,7 +38,7 @@ export async function saveAiActionRuns(instanceId: string, runs: AiActionRun[]):
 }
 
 export async function upsertAiActionRun(instanceId: string, run: AiActionRun): Promise<AiActionRun[]> {
-  const runWithArtifacts = await saveArtifactsFromTerminalAiActionRun(run);
+  const runWithArtifacts = await saveArtifactsFromTerminalAiActionRun(instanceId, run);
   const runs = await loadAiActionRuns(instanceId);
   const exists = runs.some((item) => item.id === runWithArtifacts.id);
   const nextRuns = exists
@@ -138,7 +142,7 @@ async function loadRunArtifacts(artifactIds: string[] | undefined): Promise<Arti
   return artifacts.filter((artifact): artifact is ArtifactMeta => artifact !== null);
 }
 
-async function saveArtifactsFromTerminalAiActionRun(run: AiActionRun): Promise<AiActionRun> {
+async function saveArtifactsFromTerminalAiActionRun(instanceId: string, run: AiActionRun): Promise<AiActionRun> {
   if (run.status !== 'done' || !run.lastAssistantResponse) return run;
 
   const parsedArtifacts = parseArtifactsFromText(run.lastAssistantResponse);
@@ -156,7 +160,8 @@ async function saveArtifactsFromTerminalAiActionRun(run: AiActionRun): Promise<A
         continue;
       }
 
-      const artifact = await saveArtifactFromChat(parsed, 'action_run', run.id, run.type);
+      const savedArtifact = await saveArtifactFromChat(parsed, 'action_run', run.id, run.type);
+      const artifact = await mirrorActionRunArtifactToRepository(instanceId, savedArtifact, parsed.html || undefined);
       existingArtifactIds.add(artifact.id);
       existingByTitle.set(artifact.title, artifact);
     }
@@ -171,6 +176,38 @@ async function saveArtifactsFromTerminalAiActionRun(run: AiActionRun): Promise<A
   } catch {
     return run;
   }
+}
+
+async function mirrorActionRunArtifactToRepository(
+  instanceId: string,
+  artifact: ArtifactMeta,
+  html?: string,
+): Promise<ArtifactMeta> {
+  if (artifact.repositoryOutputPath) return artifact;
+
+  try {
+    const output = await mirrorArtifactToReadyRepositoryOutput(instanceId, artifact, html);
+    if (!output) return artifact;
+
+    const updatedArtifact = {
+      ...artifact,
+      ...buildArtifactRepositoryOutputUpdates(output),
+      updatedAt: Date.now(),
+    };
+    await artifactPersistence.saveMeta(updatedArtifact.id, updatedArtifact);
+    await updateArtifactIndexEntry(updatedArtifact);
+    return updatedArtifact;
+  } catch {
+    return artifact;
+  }
+}
+
+async function updateArtifactIndexEntry(artifact: ArtifactMeta): Promise<void> {
+  const index = await artifactPersistence.list();
+  const nextIndex = index.some((entry) => entry.id === artifact.id)
+    ? index.map((entry) => (entry.id === artifact.id ? artifact : entry))
+    : [...index, artifact];
+  await artifactPersistence.updateIndex(nextIndex);
 }
 
 async function listExistingActionRunArtifacts(actionRunId: string): Promise<ArtifactMeta[]> {

@@ -18,4 +18,36 @@ describe('artifact parser', () => {
     expect(parsed.map((artifact) => artifact.title)).toEqual(['周报', '执行清单']);
     expect(parsed[1].tags).toEqual(['todo']);
   });
+
+  it('preserves non-HTML artifact metadata from artifact block headers', () => {
+    const parsed = parseArtifactsFromText([
+      '<artifact>',
+      JSON.stringify({
+        title: '路线图 PPT',
+        type: 'file',
+        filePath: '/Users/deepin/Documents/roadmap.pptx',
+        fileName: 'roadmap.pptx',
+        fileSize: 4096,
+        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        externalFormat: 'powerpoint',
+        contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+        importFile: true,
+      }),
+      '</artifact>',
+    ].join('\n'));
+
+    expect(parsed[0]).toEqual(
+      expect.objectContaining({
+        title: '路线图 PPT',
+        type: 'file',
+        filePath: '/Users/deepin/Documents/roadmap.pptx',
+        fileName: 'roadmap.pptx',
+        fileSize: 4096,
+        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        externalFormat: 'powerpoint',
+        contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+        importFile: true,
+      }),
+    );
+  });
 });

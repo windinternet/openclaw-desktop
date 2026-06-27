@@ -19,12 +19,19 @@ export type ArtifactRepositoryOutputUpdates = Pick<ArtifactMeta, 'repositoryOutp
 const TYPE_DIR: Record<string, string> = {
   report: 'reports',
   dashboard: 'dashboards',
+  analysis: 'analyses',
+  checklist: 'checklists',
+  code: 'code',
   document: 'documents',
   slide: 'slides',
+  form: 'forms',
+  other: 'other',
+  file: 'files',
   image: 'media',
   video: 'media',
   audio: 'media',
   link: 'links',
+  app: 'apps',
 };
 
 export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string): string {

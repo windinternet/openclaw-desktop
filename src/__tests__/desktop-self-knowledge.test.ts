@@ -33,6 +33,8 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('runtime authorization records');
     expect(skillContent).toContain('runtime bridge call records');
     expect(skillContent).toContain('filePath');
+    expect(skillContent).toContain('importFile');
+    expect(skillContent).toContain('outputs/files/');
     expect(skillContent).toContain('system file handler');
     expect(skillContent).toContain('imported into Artifact storage');
     expect(skillContent).toContain('contentSummary');

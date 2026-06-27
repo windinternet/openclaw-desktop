@@ -87,6 +87,38 @@ describe('repository outputs', () => {
     );
   });
 
+  it('writes file artifacts into the repository files output bucket', async () => {
+    const writeText = vi.fn();
+    const readText = vi.fn(async () => '# Outputs\n');
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: {
+          writeText,
+          readText,
+        },
+      },
+    });
+
+    const result = await createRepositoryOutput({
+      binding: createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      artifact: createArtifact({
+        id: 'art_file',
+        title: '路线图 PPT',
+        type: 'file',
+        externalFormat: 'powerpoint',
+        contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+      }),
+    });
+
+    expect(result.outputPath).toBe('outputs/files/art_file.md');
+    expect(result.previewPath).toBeUndefined();
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'outputs/files/art_file.md',
+      expect.stringContaining('contentSummary: PowerPoint · roadmap.pptx · 4 KB'),
+    );
+  });
+
   it('mirrors artifacts through the current ready repository binding', async () => {
     const writeText = vi.fn();
     const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
@@ -162,7 +194,7 @@ describe('repository outputs', () => {
   });
 });
 
-function createArtifact(): ArtifactMeta {
+function createArtifact(overrides: Partial<ArtifactMeta> = {}): ArtifactMeta {
   return {
     id: 'art_1',
     title: 'Quarterly Report',
@@ -174,5 +206,6 @@ function createArtifact(): ArtifactMeta {
     status: 'draft',
     createdAt: 1,
     updatedAt: 2,
+    ...overrides,
   };
 }
