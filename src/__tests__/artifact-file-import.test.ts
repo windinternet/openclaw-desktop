@@ -5,6 +5,7 @@ import { artifactPersistence } from '../lib/artifact-persistence';
 vi.mock('../lib/artifact-persistence', () => ({
   artifactPersistence: {
     importFile: vi.fn(),
+    readImportedText: vi.fn(),
     saveMeta: vi.fn(),
     saveHtml: vi.fn(),
     list: vi.fn(),
@@ -20,6 +21,11 @@ describe('artifact file import', () => {
     mockedPersistence.list.mockResolvedValue([]);
     mockedPersistence.updateIndex.mockResolvedValue(undefined);
     mockedPersistence.saveMeta.mockResolvedValue(undefined);
+    mockedPersistence.readImportedText.mockResolvedValue({
+      text: '# 推进计划\n\nShip the content extraction slice.',
+      bytesRead: 58,
+      truncated: false,
+    });
     mockedPersistence.importFile.mockResolvedValue({
       filePath: '/user-data/storage/artifacts/art_1/files/roadmap.pptx',
       fileName: 'roadmap.pptx',
@@ -43,6 +49,7 @@ describe('artifact file import', () => {
       '/Users/deepin/Documents/roadmap.pptx',
       'roadmap.pptx',
     );
+    expect(mockedPersistence.readImportedText).not.toHaveBeenCalled();
     expect(artifact).toEqual(
       expect.objectContaining({
         filePath: '/user-data/storage/artifacts/art_1/files/roadmap.pptx',
@@ -75,6 +82,52 @@ describe('artifact file import', () => {
           format: 'powerpoint',
           sourceKind: 'imported_file',
           previewStatus: 'external_app',
+        }),
+      }),
+    );
+  });
+
+  it('automatically extracts imported text artifact content into metadata', async () => {
+    mockedPersistence.importFile.mockResolvedValue({
+      filePath: '/user-data/storage/artifacts/art_1/files/plan.md',
+      fileName: 'plan.md',
+      fileSize: 128,
+      mimeType: 'text/markdown',
+    });
+
+    const artifact = await artifactService.generate({
+      title: '推进计划',
+      type: 'file',
+      filePath: '/Users/deepin/Documents/plan.md',
+      fileName: 'plan.md',
+      mimeType: 'text/markdown',
+      importFile: true,
+    });
+
+    expect(mockedPersistence.readImportedText).toHaveBeenCalledWith(artifact.id);
+    expect(artifact).toEqual(
+      expect.objectContaining({
+        filePath: '/user-data/storage/artifacts/art_1/files/plan.md',
+        originalFilePath: '/Users/deepin/Documents/plan.md',
+        externalFormat: 'text',
+        contentExtract: expect.objectContaining({
+          status: 'extracted',
+          format: 'text',
+          sourceKind: 'imported_file',
+          fileName: 'plan.md',
+          mimeType: 'text/markdown',
+          bytesRead: 58,
+          truncated: false,
+          snippet: '# 推进计划\n\nShip the content extraction slice.',
+        }),
+      }),
+    );
+    expect(mockedPersistence.saveMeta).toHaveBeenCalledWith(
+      artifact.id,
+      expect.objectContaining({
+        contentExtract: expect.objectContaining({
+          status: 'extracted',
+          snippet: '# 推进计划\n\nShip the content extraction slice.',
         }),
       }),
     );

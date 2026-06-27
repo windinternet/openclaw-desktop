@@ -1,6 +1,7 @@
 import type { ArtifactMeta, ArtifactType, ArtifactSource } from './artifact-types';
 import { artifactPersistence } from './artifact-persistence';
 import { auditArtifactHtml } from './artifact-html-audit';
+import { buildArtifactContentExtract, resolveArtifactContentExtractEligibility } from './artifact-content-extract';
 import { buildArtifactFileInspection, shouldInspectArtifactFile } from './artifact-file-inspection';
 import { buildArtifactValueSummary, inferArtifactExternalFormat } from './artifact-value-summary';
 import {
@@ -157,6 +158,15 @@ export const artifactService = {
     meta.versions = [createInitialArtifactVersion(meta)];
     if (shouldInspectArtifactFile(meta)) {
       meta.fileInspection = buildArtifactFileInspection(meta, now);
+    }
+    if (resolveArtifactContentExtractEligibility(meta).eligible) {
+      try {
+        await artifactPersistence.saveMeta(id, meta);
+        const contentRead = await artifactPersistence.readImportedText(id);
+        meta.contentExtract = buildArtifactContentExtract(meta, contentRead, now);
+      } catch {
+        // Artifact creation should not fail just because content extraction is unavailable.
+      }
     }
 
     await artifactPersistence.saveMeta(id, meta);

@@ -53,6 +53,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('records file inspection facts only');
     expect(skillContent).toContain('desktop.artifacts.content.extract');
     expect(skillContent).toContain('reads only imported text/code Artifact copies');
+    expect(skillContent).toContain(
+      'Newly imported text/code/HTML file Artifacts automatically record `contentExtract`',
+    );
     expect(skillContent).toContain('desktop.artifacts.describe');
     expect(skillContent).toContain('desktop.outputs.create');
     expect(skillContent).toContain('Repository `outputs/index.md`');
