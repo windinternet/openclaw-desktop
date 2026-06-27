@@ -11,4 +11,13 @@ describe('artifact runtime authorization recording', () => {
     expect(source).toContain('writeMeta(artifactId');
     expect(source).toContain('writeIndexEntry');
   });
+
+  it('records Desktop Bridge call results back into artifact metadata', () => {
+    const source = readFileSync('electron/artifact-handlers.ts', 'utf8');
+
+    expect(source).toContain('recordArtifactBridgeCallResult');
+    expect(source).toContain('status:');
+    expect(source).toContain('resultSummary');
+    expect(source).toContain('writeIndexEntry');
+  });
 });

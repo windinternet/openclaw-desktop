@@ -742,6 +742,8 @@
     "runtimeAuthGranted": "Granted",
     "runtimeAuthDenied": "Denied",
     "runtimeAuthCount": "{{count}} auth record",
+    "runtimeBridge": "Bridge calls",
+    "runtimeBridgeCount": "{{count}} bridge call",
     "importFileHint": "When a local file path is provided, a copy is imported into Artifact storage.",
     "originalFilePath": "Original path",
     "fileSize": "File size",

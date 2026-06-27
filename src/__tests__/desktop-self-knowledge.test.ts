@@ -30,6 +30,7 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('完整自包含');
     expect(skillContent).toContain('htmlAudit');
     expect(skillContent).toContain('runtime authorization records');
+    expect(skillContent).toContain('runtime bridge call records');
     expect(skillContent).toContain('filePath');
     expect(skillContent).toContain('system file handler');
     expect(skillContent).toContain('imported into Artifact storage');

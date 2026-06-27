@@ -1,11 +1,11 @@
-import { app, BrowserWindow, ipcMain, protocol, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, Notification, protocol, shell } from 'electron'
 import path from 'node:path'
 import { readFileSync, existsSync, mkdirSync, writeFileSync, copyFileSync, statSync } from 'node:fs'
 import os from 'node:os'
 import { ARTIFACT_IPC } from '../src/lib/artifact-ipc'
 import { decideArtifactOpenTarget } from '../src/lib/artifact-open-target'
-import { recordArtifactAuthDecision } from '../src/lib/artifact-runtime-auth'
-import type { ArtifactMeta } from '../src/lib/artifact-types'
+import { recordArtifactAuthDecision, recordArtifactBridgeCallResult } from '../src/lib/artifact-runtime-auth'
+import type { ArtifactBridgeCallStatus, ArtifactMeta } from '../src/lib/artifact-types'
 
 function artifactsRoot(): string {
   return path.join(app.getPath('userData'), 'storage', 'artifacts')
@@ -43,7 +43,28 @@ const CSP_HEADER = [
   "media-src 'self'",
 ].join('; ')
 
-const BRIDGE_SCRIPT = `(function(){var p={};var n=0;window.artifactBridge={getMeta:function(){return s("getMeta")},getHtml:function(v){return s("getHtml",{version:v})},fetch:function(u,i){return s("fetch",{url:u,init:i})},readFile:function(p){return s("readFile",{path:p})},writeFile:function(p,c){return s("writeFile",{path:p,content:c})},exportAs:function(t){return s("exportAs",{type:t})},notify:function(t,b){return s("notify",{title:t,body:b})},exec:function(c){return s("exec",{cmd:c})}};function s(m,a){return new Promise(function(r,e){var i=++n;p[i]={resolve:r,reject:e};window.postMessage({artifactBridge:true,id:i,method:m,params:a||{}},"*");setTimeout(function(){if(p[i]){delete p[i];e(new Error("Bridge timeout"))}},30000)})}window.addEventListener("message",function(e){if(!e.data||!e.data.artifactBridge)return;var d=p[e.data.id];if(!d)return;delete p[e.data.id];if(e.data.error)d.reject(new Error(e.data.error));else d.resolve(e.data.result)})})();`
+const BRIDGE_SCRIPT = `(function(){function s(m,a){var b=window.openclawArtifactBridge;if(!b||typeof b.invoke!=="function")return Promise.reject(new Error("Artifact bridge unavailable"));return b.invoke(m,a||{})}window.artifactBridge={getMeta:function(){return s("getMeta")},getHtml:function(v){return s("getHtml",{version:v})},fetch:function(u,i){return s("fetch",{url:u,init:i})},readFile:function(p){return s("readFile",{path:p})},writeFile:function(p,c){return s("writeFile",{path:p,content:c})},exportAs:function(t){return s("exportAs",{type:t})},notify:function(t,b){return s("notify",{title:t,body:b})},exec:function(c){return s("exec",{cmd:c})}}})();`
+
+interface ArtifactPreviewWindowContext {
+  artifactId: string
+  version: number
+}
+
+interface ArtifactBridgeCallPayload {
+  method?: unknown
+  params?: unknown
+}
+
+interface ArtifactBridgeExecution {
+  result: unknown
+  resultSummary?: string
+}
+
+class ArtifactBridgeDeniedError extends Error {}
+
+class ArtifactBridgeUnsupportedError extends Error {}
+
+const artifactPreviewWindows = new Map<number, ArtifactPreviewWindowContext>()
 
 export function registerArtifactProtocol(): void {
   protocol.handle('artifact', (request) => {
@@ -135,6 +156,230 @@ function detectMimeType(fileName: string): string | undefined {
   return known[ext]
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function requireStringParam(params: Record<string, unknown>, key: string): string {
+  const value = params[key]
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new Error(`Missing artifact bridge parameter: ${key}`)
+  }
+  return value
+}
+
+function getBridgeMainWindow(): BrowserWindow | undefined {
+  const windows = BrowserWindow.getAllWindows()
+  return windows.find((win) => !artifactPreviewWindows.has(win.webContents.id)) ?? windows[0]
+}
+
+async function requestArtifactAuthorization(
+  artifactId: string,
+  capability: string,
+  detail: string,
+): Promise<{ granted: boolean; level: string }> {
+  const requestedAt = Date.now()
+  const recordDecision = (result: { granted: boolean; level: string }) => {
+    const decidedAt = Date.now()
+    const meta = readMeta(artifactId)
+    if (meta) {
+      const updatedMeta = recordArtifactAuthDecision(meta, {
+        capability,
+        detail,
+        granted: result.granted,
+        level: result.level,
+        requestedAt,
+        decidedAt,
+      })
+      writeMeta(artifactId, updatedMeta)
+      writeIndexEntry(updatedMeta)
+    }
+    return result
+  }
+
+  const mainWindow = getBridgeMainWindow()
+  if (!mainWindow) return recordDecision({ granted: false, level: 'once' })
+
+  return new Promise<{ granted: boolean; level: string }>((resolve) => {
+    let settled = false
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    const settle = (result: { granted: boolean; level: string }) => {
+      if (settled) return
+      settled = true
+      if (timeout) clearTimeout(timeout)
+      ipcMain.removeListener(ARTIFACT_IPC.GRANT_AUTH, handler)
+      resolve(recordDecision(result))
+    }
+    const handler = (_e: unknown, result: { granted: boolean; level: string }) => {
+      settle(result)
+    }
+    ipcMain.on(ARTIFACT_IPC.GRANT_AUTH, handler)
+    mainWindow.webContents.send(ARTIFACT_IPC.REQUEST_AUTH, artifactId, capability, detail)
+    timeout = setTimeout(() => settle({ granted: false, level: 'once' }), 60000)
+  })
+}
+
+async function requireArtifactBridgeAuthorization(
+  artifactId: string,
+  capability: string,
+  detail: string,
+): Promise<void> {
+  const result = await requestArtifactAuthorization(artifactId, capability, detail)
+  if (!result.granted) {
+    throw new ArtifactBridgeDeniedError(`Artifact bridge ${capability} denied`)
+  }
+}
+
+function describeBridgeCall(method: string, params: Record<string, unknown>): string | undefined {
+  switch (method) {
+    case 'getHtml':
+      return typeof params.version === 'number' ? `version ${params.version}` : undefined
+    case 'fetch':
+      return typeof params.url === 'string' ? params.url : undefined
+    case 'readFile':
+    case 'writeFile':
+      return typeof params.path === 'string' ? params.path : undefined
+    case 'exportAs':
+      return typeof params.type === 'string' ? params.type : undefined
+    case 'notify':
+      return typeof params.title === 'string' ? params.title : undefined
+    case 'exec':
+      return typeof params.cmd === 'string' ? params.cmd : undefined
+    default:
+      return undefined
+  }
+}
+
+function bridgeStatusFromError(error: unknown): ArtifactBridgeCallStatus {
+  if (error instanceof ArtifactBridgeDeniedError) return 'denied'
+  if (error instanceof ArtifactBridgeUnsupportedError) return 'unsupported'
+  return 'failed'
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+function recordArtifactBridgeCall(
+  artifactId: string,
+  params: {
+    method: string
+    detail?: string
+    status: ArtifactBridgeCallStatus
+    resultSummary?: string
+    error?: string
+    startedAt: number
+    endedAt: number
+  },
+): void {
+  const meta = readMeta(artifactId)
+  if (!meta) return
+
+  const updatedMeta = recordArtifactBridgeCallResult(meta, params)
+  writeMeta(artifactId, updatedMeta)
+  writeIndexEntry(updatedMeta)
+}
+
+async function handleArtifactBridgeCall(
+  context: ArtifactPreviewWindowContext,
+  payload: ArtifactBridgeCallPayload,
+): Promise<unknown> {
+  if (!isRecord(payload) || typeof payload.method !== 'string') {
+    throw new Error('Invalid artifact bridge call')
+  }
+
+  const method = payload.method
+  const params = isRecord(payload.params) ? payload.params : {}
+  const detail = describeBridgeCall(method, params)
+  const startedAt = Date.now()
+
+  try {
+    const execution = await executeArtifactBridgeCall(context, method, params, detail)
+    const endedAt = Date.now()
+    recordArtifactBridgeCall(context.artifactId, {
+      method,
+      detail,
+      status: 'succeeded',
+      resultSummary: execution.resultSummary,
+      startedAt,
+      endedAt,
+    })
+    return execution.result
+  } catch (error) {
+    const endedAt = Date.now()
+    recordArtifactBridgeCall(context.artifactId, {
+      method,
+      detail,
+      status: bridgeStatusFromError(error),
+      error: errorMessage(error),
+      startedAt,
+      endedAt,
+    })
+    throw error
+  }
+}
+
+async function executeArtifactBridgeCall(
+  context: ArtifactPreviewWindowContext,
+  method: string,
+  params: Record<string, unknown>,
+  detail?: string,
+): Promise<ArtifactBridgeExecution> {
+  switch (method) {
+    case 'getMeta':
+      return { result: readMeta(context.artifactId), resultSummary: 'metadata loaded' }
+    case 'getHtml': {
+      const requestedVersion = params.version
+      const version =
+        typeof requestedVersion === 'number' && Number.isInteger(requestedVersion) ? requestedVersion : context.version
+      const fp = htmlPath(context.artifactId, version)
+      if (!existsSync(fp)) return { result: null, resultSummary: `version ${version} html missing` }
+      const html = readFileSync(fp, 'utf-8')
+      return { result: html, resultSummary: `version ${version} html ${html.length} chars` }
+    }
+    case 'readFile': {
+      const filePath = requireStringParam(params, 'path')
+      await requireArtifactBridgeAuthorization(context.artifactId, 'readFile', detail ?? filePath)
+      const content = readFileSync(filePath, 'utf-8')
+      return {
+        result: content,
+        resultSummary: `read ${Buffer.byteLength(content, 'utf-8')} bytes`,
+      }
+    }
+    case 'writeFile': {
+      const filePath = requireStringParam(params, 'path')
+      const content = String(params.content ?? '')
+      await requireArtifactBridgeAuthorization(context.artifactId, 'writeFile', detail ?? filePath)
+      writeFileSync(filePath, content, 'utf-8')
+      return {
+        result: {
+          ok: true,
+          path: filePath,
+          bytes: Buffer.byteLength(content, 'utf-8'),
+        },
+        resultSummary: `wrote ${Buffer.byteLength(content, 'utf-8')} bytes`,
+      }
+    }
+    case 'notify': {
+      const title = typeof params.title === 'string' ? params.title : 'OpenClaw Artifact'
+      const body = typeof params.body === 'string' ? params.body : ''
+      await requireArtifactBridgeAuthorization(context.artifactId, 'notify', detail ?? title)
+      const supported = Notification.isSupported()
+      if (supported) new Notification({ title, body }).show()
+      return {
+        result: { ok: true, supported },
+        resultSummary: supported ? 'notification shown' : 'notification unsupported',
+      }
+    }
+    case 'fetch':
+    case 'exportAs':
+    case 'exec':
+      throw new ArtifactBridgeUnsupportedError(`Artifact bridge method ${method} is not implemented yet`)
+    default:
+      throw new ArtifactBridgeUnsupportedError(`Unknown artifact bridge method: ${method}`)
+  }
+}
+
 export function registerArtifactIpcHandlers(): void {
   ipcMain.handle(ARTIFACT_IPC.OPEN, async (_event, artifactId: string, version: number) => {
     const meta = readMeta(artifactId)
@@ -149,9 +394,18 @@ export function registerArtifactIpcHandlers(): void {
           webPreferences: {
             contextIsolation: true,
             nodeIntegration: false,
+            preload: path.join(__dirname, 'artifact-preload.js'),
           },
         })
         if (meta?.title) win.setTitle(meta.title)
+        artifactPreviewWindows.set(win.webContents.id, { artifactId: target.artifactId, version: target.version })
+        win.on('closed', () => {
+          artifactPreviewWindows.delete(win.webContents.id)
+        })
+        win.webContents.setWindowOpenHandler(({ url }) => {
+          void shell.openExternal(url)
+          return { action: 'deny' }
+        })
         win.loadURL(`artifact://${target.artifactId}.v${target.version}`)
         return win.id
       }
@@ -231,45 +485,16 @@ export function registerArtifactIpcHandlers(): void {
   })
 
   ipcMain.handle(ARTIFACT_IPC.REQUEST_AUTH, async (_event, artifactId: string, capability: string, detail: string) => {
-    const requestedAt = Date.now()
-    const recordDecision = (result: { granted: boolean; level: string }) => {
-      const decidedAt = Date.now()
-      const meta = readMeta(artifactId)
-      if (meta) {
-        const updatedMeta = recordArtifactAuthDecision(meta, {
-          capability,
-          detail,
-          granted: result.granted,
-          level: result.level,
-          requestedAt,
-          decidedAt,
-        })
-        writeMeta(artifactId, updatedMeta)
-        writeIndexEntry(updatedMeta)
-      }
-      return result
+    return requestArtifactAuthorization(artifactId, capability, detail)
+  })
+
+  ipcMain.handle(ARTIFACT_IPC.BRIDGE_CALL, async (event, payload: ArtifactBridgeCallPayload) => {
+    const context = artifactPreviewWindows.get(event.sender.id)
+    const senderUrl = event.senderFrame?.url ?? event.sender.getURL()
+    if (!context || !senderUrl.startsWith(`artifact://${context.artifactId}.v`)) {
+      throw new Error('Artifact Bridge is only available inside Artifact preview windows')
     }
 
-    const allWindows = BrowserWindow.getAllWindows()
-    const mainWindow = allWindows[0]
-    if (!mainWindow) return recordDecision({ granted: false, level: 'once' })
-
-    return new Promise<{ granted: boolean; level: string }>((resolve) => {
-      let settled = false
-      let timeout: ReturnType<typeof setTimeout> | undefined
-      const settle = (result: { granted: boolean; level: string }) => {
-        if (settled) return
-        settled = true
-        if (timeout) clearTimeout(timeout)
-        ipcMain.removeListener(ARTIFACT_IPC.GRANT_AUTH, handler)
-        resolve(recordDecision(result))
-      }
-      const handler = (_e: unknown, result: { granted: boolean; level: string }) => {
-        settle(result)
-      }
-      ipcMain.on(ARTIFACT_IPC.GRANT_AUTH, handler)
-      mainWindow.webContents.send(ARTIFACT_IPC.REQUEST_AUTH, artifactId, capability, detail)
-      timeout = setTimeout(() => settle({ granted: false, level: 'once' }), 60000)
-    })
+    return handleArtifactBridgeCall(context, payload)
   })
 }

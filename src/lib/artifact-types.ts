@@ -65,6 +65,19 @@ export interface ArtifactRuntimeAuthEvent {
   decidedAt: number;
 }
 
+export type ArtifactBridgeCallStatus = 'succeeded' | 'denied' | 'failed' | 'unsupported';
+
+export interface ArtifactRuntimeBridgeEvent {
+  id: string;
+  method: string;
+  detail?: string;
+  status: ArtifactBridgeCallStatus;
+  resultSummary?: string;
+  error?: string;
+  startedAt: number;
+  endedAt: number;
+}
+
 export interface ArtifactMeta {
   id: string;
   title: string;
@@ -91,6 +104,7 @@ export interface ArtifactMeta {
   repositoryPreviewPath?: string;
   htmlAudit?: ArtifactHtmlAudit;
   authEvents?: ArtifactRuntimeAuthEvent[];
+  bridgeEvents?: ArtifactRuntimeBridgeEvent[];
 }
 
 export interface VersionEntry {

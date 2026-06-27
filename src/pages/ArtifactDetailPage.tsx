@@ -339,6 +339,34 @@ export default function ArtifactDetailPage() {
                   </div>
                 </div>
               )}
+              {meta.bridgeEvents && meta.bridgeEvents.length > 0 && (
+                <div>
+                  <Text type="tertiary">{t('artifact.runtimeBridge')}: </Text>
+                  <Tag
+                    size="small"
+                    color={meta.bridgeEvents[meta.bridgeEvents.length - 1].status === 'succeeded' ? 'green' : 'red'}
+                    type="light"
+                  >
+                    {meta.bridgeEvents[meta.bridgeEvents.length - 1].status}
+                  </Tag>
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <Text type="tertiary" size="small">
+                      {t('artifact.runtimeBridgeCount', { count: meta.bridgeEvents.length })}
+                    </Text>
+                    {meta.bridgeEvents
+                      .slice(-3)
+                      .reverse()
+                      .map((event) => (
+                        <Text key={event.id} size="small" type="secondary">
+                          {event.method} · {event.status}
+                          {event.detail ? ` · ${event.detail}` : ''}
+                          {event.resultSummary ? ` · ${event.resultSummary}` : ''}
+                          {event.error ? ` · ${event.error}` : ''}
+                        </Text>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </Card>

@@ -22,6 +22,8 @@ describe('artifact UI metadata', () => {
     expect(detailPage).toContain("t('artifact.fileSize')");
     expect(detailPage).toContain('authEvents');
     expect(detailPage).toContain("t('artifact.runtimeAuth')");
+    expect(detailPage).toContain('bridgeEvents');
+    expect(detailPage).toContain("t('artifact.runtimeBridge')");
     expect(zh.artifact.repositoryOutput).toBeTruthy();
     expect(zh.artifact.repositoryPreview).toBeTruthy();
     expect(zh.artifact.htmlAudit).toBeTruthy();
@@ -29,6 +31,7 @@ describe('artifact UI metadata', () => {
     expect(zh.artifact.originalFilePath).toBeTruthy();
     expect(zh.artifact.fileSize).toBeTruthy();
     expect(zh.artifact.runtimeAuth).toBeTruthy();
+    expect(zh.artifact.runtimeBridge).toBeTruthy();
     expect(en.artifact.repositoryOutput).toBeTruthy();
     expect(en.artifact.repositoryPreview).toBeTruthy();
     expect(en.artifact.htmlAudit).toBeTruthy();
@@ -36,5 +39,6 @@ describe('artifact UI metadata', () => {
     expect(en.artifact.originalFilePath).toBeTruthy();
     expect(en.artifact.fileSize).toBeTruthy();
     expect(en.artifact.runtimeAuth).toBeTruthy();
+    expect(en.artifact.runtimeBridge).toBeTruthy();
   });
 });

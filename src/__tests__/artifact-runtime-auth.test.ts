@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { recordArtifactAuthDecision } from '../lib/artifact-runtime-auth';
+import { recordArtifactAuthDecision, recordArtifactBridgeCallResult } from '../lib/artifact-runtime-auth';
 import type { ArtifactMeta } from '../lib/artifact-types';
 
 function createArtifact(overrides: Partial<ArtifactMeta> = {}): ArtifactMeta {
@@ -40,6 +40,31 @@ describe('artifact runtime auth records', () => {
         level: 'artifact',
         requestedAt: 10,
         decidedAt: 20,
+      },
+    ]);
+  });
+
+  it('appends Desktop Bridge call results to artifact metadata', () => {
+    const updated = recordArtifactBridgeCallResult(createArtifact(), {
+      id: 'bridge_1',
+      method: 'readFile',
+      detail: '/Users/deepin/report.csv',
+      status: 'succeeded',
+      resultSummary: 'read 42 bytes',
+      startedAt: 30,
+      endedAt: 40,
+    });
+
+    expect(updated.updatedAt).toBe(40);
+    expect(updated.bridgeEvents).toEqual([
+      {
+        id: 'bridge_1',
+        method: 'readFile',
+        detail: '/Users/deepin/report.csv',
+        status: 'succeeded',
+        resultSummary: 'read 42 bytes',
+        startedAt: 30,
+        endedAt: 40,
       },
     ]);
   });

@@ -1,4 +1,4 @@
-import type { ArtifactMeta } from './artifact-types';
+import type { ArtifactBridgeCallStatus, ArtifactMeta } from './artifact-types';
 
 export interface RecordArtifactAuthDecisionParams {
   capability: string;
@@ -26,5 +26,39 @@ export function recordArtifactAuthDecision(meta: ArtifactMeta, params: RecordArt
     ...meta,
     updatedAt: Math.max(meta.updatedAt, params.decidedAt),
     authEvents: [...authEvents, event],
+  };
+}
+
+export interface RecordArtifactBridgeCallResultParams {
+  method: string;
+  status: ArtifactBridgeCallStatus;
+  startedAt: number;
+  endedAt: number;
+  detail?: string;
+  resultSummary?: string;
+  error?: string;
+  id?: string;
+}
+
+export function recordArtifactBridgeCallResult(
+  meta: ArtifactMeta,
+  params: RecordArtifactBridgeCallResultParams,
+): ArtifactMeta {
+  const bridgeEvents = meta.bridgeEvents ?? [];
+  const event = {
+    id: params.id ?? `bridge_${params.endedAt.toString(36)}_${bridgeEvents.length + 1}`,
+    method: params.method,
+    detail: params.detail,
+    status: params.status,
+    resultSummary: params.resultSummary,
+    error: params.error,
+    startedAt: params.startedAt,
+    endedAt: params.endedAt,
+  };
+
+  return {
+    ...meta,
+    updatedAt: Math.max(meta.updatedAt, params.endedAt),
+    bridgeEvents: [...bridgeEvents, event],
   };
 }

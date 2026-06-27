@@ -20,6 +20,28 @@ describe('repository outputs', () => {
     );
   });
 
+  it('includes Desktop Bridge call summaries in repository output markdown', () => {
+    const markdown = buildOutputMarkdown({
+      ...createArtifact(),
+      bridgeEvents: [
+        {
+          id: 'bridge_1',
+          method: 'readFile',
+          detail: '/Users/deepin/report.csv',
+          status: 'succeeded',
+          resultSummary: 'read 42 bytes',
+          startedAt: 10,
+          endedAt: 20,
+        },
+      ],
+    });
+
+    expect(markdown).toContain('runtimeBridgeCallCount: 1');
+    expect(markdown).toContain('runtimeBridgeLastMethod: readFile');
+    expect(markdown).toContain('runtimeBridgeLastStatus: succeeded');
+    expect(markdown).toContain('runtimeBridgeLastResult: read 42 bytes');
+  });
+
   it('writes output markdown, html preview, and updates outputs index', async () => {
     const writeText = vi.fn();
     const readText = vi.fn(async () => '# Outputs\n');

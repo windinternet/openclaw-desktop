@@ -30,6 +30,8 @@ const TYPE_DIR: Record<string, string> = {
 export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string): string {
   const runtimeAuthEvents = artifact.authEvents ?? [];
   const lastRuntimeAuth = runtimeAuthEvents[runtimeAuthEvents.length - 1];
+  const runtimeBridgeEvents = artifact.bridgeEvents ?? [];
+  const lastRuntimeBridge = runtimeBridgeEvents[runtimeBridgeEvents.length - 1];
 
   return [
     `# ${artifact.title}`,
@@ -50,6 +52,12 @@ export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string
     lastRuntimeAuth ? `runtimeAuthLastGranted: ${lastRuntimeAuth.granted}` : undefined,
     lastRuntimeAuth ? `runtimeAuthLastLevel: ${lastRuntimeAuth.level}` : undefined,
     lastRuntimeAuth ? `runtimeAuthLastAt: ${new Date(lastRuntimeAuth.decidedAt).toISOString()}` : undefined,
+    runtimeBridgeEvents.length > 0 ? `runtimeBridgeCallCount: ${runtimeBridgeEvents.length}` : undefined,
+    lastRuntimeBridge ? `runtimeBridgeLastMethod: ${lastRuntimeBridge.method}` : undefined,
+    lastRuntimeBridge ? `runtimeBridgeLastStatus: ${lastRuntimeBridge.status}` : undefined,
+    lastRuntimeBridge?.resultSummary ? `runtimeBridgeLastResult: ${lastRuntimeBridge.resultSummary}` : undefined,
+    lastRuntimeBridge?.error ? `runtimeBridgeLastError: ${lastRuntimeBridge.error}` : undefined,
+    lastRuntimeBridge ? `runtimeBridgeLastAt: ${new Date(lastRuntimeBridge.endedAt).toISOString()}` : undefined,
     artifact.fileName ? `fileName: ${artifact.fileName}` : undefined,
     artifact.filePath ? `filePath: ${artifact.filePath}` : undefined,
     artifact.originalFilePath ? `originalFilePath: ${artifact.originalFilePath}` : undefined,

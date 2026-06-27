@@ -8,6 +8,7 @@ export const ARTIFACT_IPC = {
   EXPORT_AS: 'artifact:exportAs',
   NOTIFY: 'artifact:notify',
   EXEC: 'artifact:exec',
+  BRIDGE_CALL: 'artifact:bridgeCall',
   REQUEST_AUTH: 'artifact:requestAuth',
   GRANT_AUTH: 'artifact:grantAuth',
   LIST: 'artifact:list',
