@@ -57,6 +57,10 @@ import {
 import { recoverInterruptedAiActionRuns, syncAiActionRunsWithGateway } from './ai-action-run-store';
 import { writeArtifactSkill } from './artifact-skill';
 import { loadAppSnapshot, removePersistedInstance, saveCurrentInstanceId, saveInstances } from './local-persistence';
+import {
+  syncDesktopSelfKnowledgeWithCompanion,
+  type DesktopSelfKnowledgeSyncResult,
+} from './desktop-self-knowledge-sync';
 import { startRepositoryAgentsFileSyncWatcher, syncRepositoryContextWithCompanion } from './repository-context-sync';
 
 function generateId(): string {
@@ -217,6 +221,7 @@ interface StoreState {
   fetchAssistantInfo: (instanceId?: string) => Promise<void>;
   detectDesktopCompanionForInstance: (instanceId?: string) => Promise<DesktopCompanionInfo | null>;
   syncRepositoryContextForInstance: (instanceId?: string) => Promise<void>;
+  syncDesktopSelfKnowledgeForInstance: (instanceId?: string) => Promise<DesktopSelfKnowledgeSyncResult | null>;
   createDesktopCompanionInstallSessionForInstance: (
     instanceId?: string,
   ) => Promise<DesktopCompanionInstallSessionResult>;
@@ -682,6 +687,7 @@ export const useStore = create<StoreState>((set, get) => ({
           );
           get().refreshAll(instance.id);
           void get().syncRepositoryContextForInstance(instance.id);
+          void get().syncDesktopSelfKnowledgeForInstance(instance.id);
           void recoverInterruptedAiActionRuns(instance.id, client).catch(() => {});
           void writeArtifactSkill(client).catch(() => {});
           void connectDesktopBridgeToGateway(instance)
@@ -889,6 +895,27 @@ export const useStore = create<StoreState>((set, get) => ({
     } catch (err) {
       cleanupRepositoryAgentsFileSyncWatcher(target.instanceId);
       console.error('[syncRepositoryContextForInstance]', err);
+    }
+  },
+
+  syncDesktopSelfKnowledgeForInstance: async (requestedInstanceId) => {
+    const target = getInstanceClient(get(), requestedInstanceId);
+    if (!target) return null;
+    try {
+      const result = await syncDesktopSelfKnowledgeWithCompanion(target.client);
+      if (result.status === 'failed') {
+        console.warn('[syncDesktopSelfKnowledgeForInstance]', result.message);
+        return result;
+      }
+      if (result.status === 'fallback_partial') {
+        console.warn('[syncDesktopSelfKnowledgeForInstance]', result);
+        return result;
+      }
+      console.info('[syncDesktopSelfKnowledgeForInstance]', result);
+      return result;
+    } catch (err) {
+      console.error('[syncDesktopSelfKnowledgeForInstance]', err);
+      return { status: 'failed', message: err instanceof Error ? err.message : String(err) };
     }
   },
 

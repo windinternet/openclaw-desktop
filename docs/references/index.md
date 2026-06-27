@@ -50,6 +50,7 @@
 | 资源 | 说明 | 链接 |
 |------|------|------|
 | OpenAI Harness Engineering | 方法论原文（Karpathy） | https://github.com/openai/openai-cookbook/blob/main/articles/harnessing_engineering.md |
+| Product Goal Conversation | OpenClaw Desktop 终极目标沟通原始资料 | `product-goal-conversation-2026-06-28.md` |
 | 渐进式披露 | 知识组织原则 | 参见 `docs/design-docs/core-beliefs.md` |
 | 智能体可读性 | 文档设计原则 | 参见 `docs/FRONTEND.md` |
 

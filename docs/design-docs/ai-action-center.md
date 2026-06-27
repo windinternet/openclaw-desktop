@@ -39,6 +39,14 @@ AI Action Center 是 Desktop 的“办事层”。它不等同于聊天会话，
 
 普通聊天会话用于讨论；ActionRun 用于办事。用户可以从聊天触发 ActionRun，但执行过程和工具调用不应污染普通聊天上下文。
 
+2026-06-28 边界校准：
+
+- ActionRun 本质是 Desktop 在普通聊天之外调用大模型的通用操作单元。
+- ActionRun 不隶属于 Workbench；Workbench 只是其中一个来源页面。
+- 任何需要“用户在 UI 上用自然语言做事，但不进入普通聊天”的场景，都可以建模为 ActionRun。
+- ActionRun 可以关联仓库事项，也可以只服务产物、知识库、Agent Teams、3D Office、Control Center 或本地桥接能力。
+- ActionRun 的结果可以是计划、审批、仓库写入、知识库更新、HTML/文件/链接等产物、团队草稿、布局方案、复盘建议或普通摘要。
+
 ## 数据模型
 
 实例级本地文件保存 ActionRun 索引：

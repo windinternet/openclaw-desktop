@@ -9,9 +9,15 @@
 |------|--------|------|------|
 | 质量门禁收口 | P0 | 🔄 进行中 | 让 lint / format / stylelint / typecheck / test / build / doc validation 与当前代码事实一致 |
 | 文档事实校准 | P0 | 🔄 进行中 | 按当前代码更新 ARCHITECTURE、FRONTEND、QUALITY_SCORE、产品规格和计划文档 |
+| Desktop Self-Knowledge Pack | P0 | ✅ 第一版完成，持续打磨 | 已编写 Desktop 操作手册，生成 `openclaw-desktop-operator` Skill，并支持 Companion 优先、Agent workspace 降级同步 |
+| 产物系统收口 | P0 | ⏳ 待计划 | 将 Artifacts 作为 P0 价值层推进，重点强化 HTML 富交互产物、来源追踪和仓库 outputs 沉淀 |
+| ActionRun 定位统一 | P0 | ⏳ 待计划 | 明确 ActionRun 是 Desktop 非聊天式 AI 操作通道，统一计划、审批、执行和结果沉淀 |
+| Knowledge 导入/消化/健康检查 | P0 | ⏳ 待计划 | 补资料导入、未消化队列、Wiki 消化、索引日志更新和仓库健康检查 |
+| 开始一件事闭环 | P0 | ⏳ 专题讨论 | 用户一句话到事项、计划、执行、产物和复盘的金线路径，后续单独设计 |
 | 会话页闭环 | P1 | ⏳ 待计划 | `/sessions` 当前是轻量 Hub，应补最近会话、运行状态和恢复入口 |
 | Workbench 深化 | P1 | ✅ 第一版完成，持续打磨 | Repository work/plans/runs/outputs/reviews 已落地，后续做体验与语义映射增强 |
 | Knowledge 深化 | P1 | ✅ 第一版完成，持续打磨 | sources/wiki/index/log/relationships 已落地，后续做导入、维护和健康检查 |
+| 技能流程可视化 | P1 | ⏳ 待计划 | Skill / MCP / ActionRun 的流程、输入输出、权限和审批点可视化 |
 | 3D Office | P2 | ✅ 第一版完成，持续打磨 | Three.js Office、主题、音效、交互玩法和测试已落地 |
 | 性能与发布体验 | P2 | ⏳ 待计划 | 主 bundle 较大，构建有 chunk warning；后续需要 code splitting / chunk 策略 |
 
@@ -27,6 +33,7 @@
 | Navigation restructure | 2026-06 | 主导航收敛为 Dashboard / New Session / Workbench / Knowledge / Collaboration / Control Center |
 | 3D Office 第一版 | 2026-06 | Three.js 2.5D Office、Agent 状态映射、主题、音效和玩法 |
 | Desktop Pet | 2026-06 | 独立桌宠窗口、事件桥、动画状态机和持久化 |
+| Desktop Self-Knowledge Pack 第一版 | 2026-06 | Desktop 操作手册、Gateway Skill 生成、Agent workspace 降级同步和 Control Center 手动同步入口 |
 | Cross-platform release | 2026-06 | macOS / Windows / Linux 构建配置与 release workflow |
 
 ## 技术债务

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Button, Card, Empty, Space, Spin, Tabs, Tag, Typography } from '@douyinfe/semi-ui';
+import { Button, Card, Empty, Space, Spin, Tabs, Tag, Toast, Typography } from '@douyinfe/semi-ui';
+import { IconRefresh, IconSync } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { loadRepositoryBinding } from '../lib/agentic-repository-store';
 import {
@@ -22,6 +23,7 @@ export default function RepositoryProtocolPage({ embedded = false, onHeaderActio
   const [snapshot, setSnapshot] = useState<RepositoryProtocolSnapshot | null>(null);
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'empty' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [syncingSelfKnowledge, setSyncingSelfKnowledge] = useState(false);
 
   const permissionItems = useMemo(
     () => [
@@ -62,7 +64,48 @@ export default function RepositoryProtocolPage({ embedded = false, onHeaderActio
     void load();
   }, [load]);
 
-  const headerActions = useMemo(() => <Button onClick={load}>{t('common.refresh')}</Button>, [load, t]);
+  const handleSyncDesktopSelfKnowledge = useCallback(async () => {
+    if (!currentInstanceId) {
+      Toast.warning(t('connection.notConnected'));
+      return;
+    }
+
+    setSyncingSelfKnowledge(true);
+    try {
+      const result = await useStore.getState().syncDesktopSelfKnowledgeForInstance(currentInstanceId);
+      if (!result) {
+        Toast.warning(t('connection.notConnected'));
+        return;
+      }
+      if (result.status === 'failed') {
+        Toast.error(result.message || t('controlCenter.desktopSelfKnowledgeSyncFailed'));
+        return;
+      }
+      if (result.status === 'fallback_partial') {
+        Toast.warning(t('controlCenter.desktopSelfKnowledgeSyncPartial'));
+        return;
+      }
+      Toast.success(t('controlCenter.desktopSelfKnowledgeSyncDone'));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('controlCenter.desktopSelfKnowledgeSyncFailed'));
+    } finally {
+      setSyncingSelfKnowledge(false);
+    }
+  }, [currentInstanceId, t]);
+
+  const headerActions = useMemo(
+    () => (
+      <Space>
+        <Button icon={<IconRefresh />} onClick={load}>
+          {t('common.refresh')}
+        </Button>
+        <Button icon={<IconSync />} onClick={handleSyncDesktopSelfKnowledge} loading={syncingSelfKnowledge}>
+          {t('controlCenter.syncDesktopSelfKnowledge')}
+        </Button>
+      </Space>
+    ),
+    [handleSyncDesktopSelfKnowledge, load, syncingSelfKnowledge, t],
+  );
 
   useEffect(() => {
     if (!embedded) return undefined;
