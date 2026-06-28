@@ -65,7 +65,15 @@ export interface WorkbenchReviewDraftInput {
   workItemPath: string;
   tailActionId?: string;
   relatedKnowledgeRunIds?: string[];
+  relatedKnowledgeRuns?: WorkbenchReviewDraftKnowledgeRun[];
   createdAt?: Date;
+}
+
+export interface WorkbenchReviewDraftKnowledgeRun {
+  id: string;
+  status: string;
+  resultSummary?: string;
+  error?: string;
 }
 
 export interface WorkbenchReviewDraftResult {
@@ -508,6 +516,7 @@ export async function writeWorkbenchReviewDraft(
     workItemPath,
     tailActionId: input.tailActionId,
     relatedKnowledgeRunIds: input.relatedKnowledgeRunIds,
+    relatedKnowledgeRuns: input.relatedKnowledgeRuns,
     createdAt,
   });
 
@@ -949,10 +958,15 @@ function buildWorkbenchReviewDraftMarkdown(input: {
   workItemPath: string;
   tailActionId?: string;
   relatedKnowledgeRunIds?: string[];
+  relatedKnowledgeRuns?: WorkbenchReviewDraftKnowledgeRun[];
   createdAt: Date;
 }): string {
   const sourceExecutionId = isActionRunReviewTailActionId(input.tailActionId) ? input.tailActionId : undefined;
-  const relatedKnowledgeRunIds = dedupeRelatedRunIds(input.relatedKnowledgeRunIds);
+  const relatedKnowledgeRuns = dedupeRelatedKnowledgeRuns(input.relatedKnowledgeRuns);
+  const relatedKnowledgeRunIds = dedupeRelatedRunIds([
+    ...(input.relatedKnowledgeRunIds ?? []),
+    ...relatedKnowledgeRuns.map((run) => run.id),
+  ]);
   return [
     '---',
     sourceExecutionId
@@ -977,6 +991,15 @@ function buildWorkbenchReviewDraftMarkdown(input: {
     relatedKnowledgeRunIds.length
       ? `相关知识更新 ActionRun: ${relatedKnowledgeRunIds.map((id) => `\`${id}\``).join(', ')}`
       : undefined,
+    relatedKnowledgeRuns.length ? '' : undefined,
+    relatedKnowledgeRuns.length ? '## 相关知识更新' : undefined,
+    relatedKnowledgeRuns.length ? '' : undefined,
+    relatedKnowledgeRuns.length ? '| ActionRun | 状态 | 摘要 |' : undefined,
+    relatedKnowledgeRuns.length ? '| --- | --- | --- |' : undefined,
+    ...relatedKnowledgeRuns.map(
+      (run) =>
+        `| \`${run.id}\` | ${formatReviewTableCell(run.status)} | ${formatReviewTableCell(run.resultSummary ?? run.error ?? '暂无摘要')} |`,
+    ),
     '',
     '## 核对清单',
     '',
@@ -1012,6 +1035,22 @@ function dedupeRelatedRunIds(values?: string[]): string[] {
     result.push(trimmed);
   }
   return result;
+}
+
+function dedupeRelatedKnowledgeRuns(values?: WorkbenchReviewDraftKnowledgeRun[]): WorkbenchReviewDraftKnowledgeRun[] {
+  const seen = new Set<string>();
+  const result: WorkbenchReviewDraftKnowledgeRun[] = [];
+  for (const value of values ?? []) {
+    const id = value.id.trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    result.push({ ...value, id });
+  }
+  return result;
+}
+
+function formatReviewTableCell(value: string): string {
+  return value.replace(/\r?\n/g, ' ').replace(/\|/g, '\\|').trim();
 }
 
 function markWorkbenchReviewDraftConfirmed(markdown: string, reviewedAt: Date): string | null {

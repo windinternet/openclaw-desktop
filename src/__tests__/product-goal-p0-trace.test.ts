@@ -93,6 +93,7 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('复盘草稿链接回来源事项');
     expect(source).toContain('计划执行知识/复盘后续入口去重');
     expect(source).toContain('计划执行复盘草稿带入相关知识更新');
+    expect(source).toContain('计划执行复盘草稿带入知识更新状态摘要');
     expect(source).toContain('计划执行知识更新后的复盘入口强化');
     expect(source).toContain('计划执行知识更新后的精准复盘建议');
     expect(source).toContain('计划执行复盘草稿显式确认');
@@ -102,6 +103,8 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('shouldOfferPlanExecutionReview');
     expect(source).toContain('action-run-review:<runId>');
     expect(source).toContain('relatedKnowledgeRunIds');
+    expect(source).toContain('relatedKnowledgeRuns');
+    expect(source).toContain('## 相关知识更新');
     expect(source).toContain('findPlanExecutionKnowledgeUpdateState');
     expect(source).toContain('getPlanExecutionKnowledgeReviewSuggestion');
     expect(source).toContain('findPlanExecutionReviewState');
@@ -178,6 +181,7 @@ describe('product goal P0 traceability', () => {
     expect(plans).toContain('shouldOfferPlanExecutionReview');
     expect(plans).toContain('action-run-review:<runId>');
     expect(plans).toContain('relatedKnowledgeRunIds');
+    expect(plans).toContain('## 相关知识更新');
     expect(plans).toContain('writePlanExecutionReviewWithKnowledge');
     expect(plans).toContain('getPlanExecutionKnowledgeReviewSuggestion');
     expect(plans).toContain('findPlanExecutionKnowledgeUpdateState');
@@ -232,6 +236,7 @@ describe('product goal P0 traceability', () => {
     expect(roadmap).toContain('草稿相对链接写回来源事项的 `## 复盘`');
     expect(roadmap).toContain('sourceExecutionId` 或 `tailActionId` 为 `action-run-review:<runId>`');
     expect(roadmap).toContain('relatedKnowledgeRunIds');
+    expect(roadmap).toContain('## 相关知识更新');
     expect(roadmap).toContain('计划执行知识更新后的复盘入口强化');
     expect(roadmap).toContain('writePlanExecutionReviewWithKnowledge');
     expect(roadmap).toContain('计划执行知识更新后的精准复盘建议');
@@ -306,6 +311,7 @@ describe('product goal P0 traceability', () => {
     expect(skillContent).toContain('non-failed, non-cancelled `knowledge_rewrite`');
     expect(skillContent).toContain('sourceExecutionId` or `tailActionId` equal to `action-run-review:<runId>`');
     expect(skillContent).toContain('relatedKnowledgeRunIds');
+    expect(skillContent).toContain('a `## 相关知识更新` table with status and result/error summary');
     expect(skillContent).toContain('Review Knowledge Update');
     expect(skillContent).toContain('writePlanExecutionReviewWithKnowledge');
     expect(skillContent).toContain('Review Knowledge Write');

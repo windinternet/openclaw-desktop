@@ -75,6 +75,7 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('non-failed, non-cancelled `knowledge_rewrite`');
     expect(skillContent).toContain('sourceExecutionId` or `tailActionId` equal to `action-run-review:<runId>`');
     expect(skillContent).toContain('relatedKnowledgeRunIds');
+    expect(skillContent).toContain('a `## 相关知识更新` table with status and result/error summary');
     expect(skillContent).toContain('verify whether Wiki/index/log was updated or no write was needed');
     expect(skillContent).toContain('Review Knowledge Update');
     expect(skillContent).toContain('writePlanExecutionReviewWithKnowledge');

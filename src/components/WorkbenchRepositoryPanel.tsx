@@ -305,13 +305,19 @@ export default function WorkbenchRepositoryPanel({
       const sourceRun = context.id?.startsWith('action-run-review:')
         ? activityRuns.find((run) => run.id === context.id?.replace(/^action-run-review:/, ''))
         : undefined;
-      const relatedKnowledgeRunIds = findPlanExecutionKnowledgeFollowUpRuns(sourceRun, {
+      const relatedKnowledgeRuns = findPlanExecutionKnowledgeFollowUpRuns(sourceRun, {
         actionRuns: activityRuns,
-      }).map((run) => run.id);
+      });
       const draft = await writeWorkbenchReviewDraft(binding, {
         workItemPath: context.workItemPath,
         tailActionId: context.id,
-        relatedKnowledgeRunIds,
+        relatedKnowledgeRunIds: relatedKnowledgeRuns.map((run) => run.id),
+        relatedKnowledgeRuns: relatedKnowledgeRuns.map((run) => ({
+          id: run.id,
+          status: run.status,
+          resultSummary: run.resultSummary,
+          error: run.error,
+        })),
       });
       setSelectedPreviewPath(draft.path);
       setSelectedPreviewContent(draft.content);

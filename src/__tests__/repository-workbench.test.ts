@@ -653,6 +653,49 @@ describe('repository workbench', () => {
     expect(draft.content).toContain('- [ ] 核对相关知识更新 ActionRun 是否已写入 Wiki/index/log 或确认无需写入。');
   });
 
+  it('writes related knowledge ActionRun status and summaries into a plan execution review draft', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'work/active/release.md') {
+        return ['# 发布推进', '', '## 复盘', '', '- 暂无'].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const draft = await writeWorkbenchReviewDraft(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'action-run-review:run-1',
+        relatedKnowledgeRuns: [
+          {
+            id: 'run-knowledge-done',
+            status: 'done',
+            resultSummary: '已更新 wiki/release.md、wiki/index.md 和 wiki/log.md。',
+          },
+          {
+            id: 'run-knowledge-no-write',
+            status: 'done',
+            resultSummary: 'no_write_needed：现有知识库已经覆盖。',
+          },
+        ],
+        createdAt: new Date('2026-06-28T10:00:00.000Z'),
+      },
+    );
+
+    expect(draft.content).toContain('relatedKnowledgeRunIds: run-knowledge-done, run-knowledge-no-write');
+    expect(draft.content).toContain('## 相关知识更新');
+    expect(draft.content).toContain(
+      '| `run-knowledge-done` | done | 已更新 wiki/release.md、wiki/index.md 和 wiki/log.md。 |',
+    );
+    expect(draft.content).toContain('| `run-knowledge-no-write` | done | no_write_needed：现有知识库已经覆盖。 |');
+  });
+
   it('confirms a review draft and completes the matching source tail action', async () => {
     const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
       if (relativePath === 'reviews/weekly/2026-06-28-work-release-tail-action-1-review.md') {
@@ -1433,6 +1476,7 @@ describe('repository workbench', () => {
     expect(source).toContain('workbench.planExecutionReviewConfirmed');
     expect(source).toContain('reviewDocuments: snapshot?.reviewDocuments');
     expect(source).toContain('relatedKnowledgeRunIds');
+    expect(source).toContain('relatedKnowledgeRuns');
     expect(source).toContain('selectedPlanRelatedKnowledgeRunIds');
     expect(planExecution).toContain('workbench.writePlanExecutionReviewWithKnowledge');
     expect(planExecution).toContain('workbench.writePlanExecutionReviewWithKnowledgeHint');
