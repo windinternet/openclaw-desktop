@@ -19,6 +19,7 @@ import { useNavigate } from 'react-router-dom';
 import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway, useStore } from '../lib';
 import { upsertAiActionRun } from '../lib/ai-action-run-store';
 import type { RepositoryBinding } from '../lib/agentic-repository';
+import type { DashboardTailActionRouteContext } from '../lib/dashboard-tail-action-routing';
 import type {
   KnowledgeDocument,
   KnowledgeSnapshot,
@@ -28,6 +29,7 @@ import type {
 } from '../lib/repository-knowledge';
 import {
   buildKnowledgeRewritePrompt,
+  buildKnowledgeTailActionRewriteInstruction,
   importKnowledgeFileSource,
   importKnowledgeFolderSource,
   importKnowledgeTextSource,
@@ -55,12 +57,20 @@ export type KnowledgeSection =
   | 'index'
   | 'log';
 
+interface KnowledgeRewriteOptions {
+  userInstruction?: string;
+  workItemPath?: string;
+  tailActionId?: string;
+}
+
 export default function KnowledgeRepositoryPanel({
   binding,
   section,
+  tailActionContext,
 }: {
   binding: RepositoryBinding;
   section?: KnowledgeSection;
+  tailActionContext?: DashboardTailActionRouteContext | null;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -91,6 +101,7 @@ export default function KnowledgeRepositoryPanel({
   const [importUrlTitle, setImportUrlTitle] = useState('');
   const [importUrlNote, setImportUrlNote] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const knowledgeTailActionContext = tailActionContext?.kind === 'knowledge' ? tailActionContext : null;
 
   useEffect(() => {
     if (section) setActiveSection(section);
@@ -297,6 +308,7 @@ export default function KnowledgeRepositoryPanel({
   const handleKnowledgeRewrite = async (
     intent: 'digest-source' | 'refresh-index' | 'update-selected',
     selectedPathOverride?: string,
+    options: KnowledgeRewriteOptions = {},
   ) => {
     if (!activeClient || !currentInstanceId) {
       Toast.error(t('knowledge.rewriteNotConnected'));
@@ -323,10 +335,12 @@ export default function KnowledgeRepositoryPanel({
           : intent === 'update-selected'
             ? t('knowledge.updateSelected')
             : t('knowledge.refreshIndexLog'),
-        selectedPath ? selectedPath : '',
+        selectedPath ? `path: ${selectedPath}` : '',
+        options.workItemPath ? `${t('knowledge.tailActionSource')}: ${options.workItemPath}` : '',
+        options.tailActionId ? `tailActionId: ${options.tailActionId}` : '',
       ]
         .filter(Boolean)
-        .join(': ');
+        .join('\n');
       const actionRun = createAiActionRun({
         type: 'knowledge_rewrite',
         sourcePage: 'knowledge',
@@ -334,6 +348,7 @@ export default function KnowledgeRepositoryPanel({
         agentId: agent.id,
         executionMode: 'isolated-session',
         input,
+        workItemPath: options.workItemPath,
       });
       await upsertAiActionRun(currentInstanceId, { ...actionRun, status: 'planning', updatedAt: Date.now() });
       const runningRun = await executeAiActionRunWithGateway(activeClient, actionRun, {
@@ -343,6 +358,7 @@ export default function KnowledgeRepositoryPanel({
           intent,
           selectedPath,
           sourcePath,
+          userInstruction: options.userInstruction,
         }),
       });
       await upsertAiActionRun(currentInstanceId, runningRun);
@@ -363,6 +379,22 @@ export default function KnowledgeRepositoryPanel({
     } finally {
       setRewriteLoading(false);
     }
+  };
+
+  const handleKnowledgeTailActionRewrite = () => {
+    if (!knowledgeTailActionContext?.workItemPath) {
+      Toast.warning(t('knowledge.tailActionRewriteUnavailable'));
+      return;
+    }
+
+    void handleKnowledgeRewrite('refresh-index', undefined, {
+      userInstruction: buildKnowledgeTailActionRewriteInstruction({
+        workItemPath: knowledgeTailActionContext.workItemPath,
+        tailActionId: knowledgeTailActionContext.id,
+      }),
+      workItemPath: knowledgeTailActionContext.workItemPath,
+      tailActionId: knowledgeTailActionContext.id,
+    });
   };
 
   const renderFileButton = (file: RepositoryMarkdownFile) => (
@@ -875,6 +907,48 @@ export default function KnowledgeRepositoryPanel({
         </div>
       ) : null}
       <Space vertical align="start" style={{ width: '100%' }} spacing={16}>
+        {knowledgeTailActionContext ? (
+          <div
+            style={{
+              width: '100%',
+              border: '1px solid var(--semi-color-border)',
+              borderRadius: 8,
+              padding: 12,
+              background: 'var(--semi-color-fill-0)',
+            }}
+          >
+            <Space align="center" wrap style={{ justifyContent: 'space-between', width: '100%' }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <Tag color="green" size="small">
+                  {t('knowledge.tailActionContextTitle')}
+                </Tag>
+                <Text size="small" style={{ display: 'block', marginTop: 8 }}>
+                  {t('knowledge.tailActionRewriteDesc')}
+                </Text>
+                {knowledgeTailActionContext.workItemPath ? (
+                  <Text
+                    type="tertiary"
+                    size="small"
+                    ellipsis={{ showTooltip: true }}
+                    style={{ display: 'block', marginTop: 4 }}
+                  >
+                    {t('knowledge.tailActionSource')}: {knowledgeTailActionContext.workItemPath}
+                  </Text>
+                ) : null}
+              </div>
+              <Button
+                type="primary"
+                icon={<IconBolt />}
+                loading={rewriteLoading}
+                disabled={!knowledgeTailActionContext.workItemPath}
+                onClick={handleKnowledgeTailActionRewrite}
+              >
+                {t('knowledge.startTailActionRewrite')}
+              </Button>
+            </Space>
+          </div>
+        ) : null}
+
         <Space wrap style={{ justifyContent: 'space-between', width: '100%' }}>
           <Space wrap>
             <Tag color="blue">{t('knowledge.sourceCount', { count: snapshot?.sources.length ?? 0 })}</Tag>

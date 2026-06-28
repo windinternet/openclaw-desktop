@@ -45,8 +45,12 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('事项尾动作复盘确认联动');
     expect(source).toContain('事项状态尾动作处理入口');
     expect(source).toContain('事项成果尾动作保存后回写');
+    expect(source).toContain('事项知识尾动作发起 ActionRun');
+    expect(plans).toContain('发起知识更新 ActionRun');
+    expect(roadmap).toContain('Dashboard 知识类尾动作进入 Knowledge');
     expect(skillContent).toContain('Screenshot-confirmed P0 baseline');
     expect(skillContent).toContain('Do not demote these scopes to P1/P2');
+    expect(skillContent).toContain('Knowledge tail actions can start a source-bound `knowledge_rewrite` ActionRun');
     expect(skillContent).toContain('Artifacts UI also exposes a reuse-kind filter');
     expect(skillContent).toContain('Repository `outputs/assets/index.md`');
     expect(skillContent).toContain('post-run review clues');

@@ -273,7 +273,10 @@
     "emptyRelationships": "暂无关系",
     "tailActionContextTitle": "待更新知识库",
     "tailActionContextDesc": "来自 Dashboard 的知识库收尾动作，可先刷新索引/日志或发起知识库自动改写。",
-    "tailActionSource": "来源事项"
+    "tailActionSource": "来源事项",
+    "tailActionRewriteDesc": "根据来源事项、执行记录、成果和已有知识库生成更新计划，写入前仍需审批。",
+    "startTailActionRewrite": "发起知识更新 ActionRun",
+    "tailActionRewriteUnavailable": "当前知识库收尾动作无法发起"
   },
   "repositoryGate": {
     "knowledgeTitle": "知识库仓库",

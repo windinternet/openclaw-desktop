@@ -12,6 +12,7 @@
 | “有哪些资料还没整理”         | 打开 Knowledge 未消化资料队列 `/knowledge?section=digest`；选择资料后发起消化 ActionRun，写入前请求审批。                                                                  |
 | “检查知识库健康”             | 查看 Knowledge 健康检查或 Dashboard 知识动态；关注孤立资料、陈旧索引、断链、无来源引用 Wiki、长期未复盘事项和相互矛盾记录；修复前先请求审批。                                |
 | “把知识库健康检查写入复盘”   | 打开 Knowledge 健康检查 `/knowledge?section=health`，使用“写入周复盘”把当前报告写入 `reviews/weekly/`；这只归档事实，不自动修复问题。                                      |
+| “处理这个知识库收尾动作”     | 从 Dashboard 进入 Knowledge 的 `tailAction=knowledge` 上下文，发起携带 `workItemPath` / `tailActionId` 的 `knowledge_rewrite` ActionRun；先读取来源事项、关联执行记录、关联成果和现有知识库，写入前请求审批，不直接勾选尾动作。 |
 | “生成一个可交互报告”         | 使用 Artifact 协议生成自包含 HTML；如需写入仓库 outputs，先请求审批。                                                                                                      |
 | “检查我的工作系统状态”       | 汇总 Workbench、Knowledge、ActionRun、Artifacts 和待审批项，不只回答 Gateway 健康状态。                                                                                    |
 | “继续上次那件事”             | 查 Workbench 当前事项、active plans、recent ActionRuns，再决定进入普通聊天或 ActionRun。                                                                                   |

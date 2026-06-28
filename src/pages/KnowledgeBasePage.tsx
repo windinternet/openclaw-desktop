@@ -38,7 +38,9 @@ export default function KnowledgeBasePage() {
 
   const renderKnowledgeSection = (section: KnowledgeSection) => (
     <RepositoryGate area="knowledge" setupVisible={false} fallback={repositoryFallback}>
-      {(binding) => <KnowledgeRepositoryPanel binding={binding} section={section} />}
+      {(binding) => (
+        <KnowledgeRepositoryPanel binding={binding} section={section} tailActionContext={tailActionContext} />
+      )}
     </RepositoryGate>
   );
 

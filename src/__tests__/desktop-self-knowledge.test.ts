@@ -50,6 +50,11 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain(
       'Status tail actions can update the source matter `status` and check off only the matching status tail action',
     );
+    expect(skillContent).toContain(
+      'Knowledge tail actions open Knowledge with the source matter preserved and can start a `knowledge_rewrite` ActionRun',
+    );
+    expect(skillContent).toContain('outputting `no_write_needed`');
+    expect(skillContent).toContain('does not check off the knowledge tail action by itself');
     expect(skillContent).toContain('Review tail actions open Workbench reviews with a review tail action card');
     expect(skillContent).toContain('points to `reviews/weekly/`');
     expect(skillContent).toContain('exposes `desktop.artifacts.execution.review.write`');
@@ -146,6 +151,7 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain(
       'After the user explicitly saves an Artifact from an output tail action, Desktop can link it back to `## 关联成果`',
     );
+    expect(skillContent).toContain('Knowledge tail actions can start a source-bound `knowledge_rewrite` ActionRun');
     expect(skillContent).toContain(
       'Dashboard recent and weekly outputs mark reusable Artifacts and Repository outputs',
     );

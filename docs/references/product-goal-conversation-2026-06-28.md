@@ -893,6 +893,21 @@ HTML 的独特优势：
 
 - 仍需要更完整的成果保存表单、从最近 ActionRun 自动带入更强的成果候选、保存后刷新 Dashboard 待确认状态的更顺滑体验、知识更新尾动作入口，以及完成事项后的显式移动流程。
 
+### 10.42 2026-06-28 当前实施记录：事项知识尾动作发起 ActionRun
+
+围绕“ActionRun 结束后必须触发是否更新知识库”和“知识库更新也要通过非聊天式 AI 操作与审批边界”的 P0 验收，当前继续落地一段代码事实：
+
+- Dashboard 的 `tail-action:knowledge` 仍会打开 Knowledge，并携带 `tailAction`、`tailActionId` 和 `workItemPath`。
+- Knowledge 页面现在会把尾动作上下文传给仓库面板，并显示“发起知识更新 ActionRun”入口。
+- 用户点击后，Desktop 会创建 `knowledge_rewrite` ActionRun，把来源事项 `workItemPath` 写入运行记录输入，同时把 `tailActionId` 写入输入与 prompt。
+- 该 ActionRun 的 prompt 要求 Agent 先读取来源事项、关联执行记录、关联成果和现有知识库，再提出写入 Wiki、更新 `wiki/index.md` 或追加 `wiki/log.md` 的审批计划。
+- 如果没有必要写入知识库，Agent 应输出 `no_write_needed`，而不是为了完成尾动作硬写 Wiki。
+- 该入口不会直接改写 Wiki，不会自动更新 `wiki/index.md` / `wiki/log.md`，不会自动勾选知识尾动作，不会更新事项状态，也不会替代复盘。
+
+仍未完成的 P0 后续：
+
+- 仍需要知识写入完成后的显式确认/勾选联动、从 ActionRun 结果回到来源事项的更顺滑体验、知识更新后的复盘建议、完成事项后的显式移动流程，以及更完整的“开始一件事”专题闭环。
+
 ### 10.40 2026-06-28 当前实施记录：事项状态尾动作处理入口
 
 围绕“ActionRun 结束后必须触发是否更新事项状态”和“尾动作需要回到事项页闭环”的 P0 验收，当前继续落地一段代码事实：

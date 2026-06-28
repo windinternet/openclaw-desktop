@@ -564,6 +564,19 @@ export async function loadKnowledgeDocumentHistory(
   }
 }
 
+export function buildKnowledgeTailActionRewriteInstruction(options: {
+  workItemPath: string;
+  tailActionId?: string;
+}): string {
+  return [
+    `根据来源事项 ${options.workItemPath} 的知识库收尾动作，检查本次事项中是否有需要写入 Wiki、更新 wiki/index.md 或追加 wiki/log.md 的知识。`,
+    options.tailActionId ? `来源尾动作 ID：${options.tailActionId}` : undefined,
+    '请先读取来源事项、关联执行记录、关联成果和现有知识库，再提出需要审批的写入计划；没有必要写入时输出 no_write_needed。',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 export function parseKnowledgeIndexEntries(options: {
   binding: RepositoryBinding;
   indexPath: string;

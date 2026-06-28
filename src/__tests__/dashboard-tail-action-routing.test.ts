@@ -7,6 +7,7 @@ describe('dashboard tail action routing', () => {
     const workbenchPanel = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
     const artifacts = readFileSync('src/pages/ArtifactsPage.tsx', 'utf8');
     const knowledge = readFileSync('src/pages/KnowledgeBasePage.tsx', 'utf8');
+    const knowledgePanel = readFileSync('src/components/KnowledgeRepositoryPanel.tsx', 'utf8');
 
     expect(workbench).toContain('parseDashboardTailActionRoute(location.search)');
     expect(workbench).toContain('getWorkbenchTailActionTab(tailActionContext)');
@@ -38,5 +39,12 @@ describe('dashboard tail action routing', () => {
     expect(knowledge).toContain('getKnowledgeTailActionTab(tailActionContext)');
     expect(knowledge).toContain("t('knowledge.tailActionContextTitle')");
     expect(knowledge).toContain('tailActionContext.workItemPath');
+    expect(knowledge).toContain('tailActionContext={tailActionContext}');
+
+    expect(knowledgePanel).toContain("tailActionContext?.kind === 'knowledge'");
+    expect(knowledgePanel).toContain('buildKnowledgeTailActionRewriteInstruction');
+    expect(knowledgePanel).toContain("t('knowledge.startTailActionRewrite')");
+    expect(knowledgePanel).toContain('workItemPath: knowledgeTailActionContext.workItemPath');
+    expect(knowledgePanel).toContain('tailActionId: knowledgeTailActionContext.id');
   });
 });

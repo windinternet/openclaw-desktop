@@ -5,6 +5,7 @@ import {
   buildKnowledgeHealthReview,
   buildKnowledgeFileSourceImport,
   buildKnowledgeFolderSourceImport,
+  buildKnowledgeTailActionRewriteInstruction,
   buildKnowledgeTextSourceImport,
   buildKnowledgeUrlSourceImport,
   buildKnowledgeRepositoryMappingPrompt,
@@ -742,6 +743,26 @@ describe('repository knowledge', () => {
     expect(prompt).toContain('wiki/log.md');
     expect(prompt).toContain('approval_required');
     expect(prompt).toContain('写入或改写任何仓库文件前');
+  });
+
+  it('builds a source matter instruction for knowledge tail actions', () => {
+    const instruction = buildKnowledgeTailActionRewriteInstruction({
+      workItemPath: 'work/active/release.md',
+      tailActionId: 'work/active/release.md:tail-action:2',
+    });
+    const prompt = buildKnowledgeRewritePrompt({
+      binding: createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      intent: 'refresh-index',
+      userInstruction: instruction,
+    });
+
+    expect(instruction).toContain('work/active/release.md');
+    expect(instruction).toContain('work/active/release.md:tail-action:2');
+    expect(instruction).toContain('关联执行记录');
+    expect(instruction).toContain('no_write_needed');
+    expect(prompt).toContain('work/active/release.md');
+    expect(prompt).toContain('来源尾动作 ID');
+    expect(prompt).toContain('approval_required');
   });
 
   it('builds a binding-time semantic mapping prompt for LLM Wiki repositories', () => {

@@ -273,7 +273,10 @@
     "emptyRelationships": "No relationships yet",
     "tailActionContextTitle": "Knowledge Update Pending",
     "tailActionContextDesc": "A Dashboard knowledge tail action. Refresh the index/log or start a knowledge rewrite when ready.",
-    "tailActionSource": "Source matter"
+    "tailActionSource": "Source matter",
+    "tailActionRewriteDesc": "Create an update plan from the source matter, execution records, outputs, and existing knowledge. Writes still require approval.",
+    "startTailActionRewrite": "Start Knowledge ActionRun",
+    "tailActionRewriteUnavailable": "This knowledge tail action cannot be started"
   },
   "repositoryGate": {
     "knowledgeTitle": "Knowledge Repository",
