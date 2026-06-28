@@ -28,12 +28,16 @@ describe('dashboard tail action routing', () => {
     expect(workbenchPanel).toContain('confirmWorkbenchReviewDraft');
     expect(workbenchPanel).toContain("t('workbench.createReviewDraft')");
     expect(workbenchPanel).toContain("t('workbench.reviewDraftCreated')");
-    expect(workbenchPanel).toContain("t('workbench.confirmReviewDraft')");
-    expect(workbenchPanel).toContain("t('workbench.reviewDraftConfirmed')");
+    expect(workbenchPanel).toContain('workbench.confirmReviewDraft');
+    expect(workbenchPanel).toContain('workbench.reviewDraftConfirmed');
+    expect(workbenchPanel).toContain('workbench.confirmReviewSourceDraft');
+    expect(workbenchPanel).toContain('workbench.reviewSourceDraftConfirmed');
     expect(workbenchPanel).toContain('desktop.artifacts.execution.review.write');
     expect(workbenchPanel).toContain('reviews/weekly/');
     expect(workbenchPanel).toContain('reviewTailActionCanConfirm');
     expect(workbenchPanel).toContain("reviewTailActionContext.id.includes(':tail-action:')");
+    expect(workbenchPanel).toContain('reviewSourceExecutionCanConfirm');
+    expect(workbenchPanel).toContain("reviewTailActionContext.id.startsWith('action-run-review:')");
     expect(workbenchPanel).toContain('reviewTailActionRunId');
     expect(workbenchPanel).toContain('action-run-review:');
     expect(workbenchPanel).toContain("t('workbench.reviewTailActionRunSource')");

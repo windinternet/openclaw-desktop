@@ -1334,6 +1334,21 @@ HTML 的独特优势：
 
 - 仍需要复盘确认后的更完整状态表达、更完整的执行结果候选提取，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
 
+### 10.71 2026-06-29 当前实施记录：计划执行复盘草稿显式确认
+
+围绕“执行 -> 复盘 -> 回到可观测状态”的 P0 闭环，当前继续补齐计划执行来源复盘草稿的显式确认动作：
+
+- Workbench reviews 视图现在区分真实事项尾动作复盘和 `action-run-review:<runId>` 来源执行复盘。
+- 当 `action-run-review:<runId>` 来源的复盘草稿仍为 `status: draft` 时，UI 显示“确认计划执行复盘 / Confirm Plan Execution Review”，对应文案 key 为 `confirmReviewSourceDraft`。
+- `confirmWorkbenchReviewDraft` 现在会校验该草稿的 `source: desktop-workbench-review-source-execution`、`workItemPath`、`tailActionId` 和 `sourceExecutionId`，确认后只把复盘文档改为 `status: confirmed` 并写入 `reviewedAt`。
+- 确认成功后 UI 使用 `reviewSourceDraftConfirmed` 提示“计划执行复盘已确认 / Plan execution review confirmed”。
+- 真实事项尾动作复盘仍继续使用“确认复盘并完成尾动作”，会勾选匹配 checklist；计划执行来源复盘不会把 `action-run-review:<runId>` 冒充为事项 checklist ID。
+- 该能力以当前代码事实为准：不勾选来源事项尾动作，不更新事项状态，不沉淀成果，不写 Wiki/index/log，不移动事项文件，不执行资产，不授予权限。
+
+仍未完成的 P0 后续：
+
+- 仍需要复盘确认后的 Dashboard/Workbench 刷新体验进一步自然化、更完整的执行结果候选提取，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
+
 ### 10.62 2026-06-29 当前实施记录：计划执行复盘状态标签
 
 围绕“开始一件事闭环”中“执行 -> 复盘 -> 回到 Workbench 可观测”的 P0 缺口，当前继续把已有复盘文档状态显示到计划预览：

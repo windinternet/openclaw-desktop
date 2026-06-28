@@ -720,6 +720,67 @@ describe('repository workbench', () => {
     ]);
   });
 
+  it('confirms a plan execution review draft without completing a source tail action', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'reviews/weekly/2026-06-28-work-release-action-run-review-run-1-review.md') {
+        return [
+          '---',
+          'source: desktop-workbench-review-source-execution',
+          'workItemPath: work/active/release.md',
+          'tailActionId: action-run-review:run-1',
+          'sourceExecutionId: action-run-review:run-1',
+          'createdAt: 2026-06-28T10:00:00.000Z',
+          'status: draft',
+          '---',
+          '',
+          '# release 复盘草稿',
+          '',
+          '## 复盘正文',
+          '',
+          '- 本次推进：计划执行完成，知识更新已核对。',
+        ].join('\n');
+      }
+      if (relativePath === 'work/active/release.md') {
+        return [
+          '# 发布推进',
+          '',
+          '## 收尾动作',
+          '',
+          '- [ ] 根据 ActionRun 更新事项状态。',
+          '- [ ] 判断是否需要写入复盘。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const confirmed = await confirmWorkbenchReviewDraft(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        reviewPath: 'reviews/weekly/2026-06-28-work-release-action-run-review-run-1-review.md',
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'action-run-review:run-1',
+        reviewedAt: new Date('2026-06-28T11:00:00.000Z'),
+      },
+    );
+
+    expect(confirmed).toBe(true);
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(writeText.mock.calls[0]).toEqual([
+      '/repo',
+      'reviews/weekly/2026-06-28-work-release-action-run-review-run-1-review.md',
+      expect.stringContaining('status: confirmed'),
+    ]);
+    expect((writeText.mock.calls[0] as unknown as [string, string, string])[2]).toContain(
+      'reviewedAt: 2026-06-28T11:00:00.000Z',
+    );
+  });
+
   it('updates a work item status and completes the matching status tail action', async () => {
     const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
       if (relativePath === 'work/active/release.md') {

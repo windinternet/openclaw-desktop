@@ -537,9 +537,27 @@ export async function confirmWorkbenchReviewDraft(
   if (!reviewPath || !reviewPath.startsWith('reviews/') || !workItemPath || !workItemPath.startsWith('work/')) {
     return false;
   }
-  if (tailActionIndex === null) return false;
 
   const repository = getWorkbenchWriteApi();
+  if (isActionRunReviewTailActionId(input.tailActionId)) {
+    const reviewMarkdown = await repository.readText(binding.repoPath, reviewPath);
+    if (!/^status:\s*draft\s*$/m.test(reviewMarkdown)) return false;
+    if (readWorkbenchFrontmatterValue(reviewMarkdown, 'source') !== 'desktop-workbench-review-source-execution') {
+      return false;
+    }
+    if (readWorkbenchFrontmatterValue(reviewMarkdown, 'workItemPath') !== workItemPath) return false;
+    if (readWorkbenchFrontmatterValue(reviewMarkdown, 'tailActionId') !== input.tailActionId) return false;
+    if (readWorkbenchFrontmatterValue(reviewMarkdown, 'sourceExecutionId') !== input.tailActionId) return false;
+
+    const nextReview = markWorkbenchReviewDraftConfirmed(reviewMarkdown, input.reviewedAt ?? new Date());
+    if (!nextReview || nextReview === reviewMarkdown) return false;
+
+    await repository.writeText(binding.repoPath, reviewPath, nextReview);
+    return true;
+  }
+
+  if (tailActionIndex === null) return false;
+
   const [reviewMarkdown, workMarkdown] = await Promise.all([
     repository.readText(binding.repoPath, reviewPath),
     repository.readText(binding.repoPath, workItemPath),

@@ -342,7 +342,13 @@ export default function WorkbenchRepositoryPanel({
       }
       setSelectedPreviewContent(await readWorkbenchMarkdown(binding, selectedPreviewPath));
       setSnapshot(await loadWorkbenchSnapshot(binding));
-      Toast.success(t('workbench.reviewDraftConfirmed'));
+      Toast.success(
+        t(
+          context.id.startsWith('action-run-review:')
+            ? 'workbench.reviewSourceDraftConfirmed'
+            : 'workbench.reviewDraftConfirmed',
+        ),
+      );
     } catch (err) {
       Toast.error(err instanceof Error ? err.message : t('workbench.reviewDraftConfirmFailed'));
     } finally {
@@ -1422,13 +1428,16 @@ export default function WorkbenchRepositoryPanel({
     const reviewTailActionCanConfirm = Boolean(
       reviewTailActionContext.id && reviewTailActionContext.id.includes(':tail-action:'),
     );
+    const reviewSourceExecutionCanConfirm = Boolean(
+      reviewTailActionContext.id && reviewTailActionContext.id.startsWith('action-run-review:'),
+    );
     const reviewTailActionRunId = reviewTailActionContext.id?.startsWith('action-run-review:')
       ? reviewTailActionContext.id
       : undefined;
     const canConfirmReviewDraft =
       selectedPreviewPath.startsWith('reviews/') &&
       /^status:\s*draft\s*$/m.test(selectedPreviewContent) &&
-      reviewTailActionCanConfirm &&
+      (reviewTailActionCanConfirm || reviewSourceExecutionCanConfirm) &&
       Boolean(reviewTailActionContext.workItemPath && reviewTailActionContext.id);
     return (
       <div
@@ -1478,7 +1487,11 @@ export default function WorkbenchRepositoryPanel({
                 loading={reviewDraftConfirming}
                 onClick={() => void handleConfirmReviewDraft(reviewTailActionContext)}
               >
-                {t('workbench.confirmReviewDraft')}
+                {t(
+                  reviewSourceExecutionCanConfirm
+                    ? 'workbench.confirmReviewSourceDraft'
+                    : 'workbench.confirmReviewDraft',
+                )}
               </Button>
             ) : null}
           </Space>
