@@ -75,8 +75,11 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('Knowledge PDF/Office 资料导入第一片');
     expect(source).toContain('Repository 手动资产登记入口');
     expect(source).toContain('Repository 资产搜索入口');
+    expect(source).toContain('Repository 资产执行记录入口');
     expect(source).toContain('desktop.repository.assets.record');
     expect(source).toContain('desktop.repository.assets.search');
+    expect(source).toContain('desktop.repository.assets.execution.record');
+    expect(source).toContain('runs/assets/');
     expect(source).toContain('repository:extractKnowledgeFileText');
     expect(source).toContain('artifact-execution-review-command');
     expect(source).toContain('ActionRun 成果沉淀后的 Dashboard 去重');
@@ -347,6 +350,8 @@ describe('product goal P0 traceability', () => {
     expect(skillContent).toContain('Repository `outputs/assets/index.md`');
     expect(skillContent).toContain('desktop.repository.assets.record');
     expect(skillContent).toContain('desktop.repository.assets.search');
+    expect(skillContent).toContain('desktop.repository.assets.execution.record');
+    expect(skillContent).toContain('runs/assets/');
     expect(skillContent).toContain('post-run review clues');
     expect(skillContent).toContain('desktop.artifacts.execution.review.write');
   });

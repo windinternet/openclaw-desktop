@@ -1,4 +1,4 @@
-import type { ArtifactMeta, ArtifactReuseKind } from './artifact-types';
+import type { ArtifactExecutionStatus, ArtifactMeta, ArtifactReuseKind } from './artifact-types';
 import type { RepositoryBinding } from './agentic-repository';
 import { loadRepositoryBinding } from './agentic-repository-store';
 import { buildArtifactVersionHistory } from './artifact-version-history';
@@ -65,6 +65,7 @@ export interface RepositoryAssetSearchResult {
   summary?: string;
   valueHealth?: string;
   execution?: string;
+  lastRun?: string;
   review?: string;
   reviewResult?: string;
   tags: string[];
@@ -81,8 +82,39 @@ export interface RepositoryAssetSearchResultSet {
   results: RepositoryAssetSearchResult[];
 }
 
+export interface RecordRepositoryAssetExecutionParams {
+  binding: RepositoryBinding;
+  status: ArtifactExecutionStatus;
+  assetId?: string;
+  path?: string;
+  runner?: string;
+  command?: string;
+  resultSummary?: string;
+  outputArtifactId?: string;
+  repositoryOutputPath?: string;
+  workItemPath?: string;
+  executedAt?: Date | string | number;
+}
+
+export interface RepositoryAssetExecutionRecordResult {
+  indexPath: string;
+  runPath: string;
+  assetId: string;
+  assetPath: string;
+  title: string;
+  reuseKind: ArtifactReuseKind;
+  status: ArtifactExecutionStatus;
+  reviewSuggested: boolean;
+  reviewTarget?: string;
+  recordOnly: true;
+  desktopExecutes: false;
+  grantsPermission: false;
+}
+
 const DEFAULT_REPOSITORY_ASSET_INDEX_PATH = 'outputs/assets/index.md';
 const REPOSITORY_ASSET_REUSE_KINDS = new Set<ArtifactReuseKind>(['asset', 'template', 'tool', 'script', 'workflow']);
+const EXECUTABLE_REPOSITORY_ASSET_REUSE_KINDS = new Set<ArtifactReuseKind>(['tool', 'script', 'workflow']);
+const TERMINAL_ASSET_EXECUTION_STATUSES = new Set<ArtifactExecutionStatus>(['succeeded', 'failed', 'cancelled']);
 
 const TYPE_DIR: Record<string, string> = {
   report: 'reports',
@@ -359,6 +391,59 @@ export async function searchRepositoryAssetIndex(
   };
 }
 
+export async function recordRepositoryAssetExecution(
+  params: RecordRepositoryAssetExecutionParams,
+): Promise<RepositoryAssetExecutionRecordResult> {
+  const repository = getRepositoryWriteApi();
+  const indexPath = getRepositoryAssetIndexPath(params.binding);
+  const existingAssetIndex = await repository.readText(params.binding.repoPath, indexPath);
+  const assetPath = params.path ? normalizeRepositoryAssetPath(params.path, indexPath) : undefined;
+  const asset = findRepositoryAssetExecutionTarget(parseRepositoryAssetIndex(existingAssetIndex), {
+    assetId: params.assetId,
+    assetPath,
+  });
+  if (!asset) throw new Error('repository asset not found');
+  if (!EXECUTABLE_REPOSITORY_ASSET_REUSE_KINDS.has(asset.reuseKind)) {
+    throw new Error('repository asset is not executable');
+  }
+
+  const executedAt = normalizeRepositoryAssetExecutionDate(params.executedAt);
+  const runPath = buildRepositoryAssetExecutionRunPath(params.binding, asset.id, executedAt);
+  const reviewSuggested = TERMINAL_ASSET_EXECUTION_STATUSES.has(params.status);
+  const assetExecutionPath = asset.path ?? asset.output ?? asset.link;
+
+  await repository.writeText(
+    params.binding.repoPath,
+    runPath,
+    buildRepositoryAssetExecutionMarkdown({ asset, params, runPath, executedAt, reviewSuggested }),
+  );
+  await repository.writeText(
+    params.binding.repoPath,
+    indexPath,
+    updateRepositoryAssetIndexExecution(existingAssetIndex, asset, {
+      runPath,
+      status: params.status,
+      resultSummary: params.resultSummary,
+      reviewSuggested,
+    }),
+  );
+
+  return {
+    indexPath,
+    runPath,
+    assetId: asset.id,
+    assetPath: assetExecutionPath,
+    title: asset.title,
+    reuseKind: asset.reuseKind,
+    status: params.status,
+    reviewSuggested,
+    reviewTarget: reviewSuggested ? 'reviews/weekly/' : undefined,
+    recordOnly: true,
+    desktopExecutes: false,
+    grantsPermission: false,
+  };
+}
+
 export async function mirrorArtifactToReadyRepositoryOutput(
   instanceId: string,
   artifact: ArtifactMeta,
@@ -512,6 +597,7 @@ function parseRepositoryAssetIndex(indexMarkdown: string): RepositoryAssetSearch
         summary: metadata.get('summary'),
         valueHealth: metadata.get('valueHealth'),
         execution: metadata.get('execution'),
+        lastRun: metadata.get('lastRun'),
         review: metadata.get('review'),
         reviewResult: metadata.get('reviewResult'),
       }),
@@ -525,6 +611,138 @@ function parseRepositoryAssetIndex(indexMarkdown: string): RepositoryAssetSearch
   }
 
   return assets;
+}
+
+function findRepositoryAssetExecutionTarget(
+  assets: RepositoryAssetSearchResult[],
+  params: { assetId?: string; assetPath?: string },
+): RepositoryAssetSearchResult | undefined {
+  if (params.assetId) return assets.find((asset) => asset.id === params.assetId);
+  if (params.assetPath) {
+    return assets.find(
+      (asset) =>
+        asset.path === params.assetPath || asset.output === params.assetPath || asset.link === params.assetPath,
+    );
+  }
+  return undefined;
+}
+
+function buildRepositoryAssetExecutionMarkdown(params: {
+  asset: RepositoryAssetSearchResult;
+  params: RecordRepositoryAssetExecutionParams;
+  runPath: string;
+  executedAt: Date;
+  reviewSuggested: boolean;
+}): string {
+  const assetPath = params.asset.path ?? params.asset.output ?? params.asset.link;
+  const lines = [
+    '---',
+    `title: ${JSON.stringify(`仓库资产执行 - ${params.asset.title}`)}`,
+    'source: desktop-repository-asset-execution',
+    `assetId: ${params.asset.id}`,
+    `assetPath: ${assetPath}`,
+    `assetReuseKind: ${params.asset.reuseKind}`,
+    `status: ${params.params.status}`,
+    params.params.runner ? `runner: ${formatInlineText(params.params.runner)}` : undefined,
+    params.params.command ? `command: ${formatInlineText(params.params.command)}` : undefined,
+    params.params.outputArtifactId ? `outputArtifactId: ${params.params.outputArtifactId}` : undefined,
+    params.params.repositoryOutputPath ? `repositoryOutputPath: ${params.params.repositoryOutputPath}` : undefined,
+    params.params.workItemPath ? `workItemPath: ${params.params.workItemPath}` : undefined,
+    `runPath: ${params.runPath}`,
+    `executedAt: ${params.executedAt.toISOString()}`,
+    'recordOnly: true',
+    'desktopExecutes: false',
+    'grantsPermission: false',
+    '---',
+    '',
+    `# 仓库资产执行：${params.asset.title}`,
+    '',
+    '## 摘要',
+    '',
+    `- 资产：${params.asset.id}`,
+    `- 路径：${assetPath}`,
+    `- 类型：${params.asset.reuseKind}`,
+    `- 状态：${params.params.status}`,
+    params.params.runner ? `- 运行器：${params.params.runner}` : undefined,
+    params.params.command ? `- 命令：\`${params.params.command}\`` : undefined,
+    params.params.resultSummary ? `- 执行结果：${params.params.resultSummary}` : undefined,
+    params.params.outputArtifactId ? `- 输出产物：artifact://${params.params.outputArtifactId}` : undefined,
+    params.params.repositoryOutputPath ? `- 仓库输出：${params.params.repositoryOutputPath}` : undefined,
+    params.params.workItemPath ? `- 关联事项：${params.params.workItemPath}` : undefined,
+    '',
+    '## 复盘线索',
+    '',
+    params.reviewSuggested ? '- [ ] 写入 `reviews/weekly/` 复盘。' : '- 当前状态尚未进入终态复盘。',
+    params.reviewSuggested ? '- [ ] 关联输出、复用判断和后续动作。' : undefined,
+    '',
+    '## 边界',
+    '',
+    '- Desktop 只记录仓库资产执行事实，不执行资产。',
+    '- Desktop 不授予执行权限，不替代用户审批。',
+    '',
+  ];
+
+  return lines.filter((line): line is string => typeof line === 'string').join('\n');
+}
+
+function updateRepositoryAssetIndexExecution(
+  existingIndex: string,
+  asset: RepositoryAssetSearchResult,
+  execution: {
+    runPath: string;
+    status: ArtifactExecutionStatus;
+    resultSummary?: string;
+    reviewSuggested: boolean;
+  },
+): string {
+  const lines = existingIndex.trimEnd().split('\n');
+  let start = -1;
+  let end = -1;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const entryMatch = /^- \[[^\]]+]\([^)]+\) \(`([^`]+)`,/.exec(lines[index]);
+    if (!entryMatch || entryMatch[1] !== asset.id) continue;
+    start = index;
+    end = index + 1;
+    while (end < lines.length && lines[end].startsWith('  - ')) end += 1;
+    break;
+  }
+
+  if (start === -1 || end === -1) throw new Error('repository asset index entry not found');
+
+  const previousMetadataLines = lines.slice(start + 1, end);
+  const metadataLines = previousMetadataLines.filter(
+    (line) =>
+      !line.startsWith('  - execution:') &&
+      !line.startsWith('  - lastRun:') &&
+      !line.startsWith('  - review:') &&
+      !line.startsWith('  - reviewResult:'),
+  );
+  const previousExecutionLine = previousMetadataLines.find((line) => line.startsWith('  - execution:'));
+  const executionCount = parseRepositoryAssetExecutionCount(previousExecutionLine) + 1;
+  const executionLines = [
+    `  - execution: ${executionCount} events, last ${execution.status}`,
+    `  - lastRun: ${execution.runPath}`,
+    execution.reviewSuggested ? '  - review: pending, write reviews/weekly/ entry' : undefined,
+    execution.reviewSuggested && execution.resultSummary
+      ? `  - reviewResult: ${formatInlineText(execution.resultSummary)}`
+      : undefined,
+  ].filter((line): line is string => typeof line === 'string');
+  const boundaryIndex = metadataLines.findIndex((line) => line.startsWith('  - boundary:'));
+  const nextMetadataLines =
+    boundaryIndex === -1
+      ? [...metadataLines, ...executionLines]
+      : [...metadataLines.slice(0, boundaryIndex), ...executionLines, ...metadataLines.slice(boundaryIndex)];
+
+  return [...lines.slice(0, start + 1), ...nextMetadataLines, ...lines.slice(end)].join('\n').trimEnd() + '\n';
+}
+
+function parseRepositoryAssetExecutionCount(value: string | undefined): number {
+  if (!value) return 0;
+  const match = /execution:\s*(\d+)\s+events/.exec(value);
+  if (!match) return 0;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function ensureIndexTitle(existingIndex: string, title: string): string {
@@ -586,6 +804,19 @@ function slugRepositoryAssetId(value: string): string {
   );
 }
 
+function normalizeRepositoryAssetExecutionDate(value: Date | string | number | undefined): Date {
+  if (value === undefined) return new Date();
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) throw new Error('invalid repository asset execution date');
+  return date;
+}
+
+function buildRepositoryAssetExecutionRunPath(binding: RepositoryBinding, assetId: string, executedAt: Date): string {
+  const runsRoot = binding.paths.runs || 'runs';
+  const stamp = executedAt.toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-');
+  return `${runsRoot}/assets/${stamp}-${slugRepositoryAssetId(assetId)}.md`;
+}
+
 function formatRepositoryAssetDate(value: Date | string | number | undefined): string | undefined {
   if (value === undefined) return new Date().toISOString();
   const date = value instanceof Date ? value : new Date(value);
@@ -634,6 +865,7 @@ function buildRepositoryAssetSearchText(asset: RepositoryAssetSearchResult): str
     asset.summary,
     asset.valueHealth,
     asset.execution,
+    asset.lastRun,
     asset.review,
     asset.reviewResult,
     ...asset.tags,

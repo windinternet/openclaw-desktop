@@ -4,6 +4,7 @@ import {
   buildOutputMarkdown,
   createRepositoryOutput,
   mirrorArtifactToReadyRepositoryOutput,
+  recordRepositoryAssetExecution,
   recordRepositoryAssetIndexEntry,
   searchRepositoryAssetIndex,
 } from '../lib/repository-outputs';
@@ -734,6 +735,81 @@ describe('repository outputs', () => {
         },
       }),
     ]);
+  });
+
+  it('records repository-local executable asset runs into runs and refreshes the asset index', async () => {
+    const writeText = vi.fn();
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'outputs/assets/index.md') {
+        return [
+          '# Reusable Assets',
+          '- [发布检查脚本](../../tools/release-check.sh) (`tools-release-check-sh`, script, repository-manual)',
+          '  - source: repository-manual',
+          '  - path: tools/release-check.sh',
+          '  - version: 1',
+          '  - summary: 发布前检查脚本',
+          '  - boundary: recordOnly, desktopExecutes=false, grantsPermission=false',
+          '  - tags: release, check',
+          '',
+        ].join('\n');
+      }
+      return '';
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: {
+          writeText,
+          readText,
+        },
+      },
+    });
+
+    const result = await recordRepositoryAssetExecution({
+      binding: createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      assetId: 'tools-release-check-sh',
+      status: 'succeeded',
+      runner: 'Gateway Agent',
+      command: 'bash tools/release-check.sh',
+      resultSummary: '发布检查通过',
+      repositoryOutputPath: 'outputs/reports/release-check.md',
+      workItemPath: 'work/active/release.md',
+      executedAt: new Date('2026-06-29T01:02:03.000Z'),
+    });
+
+    expect(result).toEqual({
+      indexPath: 'outputs/assets/index.md',
+      runPath: 'runs/assets/20260629-010203-tools-release-check-sh.md',
+      assetId: 'tools-release-check-sh',
+      assetPath: 'tools/release-check.sh',
+      title: '发布检查脚本',
+      reuseKind: 'script',
+      status: 'succeeded',
+      reviewSuggested: true,
+      reviewTarget: 'reviews/weekly/',
+      recordOnly: true,
+      desktopExecutes: false,
+      grantsPermission: false,
+    });
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'runs/assets/20260629-010203-tools-release-check-sh.md',
+      expect.stringContaining('source: desktop-repository-asset-execution'),
+    );
+    const runWrite = writeText.mock.calls.find((call) => call[1] === result.runPath)?.[2] as string;
+    expect(runWrite).toContain('assetId: tools-release-check-sh');
+    expect(runWrite).toContain('assetPath: tools/release-check.sh');
+    expect(runWrite).toContain('status: succeeded');
+    expect(runWrite).toContain('- 运行器：Gateway Agent');
+    expect(runWrite).toContain('- 命令：`bash tools/release-check.sh`');
+    expect(runWrite).toContain('- 执行结果：发布检查通过');
+    expect(runWrite).toContain('- Desktop 只记录仓库资产执行事实，不执行资产。');
+
+    const indexWrite = writeText.mock.calls.find((call) => call[1] === 'outputs/assets/index.md')?.[2] as string;
+    expect(indexWrite).toContain('  - execution: 1 events, last succeeded');
+    expect(indexWrite).toContain('  - lastRun: runs/assets/20260629-010203-tools-release-check-sh.md');
+    expect(indexWrite).toContain('  - review: pending, write reviews/weekly/ entry');
+    expect(indexWrite).toContain('  - reviewResult: 发布检查通过');
+    expect(indexWrite).toContain('  - boundary: recordOnly, desktopExecutes=false, grantsPermission=false');
   });
 
   it('writes file artifacts into the repository files output bucket', async () => {

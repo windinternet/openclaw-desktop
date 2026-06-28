@@ -36,6 +36,7 @@ export const DESKTOP_NODE_COMMANDS = [
   'desktop.repository.write',
   'desktop.repository.assets.record',
   'desktop.repository.assets.search',
+  'desktop.repository.assets.execution.record',
   'desktop.repository.search',
   'desktop.repository.git.status',
   'desktop.repository.git.diff',

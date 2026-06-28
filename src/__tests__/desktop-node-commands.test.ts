@@ -4,6 +4,7 @@ import { artifactService } from '../lib/artifact-service';
 import { artifactPersistence } from '../lib/artifact-persistence';
 import {
   createRepositoryOutput,
+  recordRepositoryAssetExecution,
   recordRepositoryAssetIndexEntry,
   searchRepositoryAssetIndex,
 } from '../lib/repository-outputs';
@@ -34,6 +35,7 @@ vi.mock('../lib/repository-outputs', () => ({
     repositoryPreviewPath: output.previewPath,
   }),
   createRepositoryOutput: vi.fn(),
+  recordRepositoryAssetExecution: vi.fn(),
   recordRepositoryAssetIndexEntry: vi.fn(),
   searchRepositoryAssetIndex: vi.fn(),
 }));
@@ -41,6 +43,7 @@ vi.mock('../lib/repository-outputs', () => ({
 const mockedArtifactService = vi.mocked(artifactService);
 const mockedArtifactPersistence = vi.mocked(artifactPersistence);
 const mockedCreateRepositoryOutput = vi.mocked(createRepositoryOutput);
+const mockedRecordRepositoryAssetExecution = vi.mocked(recordRepositoryAssetExecution);
 const mockedRecordRepositoryAssetIndexEntry = vi.mocked(recordRepositoryAssetIndexEntry);
 const mockedSearchRepositoryAssetIndex = vi.mocked(searchRepositoryAssetIndex);
 
@@ -2212,6 +2215,68 @@ describe('desktop node commands', () => {
         query: '发布',
         reuseKind: 'script',
         limit: 5,
+      }),
+    );
+  });
+
+  it('records repository reusable asset execution facts through a structured repository command', async () => {
+    mockedRecordRepositoryAssetExecution.mockResolvedValue({
+      indexPath: 'outputs/assets/index.md',
+      runPath: 'runs/assets/20260629-010203-tools-release-check-sh.md',
+      assetId: 'tools-release-check-sh',
+      assetPath: 'tools/release-check.sh',
+      title: '发布检查脚本',
+      reuseKind: 'script',
+      status: 'succeeded',
+      reviewSuggested: true,
+      reviewTarget: 'reviews/weekly/',
+      recordOnly: true,
+      desktopExecutes: false,
+      grantsPermission: false,
+    });
+
+    await expect(
+      handleDesktopNodeCommand('desktop.repository.assets.execution.record', {
+        repoPath: '/repo',
+        gatewayInstanceId: 'inst-1',
+        assetId: 'tools-release-check-sh',
+        status: 'succeeded',
+        runner: 'Gateway Agent',
+        command: 'bash tools/release-check.sh',
+        resultSummary: '发布检查通过',
+        repositoryOutputPath: 'outputs/reports/release-check.md',
+        workItemPath: 'work/active/release.md',
+        executedAt: '2026-06-29T01:02:03.000Z',
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      execution: {
+        indexPath: 'outputs/assets/index.md',
+        runPath: 'runs/assets/20260629-010203-tools-release-check-sh.md',
+        assetId: 'tools-release-check-sh',
+        assetPath: 'tools/release-check.sh',
+        title: '发布检查脚本',
+        reuseKind: 'script',
+        status: 'succeeded',
+        reviewSuggested: true,
+        reviewTarget: 'reviews/weekly/',
+        recordOnly: true,
+        desktopExecutes: false,
+        grantsPermission: false,
+      },
+    });
+
+    expect(mockedRecordRepositoryAssetExecution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        binding: expect.objectContaining({ repoPath: '/repo', gatewayInstanceId: 'inst-1' }),
+        assetId: 'tools-release-check-sh',
+        status: 'succeeded',
+        runner: 'Gateway Agent',
+        command: 'bash tools/release-check.sh',
+        resultSummary: '发布检查通过',
+        repositoryOutputPath: 'outputs/reports/release-check.md',
+        workItemPath: 'work/active/release.md',
+        executedAt: new Date('2026-06-29T01:02:03.000Z'),
       }),
     );
   });

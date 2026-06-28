@@ -31,6 +31,7 @@ import {
   buildArtifactRepositoryOutputUpdates,
   createRepositoryOutput,
   recordRepositoryAssetIndexEntry,
+  recordRepositoryAssetExecution,
   searchRepositoryAssetIndex,
   type RepositoryOutputResult,
 } from './repository-outputs';
@@ -703,6 +704,33 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
     });
 
     return { ok: true, assets };
+  }
+
+  if (command === 'desktop.repository.assets.execution.record') {
+    const repoPath = stringValue(params.repoPath);
+    const assetId = stringValue(params.assetId);
+    const relativePath = stringValue(params.path);
+    if (!repoPath) return invalidParams('repoPath is required');
+    if (!assetId && !relativePath) return invalidParams('assetId or path is required');
+
+    const execution = await recordRepositoryAssetExecution({
+      binding: createDefaultRepositoryBinding({
+        gatewayInstanceId: stringValue(params.gatewayInstanceId) ?? 'desktop-node',
+        repoPath,
+      }),
+      assetId,
+      path: relativePath,
+      status: artifactExecutionStatusValue(params.status),
+      runner: stringValue(params.runner),
+      command: stringValue(params.command),
+      resultSummary: stringValue(params.resultSummary),
+      outputArtifactId: stringValue(params.outputArtifactId),
+      repositoryOutputPath: stringValue(params.repositoryOutputPath),
+      workItemPath: stringValue(params.workItemPath),
+      executedAt: dateValue(params.executedAt),
+    });
+
+    return { ok: true, execution };
   }
 
   if (command === 'desktop.repository.search') {

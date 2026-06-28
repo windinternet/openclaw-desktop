@@ -1577,6 +1577,21 @@ HTML 的独特优势：
 
 - 仍需要更完整的 Repository 资产目录协议、资产权限面板、资产运行记录 UI、运行后成果/知识/复盘联动，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
 
+### 10.78 2026-06-29 当前实施记录：Repository 资产执行记录入口
+
+围绕“可复用资产一等对象需要运行记录、产出关联和复盘线索”的 P0 缺口，当前继续补齐仓库本地资产的执行事实归档：
+
+- 新增 `recordRepositoryAssetExecution`，用于把 `outputs/assets/index.md` 中已有的仓库本地 `tool / script / workflow` 资产执行事实写入 `runs/assets/`。
+- 新增 Desktop node command `desktop.repository.assets.execution.record`，Gateway 可传入 `repoPath`、`assetId` 或仓库相对 `path`、`status`，以及可选 `runner`、`command`、`resultSummary`、`outputArtifactId`、`repositoryOutputPath`、`workItemPath` 和 `executedAt`。
+- 执行记录会写入 `runs/assets/YYYYMMDD-HHmmss-<assetId>.md`，frontmatter 和正文都保留资产 id、资产路径、复用分类、状态、runner、命令、结果摘要、关联输出、关联事项和只记录/不执行/不授权边界。
+- `outputs/assets/index.md` 会同步刷新 `execution: <n> events, last <status>`、`lastRun`，并在终态 `succeeded / failed / cancelled` 时写入 `review: pending, write reviews/weekly/ entry` 和 `reviewResult`。
+- `desktop.repository.assets.search` 现在也能通过 `lastRun` 检索到最近执行记录线索。
+- 该能力以当前代码事实为准：Desktop 只记录仓库资产执行事实，不执行资产、不授予权限、不自动写复盘、不更新事项状态、不沉淀成果、不更新知识库。
+
+仍未完成的 P0 后续：
+
+- 仍需要资产权限面板、资产运行记录 UI、运行后成果/知识/复盘联动，以及把仓库本地资产执行记录纳入更自然的“开始一件事”闭环。
+
 ### 10.77 2026-06-29 当前实施记录：Repository 资产搜索入口
 
 围绕“仓库中已有资产不仅要能登记，还要能被 Gateway 和 Agent 结构化找到”的 P0 缺口，当前继续补齐资产目录查询入口：
