@@ -4,6 +4,7 @@ import {
   normalizeArtifactAICreatePreviewDraft,
   parseArtifactAICreatePreview,
   parseArtifactAICreatePreviews,
+  selectArtifactAICreatePreviewsForSave,
 } from '../lib/artifact-ai-create-preview';
 
 describe('artifact AI create preview', () => {
@@ -87,6 +88,56 @@ describe('artifact AI create preview', () => {
       }),
     );
     expect(parseArtifactAICreatePreview('')).toBeNull();
+  });
+
+  it('selects multiple edited artifact candidates for explicit batch saving', () => {
+    const previews = parseArtifactAICreatePreviews(
+      [
+        '<artifact>',
+        JSON.stringify({
+          title: '交互式 HTML 仪表盘',
+          type: 'dashboard',
+          externalFormat: 'html',
+          contentSummary: 'HTML · 可交互推进仪表盘',
+        }),
+        '<!doctype html><html><body>dashboard</body></html>',
+        '</artifact>',
+        '<artifact>',
+        JSON.stringify({
+          title: '路线图链接',
+          type: 'link',
+          url: ' https://example.com/roadmap ',
+          externalFormat: 'link',
+          contentSummary: '链接 · 路线图入口',
+        }),
+        '</artifact>',
+        '<artifact>',
+        JSON.stringify({
+          title: '   ',
+          type: 'document',
+          externalFormat: 'word',
+          fileName: 'brief.docx',
+        }),
+        '</artifact>',
+      ].join('\n'),
+    );
+
+    const selected = selectArtifactAICreatePreviewsForSave(previews, [1, 0, 1, 99, -1]);
+
+    expect(selected).toHaveLength(2);
+    expect(selected.map((preview) => preview.title)).toEqual(['路线图链接', '交互式 HTML 仪表盘']);
+    expect(selected[0]).toEqual(
+      expect.objectContaining({
+        url: 'https://example.com/roadmap',
+        externalFormat: 'link',
+      }),
+    );
+    expect(selected[1]).toEqual(
+      expect.objectContaining({
+        html: '<!doctype html><html><body>dashboard</body></html>',
+        externalFormat: 'html',
+      }),
+    );
   });
 
   it('normalizes edited save metadata while keeping generated content', () => {

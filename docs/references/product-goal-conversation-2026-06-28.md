@@ -1441,10 +1441,11 @@ HTML 的独特优势：
 
 - AI 创建保存表单已支持多个候选产物；`parseArtifactAICreatePreviews` 会把一次响应里的多个 `<artifact>` 块保留为多个保存候选。
 - `parseArtifactAICreatePreview` 保持兼容旧调用，但会从候选列表中取最后一个候选作为单预览结果。
-- `ArtifactAICreateDrawer` 会保存完整候选列表，默认选中最新候选，并在预览区显示候选数量和候选按钮。
-- 用户选择某个候选后，点击保存时只会把 selected candidate 传给 `buildArtifactAICreateGenerateParams`，继续沿用现有 Artifact 保存、ActionRun `artifactIds` 回填和 `notifyActionRunsChanged` 观察刷新。
+- `ArtifactAICreateDrawer` 会保存完整候选列表，默认选中最新候选，并在预览区显示候选数量、候选按钮和“纳入本次保存”复选框。
+- 用户可显式选择一个或多个候选后保存；保存时会通过 `selectArtifactAICreatePreviewsForSave` 去重、过滤越界索引并规范化草稿，逐个把候选传给 `buildArtifactAICreateGenerateParams` / `generateArtifact`，继续沿用现有 Artifact 保存、ActionRun `artifactIds` 回填和 `notifyActionRunsChanged` 观察刷新。
+- 批量保存会把所有新 Artifact id 合并回来源 ActionRun，并逐个触发 `onSaved`，因此 Dashboard 输出尾动作回写可以记录多个有价值成果。
 - `artifact-create.md` 已要求：如果一次生成多个有价值产物，应连续输出多个 `<artifact>` 块，每个块只描述一个可单独保存的产物。
-- 该能力以当前代码事实为准：支持 multiple Artifact candidates 和 selected candidate 保存，但不会自动批量创建 Artifact，不会自动写 Repository output，不会读取任意本地文件，不会执行资产，不会授予权限，不会写 Wiki/index/log，不会写复盘，不会更新事项状态，不会移动事项文件。
+- 该能力以当前代码事实为准：支持 multiple Artifact candidates、selected candidate 编辑和 explicitly selected batch save；但不会自动批量创建 Artifact，不会自动写 Repository output，不会读取任意本地文件，不会执行资产，不会授予权限，不会写 Wiki/index/log，不会写复盘，不会更新事项状态，不会移动事项文件。
 
 仍未完成的 P0 后续：
 
@@ -1455,7 +1456,7 @@ HTML 的独特优势：
 围绕“AI 创建保存表单不能把 AI 输出当成不可修改事实”的 P0 体验缺口，当前继续补齐用户显式保存前的基础编辑：
 
 - AI 创建保存表单已支持保存前基础编辑；`ArtifactAICreateDrawer` 会在 selected candidate 上提供标题、类型、说明、标签和价值摘要输入控件。
-- 多候选场景下，每个候选保留自己的编辑状态；用户切换候选时，保存按钮仍只保存当前 selected candidate。
+- 多候选场景下，每个候选保留自己的编辑状态；用户切换候选只改变当前编辑对象，保存按钮会保存已显式勾选的候选集合。
 - 新增 `normalizeArtifactAICreatePreviewDraft`，在保存前裁剪标题、说明和 `contentSummary` 的首尾空白，移除空标签，并保留 HTML 正文、URL、命令、文件元数据、`externalFormat`、`reuseKind`、`importFile` 和来源 ActionRun。
 - 如果标题被清空，保存按钮会禁用，保存动作也会提示用户输入标题。
 - 该能力以当前代码事实为准：支持 edit title, type, description, tags, and content summary before saving；HTML 正文编辑在后续实施片中单独补齐。该基础编辑片不会编辑文件路径、链接、来源 ActionRun 或权限边界，不会自动批量创建 Artifact，不会自动写 Repository output，不会读取任意本地文件，不会执行资产，不会授予权限，不会写 Wiki/index/log，不会写复盘，不会更新事项状态，不会移动事项文件。
@@ -1469,7 +1470,7 @@ HTML 的独特优势：
 围绕“HTML 是 Desktop 特色产物，具备可视性与交互性，保存前不能把正文当成不可校正黑盒”的 P0 体验缺口，当前继续补齐 HTML 候选产物的保存前正文编辑：
 
 - AI 创建保存表单已支持保存前 HTML 正文编辑；当 selected candidate 携带 HTML 正文或 HTML 格式线索时，`ArtifactAICreateDrawer` 会显示 `artifact.aiCreateHtmlBody` 编辑区。
-- 用户校正后的 HTML 正文仍保存在同一个 selected candidate 草稿里；多候选场景下，每个候选保留自己的 HTML 草稿，保存按钮仍只保存当前 selected candidate。
+- 用户校正后的 HTML 正文仍保存在同一个 selected candidate 草稿里；多候选场景下，每个候选保留自己的 HTML 草稿，保存按钮会保存已显式勾选的候选集合。
 - `normalizeArtifactAICreatePreviewDraft` 会继续裁剪标题、说明和 `contentSummary` 的首尾空白、移除空标签，但会原样保留 HTML 正文，不裁剪正文首尾字符。
 - `buildArtifactAICreateGenerateParams` 会把校正后的 HTML 正文传给 `generateArtifact`；后续仍沿用现有 Artifact 保存、HTML 审计、ActionRun `artifactIds` 回填和 `notifyActionRunsChanged` 观察刷新。
 - 该能力以当前代码事实为准：支持保存前可编辑 HTML 正文，但不会自动检查或修复 HTML，不会编辑文件路径、链接、来源 ActionRun 或权限边界，不会自动批量创建 Artifact，不会自动写 Repository output，不会读取任意本地文件，不会执行资产，不会授予权限，不会写 Wiki/index/log，不会写复盘，不会更新事项状态，不会移动事项文件。
@@ -1485,7 +1486,7 @@ HTML 的独特优势：
 - AI 创建保存表单已支持保存前文件/链接细节编辑；`ArtifactAICreateDrawer` 会提供“格式、复用与文件/链接细节”编辑区。
 - 用户可在 selected candidate 上编辑 `externalFormat`、`reuseKind`、URL、命令、本地文件路径、文件名、文件大小、MIME，以及“保存时导入本地文件副本”。
 - 链接、命令、文件路径、文件名、MIME 等字符串元数据会在 `normalizeArtifactAICreatePreviewDraft` 中裁剪首尾空白；`buildArtifactAICreateGenerateParams` 会把校正后的细节传给 `generateArtifact`。
-- 多候选场景下，每个候选保留自己的文件/链接细节草稿；用户切换候选时，保存按钮仍只保存当前 selected candidate。
+- 多候选场景下，每个候选保留自己的文件/链接细节草稿；用户切换候选只改变当前编辑对象，保存按钮会保存已显式勾选的候选集合。
 - 该能力以当前代码事实为准：支持保存前可编辑 Artifact 文件/链接元数据，但不会在编辑时读取本地文件、打开链接、执行命令或授予权限；`importFile` 只会在用户显式保存时进入既有 Artifact 保存流程，不绕过现有文件导入和审计边界。该能力不自动批量创建 Artifact，不自动写 Repository output，不写 Wiki/index/log，不写复盘，不更新事项状态，不移动事项文件。
 
 仍未完成的 P0 后续：

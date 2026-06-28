@@ -93,6 +93,7 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('notifyActionRunsChanged');
     expect(source).toContain('artifact-ai-create-preview');
     expect(source).toContain('parseArtifactAICreatePreviews');
+    expect(source).toContain('selectArtifactAICreatePreviewsForSave');
     expect(source).toContain('normalizeArtifactAICreatePreviewDraft');
     expect(source).toContain('shouldOfferPlanExecutionOutputPreservation');
     expect(source).toContain('extractActionRunOutputCandidates');
@@ -324,7 +325,8 @@ describe('product goal P0 traceability', () => {
     expect(skillContent).toContain('artifact-ai-create-preview');
     expect(skillContent).toContain('rich `<artifact>` blocks');
     expect(skillContent).toContain('multiple Artifact candidates');
-    expect(skillContent).toContain('selected candidate');
+    expect(skillContent).toContain('one or more candidates');
+    expect(skillContent).toContain('multiple selected candidates');
     expect(skillContent).toContain('edit title, type, description, tags, content summary');
     expect(skillContent).toContain('edit the HTML body for HTML candidates');
     expect(skillContent).toContain('preserve HTML body exactly');

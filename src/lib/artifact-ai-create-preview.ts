@@ -80,6 +80,22 @@ export function normalizeArtifactAICreatePreviewDraft(preview: ArtifactAICreateP
   };
 }
 
+export function selectArtifactAICreatePreviewsForSave(
+  previews: ArtifactAICreatePreview[],
+  selectedIndexes: number[],
+): ArtifactAICreatePreview[] {
+  const seen = new Set<number>();
+  const selected: ArtifactAICreatePreview[] = [];
+  for (const index of selectedIndexes) {
+    if (!Number.isInteger(index) || index < 0 || index >= previews.length || seen.has(index)) continue;
+    seen.add(index);
+    const normalizedPreview = normalizeArtifactAICreatePreviewDraft(previews[index]);
+    if (!normalizedPreview.title) continue;
+    selected.push(normalizedPreview);
+  }
+  return selected;
+}
+
 export function buildArtifactAICreateGenerateParams(
   preview: ArtifactAICreatePreview,
   sourceRunId?: string,

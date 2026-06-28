@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   Modal,
   Button,
@@ -21,8 +21,8 @@ import { buildArtifactCreatePrompt } from '../lib/ai-action-prompts';
 import { upsertAiActionRun } from '../lib/ai-action-run-store';
 import {
   buildArtifactAICreateGenerateParams,
-  normalizeArtifactAICreatePreviewDraft,
   parseArtifactAICreatePreviews,
+  selectArtifactAICreatePreviewsForSave,
   type ArtifactAICreatePreview,
 } from '../lib/artifact-ai-create-preview';
 import { useWorkbenchWorkItemOptions } from '../lib/workbench-work-items';
@@ -150,11 +150,17 @@ export function ArtifactAICreateDrawer({
   const [generating, setGenerating] = useState(false);
   const [previews, setPreviews] = useState<ArtifactAICreatePreview[]>([]);
   const [selectedPreviewIndex, setSelectedPreviewIndex] = useState(0);
+  const [selectedPreviewIndexes, setSelectedPreviewIndexes] = useState<number[]>([]);
   const [previewRun, setPreviewRun] = useState<AiActionRun | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isGeneratingRef = useRef(false);
   const preview = previews[selectedPreviewIndex] ?? null;
-  const canSavePreview = Boolean(preview?.title.trim());
+  const selectedPreviewIndexSet = useMemo(() => new Set(selectedPreviewIndexes), [selectedPreviewIndexes]);
+  const previewsToSave = useMemo(
+    () => selectArtifactAICreatePreviewsForSave(previews, selectedPreviewIndexes),
+    [previews, selectedPreviewIndexes],
+  );
+  const canSavePreview = previewsToSave.length > 0;
   const canEditHtmlBody = Boolean(
     preview &&
     preview.html !== undefined &&
@@ -193,6 +199,7 @@ export function ArtifactAICreateDrawer({
     setGenerating(true);
     setPreviews([]);
     setSelectedPreviewIndex(0);
+    setSelectedPreviewIndexes([]);
     setPreviewRun(null);
     setError(null);
 
@@ -239,6 +246,7 @@ export function ArtifactAICreateDrawer({
         if (parsed.length > 0) {
           setPreviews(parsed);
           setSelectedPreviewIndex(parsed.length - 1);
+          setSelectedPreviewIndexes([parsed.length - 1]);
           setPreviewRun(latestRun);
         } else {
           setError('AI 未能生成有效的产物结构，请尝试更具体的描述');
@@ -275,40 +283,68 @@ export function ArtifactAICreateDrawer({
     [selectedPreviewIndex],
   );
 
-  const handleSave = useCallback(async () => {
-    if (!preview) return;
-    const normalizedPreview = normalizeArtifactAICreatePreviewDraft(preview);
-    if (!normalizedPreview.title) {
+  const togglePreviewSelection = useCallback((index: number, checked: boolean) => {
+    setSelectedPreviewIndexes((current) => {
+      if (checked) return Array.from(new Set([...current, index])).sort((a, b) => a - b);
+      return current.filter((candidateIndex) => candidateIndex !== index);
+    });
+  }, []);
+
+  const handleSaveSelectedPreviews = useCallback(async () => {
+    const previewsToSave = selectArtifactAICreatePreviewsForSave(previews, selectedPreviewIndexes);
+    if (previewsToSave.length === 0) {
       Toast.error('请输入产物标题');
       return;
     }
     try {
-      const artifact = await generateArtifact(buildArtifactAICreateGenerateParams(preview, previewRun?.id));
+      const savedArtifacts: ArtifactMeta[] = [];
+      for (const candidate of previewsToSave) {
+        const artifact = await generateArtifact(buildArtifactAICreateGenerateParams(candidate, previewRun?.id));
+        savedArtifacts.push(artifact);
+      }
       if (currentInstanceId && previewRun) {
         await upsertAiActionRun(currentInstanceId, {
           ...previewRun,
-          artifactIds: Array.from(new Set([...(previewRun.artifactIds ?? []), artifact.id])),
+          artifactIds: Array.from(
+            new Set([...(previewRun.artifactIds ?? []), ...savedArtifacts.map((artifact) => artifact.id)]),
+          ),
           updatedAt: Date.now(),
         });
         notifyActionRunsChanged();
       }
-      await onSaved?.(artifact);
-      Toast.success('产物已创建');
+      for (const artifact of savedArtifacts) {
+        await onSaved?.(artifact);
+      }
+      Toast.success(
+        savedArtifacts.length > 1 ? t('artifact.aiCreateSavedCount', { count: savedArtifacts.length }) : '产物已创建',
+      );
       setInput('');
       setPreviews([]);
       setSelectedPreviewIndex(0);
+      setSelectedPreviewIndexes([]);
       setPreviewRun(null);
       onClose();
     } catch (e) {
       Toast.error(String(e));
     }
-  }, [currentInstanceId, preview, previewRun, generateArtifact, notifyActionRunsChanged, onClose, onSaved]);
+  }, [
+    currentInstanceId,
+    previews,
+    selectedPreviewIndexes,
+    previewRun,
+    generateArtifact,
+    notifyActionRunsChanged,
+    onClose,
+    onSaved,
+    t,
+  ]);
 
   const handleClose = () => {
     if (!generating) {
       setInput('');
       setPreviews([]);
       setSelectedPreviewIndex(0);
+      setSelectedPreviewIndexes([]);
       setPreviewRun(null);
       setError(null);
       if (!workItemPath) setSelectedWorkItemPath('');
@@ -385,30 +421,40 @@ export function ArtifactAICreateDrawer({
             {previews.length > 1 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <Text type="tertiary" size="small">
-                  已识别 {previews.length} 个候选产物，选择一个保存
+                  {t('artifact.aiCreateCandidatesHint', { count: previews.length })}
                 </Text>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
                   {previews.map((candidate, index) => (
-                    <Button
+                    <div
                       key={`${candidate.title}-${index}`}
-                      theme={index === selectedPreviewIndex ? 'solid' : 'light'}
-                      type={index === selectedPreviewIndex ? 'primary' : 'tertiary'}
-                      onClick={() => setSelectedPreviewIndex(index)}
-                      style={{ minWidth: 0, justifyContent: 'flex-start' }}
+                      style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}
                     >
-                      <span
-                        style={{
-                          display: 'block',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          width: '100%',
-                          textAlign: 'left',
-                        }}
+                      <Button
+                        theme={index === selectedPreviewIndex ? 'solid' : 'light'}
+                        type={index === selectedPreviewIndex ? 'primary' : 'tertiary'}
+                        onClick={() => setSelectedPreviewIndex(index)}
+                        style={{ minWidth: 0, justifyContent: 'flex-start' }}
                       >
-                        候选 {index + 1} · {candidate.title}
-                      </span>
-                    </Button>
+                        <span
+                          style={{
+                            display: 'block',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            width: '100%',
+                            textAlign: 'left',
+                          }}
+                        >
+                          候选 {index + 1} · {candidate.title}
+                        </span>
+                      </Button>
+                      <Checkbox
+                        checked={selectedPreviewIndexSet.has(index)}
+                        onChange={(event) => togglePreviewSelection(index, event.target.checked === true)}
+                      >
+                        {t('artifact.aiCreateCandidateSelected')}
+                      </Checkbox>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -660,8 +706,10 @@ export function ArtifactAICreateDrawer({
               )}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <Button theme="solid" onClick={handleSave} disabled={!canSavePreview} style={{ flex: 1 }}>
-                保存产物
+              <Button theme="solid" onClick={handleSaveSelectedPreviews} disabled={!canSavePreview} style={{ flex: 1 }}>
+                {previews.length > 1
+                  ? t('artifact.aiCreateSaveSelected', { count: previewsToSave.length })
+                  : t('artifact.aiCreateSave')}
               </Button>
               <Button icon={<IconRefresh />} onClick={handleGenerate}>
                 重新生成

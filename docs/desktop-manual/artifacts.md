@@ -109,6 +109,8 @@ HTML 产物可以通过 `artifactBridge.exportAs(typeOrOptions, content, fileNam
 
 聊天和 ActionRun 都可以携带 `<artifact>` 块。普通聊天中已完成的 assistant 消息如果包含一个或多个 `<artifact>` 块，Desktop 会逐个解析并保存为 `source: chat` 的 Artifact；仓库绑定就绪时会走同一条 Repository `outputs/` 镜像路径并回写 output / preview 路径。终态 ActionRun 的 `lastAssistantResponse` 如果包含这些块，Desktop 会自动保存为 `source: action_run` 的 Artifact，并把 Artifact id 回写到对应 ActionRun。
 
+Artifacts 的 AI 创建保存表单会把一次响应里的多个 `<artifact>` 块保留为多个候选。用户可以切换候选编辑标题、类型、说明、标签、价值摘要、HTML 正文、文件和链接细节，并显式勾选一个或多个候选后保存；批量保存会逐个创建 Artifact，把所有新 Artifact id 合并回来源 ActionRun，并逐个触发来源事项成果回写。该入口不会自动批量创建 Artifact，不会自动写 Repository output，不会读取本地文件、打开链接、执行命令或授予权限。
+
 文件、链接、应用和媒体等非 HTML 产物也可以使用 `<artifact>` 块。文件型产物可在 JSON header 中提供 `filePath`、`fileName`、`fileSize`、`mimeType`、`externalFormat`、`contentSummary`、`reuseKind` 和 `importFile`。当 `importFile: true` 时，Desktop 会把本地文件复制进 Artifact storage，并通过 `originalFilePath` 保留来源路径。
 
 ## Repository outputs

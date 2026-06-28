@@ -54,7 +54,8 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('artifact-ai-create-preview');
     expect(skillContent).toContain('rich `<artifact>` blocks');
     expect(skillContent).toContain('multiple Artifact candidates');
-    expect(skillContent).toContain('selected candidate');
+    expect(skillContent).toContain('one or more candidates');
+    expect(skillContent).toContain('multiple selected candidates');
     expect(skillContent).toContain('edit title, type, description, tags, content summary');
     expect(skillContent).toContain('external format, reuse kind, URL, command, file path');
     expect(skillContent).toContain('trim file/link metadata strings');

@@ -7,7 +7,7 @@ describe('artifact ActionRun linkage', () => {
     const store = readFileSync('src/lib/ai-action-run-store.ts', 'utf8');
     const preview = readFileSync('src/lib/artifact-ai-create-preview.ts', 'utf8');
 
-    expect(source).toContain('buildArtifactAICreateGenerateParams(preview, previewRun?.id)');
+    expect(source).toContain('buildArtifactAICreateGenerateParams(candidate, previewRun?.id)');
     expect(preview).toContain("source: { type: 'action_run'");
     expect(source).toContain('artifactIds');
     expect(source).toContain('upsertAiActionRun(currentInstanceId');
@@ -37,6 +37,26 @@ describe('artifact ActionRun linkage', () => {
     expect(drawer).toContain('previews.map((candidate, index)');
     expect(drawer).toContain('setSelectedPreviewIndex(index)');
     expect(drawer).toContain('候选');
+  });
+
+  it('lets users explicitly select and save multiple AI-created artifact candidates', () => {
+    const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
+    const preview = readFileSync('src/lib/artifact-ai-create-preview.ts', 'utf8');
+    const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
+    const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
+
+    expect(preview).toContain('selectArtifactAICreatePreviewsForSave');
+    expect(drawer).toContain('const [selectedPreviewIndexes, setSelectedPreviewIndexes]');
+    expect(drawer).toContain('togglePreviewSelection');
+    expect(drawer).toContain('handleSaveSelectedPreviews');
+    expect(drawer).toContain('selectArtifactAICreatePreviewsForSave(previews, selectedPreviewIndexes)');
+    expect(drawer).toContain('for (const candidate of previewsToSave)');
+    expect(drawer).toContain('savedArtifacts.map((artifact) => artifact.id)');
+    expect(drawer).toContain('await onSaved?.(artifact)');
+    expect(drawer).toContain("t('artifact.aiCreateSaveSelected', { count: previewsToSave.length })");
+    expect(drawer).toContain("t('artifact.aiCreateCandidateSelected')");
+    expect(zh.artifact.aiCreateSaveSelected).toBeTruthy();
+    expect(en.artifact.aiCreateSaveSelected).toBeTruthy();
   });
 
   it('lets users edit selected AI-created artifact metadata before saving', () => {

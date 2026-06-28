@@ -102,6 +102,7 @@ Skill 应包含：
 - HTML 产物可通过 `artifactBridge.exportAs(typeOrOptions, content, fileName)` 请求导出 HTML、文本、Markdown 或 JSON；这会触发 `export` 授权和系统保存对话框，并把结果写入 `bridgeEvents`，不能用于静默写文件。
 - Artifact 会记录版本历史；新建产物是 v1，HTML 追加会增加版本，`desktop.artifacts.describe` 和 Repository output markdown 会暴露版本数量与最新版本信息。
 - 普通聊天里已完成的 assistant 消息可以包含一个或多个 `<artifact>` 块；Desktop 会逐个保存为 `source: chat` 的 Artifact，仓库绑定就绪时镜像到 Repository `outputs/`。
+- Artifacts 的 AI 创建保存表单会把一次响应里的多个 `<artifact>` 块保留为多个候选；用户可切换候选编辑标题、类型、说明、标签、价值摘要、HTML 正文、文件和链接细节，并显式勾选一个或多个候选后保存。批量保存会逐个创建 Artifact，把所有新 Artifact id 合并回来源 ActionRun，并逐个触发 `onSaved` 回写；该入口不会自动批量创建 Artifact、不自动写 Repository output、不读取本地文件、不打开链接、不执行命令、不授予权限。
 - 文件型产物可以通过 `filePath` 或 `url` 表示；本地文件可复制导入 Artifact storage，并交给系统文件处理器打开。
 - 非 HTML / Office / 文件 / 链接 / 应用入口产物会生成预览卡片，包含 format label、thumbnail label、summary、location、primary action 和 safety note；Artifacts UI、`desktop.artifacts.search`、`desktop.artifacts.describe` 和 Repository output markdown 会暴露同一份线索。Gateway-facing 的 `search/describe` 只暴露 `thumbnailAvailable`，不会返回图片 data URL。
 - 新产物会记录 `previewPlan`；文件型、Office、PDF、媒体、链接、应用入口和命令型产物可通过 `desktop.artifacts.inspect` 刷新 `fileInspection` 和 `previewPlan`，记录格式、来源类型、打开方式、安全预览策略、预览状态、摘要、路径、限制和下一步缺口；这是文件检查和预览计划事实，不读取内容、不渲染 Office、不执行命令、不授予权限。
