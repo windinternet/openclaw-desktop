@@ -248,6 +248,36 @@ describe('AI Action Center session rules', () => {
     });
   });
 
+  it('keeps batch repository write payloads on knowledge rewrite approvals', () => {
+    const run = createAiActionRun({
+      type: 'knowledge_rewrite',
+      sourcePage: 'knowledge',
+      instanceId: 'instance-1',
+      input: '消化资料 sources/raw.md',
+    });
+
+    const updated = applyAiActionAssistantResponse(
+      run,
+      `准备写入知识库。
+
+\`\`\`ai-action
+{"version":1,"kind":"approval_required","summary":"消化资料并更新知识库","approval":{"title":"写入知识库 Wiki/index/log","risk":"medium","reason":"将更新 wiki 条目、索引和日志"},"repositoryWrite":{"sourcePath":"sources/raw.md","writes":[{"path":"wiki/topics/raw.md","content":"# Raw\\n\\nReusable knowledge."},{"path":"wiki/index.md","content":"# Knowledge Index\\n\\n- [Raw](topics/raw.md)"},{"path":"wiki/log.md","content":"# Knowledge Log\\n\\n- 2026-06-28: digested sources/raw.md"}]}}
+\`\`\``,
+    );
+
+    expect(updated.status).toBe('awaiting_approval');
+    expect(updated.approvals?.[0].repositoryWrite).toEqual({
+      path: 'wiki/topics/raw.md',
+      content: '# Raw\n\nReusable knowledge.',
+      sourcePath: 'sources/raw.md',
+      writes: [
+        { path: 'wiki/topics/raw.md', content: '# Raw\n\nReusable knowledge.' },
+        { path: 'wiki/index.md', content: '# Knowledge Index\n\n- [Raw](topics/raw.md)' },
+        { path: 'wiki/log.md', content: '# Knowledge Log\n\n- 2026-06-28: digested sources/raw.md' },
+      ],
+    });
+  });
+
   it('captures the real Gateway agent id from a completed create response', () => {
     const run = createAiActionRun({
       type: 'gateway_agent_create',

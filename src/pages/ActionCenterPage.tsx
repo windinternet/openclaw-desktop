@@ -27,6 +27,7 @@ import {
 } from '../lib/ai-action-run-store';
 import { loadRepositoryBinding } from '../lib/agentic-repository-store';
 import { applyWorkbenchMatterPlanApproval, loadWorkbenchSnapshot } from '../lib/repository-workbench';
+import { applyKnowledgeRewriteApproval } from '../lib/repository-knowledge';
 import MarkdownView from '../components/MarkdownView';
 import { useStore } from '../lib';
 import type { AiActionApproval, AiActionRun, AiActionRunStatus } from '../lib/types';
@@ -229,6 +230,24 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
           updated = {
             ...updated,
             resultSummary: t('actions.workMatterPlanWritten', { path: writeResult.planPath }),
+            updatedAt: Date.now(),
+          };
+          await upsertAiActionRun(currentInstanceId, updated);
+          setRuns((current) => current.map((run) => (run.id === updated.id ? updated : run)));
+        }
+
+        if (decision === 'approved' && selectedRun.type === 'knowledge_rewrite' && approval.repositoryWrite) {
+          const binding = await loadRepositoryBinding(currentInstanceId);
+          if (!binding || binding.status !== 'repo_ready') {
+            throw new Error(t('actions.knowledgeRewriteWriteNoRepository'));
+          }
+          const writeResult = await applyKnowledgeRewriteApproval(binding, {
+            actionRunId: selectedRun.id,
+            repositoryWrite: approval.repositoryWrite,
+          });
+          updated = {
+            ...updated,
+            resultSummary: t('actions.knowledgeRewriteWritten', { count: writeResult.writtenPaths.length }),
             updatedAt: Date.now(),
           };
           await upsertAiActionRun(currentInstanceId, updated);

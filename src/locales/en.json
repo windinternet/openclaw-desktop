@@ -1181,6 +1181,8 @@
     "decisionFailed": "Failed to submit approval decision",
     "workMatterPlanWritten": "Work matter plan written: {{path}}",
     "workMatterPlanWriteNoRepository": "No writable local Repository is available for writing the work matter plan",
+    "knowledgeRewriteWritten": "Knowledge files written: {{count}}",
+    "knowledgeRewriteWriteNoRepository": "No writable local Repository is available for writing knowledge files",
     "notConnectedResync": "Not connected to Gateway, cannot resync",
     "resynced": "Resynced",
     "statusRefreshed": "Status refreshed",

@@ -10,6 +10,7 @@ import {
   buildKnowledgeUrlSourceImport,
   buildKnowledgeRepositoryMappingPrompt,
   buildKnowledgeRewritePrompt,
+  applyKnowledgeRewriteApproval,
   classifyKnowledgeSearchResult,
   extractMarkdownLinks,
   findBacklinks,
@@ -784,6 +785,81 @@ describe('repository knowledge', () => {
       sourceType: 'wiki',
     });
     expect(readText).toHaveBeenCalledWith('/repo', 'wiki/topics/agentic.md');
+  });
+
+  it('applies approved knowledge rewrite writes to wiki, index and log', async () => {
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { writeText },
+      },
+    });
+
+    const result = await applyKnowledgeRewriteApproval(
+      {
+        ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+        status: 'repo_ready',
+      },
+      {
+        actionRunId: 'run-knowledge-1',
+        repositoryWrite: {
+          path: 'wiki/topics/raw.md',
+          content: '# Raw\n\nReusable knowledge.',
+          sourcePath: 'sources/raw.md',
+          writes: [
+            { path: 'wiki/topics/raw.md', content: '# Raw\n\nReusable knowledge.' },
+            { path: 'wiki/index.md', content: '# Knowledge Index\n\n- [Raw](topics/raw.md)' },
+            { path: 'wiki/log.md', content: '# Knowledge Log\n\n- 2026-06-28: digested sources/raw.md' },
+          ],
+        },
+      },
+    );
+
+    expect(result.writtenPaths).toEqual(['wiki/topics/raw.md', 'wiki/index.md', 'wiki/log.md']);
+    expect(writeText).toHaveBeenCalledTimes(3);
+    expect(writeText).toHaveBeenNthCalledWith(1, '/repo', 'wiki/topics/raw.md', '# Raw\n\nReusable knowledge.');
+    expect(writeText).toHaveBeenNthCalledWith(
+      2,
+      '/repo',
+      'wiki/index.md',
+      '# Knowledge Index\n\n- [Raw](topics/raw.md)',
+    );
+    expect(writeText).toHaveBeenNthCalledWith(
+      3,
+      '/repo',
+      'wiki/log.md',
+      '# Knowledge Log\n\n- 2026-06-28: digested sources/raw.md',
+    );
+  });
+
+  it('rejects approved knowledge rewrite writes outside the knowledge wiki boundary', async () => {
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { writeText },
+      },
+    });
+
+    await expect(
+      applyKnowledgeRewriteApproval(
+        {
+          ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+          status: 'repo_ready',
+        },
+        {
+          actionRunId: 'run-knowledge-1',
+          repositoryWrite: {
+            path: 'wiki/topics/raw.md',
+            content: '# Raw',
+            writes: [
+              { path: 'wiki/topics/raw.md', content: '# Raw' },
+              { path: 'work/active/side-effect.md', content: '# Side effect' },
+            ],
+          },
+        },
+      ),
+    ).rejects.toThrow('Approved knowledge writes can only update wiki files');
+    expect(writeText).not.toHaveBeenCalled();
   });
 
   it('builds an approval-first prompt for automatic knowledge rewriting', () => {

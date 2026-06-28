@@ -2,6 +2,7 @@ import knowledgeSemanticMappingTemplate from '../prompts/repository/knowledge-se
 import type { KnowledgeRepositoryMapping, RepositoryBinding } from './agentic-repository';
 import type { KnowledgeExtractedFileFormat } from './knowledge-file-import';
 import { renderPromptTemplate } from './prompt-template';
+import type { AiActionRepositoryWrite, AiActionRepositoryWriteEntry } from './types';
 
 export interface RepositoryMarkdownFile {
   path: string;
@@ -109,6 +110,16 @@ export interface KnowledgeRepositoryMappingResponse {
   confidence?: 'low' | 'medium' | 'high';
   reason?: string;
   mapping?: KnowledgeRepositoryMapping;
+}
+
+export interface KnowledgeRewriteApprovalInput {
+  actionRunId: string;
+  repositoryWrite: AiActionRepositoryWrite;
+  approvedAt?: Date;
+}
+
+export interface KnowledgeRewriteApprovalResult {
+  writtenPaths: string[];
 }
 
 interface KnowledgeReadApi {
@@ -568,6 +579,18 @@ export async function writeKnowledgeHealthReview(
   return review;
 }
 
+export async function applyKnowledgeRewriteApproval(
+  binding: RepositoryBinding,
+  input: KnowledgeRewriteApprovalInput,
+): Promise<KnowledgeRewriteApprovalResult> {
+  const entries = normalizeApprovedKnowledgeWriteEntries(binding, input.repositoryWrite);
+  const repository = getKnowledgeWriteApi();
+  for (const entry of entries) {
+    await repository.writeText(binding.repoPath, entry.path, entry.content);
+  }
+  return { writtenPaths: entries.map((entry) => entry.path) };
+}
+
 export async function loadKnowledgeDocumentHistory(
   binding: RepositoryBinding,
   relativePath: string,
@@ -913,12 +936,13 @@ export function buildKnowledgeRewritePrompt(options: {
     '1. 先使用 desktop.repository.read / desktop.repository.search 读取资料源、现有 Wiki、index 和 log，不要臆造。',
     '2. sources/ 是事实源，默认不改写原始正文；可在 wiki/ 中沉淀可复用知识。',
     '3. 需要写入或改写任何仓库文件前，必须先输出 ```ai-action 的 approval_required，请列出将修改的路径和风险。',
-    '4. 用户批准后，才可使用 desktop.repository.write 写入 Wiki 条目、更新 wiki/index.md，并向 wiki/log.md 追加维护记录。',
-    '5. 完成后输出 ```ai-action 的 completed，summary 说明新增/更新的知识条目、索引和日志。',
+    `4. approval_required 必须携带 repositoryWrite.writes，逐项给出 Wiki 条目、index 和 log 的完整目标路径与完整文件内容；路径只能位于 ${binding.knowledge.wikiRoot}/，或正好是 ${binding.knowledge.indexPath} / ${binding.knowledge.logPath}。`,
+    '5. 用户批准后，Desktop 会通过 desktop.repository.write 按 repositoryWrite.writes 写入 Wiki 条目、更新 wiki/index.md，并向 wiki/log.md 追加维护记录。',
+    '6. 完成后输出 ```ai-action 的 completed，summary 说明新增/更新的知识条目、索引和日志。',
     '',
     '结构化审批示例：',
     '```ai-action',
-    '{"version":1,"kind":"approval_required","summary":"准备消化资料源并更新知识库","approval":{"title":"写入知识库 Wiki/index/log","risk":"medium","reason":"将通过 desktop.repository.write 修改 wiki 条目、wiki/index.md 和 wiki/log.md"}}',
+    '{"version":1,"kind":"approval_required","summary":"准备消化资料源并更新知识库","approval":{"title":"写入知识库 Wiki/index/log","risk":"medium","reason":"将写入 wiki 条目、wiki/index.md 和 wiki/log.md"},"repositoryWrite":{"sourcePath":"sources/raw.md","writes":[{"path":"wiki/topics/raw.md","content":"# Raw\\n\\n...完整 Wiki 内容..."},{"path":"wiki/index.md","content":"# Knowledge Index\\n\\n...完整索引内容..."},{"path":"wiki/log.md","content":"# Knowledge Log\\n\\n- 2026-06-28: 消化 sources/raw.md"}]}}',
     '```',
   ].join('\n');
 }
@@ -1175,6 +1199,60 @@ function normalizeFolderRelativePath(value: string): string {
   if (rawSegments.some((segment) => segment === '..')) throw new Error('Unsafe folder import path');
   const path = normalizePathSegments(rawSegments.join('/'));
   if (!path) throw new Error('Folder import relative path is required');
+  return path;
+}
+
+function normalizeApprovedKnowledgeWriteEntries(
+  binding: RepositoryBinding,
+  repositoryWrite: AiActionRepositoryWrite,
+): AiActionRepositoryWriteEntry[] {
+  const rawEntries =
+    repositoryWrite.writes && repositoryWrite.writes.length > 0
+      ? repositoryWrite.writes
+      : [{ path: repositoryWrite.path, content: repositoryWrite.content }];
+  const seen = new Set<string>();
+  const entries = rawEntries.map((entry) => {
+    const path = normalizeWritableKnowledgeMarkdownPath(entry.path);
+    const content = entry.content.trim();
+    if (!path || !content || !isApprovedKnowledgeWritePath(binding, path) || seen.has(path)) {
+      throw new Error('Approved knowledge writes can only update wiki files');
+    }
+    seen.add(path);
+    return { path, content };
+  });
+  if (entries.length === 0) throw new Error('Approved knowledge write payload is empty');
+  return entries;
+}
+
+function isApprovedKnowledgeWritePath(binding: RepositoryBinding, path: string): boolean {
+  const sourceRoot = normalizeKnowledgeWriteRoot(binding.knowledge.sourceRoot);
+  if (isPathWithinKnowledgeRoot(path, sourceRoot)) return false;
+
+  const indexPath = normalizeWritableKnowledgeMarkdownPath(binding.knowledge.indexPath);
+  const logPath = normalizeWritableKnowledgeMarkdownPath(binding.knowledge.logPath);
+  if (path === indexPath || path === logPath) return true;
+
+  const wikiRoot = normalizeKnowledgeWriteRoot(binding.knowledge.wikiRoot);
+  return isPathWithinKnowledgeRoot(path, wikiRoot);
+}
+
+function normalizeKnowledgeWriteRoot(value: string): string {
+  return value
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^\/+|\/+$/g, '');
+}
+
+function isPathWithinKnowledgeRoot(path: string, root: string): boolean {
+  return Boolean(path && root && path === root) || path.startsWith(`${root}/`);
+}
+
+function normalizeWritableKnowledgeMarkdownPath(value: string): string | null {
+  const path = value.trim().replace(/\\/g, '/').replace(/^\/+/, '');
+  const segments = path.split('/');
+  if (!path.endsWith('.md') || segments.some((segment) => !segment || segment === '.' || segment === '..')) {
+    return null;
+  }
   return path;
 }
 

@@ -142,10 +142,16 @@ export type AiActionRunStatus =
 
 export type AiActionExecutionMode = 'isolated-session' | 'domain-thread' | 'subagent-tree' | 'local-bridge';
 
-export interface AiActionRepositoryWrite {
+export interface AiActionRepositoryWriteEntry {
   path: string;
   content: string;
+}
+
+export interface AiActionRepositoryWrite extends AiActionRepositoryWriteEntry {
   workItemPath?: string;
+  sourcePath?: string;
+  selectedPath?: string;
+  writes?: AiActionRepositoryWriteEntry[];
 }
 
 export interface AiActionApproval {

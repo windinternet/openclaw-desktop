@@ -149,16 +149,35 @@ function normalizeRisk(value: unknown): 'low' | 'medium' | 'high' {
   return value === 'high' || value === 'low' ? value : 'medium';
 }
 
-function normalizeRepositoryWrite(value: unknown): AiActionRepositoryWrite | undefined {
+function normalizeRepositoryWriteEntry(value: unknown): { path: string; content: string } | undefined {
   if (!isRecord(value)) return undefined;
   const path = typeof value.path === 'string' ? value.path.trim() : '';
   const content = typeof value.content === 'string' ? value.content.trim() : '';
-  const workItemPath = typeof value.workItemPath === 'string' ? value.workItemPath.trim() : '';
   if (!path || !content) return undefined;
+  return { path, content };
+}
+
+function normalizeRepositoryWrite(value: unknown): AiActionRepositoryWrite | undefined {
+  if (!isRecord(value)) return undefined;
+  const singleWrite = normalizeRepositoryWriteEntry(value);
+  const writes = Array.isArray(value.writes)
+    ? value.writes
+        .map(normalizeRepositoryWriteEntry)
+        .filter((entry): entry is { path: string; content: string } => Boolean(entry))
+    : [];
+  const firstWrite = singleWrite ?? writes[0];
+  if (!firstWrite) return undefined;
+
+  const workItemPath = typeof value.workItemPath === 'string' ? value.workItemPath.trim() : '';
+  const sourcePath = typeof value.sourcePath === 'string' ? value.sourcePath.trim() : '';
+  const selectedPath = typeof value.selectedPath === 'string' ? value.selectedPath.trim() : '';
   return {
-    path,
-    content,
+    path: firstWrite.path,
+    content: firstWrite.content,
     workItemPath: workItemPath || undefined,
+    sourcePath: sourcePath || undefined,
+    selectedPath: selectedPath || undefined,
+    writes: writes.length > 0 ? writes : undefined,
   };
 }
 

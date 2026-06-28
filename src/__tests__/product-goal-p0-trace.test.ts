@@ -147,6 +147,9 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('confirmWorkbenchKnowledgeTailAction');
     expect(plans).toContain('发起知识更新 ActionRun');
     expect(plans).toContain('显式确认该尾动作');
+    expect(plans).toContain('Knowledge 审批写入 Wiki/index/log');
+    expect(plans).toContain('repositoryWrite.writes');
+    expect(plans).toContain('applyKnowledgeRewriteApproval');
     expect(plans).toContain('归档完成事项');
     expect(plans).toContain('workItemRequired: true');
     expect(plans).toContain('已有无事项运行的补归属流程已接入 ActionCenter');
@@ -294,10 +297,14 @@ describe('product goal P0 traceability', () => {
     expect(roadmap).toContain('action-run-review:<runId>');
     expect(roadmap).toContain('applyWorkbenchMatterPlanApproval');
     expect(roadmap).toContain('repositoryWrite.path/content/workItemPath');
+    expect(roadmap).toContain('applyKnowledgeRewriteApproval');
+    expect(roadmap).toContain('repositoryWrite.writes');
     expect(skillContent).toContain('Screenshot-confirmed P0 baseline');
     expect(skillContent).toContain('Do not demote these scopes to P1/P2');
     expect(skillContent).toContain('Knowledge tail actions can start a source-bound `knowledge_rewrite` ActionRun');
     expect(skillContent).toContain('check off only the matching source knowledge tail action');
+    expect(skillContent).toContain('applyKnowledgeRewriteApproval');
+    expect(skillContent).toContain('repositoryWrite.writes');
     expect(skillContent).toContain('work/completed/*.md');
     expect(skillContent).toContain('workItemUnassignedReason: pending_work_item_assignment');
     expect(skillContent).toContain('ActionCenter can let the user choose an existing work item to backfill assignment');
@@ -370,6 +377,8 @@ describe('product goal P0 traceability', () => {
     expect(skillContent).toContain('Review Confirmed');
     expect(skillContent).toContain('applyWorkbenchMatterPlanApproval');
     expect(skillContent).toContain('repositoryWrite.path/content/workItemPath');
+    expect(skillContent).toContain('applyKnowledgeRewriteApproval');
+    expect(skillContent).toContain('repositoryWrite.writes');
     expect(skillContent).toContain('Artifacts UI also exposes a reuse-kind filter');
     expect(skillContent).toContain('Repository `outputs/assets/index.md`');
     expect(skillContent).toContain('desktop.repository.assets.record');
