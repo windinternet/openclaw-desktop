@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   findPlanExecutionKnowledgeFollowUpRuns,
   findLatestPlanExecutionRun,
+  findPlanExecutionReviewState,
   getPlanExecutionPlanPath,
   shouldOfferPlanExecutionKnowledgeUpdate,
   shouldOfferPlanExecutionOutputPreservation,
@@ -317,6 +318,64 @@ describe('workbench plan execution observability', () => {
     ].join('\n');
 
     expect(shouldOfferPlanExecutionReview(planRun, { reviewDocuments: [{ content: reviewMarkdown }] })).toBe(false);
+  });
+
+  it('reports source-bound plan execution review draft and confirmed states', () => {
+    const planRun = createRun({
+      id: 'run-plan',
+      status: 'done',
+      resultSummary: '完成打包验证，需要复盘遗留风险',
+      workItemPath: 'work/active/release.md',
+    });
+    const draftReviewMarkdown = [
+      '---',
+      'source: desktop-workbench-review-source-execution',
+      'workItemPath: work/active/release.md',
+      'tailActionId: action-run-review:run-plan',
+      'sourceExecutionId: action-run-review:run-plan',
+      'status: draft',
+      '---',
+      '',
+      '# release 复盘草稿',
+    ].join('\n');
+    const confirmedReviewMarkdown = [
+      '---',
+      'source: desktop-workbench-review-source-execution',
+      'workItemPath: work/active/release.md',
+      'tailActionId: action-run-review:run-plan',
+      'sourceExecutionId: action-run-review:run-plan',
+      'status: confirmed',
+      'reviewedAt: 2026-06-28T11:00:00.000Z',
+      '---',
+      '',
+      '# release 复盘',
+    ].join('\n');
+    const otherMatterReviewMarkdown = [
+      '---',
+      'workItemPath: work/active/other.md',
+      'sourceExecutionId: action-run-review:run-plan',
+      'status: confirmed',
+      '---',
+    ].join('\n');
+
+    expect(
+      findPlanExecutionReviewState(planRun, {
+        reviewDocuments: [{ path: 'reviews/weekly/draft.md', content: draftReviewMarkdown }],
+      }),
+    ).toEqual({ status: 'draft', path: 'reviews/weekly/draft.md', reviewedAt: undefined });
+    expect(
+      findPlanExecutionReviewState(planRun, {
+        reviewDocuments: [
+          { path: 'reviews/weekly/draft.md', content: draftReviewMarkdown },
+          { path: 'reviews/weekly/confirmed.md', content: confirmedReviewMarkdown },
+          { path: 'reviews/weekly/other.md', content: otherMatterReviewMarkdown },
+        ],
+      }),
+    ).toEqual({
+      status: 'confirmed',
+      path: 'reviews/weekly/confirmed.md',
+      reviewedAt: '2026-06-28T11:00:00.000Z',
+    });
   });
 
   it('still offers review draft creation when the existing source execution review belongs to another matter', () => {

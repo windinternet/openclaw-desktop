@@ -1341,6 +1341,10 @@ describe('repository workbench', () => {
     const en = readFileSync('src/locales/en.json', 'utf8');
 
     expect(source).toContain('shouldOfferPlanExecutionReview');
+    expect(source).toContain('findPlanExecutionReviewState');
+    expect(source).toContain('selectedPlanReviewState');
+    expect(source).toContain('workbench.planExecutionReviewDraft');
+    expect(source).toContain('workbench.planExecutionReviewConfirmed');
     expect(source).toContain('reviewDocuments: snapshot?.reviewDocuments');
     expect(source).toContain('relatedKnowledgeRunIds');
     expect(source).toContain('selectedPlanRelatedKnowledgeRunIds');
@@ -1354,11 +1358,15 @@ describe('repository workbench', () => {
     expect(zh).toContain('"writePlanExecutionReview": "写复盘"');
     expect(zh).toContain('"writePlanExecutionReviewWithKnowledge": "复盘知识更新"');
     expect(zh).toContain('"writePlanExecutionReviewWithKnowledgeHint": "复盘草稿会带入同源知识更新记录"');
+    expect(zh).toContain('"planExecutionReviewDraft": "复盘草稿"');
+    expect(zh).toContain('"planExecutionReviewConfirmed": "已复盘"');
     expect(en).toContain('"writePlanExecutionReview": "Write Review"');
     expect(en).toContain('"writePlanExecutionReviewWithKnowledge": "Review Knowledge Update"');
     expect(en).toContain(
       '"writePlanExecutionReviewWithKnowledgeHint": "The review draft will include source-bound knowledge updates"',
     );
+    expect(en).toContain('"planExecutionReviewDraft": "Review Draft"');
+    expect(en).toContain('"planExecutionReviewConfirmed": "Review Confirmed"');
   });
 
   it('wires ActionCenter unassigned ActionRun backfill to repository work items', () => {

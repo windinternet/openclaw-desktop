@@ -28,6 +28,7 @@ import { extractWorkbenchMatterId, isWorkbenchMatterPath } from '../lib/workbenc
 import {
   findPlanExecutionKnowledgeFollowUpRuns,
   findLatestPlanExecutionRun,
+  findPlanExecutionReviewState,
   shouldOfferPlanExecutionKnowledgeUpdate,
   shouldOfferPlanExecutionOutputPreservation,
   shouldOfferPlanExecutionReview,
@@ -1544,6 +1545,9 @@ export default function WorkbenchRepositoryPanel({
   const selectedPlanCanWriteReview = shouldOfferPlanExecutionReview(selectedPlanLatestRun, {
     reviewDocuments: snapshot?.reviewDocuments,
   });
+  const selectedPlanReviewState = findPlanExecutionReviewState(selectedPlanLatestRun, {
+    reviewDocuments: snapshot?.reviewDocuments,
+  });
   const selectedPlanReviewHasKnowledgeContext = selectedPlanRelatedKnowledgeRunIds.length > 0;
   const previewTitle =
     panelView === 'projects' ? t('workbench.projectPreview') : selectedPreviewPath || t('workbench.preview');
@@ -1716,6 +1720,15 @@ export default function WorkbenchRepositoryPanel({
                           <Tag color={actionStatusColor(selectedPlanLatestRun.status)}>
                             {t(ACTION_STATUS_LABEL_KEYS[selectedPlanLatestRun.status])}
                           </Tag>
+                          {selectedPlanReviewState && (
+                            <Tag color={selectedPlanReviewState.status === 'confirmed' ? 'green' : 'orange'}>
+                              {t(
+                                selectedPlanReviewState.status === 'confirmed'
+                                  ? 'workbench.planExecutionReviewConfirmed'
+                                  : 'workbench.planExecutionReviewDraft',
+                              )}
+                            </Tag>
+                          )}
                           <Button size="small" type="tertiary" onClick={() => navigate('/actions')}>
                             {t('workbench.openPlanExecutionRuns')}
                           </Button>

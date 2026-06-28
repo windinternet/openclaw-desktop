@@ -1,7 +1,13 @@
 import type { AiActionRun } from './types';
 import { isWorkbenchMatterPath } from './workbench-matter';
 
-export type PlanExecutionReviewDocument = string | { content: string };
+export type PlanExecutionReviewDocument = string | { content: string; path?: string };
+
+export interface PlanExecutionReviewState {
+  status: 'draft' | 'confirmed';
+  path?: string;
+  reviewedAt?: string;
+}
 
 export interface PlanExecutionFollowUpContext {
   actionRuns?: readonly AiActionRun[];
@@ -83,22 +89,45 @@ export function findPlanExecutionKnowledgeFollowUpRuns(
   );
 }
 
+export function findPlanExecutionReviewState(
+  run: AiActionRun | undefined,
+  context: PlanExecutionFollowUpContext = {},
+): PlanExecutionReviewState | undefined {
+  const states = findPlanExecutionReviewStates(run, context);
+  return states.find((state) => state.status === 'confirmed') ?? states[0];
+}
+
 function hasPlanExecutionKnowledgeFollowUp(run: AiActionRun, context: PlanExecutionFollowUpContext): boolean {
   return findPlanExecutionKnowledgeFollowUpRuns(run, context).length > 0;
 }
 
 function hasPlanExecutionReviewFollowUp(run: AiActionRun, context: PlanExecutionFollowUpContext): boolean {
+  return Boolean(findPlanExecutionReviewState(run, context));
+}
+
+function findPlanExecutionReviewStates(
+  run: AiActionRun | undefined,
+  context: PlanExecutionFollowUpContext,
+): PlanExecutionReviewState[] {
+  if (!run?.workItemPath) return [];
   const sourceExecutionId = `action-run-review:${run.id}`;
-  return Boolean(
-    context.reviewDocuments?.some((document) => {
-      const content = typeof document === 'string' ? document : document.content;
-      return (
-        hasFrontmatterValue(content, 'workItemPath', run.workItemPath) &&
-        (hasFrontmatterValue(content, 'sourceExecutionId', sourceExecutionId) ||
-          hasFrontmatterValue(content, 'tailActionId', sourceExecutionId))
-      );
-    }),
-  );
+  const states: PlanExecutionReviewState[] = [];
+  for (const document of context.reviewDocuments ?? []) {
+    const content = typeof document === 'string' ? document : document.content;
+    if (
+      !hasFrontmatterValue(content, 'workItemPath', run.workItemPath) ||
+      (!hasFrontmatterValue(content, 'sourceExecutionId', sourceExecutionId) &&
+        !hasFrontmatterValue(content, 'tailActionId', sourceExecutionId))
+    ) {
+      continue;
+    }
+    states.push({
+      status: getFrontmatterValue(content, 'status') === 'confirmed' ? 'confirmed' : 'draft',
+      path: typeof document === 'string' ? undefined : document.path,
+      reviewedAt: getFrontmatterValue(content, 'reviewedAt'),
+    });
+  }
+  return states;
 }
 
 function isActiveFollowUpRun(run: AiActionRun): boolean {
@@ -107,9 +136,13 @@ function isActiveFollowUpRun(run: AiActionRun): boolean {
 
 function hasFrontmatterValue(markdown: string, key: string, value?: string): boolean {
   if (!value) return false;
+  return getFrontmatterValue(markdown, key) === value;
+}
+
+function getFrontmatterValue(markdown: string, key: string): string | undefined {
   const escapedKey = escapeRegExp(key);
-  const escapedValue = escapeRegExp(value);
-  return new RegExp(`^${escapedKey}:\\s*${escapedValue}\\s*$`, 'm').test(markdown);
+  const match = new RegExp(`^${escapedKey}:\\s*(.+?)\\s*$`, 'm').exec(markdown);
+  return match?.[1]?.trim();
 }
 
 function escapeRegExp(value: string): string {

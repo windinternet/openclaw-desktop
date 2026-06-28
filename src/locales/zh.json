@@ -184,6 +184,8 @@
     "writePlanExecutionReview": "写复盘",
     "writePlanExecutionReviewWithKnowledge": "复盘知识更新",
     "writePlanExecutionReviewWithKnowledgeHint": "复盘草稿会带入同源知识更新记录",
+    "planExecutionReviewDraft": "复盘草稿",
+    "planExecutionReviewConfirmed": "已复盘",
     "createArtifactForMatter": "生成成果",
     "tailActionContextTitle": "待处理收尾动作",
     "tailActionContextDesc": "来自 Dashboard 的事项收尾动作，先核对来源事项后继续处理。",
