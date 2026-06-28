@@ -247,8 +247,9 @@ HTML 产物是特色能力：
 - Knowledge 页面新增“未消化资料”视图，`/knowledge?section=digest` 会打开队列，并支持对单条资料发起 `knowledge_rewrite` 消化 ActionRun。
 - Knowledge 页面新增“导入文本”入口，可把粘贴内容写入 `sources/imported/YYYY-MM-DD-HHmmss-*.md`，frontmatter 标记 `source: desktop-paste`，导入后刷新 Snapshot、切到未消化资料队列并打开新资料源。
 - Knowledge 页面新增“导入文件”入口，可通过系统文件选择器读取本地 Markdown/TXT 文本文件，写入 `sources/imported/YYYY-MM-DD-HHmmss-*.md`，frontmatter 标记 `source: desktop-file`、原始文件名和 MIME 类型，导入后刷新 Snapshot、切到未消化资料队列并打开最后一个导入的资料源。
+- Knowledge 页面新增“拖拽导入”入口，可把本地 Markdown/TXT 文本文件拖入 Knowledge 页面，复用 `source: desktop-file` 写入 `sources/imported/` 并进入未消化资料队列。
 - Knowledge 页面新增“剪藏 URL”入口，可把网页链接和可选摘录/备注写入 `sources/imported/YYYY-MM-DD-HHmmss-*.md`，frontmatter 标记 `source: desktop-url` 和 `url`；当前不后台抓取网页正文。
-- 当前健康检查只做可观测事实，不自动写入 `reviews/weekly/`，也不自动修复索引、Wiki 或资料来源；文件夹导入、拖拽导入和 Office/PDF/二进制内容导入仍是 P0 后续。
+- 当前健康检查只做可观测事实，不自动写入 `reviews/weekly/`，也不自动修复索引、Wiki 或资料来源；文件夹导入和 Office/PDF/二进制内容导入仍是 P0 后续。
 
 验收：
 

@@ -199,6 +199,8 @@
     "importFileSource": "Import Files",
     "importFileDone": "{{count}} text file(s) imported and added to the undigested queue.",
     "importFileFailed": "Failed to import files",
+    "dropFilesToImport": "Drop to import source files",
+    "dropFilesToImportDesc": "Markdown / TXT text files enter the undigested queue after import.",
     "importUrlSource": "Clip URL",
     "importUrlConfirm": "Import to Sources",
     "importUrlPlaceholder": "Paste a web URL, e.g. https://example.com/article",

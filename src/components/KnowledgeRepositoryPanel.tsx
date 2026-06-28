@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { type DragEvent, useEffect, useRef, useState } from 'react';
 import {
   Button,
   Card,
@@ -39,6 +39,7 @@ import {
 import MarkdownView from './MarkdownView';
 
 const { Text, Title } = Typography;
+const KNOWLEDGE_TEXT_FILE_EXTENSIONS = ['.md', '.markdown', '.txt'];
 
 export type KnowledgeSection =
   | 'dashboard'
@@ -79,6 +80,7 @@ export default function KnowledgeRepositoryPanel({
   const [activeSection, setActiveSection] = useState<KnowledgeSection>(section ?? 'wiki');
   const [showImportText, setShowImportText] = useState(false);
   const [showImportUrl, setShowImportUrl] = useState(false);
+  const [dragImportActive, setDragImportActive] = useState(false);
   const [importTitle, setImportTitle] = useState('');
   const [importBody, setImportBody] = useState('');
   const [importUrl, setImportUrl] = useState('');
@@ -201,8 +203,8 @@ export default function KnowledgeRepositoryPanel({
     }
   };
 
-  const handleImportFiles = async (files: FileList | null) => {
-    const selectedFiles = Array.from(files ?? []);
+  const handleImportFiles = async (files: FileList | File[] | null) => {
+    const selectedFiles = Array.from(files ?? []).filter(isKnowledgeTextFile);
     if (selectedFiles.length === 0) return;
 
     setImportLoading(true);
@@ -229,6 +231,25 @@ export default function KnowledgeRepositoryPanel({
       setImportLoading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  const handleImportDragOver = (event: DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes('Files')) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    setDragImportActive(true);
+  };
+
+  const handleImportDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+    setDragImportActive(false);
+  };
+
+  const handleImportDrop = (event: DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes('Files')) return;
+    event.preventDefault();
+    setDragImportActive(false);
+    void handleImportFiles(event.dataTransfer.files);
   };
 
   const handleKnowledgeRewrite = async (
@@ -781,263 +802,302 @@ export default function KnowledgeRepositoryPanel({
   if (error) return <Empty title={t('common.failed')} description={error} />;
 
   return (
-    <Space vertical align="start" style={{ width: '100%' }} spacing={16}>
-      <Space wrap style={{ justifyContent: 'space-between', width: '100%' }}>
-        <Space wrap>
-          <Tag color="blue">{t('knowledge.sourceCount', { count: snapshot?.sources.length ?? 0 })}</Tag>
-          <Tag color="green">{t('knowledge.wikiCount', { count: snapshot?.wiki.length ?? 0 })}</Tag>
-        </Space>
-        <Space wrap>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".md,.markdown,.txt,text/markdown,text/plain"
-            multiple
-            style={{ display: 'none' }}
-            onChange={(event) => void handleImportFiles(event.currentTarget.files)}
-          />
-          <Button icon={<IconPlus />} onClick={() => setShowImportText(true)}>
-            {t('knowledge.importTextSource')}
-          </Button>
-          <Button icon={<IconUpload />} loading={importLoading} onClick={() => fileInputRef.current?.click()}>
-            {t('knowledge.importFileSource')}
-          </Button>
-          <Button icon={<IconLink />} onClick={() => setShowImportUrl(true)}>
-            {t('knowledge.importUrlSource')}
-          </Button>
-          <Button
-            icon={<IconBolt />}
-            loading={rewriteLoading}
-            disabled={!selectedDocument || selectedDocument.sourceType !== 'sources'}
-            onClick={() => void handleKnowledgeRewrite('digest-source')}
-          >
-            {t('knowledge.digestSource')}
-          </Button>
-          <Button
-            icon={<IconFile />}
-            loading={rewriteLoading}
-            disabled={!selectedDocument}
-            onClick={() =>
-              void handleKnowledgeRewrite(
-                selectedDocument?.sourceType === 'sources' ? 'digest-source' : 'update-selected',
-              )
-            }
-          >
-            {t('knowledge.updateSelected')}
-          </Button>
-          <Button loading={rewriteLoading} onClick={() => void handleKnowledgeRewrite('refresh-index')}>
-            {t('knowledge.refreshIndexLog')}
-          </Button>
-        </Space>
-      </Space>
-
-      <Space wrap style={{ width: '100%' }}>
-        <Input
-          value={query}
-          onChange={setQuery}
-          placeholder={t('knowledge.searchPlaceholder')}
-          style={{ minWidth: 320, flex: 1 }}
-          onEnterPress={handleSearch}
-        />
-        <Button icon={<IconSearch />} loading={searching} onClick={handleSearch}>
-          {t('common.search')}
-        </Button>
-      </Space>
-
-      {activeSection === 'dashboard' ? (
-        renderDashboard()
-      ) : activeSection === 'index' || activeSection === 'log' ? (
-        <>
-          {renderSearchResults()}
-          {renderReader()}
-        </>
-      ) : activeSection === 'health' ? (
-        <Card style={{ width: '100%' }}>
-          <Space align="center" style={{ justifyContent: 'space-between', width: '100%', marginBottom: 12 }}>
-            <Title heading={5} style={{ margin: 0 }}>
-              {t('knowledge.health')}
-            </Title>
-            <Tag color={(snapshot?.health.counts.total ?? 0) > 0 ? 'orange' : 'green'}>
-              {t('knowledge.healthIssueCount', { count: snapshot?.health.counts.total ?? 0 })}
-            </Tag>
-          </Space>
-          {renderHealthIssues()}
-        </Card>
-      ) : (
+    <div
+      onDragOver={handleImportDragOver}
+      onDragLeave={handleImportDragLeave}
+      onDrop={handleImportDrop}
+      style={{ width: '100%', position: 'relative' }}
+    >
+      {dragImportActive ? (
         <div
           style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 20,
+            minHeight: 220,
+            border: '2px dashed var(--semi-color-primary)',
+            borderRadius: 8,
+            background: 'color-mix(in srgb, var(--semi-color-primary-light-default) 72%, var(--semi-color-bg-0))',
             display: 'grid',
-            gridTemplateColumns: 'minmax(300px, 360px) minmax(0, 1fr)',
-            gap: 16,
-            width: '100%',
-            alignItems: 'start',
+            placeItems: 'center',
+            pointerEvents: 'none',
           }}
         >
-          <Card
-            bodyStyle={{
-              padding: 0,
-              maxHeight: 'calc(100vh - 300px)',
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
+          <Space vertical align="center" spacing={8}>
+            <IconUpload size="extra-large" />
+            <Text strong>{t('knowledge.dropFilesToImport')}</Text>
+            <Text type="tertiary" size="small">
+              {t('knowledge.dropFilesToImportDesc')}
+            </Text>
+          </Space>
+        </div>
+      ) : null}
+      <Space vertical align="start" style={{ width: '100%' }} spacing={16}>
+        <Space wrap style={{ justifyContent: 'space-between', width: '100%' }}>
+          <Space wrap>
+            <Tag color="blue">{t('knowledge.sourceCount', { count: snapshot?.sources.length ?? 0 })}</Tag>
+            <Tag color="green">{t('knowledge.wikiCount', { count: snapshot?.wiki.length ?? 0 })}</Tag>
+          </Space>
+          <Space wrap>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".md,.markdown,.txt,text/markdown,text/plain"
+              multiple
+              style={{ display: 'none' }}
+              onChange={(event) => void handleImportFiles(event.currentTarget.files)}
+            />
+            <Button icon={<IconPlus />} onClick={() => setShowImportText(true)}>
+              {t('knowledge.importTextSource')}
+            </Button>
+            <Button icon={<IconUpload />} loading={importLoading} onClick={() => fileInputRef.current?.click()}>
+              {t('knowledge.importFileSource')}
+            </Button>
+            <Button icon={<IconLink />} onClick={() => setShowImportUrl(true)}>
+              {t('knowledge.importUrlSource')}
+            </Button>
+            <Button
+              icon={<IconBolt />}
+              loading={rewriteLoading}
+              disabled={!selectedDocument || selectedDocument.sourceType !== 'sources'}
+              onClick={() => void handleKnowledgeRewrite('digest-source')}
+            >
+              {t('knowledge.digestSource')}
+            </Button>
+            <Button
+              icon={<IconFile />}
+              loading={rewriteLoading}
+              disabled={!selectedDocument}
+              onClick={() =>
+                void handleKnowledgeRewrite(
+                  selectedDocument?.sourceType === 'sources' ? 'digest-source' : 'update-selected',
+                )
+              }
+            >
+              {t('knowledge.updateSelected')}
+            </Button>
+            <Button loading={rewriteLoading} onClick={() => void handleKnowledgeRewrite('refresh-index')}>
+              {t('knowledge.refreshIndexLog')}
+            </Button>
+          </Space>
+        </Space>
+
+        <Space wrap style={{ width: '100%' }}>
+          <Input
+            value={query}
+            onChange={setQuery}
+            placeholder={t('knowledge.searchPlaceholder')}
+            style={{ minWidth: 320, flex: 1 }}
+            onEnterPress={handleSearch}
+          />
+          <Button icon={<IconSearch />} loading={searching} onClick={handleSearch}>
+            {t('common.search')}
+          </Button>
+        </Space>
+
+        {activeSection === 'dashboard' ? (
+          renderDashboard()
+        ) : activeSection === 'index' || activeSection === 'log' ? (
+          <>
+            {renderSearchResults()}
+            {renderReader()}
+          </>
+        ) : activeSection === 'health' ? (
+          <Card style={{ width: '100%' }}>
+            <Space align="center" style={{ justifyContent: 'space-between', width: '100%', marginBottom: 12 }}>
+              <Title heading={5} style={{ margin: 0 }}>
+                {t('knowledge.health')}
+              </Title>
+              <Tag color={(snapshot?.health.counts.total ?? 0) > 0 ? 'orange' : 'green'}>
+                {t('knowledge.healthIssueCount', { count: snapshot?.health.counts.total ?? 0 })}
+              </Tag>
+            </Space>
+            {renderHealthIssues()}
+          </Card>
+        ) : (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'minmax(300px, 360px) minmax(0, 1fr)',
+              gap: 16,
+              width: '100%',
+              alignItems: 'start',
             }}
           >
-            {!section && (
-              <Tabs
-                activeKey={activeSection}
-                onChange={(key) => setActiveSection(key as KnowledgeSection)}
-                type="button"
-                style={{ padding: '12px 12px 0' }}
-              >
-                <Tabs.TabPane tab={t('knowledge.indexEntries')} itemKey="entries" />
-                <Tabs.TabPane tab={t('knowledge.wiki')} itemKey="wiki" />
-                <Tabs.TabPane tab={t('knowledge.sources')} itemKey="sources" />
-                <Tabs.TabPane tab={t('knowledge.digestQueue')} itemKey="digest" />
-                <Tabs.TabPane tab={t('knowledge.recentUpdates')} itemKey="recent" />
-                <Tabs.TabPane tab={t('knowledge.relationships')} itemKey="relationships" />
-                <Tabs.TabPane tab={t('knowledge.health')} itemKey="health" />
-                <Tabs.TabPane tab={t('knowledge.index')} itemKey="index" />
-                <Tabs.TabPane tab={t('knowledge.log')} itemKey="log" />
-              </Tabs>
-            )}
-            {results.length > 0 && (
-              <div
-                style={{
-                  borderTop: '1px solid var(--semi-color-border)',
-                  padding: 12,
-                  maxHeight: 180,
-                  overflow: 'auto',
-                }}
-              >
-                <Text strong>{t('knowledge.searchResults')}</Text>
-                <Space vertical align="start" style={{ width: '100%', marginTop: 8 }}>
-                  {results.map((result) => (
-                    <button
-                      key={`${result.path}:${result.line}`}
-                      type="button"
-                      onClick={() => void openDocument(result.path)}
-                      style={{
-                        width: '100%',
-                        border: '1px solid var(--semi-color-border)',
-                        background: 'var(--semi-color-bg-0)',
-                        borderRadius: 6,
-                        padding: '8px 10px',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                      }}
-                    >
-                      <Space align="center">
-                        {result.sourceType && (
-                          <Tag size="small">
-                            {result.sourceType === 'sources' ? t('knowledge.sources') : t('knowledge.wiki')}
-                          </Tag>
-                        )}
-                        <Text strong size="small">
-                          {result.line}
-                        </Text>
-                      </Space>
-                      <Text size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block', marginTop: 4 }}>
-                        {result.path}
-                      </Text>
-                      <Text
-                        type="tertiary"
-                        size="small"
-                        ellipsis={{ showTooltip: true }}
-                        style={{ display: 'block', marginTop: 4 }}
+            <Card
+              bodyStyle={{
+                padding: 0,
+                maxHeight: 'calc(100vh - 300px)',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              {!section && (
+                <Tabs
+                  activeKey={activeSection}
+                  onChange={(key) => setActiveSection(key as KnowledgeSection)}
+                  type="button"
+                  style={{ padding: '12px 12px 0' }}
+                >
+                  <Tabs.TabPane tab={t('knowledge.indexEntries')} itemKey="entries" />
+                  <Tabs.TabPane tab={t('knowledge.wiki')} itemKey="wiki" />
+                  <Tabs.TabPane tab={t('knowledge.sources')} itemKey="sources" />
+                  <Tabs.TabPane tab={t('knowledge.digestQueue')} itemKey="digest" />
+                  <Tabs.TabPane tab={t('knowledge.recentUpdates')} itemKey="recent" />
+                  <Tabs.TabPane tab={t('knowledge.relationships')} itemKey="relationships" />
+                  <Tabs.TabPane tab={t('knowledge.health')} itemKey="health" />
+                  <Tabs.TabPane tab={t('knowledge.index')} itemKey="index" />
+                  <Tabs.TabPane tab={t('knowledge.log')} itemKey="log" />
+                </Tabs>
+              )}
+              {results.length > 0 && (
+                <div
+                  style={{
+                    borderTop: '1px solid var(--semi-color-border)',
+                    padding: 12,
+                    maxHeight: 180,
+                    overflow: 'auto',
+                  }}
+                >
+                  <Text strong>{t('knowledge.searchResults')}</Text>
+                  <Space vertical align="start" style={{ width: '100%', marginTop: 8 }}>
+                    {results.map((result) => (
+                      <button
+                        key={`${result.path}:${result.line}`}
+                        type="button"
+                        onClick={() => void openDocument(result.path)}
+                        style={{
+                          width: '100%',
+                          border: '1px solid var(--semi-color-border)',
+                          background: 'var(--semi-color-bg-0)',
+                          borderRadius: 6,
+                          padding: '8px 10px',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                        }}
                       >
-                        {result.snippet}
-                      </Text>
-                    </button>
-                  ))}
-                </Space>
-              </div>
-            )}
-            <div style={{ padding: 12, overflow: 'auto' }}>{renderNavigator()}</div>
-          </Card>
-          {renderReader()}
-        </div>
-      )}
-      <Modal
-        title={t('knowledge.importTextSource')}
-        visible={showImportText}
-        onCancel={() => {
-          if (!importLoading) setShowImportText(false);
-        }}
-        footer={
-          <Space>
-            <Button disabled={importLoading} onClick={() => setShowImportText(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              type="primary"
-              theme="solid"
-              loading={importLoading}
-              disabled={!importBody.trim()}
-              onClick={() => void handleImportTextSource()}
-            >
-              {t('knowledge.importTextConfirm')}
-            </Button>
+                        <Space align="center">
+                          {result.sourceType && (
+                            <Tag size="small">
+                              {result.sourceType === 'sources' ? t('knowledge.sources') : t('knowledge.wiki')}
+                            </Tag>
+                          )}
+                          <Text strong size="small">
+                            {result.line}
+                          </Text>
+                        </Space>
+                        <Text size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block', marginTop: 4 }}>
+                          {result.path}
+                        </Text>
+                        <Text
+                          type="tertiary"
+                          size="small"
+                          ellipsis={{ showTooltip: true }}
+                          style={{ display: 'block', marginTop: 4 }}
+                        >
+                          {result.snippet}
+                        </Text>
+                      </button>
+                    ))}
+                  </Space>
+                </div>
+              )}
+              <div style={{ padding: 12, overflow: 'auto' }}>{renderNavigator()}</div>
+            </Card>
+            {renderReader()}
+          </div>
+        )}
+        <Modal
+          title={t('knowledge.importTextSource')}
+          visible={showImportText}
+          onCancel={() => {
+            if (!importLoading) setShowImportText(false);
+          }}
+          footer={
+            <Space>
+              <Button disabled={importLoading} onClick={() => setShowImportText(false)}>
+                {t('common.cancel')}
+              </Button>
+              <Button
+                type="primary"
+                theme="solid"
+                loading={importLoading}
+                disabled={!importBody.trim()}
+                onClick={() => void handleImportTextSource()}
+              >
+                {t('knowledge.importTextConfirm')}
+              </Button>
+            </Space>
+          }
+        >
+          <Space vertical align="start" style={{ width: '100%' }}>
+            <Input
+              value={importTitle}
+              onChange={setImportTitle}
+              placeholder={t('knowledge.importTextTitlePlaceholder')}
+            />
+            <TextArea
+              value={importBody}
+              onChange={setImportBody}
+              autosize={{ minRows: 8, maxRows: 16 }}
+              placeholder={t('knowledge.importTextBodyPlaceholder')}
+            />
+            <Text type="tertiary" size="small">
+              {t('knowledge.importTextDesc')}
+            </Text>
           </Space>
-        }
-      >
-        <Space vertical align="start" style={{ width: '100%' }}>
-          <Input
-            value={importTitle}
-            onChange={setImportTitle}
-            placeholder={t('knowledge.importTextTitlePlaceholder')}
-          />
-          <TextArea
-            value={importBody}
-            onChange={setImportBody}
-            autosize={{ minRows: 8, maxRows: 16 }}
-            placeholder={t('knowledge.importTextBodyPlaceholder')}
-          />
-          <Text type="tertiary" size="small">
-            {t('knowledge.importTextDesc')}
-          </Text>
-        </Space>
-      </Modal>
-      <Modal
-        title={t('knowledge.importUrlSource')}
-        visible={showImportUrl}
-        onCancel={() => {
-          if (!importLoading) setShowImportUrl(false);
-        }}
-        footer={
-          <Space>
-            <Button disabled={importLoading} onClick={() => setShowImportUrl(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              type="primary"
-              theme="solid"
-              loading={importLoading}
-              disabled={!importUrl.trim()}
-              onClick={() => void handleImportUrlSource()}
-            >
-              {t('knowledge.importUrlConfirm')}
-            </Button>
+        </Modal>
+        <Modal
+          title={t('knowledge.importUrlSource')}
+          visible={showImportUrl}
+          onCancel={() => {
+            if (!importLoading) setShowImportUrl(false);
+          }}
+          footer={
+            <Space>
+              <Button disabled={importLoading} onClick={() => setShowImportUrl(false)}>
+                {t('common.cancel')}
+              </Button>
+              <Button
+                type="primary"
+                theme="solid"
+                loading={importLoading}
+                disabled={!importUrl.trim()}
+                onClick={() => void handleImportUrlSource()}
+              >
+                {t('knowledge.importUrlConfirm')}
+              </Button>
+            </Space>
+          }
+        >
+          <Space vertical align="start" style={{ width: '100%' }}>
+            <Input value={importUrl} onChange={setImportUrl} placeholder={t('knowledge.importUrlPlaceholder')} />
+            <Input
+              value={importUrlTitle}
+              onChange={setImportUrlTitle}
+              placeholder={t('knowledge.importUrlTitlePlaceholder')}
+            />
+            <TextArea
+              value={importUrlNote}
+              onChange={setImportUrlNote}
+              autosize={{ minRows: 5, maxRows: 12 }}
+              placeholder={t('knowledge.importUrlNotePlaceholder')}
+            />
+            <Text type="tertiary" size="small">
+              {t('knowledge.importUrlDesc')}
+            </Text>
           </Space>
-        }
-      >
-        <Space vertical align="start" style={{ width: '100%' }}>
-          <Input value={importUrl} onChange={setImportUrl} placeholder={t('knowledge.importUrlPlaceholder')} />
-          <Input
-            value={importUrlTitle}
-            onChange={setImportUrlTitle}
-            placeholder={t('knowledge.importUrlTitlePlaceholder')}
-          />
-          <TextArea
-            value={importUrlNote}
-            onChange={setImportUrlNote}
-            autosize={{ minRows: 5, maxRows: 12 }}
-            placeholder={t('knowledge.importUrlNotePlaceholder')}
-          />
-          <Text type="tertiary" size="small">
-            {t('knowledge.importUrlDesc')}
-          </Text>
-        </Space>
-      </Modal>
-    </Space>
+        </Modal>
+      </Space>
+    </div>
+  );
+}
+
+function isKnowledgeTextFile(file: File): boolean {
+  const lowerName = file.name.toLowerCase();
+  const lowerType = file.type.toLowerCase();
+  return (
+    lowerType.startsWith('text/') || KNOWLEDGE_TEXT_FILE_EXTENSIONS.some((extension) => lowerName.endsWith(extension))
   );
 }

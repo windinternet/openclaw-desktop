@@ -199,6 +199,8 @@
     "importFileSource": "导入文件",
     "importFileDone": "已导入 {{count}} 个文本文件，并进入未消化资料队列。",
     "importFileFailed": "导入文件失败",
+    "dropFilesToImport": "松开后导入资料文件",
+    "dropFilesToImportDesc": "支持 Markdown / TXT 文本文件，导入后进入未消化资料队列。",
     "importUrlSource": "剪藏 URL",
     "importUrlConfirm": "导入到资料源",
     "importUrlPlaceholder": "粘贴网页链接，例如 https://example.com/article",

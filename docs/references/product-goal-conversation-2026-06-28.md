@@ -514,3 +514,19 @@ HTML 的独特优势：
 - Office / PDF / 图片 / 音视频 / 二进制文件内容导入仍待单独设计解析、安全、失败回退和来源元数据边界。
 - “AI 先提出消化计划，批准后写入 `wiki/`、更新 `wiki/index.md` 和 `wiki/log.md`”仍需更完整的 UI 承接。
 - 健康检查结果写入 `reviews/weekly/`、长期未复盘项目和相互矛盾记录仍待继续推进。
+
+### 10.14 2026-06-28 当前实施记录：Knowledge 拖拽导入入口
+
+围绕“导入中心支持拖文件”的 P0 要求，当前继续落地一段代码事实：
+
+- Knowledge 页面支持把本地 Markdown / TXT 文本文件拖拽到页面中导入。
+- 拖拽过程中会显示导入提示，松开后复用 `source: desktop-file` 资料源写入能力。
+- Desktop 会读取文件文本，并把内容写入当前绑定仓库的 `sources/imported/YYYY-MM-DD-HHmmss-*.md`。
+- 导入成功后，Knowledge 会刷新 Snapshot、切到“未消化资料”视图，并打开最后一个导入的资料源。
+- 当前拖拽导入只接受 Markdown / TXT / text MIME 文件，不解析 Office / PDF / 图片 / 音视频 / 二进制内容。
+
+仍未完成的 P0 后续：
+
+- 选择文件夹导入仍待补齐。
+- Office / PDF / 图片 / 音视频 / 二进制文件内容导入仍待单独设计解析、安全、失败回退和来源元数据边界。
+- “AI 先提出消化计划，批准后写入 `wiki/`、更新 `wiki/index.md` 和 `wiki/log.md`”仍需更完整的 UI 承接。
