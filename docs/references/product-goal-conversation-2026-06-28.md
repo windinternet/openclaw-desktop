@@ -793,9 +793,29 @@ HTML 的独特优势：
 
 仍未完成的 P0 后续：
 
-- 仍需要把共享事项选择接入 Repository 语义映射等其它非聊天式 AI 入口。
+- 仍需要把分散在 Artifacts、Knowledge、Teams 和 RepositoryGate 的事项选择收敛成所有新 ActionRun 创建前的统一体验。
 - 仍需要发起前直接创建新事项的产品流。
 - 仍需要把 Teams ActionRun 结束后的成果、知识和复盘尾动作联动做深。
+- 仍需要把计划、执行、产物和复盘串成“开始一件事”专题金线。
+
+### 10.46 2026-06-28 当前实施记录：Repository 语义映射发起前事项选择
+
+围绕“Repository 语义映射也是 Desktop 非聊天式 AI 操作”和“每次 AI 执行应归属事项”的 P0 验收，当前继续落地一段代码事实：
+
+- RepositoryGate 的知识库语义映射入口已复用共享 `useWorkbenchWorkItemOptions` 事项候选。
+- RepositoryGate 的工作台语义映射入口也复用同一事项候选。
+- 用户可在发起 `knowledge_repository_map` 或 `workbench_repository_map` ActionRun 前选择已有事项；Desktop 会写入 `workItemPath` 和 `workItemId`。
+- 该事项选择只提供运行归属上下文，不改变语义映射的本质边界。
+- 知识库语义映射仍只做仓库结构识别，并在用户确认后保存 sources/wiki/index/log 映射。
+- 工作台语义映射仍只做工作系统结构识别，并保存语义槽位映射。
+- 用户跳过选择时，运行仍按 `workItemRequired: true` 与 `workItemUnassignedReason: pending_work_item_assignment` 进入未归属诊断，后续可通过 ActionCenter 补归属。
+- 该入口不自动创建事项、不猜测归属、不改写仓库内容、不替代 Repository Context、不绕过 Gateway 执行与审批。
+
+仍未完成的 P0 后续：
+
+- 仍需要发起前直接创建新事项的产品流。
+- 仍需要把这些分散选择器收敛成所有新 ActionRun 创建前的统一体验。
+- 仍需要把语义映射完成后的成果、知识和复盘尾动作联动做深。
 - 仍需要把计划、执行、产物和复盘串成“开始一件事”专题金线。
 
 ### 10.55 2026-06-28 当前实施记录：ActionRun 补归属流程

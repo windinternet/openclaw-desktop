@@ -306,7 +306,8 @@ HTML 产物是特色能力：
 - 事项候选加载已抽为共享 `useWorkbenchWorkItemOptions` / `loadWorkbenchWorkItemOptions` 能力，从当前绑定 Repository 的 `work/active`、`work/someday` 和 `work/completed` 读取事项，并提取 frontmatter `id`。
 - Knowledge 普通“消化资料 / 自动改写 / 刷新索引日志”入口在没有 Dashboard 尾动作来源事项时，已复用共享事项选择能力；用户可在发起 `knowledge_rewrite` ActionRun 前选择关联事项，Desktop 会写入 `workItemPath` 和 `workItemId`。Dashboard 知识尾动作入口仍以 URL 传入的来源事项为准，不被手动选择覆盖。
 - Teams 页面自然语言编排和快速创建 Agent 入口也已复用共享事项选择能力；用户可在发起 `agent_team_compose` 或 `gateway_agent_create` ActionRun 前选择已有事项，Desktop 会写入 `workItemPath` 和 `workItemId`。用户跳过选择时，运行仍按未归属诊断进入后续补归属，不自动创建事项、不猜测归属。
-- 这只是硬连接早期切片：所有新 ActionRun 创建前的全局事项选择/创建体验、即时创建事项能力、事项计划，Repository 语义映射等其它非聊天式 AI 入口，以及知识更新后的复盘建议和结构化上下文带入仍未完成。
+- RepositoryGate 的知识库语义映射和工作台语义映射入口也已复用共享事项选择能力；用户可在发起 `knowledge_repository_map` 或 `workbench_repository_map` ActionRun 前选择已有事项，Desktop 会写入 `workItemPath` 和 `workItemId`。该入口仍只做只读结构识别和用户确认后的映射保存，不自动创建事项、不猜测归属、不绕过 Repository Context 或审批。
+- 这只是硬连接早期切片：所有新 ActionRun 创建前的全局事项选择/创建体验、即时创建事项能力、事项计划，以及知识更新后的复盘建议和结构化上下文带入仍未完成。
 
 验收：
 

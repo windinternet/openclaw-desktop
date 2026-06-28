@@ -75,6 +75,8 @@ export function buildDesktopSelfKnowledgeSkillContent(): string {
     '',
     'Teams natural-language compose and quick Agent creation entry points also use the shared work matter picker before starting `agent_team_compose` or `gateway_agent_create`. When the user chooses an existing matter, Desktop attaches `workItemPath` and the matter frontmatter id as `workItemId`; if the user skips selection, the run remains observable through the unassigned ActionRun diagnostics. This does not create matters, guess assignment, replace Repository Context, or bypass approval.',
     '',
+    'RepositoryGate semantic mapping entry points also use the shared work matter picker before starting `knowledge_repository_map` or `workbench_repository_map`. When a matter is selected, Desktop attaches `workItemPath` and `workItemId`; the mapping ActionRun still only performs read-only structure recognition and user-confirmed mapping persistence. It must not create matters, guess assignment, rewrite repository content, replace Repository Context, or bypass approval.',
+    '',
     '## Artifacts',
     '',
     'Artifacts are OpenClaw Desktop P0 value objects. Any valuable result can become an Artifact when it can be saved, previewed, reused, delivered, or tracked.',
