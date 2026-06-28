@@ -22,6 +22,7 @@ import {
 } from '../lib/repository-workbench';
 import type { AiActionRun, AiActionRunStatus } from '../lib/types';
 import { extractWorkbenchMatterId, isWorkbenchMatterPath } from '../lib/workbench-matter';
+import { findLatestPlanExecutionRun } from '../lib/workbench-plan-execution';
 import { ArtifactAICreateDrawer } from './ArtifactAICreateDrawer';
 import MarkdownView from './MarkdownView';
 
@@ -187,7 +188,7 @@ export default function WorkbenchRepositoryPanel({
     let cancelled = false;
     loadAiActionRuns(binding.gatewayInstanceId)
       .then((runs) => {
-        if (!cancelled) setActivityRuns(runs.slice(0, 5));
+        if (!cancelled) setActivityRuns(runs);
       })
       .catch(() => {
         if (!cancelled) setActivityRuns([]);
@@ -970,6 +971,20 @@ export default function WorkbenchRepositoryPanel({
     </Space>
   );
 
+  const renderPlanExecutionState = (planPath: string) => {
+    const run = findLatestPlanExecutionRun(planPath, activityRuns);
+    if (!run) return null;
+    const summary = run.resultSummary || run.error || run.gatewaySessionKey || run.id;
+    return (
+      <Space align="center" wrap style={{ marginTop: 8 }}>
+        <Tag color={actionStatusColor(run.status)}>{t(ACTION_STATUS_LABEL_KEYS[run.status])}</Tag>
+        <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }}>
+          {t('workbench.latestPlanExecution')}: {summary || t('workbench.planExecutionNoSummary')}
+        </Text>
+      </Space>
+    );
+  };
+
   const renderPlansView = () => (
     <div
       style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, width: '100%' }}
@@ -978,7 +993,42 @@ export default function WorkbenchRepositoryPanel({
         <Title heading={6} style={{ marginTop: 0 }}>
           {t('workbench.activePlans')}
         </Title>
-        {renderFileList(snapshot?.activePlans ?? [], t('workbench.emptyActivePlans'))}
+        {snapshot?.activePlans && snapshot.activePlans.length > 0 ? (
+          <Space vertical align="start" style={{ width: '100%' }}>
+            {snapshot.activePlans.map((file) => (
+              <button
+                key={file.path}
+                type="button"
+                onClick={() => void openPreview(file)}
+                style={{
+                  width: '100%',
+                  border:
+                    selectedPreviewPath === file.path
+                      ? '1px solid var(--semi-color-primary)'
+                      : '1px solid var(--semi-color-border)',
+                  background:
+                    selectedPreviewPath === file.path
+                      ? 'var(--semi-color-primary-light-default)'
+                      : 'var(--semi-color-bg-0)',
+                  borderRadius: 6,
+                  padding: '8px 10px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <Text strong ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>
+                  {file.name}
+                </Text>
+                <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>
+                  {file.path}
+                </Text>
+                {renderPlanExecutionState(file.path)}
+              </button>
+            ))}
+          </Space>
+        ) : (
+          <Empty description={t('workbench.emptyActivePlans')} />
+        )}
       </div>
       <div style={sectionStyle}>
         <Title heading={6} style={{ marginTop: 0 }}>
@@ -1453,6 +1503,9 @@ export default function WorkbenchRepositoryPanel({
     selectedPlanMetadata?.workItemPath && isWorkbenchMatterPath(selectedPlanMetadata.workItemPath)
       ? selectedPlanMetadata.workItemPath
       : undefined;
+  const selectedPlanLatestRun = selectedPlanPath
+    ? findLatestPlanExecutionRun(selectedPlanPath, activityRuns)
+    : undefined;
   const previewTitle =
     panelView === 'projects' ? t('workbench.projectPreview') : selectedPreviewPath || t('workbench.preview');
   const standaloneView = panelView === 'dashboard' || panelView === 'outputs';
@@ -1618,15 +1671,27 @@ export default function WorkbenchRepositoryPanel({
               {(selectedWorkItemPath || selectedPlanPath) && (
                 <Space align="center" spacing={8}>
                   {selectedPlanPath && (
-                    <Button
-                      size="small"
-                      type="tertiary"
-                      icon={<IconBolt />}
-                      loading={planExecutionSubmitting}
-                      onClick={() => void handleExecutePlanActionRun()}
-                    >
-                      {t('workbench.executePlanForMatter')}
-                    </Button>
+                    <>
+                      {selectedPlanLatestRun && (
+                        <>
+                          <Tag color={actionStatusColor(selectedPlanLatestRun.status)}>
+                            {t(ACTION_STATUS_LABEL_KEYS[selectedPlanLatestRun.status])}
+                          </Tag>
+                          <Button size="small" type="tertiary" onClick={() => navigate('/actions')}>
+                            {t('workbench.openPlanExecutionRuns')}
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        size="small"
+                        type="tertiary"
+                        icon={<IconBolt />}
+                        loading={planExecutionSubmitting}
+                        onClick={() => void handleExecutePlanActionRun()}
+                      >
+                        {t('workbench.executePlanForMatter')}
+                      </Button>
+                    </>
                   )}
                   {selectedWorkItemPath && (
                     <>

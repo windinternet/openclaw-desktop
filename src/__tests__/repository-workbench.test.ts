@@ -1185,6 +1185,22 @@ describe('repository workbench', () => {
     expect(en).toContain('"executePlanForMatter": "Execute Plan"');
   });
 
+  it('surfaces the latest plan execution state in Workbench plans without mutating plans', () => {
+    const source = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
+    const zh = readFileSync('src/locales/zh.json', 'utf8');
+    const en = readFileSync('src/locales/en.json', 'utf8');
+
+    expect(source).toContain('findLatestPlanExecutionRun');
+    expect(source).toContain('renderPlanExecutionState');
+    expect(source).toContain("t('workbench.latestPlanExecution')");
+    expect(source).toContain("t('workbench.openPlanExecutionRuns')");
+    expect(source).toContain("navigate('/actions')");
+    expect(source).toContain('setActivityRuns(runs)');
+    expect(source).not.toContain('setActivityRuns(runs.slice(0, 5))');
+    expect(zh).toContain('"latestPlanExecution": "最近执行"');
+    expect(en).toContain('"latestPlanExecution": "Latest execution"');
+  });
+
   it('wires ActionCenter unassigned ActionRun backfill to repository work items', () => {
     const page = readFileSync('src/pages/ActionCenterPage.tsx', 'utf8');
     const zh = readFileSync('src/locales/zh.json', 'utf8');

@@ -60,6 +60,8 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('plan_execute');
     expect(source).toContain('applyWorkbenchMatterPlanApproval');
     expect(source).toContain('buildPlanExecutePrompt');
+    expect(source).toContain('计划执行状态观测');
+    expect(source).toContain('findLatestPlanExecutionRun');
     expect(source).toContain('repositoryWrite');
     expect(source).toContain('Knowledge 发起前事项选择');
     expect(source).toContain('Teams 发起前事项选择');
@@ -87,6 +89,8 @@ describe('product goal P0 traceability', () => {
     expect(plans).toContain('plan_execute');
     expect(plans).toContain('applyWorkbenchMatterPlanApproval');
     expect(plans).toContain('buildPlanExecutePrompt');
+    expect(plans).toContain('计划执行状态观测');
+    expect(plans).toContain('findLatestPlanExecutionRun');
     expect(plans).toContain('repositoryWrite.path/content/workItemPath');
     expect(plans).toContain('Knowledge 普通自动改写发起前事项选择');
     expect(plans).toContain('Teams 自然语言编排发起前事项选择');
@@ -107,6 +111,8 @@ describe('product goal P0 traceability', () => {
     expect(roadmap).toContain('plan_execute');
     expect(roadmap).toContain('buildWorkMatterPlanPrompt');
     expect(roadmap).toContain('buildPlanExecutePrompt');
+    expect(roadmap).toContain('计划执行状态观测');
+    expect(roadmap).toContain('findLatestPlanExecutionRun');
     expect(roadmap).toContain('applyWorkbenchMatterPlanApproval');
     expect(roadmap).toContain('repositoryWrite.path/content/workItemPath');
     expect(skillContent).toContain('Screenshot-confirmed P0 baseline');
@@ -130,6 +136,8 @@ describe('product goal P0 traceability', () => {
     expect(skillContent).toContain('plan_execute');
     expect(skillContent).toContain('buildWorkMatterPlanPrompt');
     expect(skillContent).toContain('buildPlanExecutePrompt');
+    expect(skillContent).toContain('findLatestPlanExecutionRun');
+    expect(skillContent).toContain('latest plan execution status');
     expect(skillContent).toContain('applyWorkbenchMatterPlanApproval');
     expect(skillContent).toContain('repositoryWrite.path/content/workItemPath');
     expect(skillContent).toContain('Artifacts UI also exposes a reuse-kind filter');
