@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Button, Card, Input, Modal, Select, Space, Tag, Toast, Typography } from '@douyinfe/semi-ui';
-import { IconBranch, IconCloud, IconFolderOpen, IconPlus, IconRefresh, IconTickCircle } from '@douyinfe/semi-icons';
+import { IconBranch, IconCloud, IconFolderOpen, IconRefresh, IconTickCircle } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway, useStore } from '../lib';
 import { upsertAiActionRun } from '../lib/ai-action-run-store';
@@ -32,6 +32,7 @@ import {
 import { buildRepositoryContextPayload } from '../lib/repository-context';
 import { syncRepositoryContextToAgentFiles } from '../lib/repository-context-fallback';
 import { useWorkbenchWorkItemOptions } from '../lib/workbench-work-items';
+import { ActionRunWorkItemPicker } from './ActionRunWorkItemPicker';
 
 const { Text, Title } = Typography;
 
@@ -90,7 +91,6 @@ export default function RepositoryGate({
   const [mappingLoading, setMappingLoading] = useState(false);
   const [fallbackSyncing, setFallbackSyncing] = useState(false);
   const [advancedManualPath, setAdvancedManualPath] = useState(false);
-  const [newRepositoryWorkItemTitle, setNewRepositoryWorkItemTitle] = useState('');
   const {
     createWorkItem: createRepositoryWorkItem,
     creating: creatingRepositoryWorkItem,
@@ -573,64 +573,25 @@ export default function RepositoryGate({
   const showDesktopActions = location === 'desktop-local';
   const canRefresh = Boolean(binding);
   const canCreateRepositoryWorkItem = binding?.status === 'repo_ready';
-  const handleCreateRepositoryWorkItem = async () => {
-    const title = newRepositoryWorkItemTitle.trim();
-    if (!title || mappingLoading || creatingRepositoryWorkItem || !canCreateRepositoryWorkItem) return;
-
-    try {
-      await createRepositoryWorkItem(title);
-      setNewRepositoryWorkItemTitle('');
-      Toast.success(t('repositoryGate.mappingNewWorkItemSuccess'));
-    } catch (error) {
-      Toast.error(error instanceof Error ? error.message : String(error));
-    }
-  };
-
   const renderMappingWorkItemPicker = () =>
     repositoryWorkItemOptions.length > 0 || canCreateRepositoryWorkItem ? (
-      <div style={{ display: 'grid', gap: 6, width: 'min(100%, 420px)' }}>
-        <Text type="tertiary" size="small">
-          {t('repositoryGate.mappingWorkItemDesc')}
-        </Text>
-        {repositoryWorkItemOptions.length > 0 ? (
-          <Select
-            size="small"
-            value={selectedRepositoryWorkItemPath}
-            placeholder={t('repositoryGate.mappingWorkItemPlaceholder')}
-            onChange={(value) => setSelectedRepositoryWorkItemPath(String(value))}
-            loading={repositoryWorkItemLoading}
-            disabled={mappingLoading || creatingRepositoryWorkItem}
-            style={{ width: '100%' }}
-          >
-            {repositoryWorkItemOptions.map((item) => (
-              <Select.Option key={item.path} value={item.path}>
-                {item.name} · {item.path}
-              </Select.Option>
-            ))}
-          </Select>
-        ) : null}
-        {canCreateRepositoryWorkItem ? (
-          <Space spacing={8} align="center">
-            <Input
-              size="small"
-              value={newRepositoryWorkItemTitle}
-              placeholder={t('repositoryGate.mappingNewWorkItemPlaceholder')}
-              onChange={setNewRepositoryWorkItemTitle}
-              disabled={mappingLoading || creatingRepositoryWorkItem}
-              style={{ flex: 1 }}
-            />
-            <Button
-              size="small"
-              icon={<IconPlus />}
-              loading={creatingRepositoryWorkItem}
-              disabled={!newRepositoryWorkItemTitle.trim() || mappingLoading || creatingRepositoryWorkItem}
-              onClick={() => void handleCreateRepositoryWorkItem()}
-            >
-              {t('repositoryGate.mappingNewWorkItem')}
-            </Button>
-          </Space>
-        ) : null}
-      </div>
+      <ActionRunWorkItemPicker
+        description={t('repositoryGate.mappingWorkItemDesc')}
+        selectPlaceholder={t('repositoryGate.mappingWorkItemPlaceholder')}
+        createLabel={t('repositoryGate.mappingNewWorkItem')}
+        createPlaceholder={t('repositoryGate.mappingNewWorkItemPlaceholder')}
+        createSuccessMessage={t('repositoryGate.mappingNewWorkItemSuccess')}
+        options={repositoryWorkItemOptions}
+        selectedPath={selectedRepositoryWorkItemPath}
+        onSelectedPathChange={setSelectedRepositoryWorkItemPath}
+        createWorkItem={createRepositoryWorkItem}
+        disabled={mappingLoading}
+        creating={creatingRepositoryWorkItem}
+        loading={repositoryWorkItemLoading}
+        showCreate={canCreateRepositoryWorkItem}
+        size="small"
+        style={{ width: 'min(100%, 420px)' }}
+      />
     ) : null;
 
   if (!setupVisible) {

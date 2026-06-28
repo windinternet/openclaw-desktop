@@ -3,9 +3,13 @@ import { describe, expect, it } from 'vitest';
 
 describe('ActionRun work item picker', () => {
   it('centralizes repository work item options for non-chat ActionRun entry points', () => {
+    const pickerPath = 'src/components/ActionRunWorkItemPicker.tsx';
+
     expect(existsSync('src/lib/workbench-work-items.ts')).toBe(true);
+    expect(existsSync(pickerPath)).toBe(true);
 
     const helper = readFileSync('src/lib/workbench-work-items.ts', 'utf8');
+    const picker = existsSync(pickerPath) ? readFileSync(pickerPath, 'utf8') : '';
     const artifactDrawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
     const knowledgePanel = readFileSync('src/components/KnowledgeRepositoryPanel.tsx', 'utf8');
     const repositoryGate = readFileSync('src/components/RepositoryGate.tsx', 'utf8');
@@ -21,8 +25,18 @@ describe('ActionRun work item picker', () => {
     expect(helper).toContain('readWorkbenchMarkdown');
     expect(helper).toContain('extractWorkbenchMatterId');
 
+    expect(picker).toContain('export function ActionRunWorkItemPicker');
+    expect(picker).toContain('WorkbenchWorkItemOption');
+    expect(picker).toContain('createWorkItem');
+    expect(picker).toContain('selectedPath');
+    expect(picker).toContain('Toast.success');
+    expect(picker).toContain('IconPlus');
+    expect(picker).toContain('Select');
+    expect(picker).toContain('Input');
+
     expect(artifactDrawer).toContain('useWorkbenchWorkItemOptions');
-    expect(artifactDrawer).toContain('newWorkItemTitle');
+    expect(artifactDrawer).toContain('ActionRunWorkItemPicker');
+    expect(artifactDrawer).not.toContain('newWorkItemTitle');
     expect(artifactDrawer).toContain('createWorkItem');
     expect(artifactDrawer).toContain("t('artifact.aiCreateNewWorkItemPlaceholder')");
     expect(artifactDrawer).toContain('selectedWorkItemId');
@@ -30,8 +44,9 @@ describe('ActionRun work item picker', () => {
     expect(artifactDrawer).toContain('workItemPath: resolvedWorkItemPath');
 
     expect(knowledgePanel).toContain('useWorkbenchWorkItemOptions');
-    expect(knowledgePanel).toContain('newKnowledgeWorkItemTitle');
-    expect(knowledgePanel).toContain('handleCreateKnowledgeWorkItem');
+    expect(knowledgePanel).toContain('ActionRunWorkItemPicker');
+    expect(knowledgePanel).not.toContain('newKnowledgeWorkItemTitle');
+    expect(knowledgePanel).not.toContain('handleCreateKnowledgeWorkItem');
     expect(knowledgePanel).toContain('selectedKnowledgeWorkItemPath');
     expect(knowledgePanel).toContain('selectedKnowledgeWorkItemId');
     expect(knowledgePanel).toContain("t('knowledge.rewriteWorkItemPlaceholder')");
@@ -40,8 +55,9 @@ describe('ActionRun work item picker', () => {
     expect(knowledgePanel).toContain('workItemPath: resolvedWorkItemPath');
 
     expect(teamsPage).toContain('useWorkbenchWorkItemOptions');
-    expect(teamsPage).toContain('newTeamWorkItemTitle');
-    expect(teamsPage).toContain('handleCreateTeamWorkItem');
+    expect(teamsPage).toContain('ActionRunWorkItemPicker');
+    expect(teamsPage).not.toContain('newTeamWorkItemTitle');
+    expect(teamsPage).not.toContain('handleCreateTeamWorkItem');
     expect(teamsPage).toContain('selectedTeamWorkItemPath');
     expect(teamsPage).toContain('selectedTeamWorkItemId');
     expect(teamsPage).toContain("t('teams.actionWorkItemPlaceholder')");
@@ -50,8 +66,9 @@ describe('ActionRun work item picker', () => {
     expect(teamsPage).toContain('workItemPath: resolvedWorkItemPath');
 
     expect(repositoryGate).toContain('useWorkbenchWorkItemOptions');
-    expect(repositoryGate).toContain('newRepositoryWorkItemTitle');
-    expect(repositoryGate).toContain('handleCreateRepositoryWorkItem');
+    expect(repositoryGate).toContain('ActionRunWorkItemPicker');
+    expect(repositoryGate).not.toContain('newRepositoryWorkItemTitle');
+    expect(repositoryGate).not.toContain('handleCreateRepositoryWorkItem');
     expect(repositoryGate).toContain('selectedRepositoryWorkItemPath');
     expect(repositoryGate).toContain('selectedRepositoryWorkItemId');
     expect(repositoryGate).toContain("t('repositoryGate.mappingWorkItemPlaceholder')");

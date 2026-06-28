@@ -50,6 +50,7 @@ import { loadInstanceData, saveInstanceDataAwaited } from '../lib/local-persiste
 import { useStore } from '../lib';
 import { useWorkbenchWorkItemOptions } from '../lib/workbench-work-items';
 import AgentFilesPanel from '../components/AgentFilesPanel';
+import { ActionRunWorkItemPicker } from '../components/ActionRunWorkItemPicker';
 import type { AiActionRun, AgentLocalProfile, AgentOfficeZone, AgentTeamProfile } from '../lib/types';
 
 const { Title, Text } = Typography;
@@ -240,7 +241,6 @@ export default function TeamsPage({ embedded = false, onHeaderActionsChange }: E
   const [composerModalVisible, setComposerModalVisible] = useState(false);
   const [quickModalVisible, setQuickModalVisible] = useState(false);
   const [actionSubmitting, setActionSubmitting] = useState(false);
-  const [newTeamWorkItemTitle, setNewTeamWorkItemTitle] = useState('');
   const [quickDraft, setQuickDraft] = useState<QuickAgentDraft>({
     displayName: '',
     role: '',
@@ -569,59 +569,22 @@ export default function TeamsPage({ embedded = false, onHeaderActionsChange }: E
     t,
   ]);
 
-  const handleCreateTeamWorkItem = useCallback(async () => {
-    const title = newTeamWorkItemTitle.trim();
-    if (!title || actionSubmitting || creatingTeamWorkItem) return;
-
-    try {
-      await createTeamWorkItem(title);
-      setNewTeamWorkItemTitle('');
-      Toast.success(t('teams.actionNewWorkItemSuccess'));
-    } catch (error) {
-      Toast.error(error instanceof Error ? error.message : String(error));
-    }
-  }, [actionSubmitting, createTeamWorkItem, creatingTeamWorkItem, newTeamWorkItemTitle, t]);
-
   const renderActionWorkItemPicker = () =>
     currentInstanceId ? (
-      <div style={{ display: 'grid', gap: 6 }}>
-        <Text type="tertiary" size="small">
-          {t('teams.actionWorkItemDesc')}
-        </Text>
-        {teamWorkItemOptions.length > 0 ? (
-          <Select
-            value={selectedTeamWorkItemPath}
-            placeholder={t('teams.actionWorkItemPlaceholder')}
-            onChange={(value) => setSelectedTeamWorkItemPath(String(value))}
-            loading={teamWorkItemLoading}
-            disabled={actionSubmitting || creatingTeamWorkItem}
-            style={{ width: '100%' }}
-          >
-            {teamWorkItemOptions.map((item) => (
-              <Select.Option key={item.path} value={item.path}>
-                {item.name} · {item.path}
-              </Select.Option>
-            ))}
-          </Select>
-        ) : null}
-        <Space spacing={8} align="center">
-          <Input
-            value={newTeamWorkItemTitle}
-            placeholder={t('teams.actionNewWorkItemPlaceholder')}
-            onChange={setNewTeamWorkItemTitle}
-            disabled={actionSubmitting || creatingTeamWorkItem}
-            style={{ flex: 1 }}
-          />
-          <Button
-            icon={<IconPlus />}
-            loading={creatingTeamWorkItem}
-            disabled={!newTeamWorkItemTitle.trim() || actionSubmitting || creatingTeamWorkItem}
-            onClick={() => void handleCreateTeamWorkItem()}
-          >
-            {t('teams.actionNewWorkItem')}
-          </Button>
-        </Space>
-      </div>
+      <ActionRunWorkItemPicker
+        description={t('teams.actionWorkItemDesc')}
+        selectPlaceholder={t('teams.actionWorkItemPlaceholder')}
+        createLabel={t('teams.actionNewWorkItem')}
+        createPlaceholder={t('teams.actionNewWorkItemPlaceholder')}
+        createSuccessMessage={t('teams.actionNewWorkItemSuccess')}
+        options={teamWorkItemOptions}
+        selectedPath={selectedTeamWorkItemPath}
+        onSelectedPathChange={setSelectedTeamWorkItemPath}
+        createWorkItem={createTeamWorkItem}
+        disabled={actionSubmitting}
+        creating={creatingTeamWorkItem}
+        loading={teamWorkItemLoading}
+      />
     ) : null;
 
   const renderOverview = () => {

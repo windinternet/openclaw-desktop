@@ -1,12 +1,13 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Modal, Button, Input, TextArea, Spin, Tag, Toast, Typography, Space, Select } from '@douyinfe/semi-ui';
+import { Modal, Button, TextArea, Spin, Tag, Toast, Typography, Space } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
-import { IconAIFilledLevel1, IconPlus, IconRefresh } from '@douyinfe/semi-icons';
+import { IconAIFilledLevel1, IconRefresh } from '@douyinfe/semi-icons';
 import { useStore } from '../lib';
 import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway } from '../lib/ai-action-center';
 import { buildArtifactCreatePrompt } from '../lib/ai-action-prompts';
 import { upsertAiActionRun } from '../lib/ai-action-run-store';
 import { useWorkbenchWorkItemOptions } from '../lib/workbench-work-items';
+import { ActionRunWorkItemPicker } from './ActionRunWorkItemPicker';
 import type { AiActionRun } from '../lib/types';
 import type { ArtifactMeta, ArtifactType } from '../lib/artifact-types';
 
@@ -60,7 +61,6 @@ export function ArtifactAICreateDrawer({
     enabled: visible && !workItemPath,
   });
   const [generating, setGenerating] = useState(false);
-  const [newWorkItemTitle, setNewWorkItemTitle] = useState('');
   const [preview, setPreview] = useState<ParsedArtifactResult | null>(null);
   const [previewRun, setPreviewRun] = useState<AiActionRun | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -190,18 +190,6 @@ export function ArtifactAICreateDrawer({
     selectedWorkItemId,
   ]);
 
-  const handleCreateWorkItem = useCallback(async () => {
-    const title = newWorkItemTitle.trim();
-    if (!title || creatingWorkItem || generating) return;
-    try {
-      await createWorkItem(title);
-      setNewWorkItemTitle('');
-      Toast.success(t('artifact.aiCreateNewWorkItemSuccess'));
-    } catch (e) {
-      Toast.error(String(e));
-    }
-  }, [createWorkItem, creatingWorkItem, generating, newWorkItemTitle, t]);
-
   const handleSave = useCallback(async () => {
     if (!preview) return;
     try {
@@ -241,7 +229,6 @@ export function ArtifactAICreateDrawer({
       setPreview(null);
       setPreviewRun(null);
       setError(null);
-      setNewWorkItemTitle('');
       if (!workItemPath) setSelectedWorkItemPath('');
     }
     onClose();
@@ -266,43 +253,20 @@ export function ArtifactAICreateDrawer({
         )}
 
         {!workItemPath && (
-          <div style={{ display: 'grid', gap: 8 }}>
-            <Text type="tertiary" size="small">
-              {t('artifact.aiCreateWorkItemDesc')}
-            </Text>
-            {workItemOptions.length > 0 && (
-              <Select
-                value={selectedWorkItemPath}
-                placeholder={t('artifact.aiCreateWorkItemPlaceholder')}
-                onChange={(value) => setSelectedWorkItemPath(String(value))}
-                disabled={generating || creatingWorkItem}
-                style={{ width: '100%' }}
-              >
-                {workItemOptions.map((option) => (
-                  <Select.Option key={option.path} value={option.path}>
-                    {option.name} · {option.path}
-                  </Select.Option>
-                ))}
-              </Select>
-            )}
-            <Space align="center" spacing={8}>
-              <Input
-                value={newWorkItemTitle}
-                placeholder={t('artifact.aiCreateNewWorkItemPlaceholder')}
-                onChange={setNewWorkItemTitle}
-                disabled={generating || creatingWorkItem}
-                style={{ flex: 1 }}
-              />
-              <Button
-                icon={<IconPlus />}
-                loading={creatingWorkItem}
-                disabled={!newWorkItemTitle.trim() || generating || creatingWorkItem}
-                onClick={handleCreateWorkItem}
-              >
-                {t('artifact.aiCreateNewWorkItem')}
-              </Button>
-            </Space>
-          </div>
+          <ActionRunWorkItemPicker
+            description={t('artifact.aiCreateWorkItemDesc')}
+            selectPlaceholder={t('artifact.aiCreateWorkItemPlaceholder')}
+            createLabel={t('artifact.aiCreateNewWorkItem')}
+            createPlaceholder={t('artifact.aiCreateNewWorkItemPlaceholder')}
+            createSuccessMessage={t('artifact.aiCreateNewWorkItemSuccess')}
+            options={workItemOptions}
+            selectedPath={selectedWorkItemPath}
+            onSelectedPathChange={setSelectedWorkItemPath}
+            createWorkItem={createWorkItem}
+            disabled={generating}
+            creating={creatingWorkItem}
+            style={{ gap: 8 }}
+          />
         )}
 
         <Button

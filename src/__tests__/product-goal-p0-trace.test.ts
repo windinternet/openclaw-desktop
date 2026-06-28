@@ -51,6 +51,8 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('Artifacts 发起前事项选择');
     expect(source).toContain('Artifacts 发起前即时创建事项');
     expect(source).toContain('Knowledge/Teams/RepositoryGate 发起前即时创建事项');
+    expect(source).toContain('ActionRun 发起前事项面板组件化');
+    expect(source).toContain('ActionRunWorkItemPicker');
     expect(source).toContain('Knowledge 发起前事项选择');
     expect(source).toContain('Teams 发起前事项选择');
     expect(source).toContain('Repository 语义映射发起前事项选择');
@@ -68,6 +70,8 @@ describe('product goal P0 traceability', () => {
     expect(plans).toContain('Artifacts 普通魔法创建发起前事项选择');
     expect(plans).toContain('Artifacts 普通魔法创建发起前即时创建事项');
     expect(plans).toContain('Knowledge/Teams/RepositoryGate 发起前即时创建事项');
+    expect(plans).toContain('ActionRun 发起前事项面板组件化');
+    expect(plans).toContain('ActionRunWorkItemPicker');
     expect(plans).toContain('Knowledge 普通自动改写发起前事项选择');
     expect(plans).toContain('Teams 自然语言编排发起前事项选择');
     expect(plans).toContain('Repository 语义映射发起前事项选择');
@@ -82,6 +86,7 @@ describe('product goal P0 traceability', () => {
     expect(roadmap).toContain('Knowledge 普通“消化资料 / 自动改写 / 刷新索引日志”入口');
     expect(roadmap).toContain('Teams 页面自然语言编排和快速创建 Agent 入口');
     expect(roadmap).toContain('RepositoryGate 的知识库语义映射和工作台语义映射入口');
+    expect(roadmap).toContain('ActionRunWorkItemPicker');
     expect(skillContent).toContain('Screenshot-confirmed P0 baseline');
     expect(skillContent).toContain('Do not demote these scopes to P1/P2');
     expect(skillContent).toContain('Knowledge tail actions can start a source-bound `knowledge_rewrite` ActionRun');
@@ -97,6 +102,8 @@ describe('product goal P0 traceability', () => {
     expect(skillContent).toContain('Ordinary Knowledge rewrite entry points');
     expect(skillContent).toContain('Teams natural-language compose and quick Agent creation entry points');
     expect(skillContent).toContain('RepositoryGate semantic mapping entry points');
+    expect(skillContent).toContain('ActionRunWorkItemPicker');
+    expect(skillContent).toContain('shared pre-run matter picker');
     expect(skillContent).toContain('Artifacts UI also exposes a reuse-kind filter');
     expect(skillContent).toContain('Repository `outputs/assets/index.md`');
     expect(skillContent).toContain('post-run review clues');

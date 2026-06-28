@@ -308,7 +308,8 @@ HTML 产物是特色能力：
 - Teams 页面自然语言编排和快速创建 Agent 入口也已复用共享事项选择/创建能力；用户可在发起 `agent_team_compose` 或 `gateway_agent_create` ActionRun 前选择已有事项，或输入标题即时创建事项，Desktop 会写入 `workItemPath` 和 `workItemId`。用户跳过选择和创建时，运行仍按未归属诊断进入后续补归属，不自动猜测归属。
 - RepositoryGate 的知识库语义映射和工作台语义映射入口也已复用共享事项选择/创建能力；用户可在发起 `knowledge_repository_map` 或 `workbench_repository_map` ActionRun 前选择已有事项，或在当前绑定仓库 ready 时输入标题即时创建事项，Desktop 会写入 `workItemPath` 和 `workItemId`。该入口仍只做只读结构识别和用户确认后的映射保存，不猜测归属、不绕过 Repository Context 或审批。
 - Knowledge、Teams、RepositoryGate 这些非聊天 ActionRun 入口现在也具备发起前即时创建事项能力；这让“ActionRun 必须能关联或创建工作事项”进一步接近可用闭环。
-- 这仍是硬连接早期切片：各入口已具备选择/创建能力，但所有新 ActionRun 创建前的统一全局事项选择/创建体验、事项计划，以及知识更新后的复盘建议和结构化上下文带入仍未完成。
+- `ActionRunWorkItemPicker` 已把 Artifacts、Knowledge、Teams、RepositoryGate 四个入口的“选择已有事项 / 即时创建事项 / 创建后自动选中 / 成功失败提示”收敛为共享 UI 组件；事项候选和创建仍由 `useWorkbenchWorkItemOptions`、`loadWorkbenchWorkItemOptions`、`createWorkbenchWorkItemOption` 提供，组件只负责发起前归属选择体验，不直接创建 ActionRun、不改 prompt、不绕过 Repository Context 或审批。
+- 这仍是硬连接早期切片：当前完成的是四个现有入口的共享 UI 部件，不是真正覆盖未来所有新 ActionRun 的全局发起前面板；事项计划、知识更新后的复盘建议和结构化上下文带入仍未完成。
 
 验收：
 

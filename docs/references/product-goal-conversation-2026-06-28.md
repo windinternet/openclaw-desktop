@@ -1121,3 +1121,20 @@ HTML 的独特优势：
 - 仍需要把“选择已有事项 / 即时创建事项”抽成所有新 ActionRun 发起前的统一面板，而不是让每个入口自己维护相似 UI。
 - 仍需要“开始一件事”专题里的计划、执行、产物、知识更新和复盘金线。
 - 仍需要让新事项创建后的后续计划生成、执行记录观测和尾动作建议更自然地串起来。
+
+### 10.49 2026-06-28 当前实施记录：ActionRun 发起前事项面板组件化
+
+围绕“所有新 ActionRun 创建前的统一事项选择/创建体验”的 P0 缺口，当前继续把上一条能力从“各入口都有一份相似 UI”收敛为共享产品部件：
+
+- 新增 `ActionRunWorkItemPicker`，统一承载“选择已有事项 / 输入标题即时创建事项 / 创建后自动选中 / 成功失败提示”的 UI 和交互。
+- Artifacts 普通“AI 魔法创建”、Knowledge 普通“消化资料 / 自动改写 / 刷新索引日志”、Teams 自然语言编排/快速创建 Gateway Agent、RepositoryGate 知识库语义映射/工作台语义映射，均改为使用同一个 `ActionRunWorkItemPicker`。
+- 事项候选加载和创建仍由 `useWorkbenchWorkItemOptions`、`loadWorkbenchWorkItemOptions`、`createWorkbenchWorkItemOption` 提供；共享组件只负责发起前归属选择体验，不直接创建 ActionRun、不写 prompt、不执行仓库业务写入。
+- RepositoryGate 保留原有边界：只有当前绑定仓库 ready 时才显示即时创建事项入口；已有事项选择仍可用于语义映射 ActionRun 归属。
+- Dashboard 知识尾动作、Workbench 事项内“生成成果”等已经带来源事项的路径仍优先使用来源 `workItemPath`，不会被普通选择器覆盖。
+- 如果用户跳过选择和创建，运行仍按 `workItemRequired: true` / `workItemUnassignedReason: pending_work_item_assignment` 进入未归属诊断；Desktop 仍不自动猜测事项、不自动生成计划、不自动沉淀成果、不自动更新知识库或写复盘。
+
+仍未完成的 P0 后续：
+
+- 仍需要真正的全局 ActionRun 发起前面板或启动协议，让未来新增非聊天 AI 操作默认复用同一入口，而不是只在四个现有入口中组件复用。
+- 仍需要“开始一件事”专题里的计划、执行、产物、知识更新和复盘金线。
+- 仍需要让新事项创建后的计划生成、执行记录观测、尾动作建议和复盘上下文更自然地串起来。

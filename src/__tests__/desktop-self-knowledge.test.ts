@@ -32,6 +32,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('An ActionRun can carry `workItemId` and `workItemPath`');
     expect(skillContent).toContain("appends an execution record back to that matter's `## 执行记录` section");
     expect(skillContent).toContain('Workbench matter preview can prefill both values');
+    expect(skillContent).toContain('ActionRunWorkItemPicker');
+    expect(skillContent).toContain('shared pre-run matter picker');
+    expect(skillContent).toContain('only handles assignment UI');
     expect(skillContent).toContain('adds a `## 收尾动作` checklist');
     expect(skillContent).toContain('missing from the repository run index');
     expect(skillContent).toContain('`action-run:unarchived` pending confirmation');
