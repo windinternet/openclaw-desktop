@@ -27,6 +27,8 @@ describe('desktop self-knowledge helpers', () => {
     );
     expect(skillContent).toContain('Repository Context 和仓库 `AGENTS.md`');
     expect(skillContent).toContain('ActionRun 是 OpenClaw Desktop 在普通聊天之外调用大模型的通用操作单元');
+    expect(skillContent).toContain('ActionRun defaults to `workItemRequired: true`');
+    expect(skillContent).toContain('workItemUnassignedReason: pending_work_item_assignment');
     expect(skillContent).toContain('An ActionRun can carry `workItemId` and `workItemPath`');
     expect(skillContent).toContain("appends an execution record back to that matter's `## 执行记录` section");
     expect(skillContent).toContain('Workbench matter preview can prefill both values');
@@ -151,6 +153,7 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('Terminal work-item ActionRuns that are missing from `runs/action-runs/index.md`');
     expect(skillContent).toContain('not an automatic repository repair');
     expect(skillContent).toContain('Terminal ActionRuns without `workItemPath`');
+    expect(skillContent).toContain('details include `workItemUnassignedReason`');
     expect(skillContent).toContain('not an automatic assignment');
     expect(skillContent).toContain('Completed work-item ActionRuns with `resultSummary` and no Artifact ids');
     expect(skillContent).toContain('do not auto-create Artifacts or Repository outputs');

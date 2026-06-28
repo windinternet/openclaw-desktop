@@ -77,12 +77,32 @@ describe('AI Action Center session rules', () => {
       status: 'draft',
       executionMode: 'isolated-session',
       agentId: 'main',
+      workItemRequired: true,
+      workItemUnassignedReason: 'pending_work_item_assignment',
       gatewaySessionKey: 'agent:main:desktop-action:agent_team_compose:action-mppy1i4g-4fzyo8',
       childSessionKeys: [],
       approvals: [],
     });
 
     vi.restoreAllMocks();
+  });
+
+  it('does not mark a work-bound ActionRun as unassigned', () => {
+    const run = createAiActionRun({
+      type: 'artifact_create',
+      sourcePage: 'workbench',
+      instanceId: 'instance-1',
+      input: '生成发布报告',
+      workItemId: 'release',
+      workItemPath: 'work/active/release.md',
+    });
+
+    expect(run).toMatchObject({
+      workItemRequired: true,
+      workItemId: 'release',
+      workItemPath: 'work/active/release.md',
+    });
+    expect(run.workItemUnassignedReason).toBeUndefined();
   });
 
   it('creates an isolated Gateway session and sends the action prompt', async () => {

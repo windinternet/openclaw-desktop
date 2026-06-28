@@ -756,6 +756,21 @@ HTML 的独特优势：
 
 - 仍需要“每次 AI 执行必须归属事项”的全局 UI / 协议强约束、知识更新后的复盘建议、结构化复盘上下文带入，以及“开始一件事”专题闭环。
 
+### 10.45 2026-06-28 当前实施记录：ActionRun 未归属原因协议
+
+围绕“每次 AI 执行应归属事项”的 P0 验收，当前继续落地一段更底层的协议事实：
+
+- `createAiActionRun` 现在默认写入 `workItemRequired: true`。
+- 如果创建 ActionRun 时还没有 `workItemPath`，Desktop 会写入 `workItemUnassignedReason: pending_work_item_assignment`。
+- 已归属事项的 ActionRun 仍保留 `workItemId` / `workItemPath`，不会写入未归属原因。
+- `runs/action-runs/*.md` 仓库摘要会写出 `workItemRequired` 和 `workItemUnassignedReason`，让仓库事实源能看到“这个执行本应归属事项，但当前还没归属”。
+- Dashboard 的 `action-run:unassigned` 待确认详情会展示未归属原因，而不是只显示“未关联事项”。
+- 该能力仍是协议和观测层第一片，不自动创建事项、不自动补写运行记录、不把旧入口强行阻断。
+
+仍未完成的 P0 后续：
+
+- 仍需要全局 UI 侧事项选择器、从 Dashboard/Workbench 给已有无事项 ActionRun 补归属的流程，以及把 Teams、Tasks、Knowledge、Artifacts 等入口逐步接入用户可理解的“选择或创建事项”体验。
+
 ### 10.43 2026-06-28 当前实施记录：事项知识尾动作确认联动
 
 围绕“ActionRun 结束后必须触发是否更新知识库”和“尾动作需要回到事项页闭环”的 P0 验收，当前继续落地一段代码事实：

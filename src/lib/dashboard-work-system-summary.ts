@@ -163,7 +163,7 @@ export function buildDashboardWorkSystemSummary(
           title: run.input || run.type,
           target: '/workbench?view=actions',
           updatedAt: run.updatedAt,
-          detail: '未关联事项',
+          detail: ['未关联事项', run.workItemUnassignedReason].filter(Boolean).join(' · '),
           status: 'action-run:unassigned',
         }))
     : [];

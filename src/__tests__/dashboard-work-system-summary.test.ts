@@ -428,6 +428,8 @@ describe('dashboard work system summary', () => {
           status: 'done',
           input: '整理剪藏资料',
           resultSummary: '资料摘要已生成',
+          workItemRequired: true,
+          workItemUnassignedReason: 'pending_work_item_assignment',
           updatedAt: 230,
         }),
         createActionRun({
@@ -458,7 +460,7 @@ describe('dashboard work system summary', () => {
         kind: 'action_run',
         title: '整理剪藏资料',
         target: '/workbench?view=actions',
-        detail: '未关联事项',
+        detail: '未关联事项 · pending_work_item_assignment',
         status: 'action-run:unassigned',
       }),
     ]);

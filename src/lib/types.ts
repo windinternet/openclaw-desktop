@@ -169,6 +169,8 @@ export interface AiActionRun {
   gatewayAgentId?: string;
   gatewaySessionKey?: string;
   gatewayRunId?: string;
+  workItemRequired?: boolean;
+  workItemUnassignedReason?: string;
   workItemId?: string;
   workItemPath?: string;
   artifactIds?: string[];

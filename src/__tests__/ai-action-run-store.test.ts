@@ -206,6 +206,22 @@ describe('AI ActionRun repository summaries', () => {
     expect(markdown).toContain('- art_2');
   });
 
+  it('records ActionRun work item assignment requirements in repository summaries', () => {
+    const markdown = buildAiActionRunMarkdown(
+      createRun({
+        id: 'action-unassigned',
+        type: 'agent_team_compose',
+        status: 'done',
+        input: '编排团队',
+        workItemRequired: true,
+        workItemUnassignedReason: 'pending_work_item_assignment',
+      }),
+    );
+
+    expect(markdown).toContain('workItemRequired: true');
+    expect(markdown).toContain('workItemUnassignedReason: pending_work_item_assignment');
+  });
+
   it('writes completed ActionRun execution records back to the owning work item', async () => {
     const writeText = vi.fn();
     const readText = vi.fn(async (_repoPath: string, relativePath: string) => {

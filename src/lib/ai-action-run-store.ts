@@ -61,6 +61,8 @@ export function buildAiActionRunMarkdown(run: AiActionRun, artifacts: ArtifactMe
     `executionMode: ${run.executionMode}`,
     run.gatewaySessionKey ? `gatewaySessionKey: ${run.gatewaySessionKey}` : undefined,
     run.gatewayRunId ? `gatewayRunId: ${run.gatewayRunId}` : undefined,
+    run.workItemRequired !== undefined ? `workItemRequired: ${run.workItemRequired}` : undefined,
+    run.workItemUnassignedReason ? `workItemUnassignedReason: ${run.workItemUnassignedReason}` : undefined,
     run.workItemId ? `workItemId: ${run.workItemId}` : undefined,
     run.workItemPath ? `workItemPath: ${run.workItemPath}` : undefined,
     `createdAt: ${new Date(run.createdAt).toISOString()}`,

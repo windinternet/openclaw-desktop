@@ -78,6 +78,8 @@ export function createAiActionRun(options: {
   agentId?: string;
   input: string;
   executionMode?: AiActionExecutionMode;
+  workItemRequired?: boolean;
+  workItemUnassignedReason?: string;
   workItemId?: string;
   workItemPath?: string;
 }): AiActionRun {
@@ -85,6 +87,12 @@ export function createAiActionRun(options: {
   const id = generateActionRunId();
   const agentId = options.agentId || 'main';
   const executionMode = options.executionMode || 'isolated-session';
+  const workItemPath = options.workItemPath?.trim() || undefined;
+  const workItemRequired = options.workItemRequired ?? true;
+  const workItemUnassignedReason =
+    workItemRequired && !workItemPath
+      ? options.workItemUnassignedReason?.trim() || 'pending_work_item_assignment'
+      : undefined;
   const gatewaySessionKey =
     executionMode === 'domain-thread'
       ? undefined
@@ -100,10 +108,12 @@ export function createAiActionRun(options: {
     executionMode,
     input: options.input,
     workItemId: options.workItemId,
-    workItemPath: options.workItemPath,
+    workItemPath,
     gatewaySessionKey,
     childSessionKeys: [],
     approvals: [],
+    workItemRequired,
+    workItemUnassignedReason,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
