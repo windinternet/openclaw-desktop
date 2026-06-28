@@ -398,6 +398,19 @@ describe('desktop node commands', () => {
           usedAt: 20,
         },
       ],
+      executionEvents: [
+        {
+          id: 'exec_1',
+          status: 'approval_required',
+          artifactVersion: 1,
+          requestedAt: 30,
+          runner: 'ActionRun',
+          command: 'npm run report',
+          approvalTitle: '运行报告工作流',
+          approvalRisk: 'medium',
+          approvalReason: '会调用外部 runner，需要用户确认',
+        },
+      ],
       repositoryOutputPath: 'outputs/reports/art_2.md',
       repositoryPreviewPath: 'outputs/html/art_2.html',
     });
@@ -431,6 +444,20 @@ describe('desktop node commands', () => {
         latestVersion: expect.objectContaining({ version: 2, label: 'Refined report' }),
         reuseEventCount: 1,
         lastReuseEvent: expect.objectContaining({ context: 'action_run', status: 'succeeded' }),
+        assetExecutionSummary: expect.objectContaining({
+          reuseKind: 'workflow',
+          executable: true,
+          requiresApprovalBeforeRun: true,
+          executionEventCount: 1,
+          latestStatus: 'approval_required',
+          latestApprovalTitle: '运行报告工作流',
+          latestApprovalRisk: 'medium',
+          boundary: {
+            recordOnly: true,
+            desktopExecutes: false,
+            grantsPermission: false,
+          },
+        }),
         repositoryOutputPath: 'outputs/reports/art_2.md',
         repositoryPreviewPath: 'outputs/html/art_2.html',
       }),
@@ -676,6 +703,89 @@ describe('desktop node commands', () => {
           id: 'art_deploy',
           title: '发布检查',
           reuseKind: 'script',
+        }),
+      ],
+    });
+  });
+
+  it('summarizes executable asset approval boundary and recent run in search results', async () => {
+    mockedArtifactPersistence.list.mockResolvedValue([
+      {
+        id: 'art_deploy',
+        title: '发布检查',
+        icon: '💻',
+        type: 'code',
+        source: { type: 'manual' },
+        tags: [],
+        currentVersion: 2,
+        status: 'draft',
+        createdAt: 1,
+        updatedAt: 30,
+        command: 'npm run deploy',
+        contentSummary: '发布前检查命令',
+        reuseKind: 'script',
+        executionEvents: [
+          {
+            id: 'exec_prepare',
+            status: 'approval_required',
+            artifactVersion: 2,
+            requestedAt: 10,
+            runner: 'ActionRun',
+            command: 'npm run deploy -- --dry-run',
+            approvalTitle: '运行发布检查',
+            approvalRisk: 'high',
+            approvalReason: '会调用本地命令，需要用户审批',
+          },
+          {
+            id: 'exec_done',
+            status: 'succeeded',
+            artifactVersion: 2,
+            requestedAt: 10,
+            startedAt: 12,
+            endedAt: 20,
+            runner: 'ActionRun',
+            command: 'npm run deploy -- --dry-run',
+            approvalTitle: '运行发布检查',
+            approvalRisk: 'high',
+            approvalReason: '会调用本地命令，需要用户审批',
+            outputArtifactId: 'art_output',
+            repositoryOutputPath: 'outputs/runs/deploy-check.md',
+            resultSummary: '生成发布前检查结果',
+          },
+        ],
+      },
+    ]);
+
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.search', {
+        query: '可复用的脚本',
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      count: 1,
+      results: [
+        expect.objectContaining({
+          id: 'art_deploy',
+          assetExecutionSummary: {
+            reuseKind: 'script',
+            executable: true,
+            requiresApprovalBeforeRun: true,
+            executionEventCount: 2,
+            latestStatus: 'succeeded',
+            latestApprovalTitle: '运行发布检查',
+            latestApprovalRisk: 'high',
+            latestApprovalReason: '会调用本地命令，需要用户审批',
+            latestRunner: 'ActionRun',
+            latestCommand: 'npm run deploy -- --dry-run',
+            latestResultSummary: '生成发布前检查结果',
+            latestOutputArtifactId: 'art_output',
+            latestRepositoryOutputPath: 'outputs/runs/deploy-check.md',
+            boundary: {
+              recordOnly: true,
+              desktopExecutes: false,
+              grantsPermission: false,
+            },
+          },
         }),
       ],
     });

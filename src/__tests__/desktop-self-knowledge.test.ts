@@ -84,6 +84,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('Search existing Artifacts before asking the user for an artifact id');
     expect(skillContent).toContain('ordinary Chinese reusable-asset queries');
     expect(skillContent).toContain('可复用的脚本');
+    expect(skillContent).toContain('assetExecutionSummary');
+    expect(skillContent).toContain('recordOnly');
+    expect(skillContent).toContain('desktopExecutes: false');
     expect(skillContent).toContain('desktop.artifacts.inspect');
     expect(skillContent).toContain(
       'Dashboard first surfaces a work-system summary before Gateway infrastructure details',

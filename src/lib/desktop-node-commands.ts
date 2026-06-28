@@ -299,9 +299,48 @@ function buildArtifactSearchResult(artifact: ArtifactMeta) {
     previewCard: buildArtifactAgentPreviewCard(artifact),
     executionEventCount: artifact.executionEvents?.length ?? 0,
     lastExecutionEvent,
+    assetExecutionSummary: buildArtifactAssetExecutionSummary(artifact),
     updatedAt: artifact.updatedAt,
     reference: reference.markdown,
   };
+}
+
+function buildArtifactAssetExecutionSummary(artifact: ArtifactMeta) {
+  if (!artifact.reuseKind && !artifact.executionEvents?.length) return undefined;
+
+  const executionEvents = artifact.executionEvents ?? [];
+  const lastExecutionEvent = executionEvents[executionEvents.length - 1];
+  const executable = artifact.reuseKind ? ARTIFACT_EXECUTABLE_REUSE_KINDS.has(artifact.reuseKind) : false;
+  const summary = {
+    reuseKind: artifact.reuseKind,
+    executable,
+    requiresApprovalBeforeRun: executable,
+    executionEventCount: executionEvents.length,
+    ...(lastExecutionEvent
+      ? {
+          latestStatus: lastExecutionEvent.status,
+          latestApprovalTitle: lastExecutionEvent.approvalTitle,
+          latestApprovalRisk: lastExecutionEvent.approvalRisk,
+          latestApprovalReason: lastExecutionEvent.approvalReason,
+          latestRunner: lastExecutionEvent.runner,
+          latestCommand: lastExecutionEvent.command,
+          latestResultSummary: lastExecutionEvent.resultSummary,
+          latestOutputArtifactId: lastExecutionEvent.outputArtifactId,
+          latestRepositoryOutputPath: lastExecutionEvent.repositoryOutputPath,
+        }
+      : {}),
+    ...(executable
+      ? {
+          boundary: {
+            recordOnly: true,
+            desktopExecutes: false,
+            grantsPermission: false,
+          },
+        }
+      : {}),
+  };
+
+  return Object.fromEntries(Object.entries(summary).filter(([, value]) => value !== undefined));
 }
 
 async function mirrorArtifactSnapshotToRepository(params: {
@@ -1038,6 +1077,7 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
         lastReuseEvent,
         executionEventCount: artifact.executionEvents?.length ?? 0,
         lastExecutionEvent,
+        assetExecutionSummary: buildArtifactAssetExecutionSummary(artifact),
         repositoryOutputPath: artifact.repositoryOutputPath,
         repositoryPreviewPath: artifact.repositoryPreviewPath,
         fileName: artifact.fileName,
