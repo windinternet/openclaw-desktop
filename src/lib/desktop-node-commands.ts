@@ -22,6 +22,7 @@ import { buildArtifactPreviewPlan } from './artifact-preview-plan';
 import { buildArtifactThumbnail, resolveArtifactThumbnailEligibility } from './artifact-thumbnail';
 import { buildArtifactReuseReference } from './artifact-reference';
 import { buildArtifactValueHealth } from './artifact-value-health';
+import { buildArtifactExecutionReviewSummary } from './artifact-review-clues';
 import { recordArtifactExecutionEvent } from './artifact-execution-record';
 import { recordArtifactReuseEvent } from './artifact-reuse-record';
 import { buildArtifactVersionHistory } from './artifact-version-history';
@@ -327,6 +328,7 @@ function buildArtifactAssetExecutionSummary(artifact: ArtifactMeta) {
           latestResultSummary: lastExecutionEvent.resultSummary,
           latestOutputArtifactId: lastExecutionEvent.outputArtifactId,
           latestRepositoryOutputPath: lastExecutionEvent.repositoryOutputPath,
+          reviewSummary: buildArtifactExecutionReviewSummary(artifact),
         }
       : {}),
     ...(executable

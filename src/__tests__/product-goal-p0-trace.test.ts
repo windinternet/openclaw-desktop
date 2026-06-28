@@ -38,9 +38,11 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('截图追溯确认');
     expect(source).toContain('Artifacts 页面复用分类筛选');
     expect(source).toContain('Repository 可复用资产索引第一片');
+    expect(source).toContain('可复用资产运行后复盘线索');
     expect(skillContent).toContain('Screenshot-confirmed P0 baseline');
     expect(skillContent).toContain('Do not demote these scopes to P1/P2');
     expect(skillContent).toContain('Artifacts UI also exposes a reuse-kind filter');
     expect(skillContent).toContain('Repository `outputs/assets/index.md`');
+    expect(skillContent).toContain('post-run review clues');
   });
 });

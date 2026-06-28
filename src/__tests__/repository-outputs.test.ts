@@ -521,8 +521,55 @@ describe('repository outputs', () => {
     expect(assetIndexWrite).toContain('  - version: 3');
     expect(assetIndexWrite).toContain('  - summary: 可复用部署脚本');
     expect(assetIndexWrite).toContain('  - execution: 1 events, last approval_required');
+    expect(assetIndexWrite).not.toContain('  - review:');
     expect(assetIndexWrite).toContain('  - boundary: recordOnly, desktopExecutes=false, grantsPermission=false');
     expect(assetIndexWrite).toContain('  - tags: deploy');
+  });
+
+  it('adds post-run review clues to the repository asset index after terminal executions', async () => {
+    const writeText = vi.fn();
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'outputs/index.md') return '# Outputs\n';
+      if (relativePath === 'outputs/assets/index.md') return '# Reusable Assets\n';
+      return '';
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: {
+          writeText,
+          readText,
+        },
+      },
+    });
+
+    await createRepositoryOutput({
+      binding: createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      artifact: createArtifact({
+        id: 'art_script',
+        title: '部署脚本',
+        type: 'code',
+        reuseKind: 'script',
+        contentSummary: '可复用部署脚本',
+        executionEvents: [
+          {
+            id: 'exec_done',
+            status: 'succeeded',
+            artifactVersion: 3,
+            requestedAt: 10,
+            startedAt: 12,
+            endedAt: 30,
+            resultSummary: '生成 3 个发布命令',
+            outputArtifactId: 'art_output',
+            repositoryOutputPath: 'outputs/runs/exec_done.md',
+          },
+        ],
+      }),
+    });
+
+    const assetIndexWrite = writeText.mock.calls.find((call) => call[1] === 'outputs/assets/index.md')?.[2] as string;
+    expect(assetIndexWrite).toContain('  - execution: 1 events, last succeeded');
+    expect(assetIndexWrite).toContain('  - review: pending, write reviews/weekly/ entry');
+    expect(assetIndexWrite).toContain('  - reviewResult: 生成 3 个发布命令');
   });
 
   it('does not write the repository asset index for ordinary non-reusable outputs', async () => {

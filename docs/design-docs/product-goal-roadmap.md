@@ -340,9 +340,10 @@ HTML 产物是特色能力：
 - Artifacts 页面已提供复用分类筛选，可按全部复用、通用资产、模板、工具、脚本和工作流筛选，并与产物类型和文本搜索共同生效后按最近更新排序。
 - Repository output 镜像已为带 `reuseKind` 的 Artifact 维护 `outputs/assets/index.md`，在 "Reusable Assets" 下记录 artifact URI、output 路径、来源、版本、更新时间、摘要、价值健康、最近执行状态、标签和只记录/不执行/不授权边界。
 - 执行型复用资产（`tool / script / workflow`）已有 `desktop.artifacts.execution.prepare` 和 `desktop.artifacts.execution.record` 审批/运行事实记录，不直接执行命令、不绕过审批。
-- `desktop.artifacts.search` 和 `desktop.artifacts.describe` 会返回 `assetExecutionSummary`，把执行型资产的审批要求、最近执行状态/结果/输出线索，以及 Desktop 只记录、不执行、不授予权限的边界直接暴露给 Gateway。
+- `desktop.artifacts.search` 和 `desktop.artifacts.describe` 会返回 `assetExecutionSummary`，把执行型资产的审批要求、最近执行状态/结果/输出线索、终态执行后的 `reviewSummary` 复盘建议，以及 Desktop 只记录、不执行、不授予权限的边界直接暴露给 Gateway。
+- Repository `outputs/assets/index.md` 会为 `succeeded / failed / cancelled` 的最近执行写入 `review: pending, write reviews/weekly/ entry` 和结果摘要线索，用于提醒后续复盘，但不会自动写复盘。
 - Dashboard 最近产物和本周新增成果会把带 `reuseKind` 的 Artifact 与 Repository output 标为“可复用资产”，并在详情中展示复用分类、最近执行状态或待审批边界。
-- 这仍是第一片可观测入口；更完整的 Repository 资产目录协议、资产权限面板、运行后复盘线索和更细的处理工作流仍需继续补齐。
+- 这仍是第一片可观测入口；更完整的 Repository 资产目录协议、资产权限面板、运行后复盘写入流程和更细的处理工作流仍需继续补齐。
 
 验收：
 

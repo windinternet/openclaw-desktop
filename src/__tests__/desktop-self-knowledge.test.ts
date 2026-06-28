@@ -184,6 +184,7 @@ describe('desktop self-knowledge helpers', () => {
     );
     expect(skillContent).toContain('Repository `outputs/assets/index.md`');
     expect(skillContent).toContain('under the "Reusable Assets" heading');
+    expect(skillContent).toContain('post-run review clue when available');
     expect(skillContent).toContain('recordOnly, desktopExecutes=false, grantsPermission=false');
     expect(skillContent).toContain('externalFormat');
     expect(skillContent).toContain('reuseKind');
@@ -196,7 +197,12 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('desktop.artifacts.execution.prepare');
     expect(skillContent).toContain('records an approval-required execution intent');
     expect(skillContent).toContain('desktop.artifacts.execution.record');
-    expect(skillContent).toContain('records executable Artifact run facts only');
+    expect(skillContent).toContain('records executable Artifact run and review-needed facts only');
+    expect(skillContent).toContain('post-run review clues');
+    expect(skillContent).toContain('reviewSummary');
+    expect(skillContent).toContain(
+      'does not execute commands, grant execution permission, or write the review automatically',
+    );
     expect(skillContent).toContain('tool`, `script`, or `workflow`');
     expect(skillContent).toContain('does not execute commands or grant execution permission');
     expect(skillContent).toContain(

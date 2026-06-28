@@ -5,6 +5,7 @@ import { buildArtifactVersionHistory } from './artifact-version-history';
 import { buildArtifactPreviewCard } from './artifact-display';
 import { formatArtifactPdfFacts } from './artifact-content-facts';
 import { buildArtifactValueHealth } from './artifact-value-health';
+import { buildArtifactExecutionReviewSummary } from './artifact-review-clues';
 
 export interface CreateRepositoryOutputParams {
   binding: RepositoryBinding;
@@ -312,6 +313,7 @@ function buildReusableAssetIndexEntry(artifact: ArtifactMeta, outputPath: string
   const valueHealth = buildArtifactValueHealth(artifact);
   const executionCount = artifact.executionEvents?.length ?? 0;
   const lastExecutionEvent = artifact.executionEvents?.[executionCount - 1];
+  const reviewSummary = buildArtifactExecutionReviewSummary(artifact);
   return [
     `- [${artifact.title}](${outputPath}) (\`${artifact.id}\`, ${artifact.reuseKind}, ${artifact.type}, ${artifact.status})`,
     `  - artifact: artifact://${artifact.id}`,
@@ -323,6 +325,10 @@ function buildReusableAssetIndexEntry(artifact: ArtifactMeta, outputPath: string
     artifact.contentSummary ? `  - summary: ${artifact.contentSummary}` : undefined,
     `  - valueHealth: ${valueHealth.status}`,
     lastExecutionEvent ? `  - execution: ${executionCount} events, last ${lastExecutionEvent.status}` : undefined,
+    reviewSummary ? `  - review: pending, write ${reviewSummary.suggestedReviewTarget} entry` : undefined,
+    reviewSummary?.latestResultSummary
+      ? `  - reviewResult: ${formatInlineText(reviewSummary.latestResultSummary)}`
+      : undefined,
     '  - boundary: recordOnly, desktopExecutes=false, grantsPermission=false',
     artifact.tags.length > 0 ? `  - tags: ${artifact.tags.join(', ')}` : undefined,
   ]

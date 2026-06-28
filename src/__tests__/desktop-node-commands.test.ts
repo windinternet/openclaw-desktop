@@ -780,6 +780,18 @@ describe('desktop node commands', () => {
             latestResultSummary: '生成发布前检查结果',
             latestOutputArtifactId: 'art_output',
             latestRepositoryOutputPath: 'outputs/runs/deploy-check.md',
+            reviewSummary: {
+              reviewRecommended: true,
+              reason: 'terminal_execution_recorded',
+              latestStatus: 'succeeded',
+              latestResultSummary: '生成发布前检查结果',
+              suggestedReviewTarget: 'reviews/weekly/',
+              nextActions: ['write-review', 'link-output-artifact', 'capture-reuse-decision'],
+              boundary: {
+                recordOnly: true,
+                desktopWritesReview: false,
+              },
+            },
             boundary: {
               recordOnly: true,
               desktopExecutes: false,
