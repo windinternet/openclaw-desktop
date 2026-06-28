@@ -11,8 +11,11 @@ import { buildArtifactValueHealth, type ArtifactValueHealthStatus } from '../lib
 import { ArtifactCreateDialog } from '../components/ArtifactCreateDialog';
 import { ArtifactAICreateDrawer } from '../components/ArtifactAICreateDrawer';
 import { loadRepositoryBinding } from '../lib/agentic-repository-store';
+import { loadAiActionRuns } from '../lib/ai-action-run-store';
+import { buildArtifactOutputPreservationPrompt } from '../lib/artifact-output-preservation';
 import { parseDashboardTailActionRoute } from '../lib/dashboard-tail-action-routing';
 import { preserveWorkbenchOutputFromTailAction } from '../lib/repository-workbench';
+import type { AiActionRun } from '../lib/types';
 
 const { Text } = Typography;
 
@@ -27,6 +30,7 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
   const fetchArtifacts = useStore((s) => s.fetchArtifacts);
   const openArtifactWindow = useStore((s) => s.openArtifactWindow);
   const currentInstanceId = useStore((s) => s.currentInstanceId);
+  const actionRunsVersion = useStore((s) => s.actionRunsVersion);
   const navigate = useNavigate();
   const location = useLocation();
   const tailActionContext = useMemo(() => parseDashboardTailActionRoute(location.search), [location.search]);
@@ -34,17 +38,19 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
   const artifactTailActionRunId = artifactTailActionContext?.id?.startsWith('action-run-output:')
     ? artifactTailActionContext.id.slice('action-run-output:'.length)
     : undefined;
+  const [artifactTailActionRun, setArtifactTailActionRun] = useState<AiActionRun | null>(null);
+  const artifactTailActionRunResultSummary =
+    artifactTailActionRun && artifactTailActionRun.id === artifactTailActionRunId
+      ? artifactTailActionRun.resultSummary
+      : undefined;
   const artifactTailActionInitialInput = useMemo(() => {
     if (!artifactTailActionContext?.workItemPath) return undefined;
-    return [
-      `请根据来源事项 ${artifactTailActionContext.workItemPath} 和最近执行记录，判断本次执行中值得沉淀的成果。`,
-      artifactTailActionRunId ? `来源执行记录 action-run-output:${artifactTailActionRunId}。` : undefined,
-      '如果适合沉淀，请生成一个可保存、可复用、可追踪的产物；优先考虑 HTML 报告/仪表盘、文档、链接或文件型成果。',
-      '请在产物说明中保留来源事项和价值摘要。',
-    ]
-      .filter(Boolean)
-      .join('\n');
-  }, [artifactTailActionContext?.workItemPath, artifactTailActionRunId]);
+    return buildArtifactOutputPreservationPrompt({
+      workItemPath: artifactTailActionContext.workItemPath,
+      actionRunOutputId: artifactTailActionRunId ? `action-run-output:${artifactTailActionRunId}` : undefined,
+      resultSummary: artifactTailActionRunResultSummary,
+    });
+  }, [artifactTailActionContext?.workItemPath, artifactTailActionRunId, artifactTailActionRunResultSummary]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [reuseKindFilter, setReuseKindFilter] = useState<ArtifactReuseKindFilter>('all');
@@ -65,6 +71,24 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
   useEffect(() => {
     if (!embedded && artifactTailActionContext) setShowAICreate(true);
   }, [artifactTailActionContext, embedded]);
+
+  useEffect(() => {
+    if (!currentInstanceId || !artifactTailActionRunId) {
+      setArtifactTailActionRun(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      const runs = await loadAiActionRuns(currentInstanceId).catch(() => []);
+      if (cancelled) return;
+      setArtifactTailActionRun(runs.find((run) => run.id === artifactTailActionRunId) ?? null);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [actionRunsVersion, artifactTailActionRunId, currentInstanceId]);
 
   const typeOptions = useMemo(
     () => [

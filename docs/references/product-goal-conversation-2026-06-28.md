@@ -1333,3 +1333,17 @@ HTML 的独特优势：
 仍未完成的 P0 后续：
 
 - 仍需要真正 Wiki 写入后的复盘建议/确认状态、复盘确认后的后续联动、更完整的执行结果候选提取，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
+
+### 10.63 2026-06-29 当前实施记录：计划执行成果候选提取
+
+围绕“开始一件事闭环”中“执行 -> 产物”的 P0 缺口，当前继续把计划执行结果里的明确候选带到 Artifacts 成果沉淀提示中：
+
+- 新增 `extractActionRunOutputCandidates`，从 ActionRun `resultSummary` 中显式的成果/产物/输出/交付物段落，以及明确的文件或 URL 线索里提取候选成果。
+- 新增 `buildArtifactOutputPreservationPrompt`，把来源事项、`action-run-output:<runId>`、最近执行结果摘要和候选成果组合成 Artifacts AI 创建初始提示。
+- Artifacts 从 Dashboard 或 Workbench 的 `action-run-output:<runId>` 路由进入时，会加载当前实例的来源 ActionRun，并把 `resultSummary` 传给提示构建器。
+- 候选成果覆盖文件、链接、HTML、文档、表格、演示等显式线索，符合“产物不止工具脚本”的 P0 边界。
+- 该能力只增强提示上下文，不自动创建 Artifact 或 Repository output、不读取任意本地文件、不执行文件、不授予权限、不更新知识库、不写复盘、不移动事项文件。
+
+仍未完成的 P0 后续：
+
+- 仍需要更丰富的候选来源、更完整的保存表单、真正 Wiki 写入后的复盘建议/确认状态、复盘确认后的后续联动，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。

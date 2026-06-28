@@ -52,14 +52,21 @@ describe('artifact ActionRun linkage', () => {
   it('prefills the artifact creation prompt when opened from a Dashboard output tail action', () => {
     const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
     const artifacts = readFileSync('src/pages/ArtifactsPage.tsx', 'utf8');
+    const prompt = readFileSync('src/lib/artifact-output-preservation.ts', 'utf8');
 
     expect(drawer).toContain('initialInput?: string');
     expect(drawer).toContain("useState(initialInput ?? '')");
     expect(drawer).toContain('if (visible && initialInput !== undefined) setInput(initialInput)');
     expect(artifacts).toContain('artifactTailActionInitialInput');
-    expect(artifacts).toContain('请根据来源事项');
+    expect(artifacts).toContain('buildArtifactOutputPreservationPrompt');
+    expect(artifacts).toContain('loadAiActionRuns(currentInstanceId)');
+    expect(artifacts).toContain('artifactTailActionRun');
+    expect(artifacts).toContain('artifactTailActionRun.id === artifactTailActionRunId');
+    expect(prompt).toContain('extractActionRunOutputCandidates');
+    expect(prompt).toContain('候选成果');
+    expect(prompt).toContain('请根据来源事项');
     expect(artifacts).toContain('artifactTailActionRunId');
-    expect(artifacts).toContain('来源执行记录 action-run-output');
+    expect(prompt).toContain('来源执行记录');
     expect(artifacts).toContain('initialInput={artifactTailActionInitialInput}');
   });
 
