@@ -68,10 +68,12 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('ActionRun 成果保存后状态刷新');
     expect(source).toContain('AI 产物创建保存表单结构化 Artifact 块');
     expect(source).toContain('AI 产物创建保存前多候选选择');
+    expect(source).toContain('AI 产物创建保存前基础编辑');
     expect(source).toContain('ActionRun 成果沉淀后的 Dashboard 去重');
     expect(source).toContain('notifyActionRunsChanged');
     expect(source).toContain('artifact-ai-create-preview');
     expect(source).toContain('parseArtifactAICreatePreviews');
+    expect(source).toContain('normalizeArtifactAICreatePreviewDraft');
     expect(source).toContain('shouldOfferPlanExecutionOutputPreservation');
     expect(source).toContain('extractActionRunOutputCandidates');
     expect(source).toContain('buildArtifactOutputPreservationPrompt');
@@ -132,6 +134,7 @@ describe('product goal P0 traceability', () => {
     expect(plans).toContain('保存后会触发 `notifyActionRunsChanged`');
     expect(plans).toContain('AI 创建保存表单已支持 `<artifact>`');
     expect(plans).toContain('AI 创建保存表单已支持多个候选产物');
+    expect(plans).toContain('AI 创建保存表单已支持保存前基础编辑');
     expect(plans).toContain('计划执行成果候选提取');
     expect(plans).toContain('shouldOfferPlanExecutionOutputPreservation');
     expect(plans).toContain('extractActionRunOutputCandidates');
@@ -184,6 +187,7 @@ describe('product goal P0 traceability', () => {
     expect(roadmap).toContain('保存后会触发 `notifyActionRunsChanged`');
     expect(roadmap).toContain('AI 创建保存表单已支持 `<artifact>`');
     expect(roadmap).toContain('AI 创建保存表单已支持多个候选产物');
+    expect(roadmap).toContain('AI 创建保存表单已支持保存前基础编辑');
     expect(roadmap).toContain('计划执行成果候选提取');
     expect(roadmap).toContain('shouldOfferPlanExecutionOutputPreservation');
     expect(roadmap).toContain('extractActionRunOutputCandidates');
@@ -243,6 +247,8 @@ describe('product goal P0 traceability', () => {
     expect(skillContent).toContain('rich `<artifact>` blocks');
     expect(skillContent).toContain('multiple Artifact candidates');
     expect(skillContent).toContain('selected candidate');
+    expect(skillContent).toContain('edit title, type, description, tags, and content summary before saving');
+    expect(skillContent).toContain('normalizeArtifactAICreatePreviewDraft');
     expect(skillContent).toContain('extractActionRunOutputCandidates');
     expect(skillContent).toContain('buildArtifactOutputPreservationPrompt');
     expect(skillContent).toContain('lastAssistantResponse');

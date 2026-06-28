@@ -1,5 +1,17 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Modal, Button, TextArea, Spin, Tag, Toast, Typography, Space } from '@douyinfe/semi-ui';
+import {
+  Modal,
+  Button,
+  Input,
+  Select,
+  TextArea,
+  Spin,
+  Tag,
+  TagInput,
+  Toast,
+  Typography,
+  Space,
+} from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
 import { IconAIFilledLevel1, IconRefresh } from '@douyinfe/semi-icons';
 import { useStore } from '../lib';
@@ -8,15 +20,36 @@ import { buildArtifactCreatePrompt } from '../lib/ai-action-prompts';
 import { upsertAiActionRun } from '../lib/ai-action-run-store';
 import {
   buildArtifactAICreateGenerateParams,
+  normalizeArtifactAICreatePreviewDraft,
   parseArtifactAICreatePreviews,
   type ArtifactAICreatePreview,
 } from '../lib/artifact-ai-create-preview';
 import { useWorkbenchWorkItemOptions } from '../lib/workbench-work-items';
 import { ActionRunWorkItemPicker } from './ActionRunWorkItemPicker';
 import type { AiActionRun } from '../lib/types';
-import type { ArtifactMeta } from '../lib/artifact-types';
+import type { ArtifactMeta, ArtifactType } from '../lib/artifact-types';
 
 const { Text, Paragraph } = Typography;
+
+const ARTIFACT_TYPE_OPTIONS: { value: ArtifactType; label: string }[] = [
+  { value: 'report', label: '报告' },
+  { value: 'dashboard', label: '仪表盘' },
+  { value: 'analysis', label: '分析' },
+  { value: 'checklist', label: '清单' },
+  { value: 'code', label: '代码' },
+  { value: 'document', label: '文档' },
+  { value: 'slide', label: '幻灯片' },
+  { value: 'form', label: '表单' },
+  { value: 'other', label: '其他' },
+  { value: 'link', label: '链接' },
+  { value: 'app', label: '应用' },
+  { value: 'file', label: '文件' },
+  { value: 'audio', label: '音频' },
+  { value: 'image', label: '图片' },
+  { value: 'video', label: '视频' },
+];
+
+const editLabelStyle = { marginBottom: 4, fontSize: 13, fontWeight: 500, color: 'var(--semi-color-text-0)' } as const;
 
 interface Props {
   visible: boolean;
@@ -63,6 +96,7 @@ export function ArtifactAICreateDrawer({
   const [error, setError] = useState<string | null>(null);
   const isGeneratingRef = useRef(false);
   const preview = previews[selectedPreviewIndex] ?? null;
+  const canSavePreview = Boolean(preview?.title.trim());
 
   useEffect(() => {
     if (visible && initialInput !== undefined) setInput(initialInput);
@@ -151,8 +185,22 @@ export function ArtifactAICreateDrawer({
     selectedWorkItemId,
   ]);
 
+  const updateSelectedPreview = useCallback(
+    (patch: Partial<ArtifactAICreatePreview>) => {
+      setPreviews((current) =>
+        current.map((candidate, index) => (index === selectedPreviewIndex ? { ...candidate, ...patch } : candidate)),
+      );
+    },
+    [selectedPreviewIndex],
+  );
+
   const handleSave = useCallback(async () => {
     if (!preview) return;
+    const normalizedPreview = normalizeArtifactAICreatePreviewDraft(preview);
+    if (!normalizedPreview.title) {
+      Toast.error('请输入产物标题');
+      return;
+    }
     try {
       const artifact = await generateArtifact(buildArtifactAICreateGenerateParams(preview, previewRun?.id));
       if (currentInstanceId && previewRun) {
@@ -284,6 +332,50 @@ export function ArtifactAICreateDrawer({
                 </div>
               </div>
             )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <Text type="tertiary" size="small">
+                保存前可编辑标题、类型、说明、标签和价值摘要；正文、文件、链接和来源记录保持 AI 生成事实。
+              </Text>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 132px', gap: 8 }}>
+                <div>
+                  <div style={editLabelStyle}>标题 *</div>
+                  <Input value={preview.title} onChange={(value) => updateSelectedPreview({ title: value })} />
+                </div>
+                <div>
+                  <div style={editLabelStyle}>类型</div>
+                  <Select
+                    value={preview.type}
+                    onChange={(value) => updateSelectedPreview({ type: value as ArtifactType })}
+                    optionList={ARTIFACT_TYPE_OPTIONS}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              </div>
+              <div>
+                <div style={editLabelStyle}>说明</div>
+                <TextArea
+                  value={preview.description ?? ''}
+                  onChange={(value) => updateSelectedPreview({ description: value })}
+                  autosize={{ minRows: 2, maxRows: 4 }}
+                  maxCount={1000}
+                />
+              </div>
+              <div>
+                <div style={editLabelStyle}>价值摘要</div>
+                <Input
+                  value={preview.contentSummary ?? ''}
+                  onChange={(value) => updateSelectedPreview({ contentSummary: value })}
+                />
+              </div>
+              <div>
+                <div style={editLabelStyle}>标签</div>
+                <TagInput
+                  placeholder="输入标签后回车确认"
+                  value={preview.tags ?? []}
+                  onChange={(value) => updateSelectedPreview({ tags: Array.isArray(value) ? value.map(String) : [] })}
+                />
+              </div>
+            </div>
             <div
               style={{
                 padding: 16,
@@ -362,7 +454,7 @@ export function ArtifactAICreateDrawer({
               )}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <Button theme="solid" onClick={handleSave} style={{ flex: 1 }}>
+              <Button theme="solid" onClick={handleSave} disabled={!canSavePreview} style={{ flex: 1 }}>
                 保存产物
               </Button>
               <Button icon={<IconRefresh />} onClick={handleGenerate}>

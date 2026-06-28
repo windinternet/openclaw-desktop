@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildArtifactAICreateGenerateParams,
+  normalizeArtifactAICreatePreviewDraft,
   parseArtifactAICreatePreview,
   parseArtifactAICreatePreviews,
 } from '../lib/artifact-ai-create-preview';
@@ -86,6 +87,36 @@ describe('artifact AI create preview', () => {
       }),
     );
     expect(parseArtifactAICreatePreview('')).toBeNull();
+  });
+
+  it('normalizes edited save metadata while keeping generated content', () => {
+    const draft = normalizeArtifactAICreatePreviewDraft({
+      title: '  用户校正后的复盘文档  ',
+      type: 'document',
+      description: '  更准确的说明  ',
+      tags: [' 复盘 ', '', ' 验收 '],
+      html: '<!doctype html><html><body>review</body></html>',
+      contentSummary: '  HTML · 可交互复盘文档  ',
+    });
+
+    expect(draft).toEqual(
+      expect.objectContaining({
+        title: '用户校正后的复盘文档',
+        description: '更准确的说明',
+        tags: ['复盘', '验收'],
+        html: '<!doctype html><html><body>review</body></html>',
+        contentSummary: 'HTML · 可交互复盘文档',
+      }),
+    );
+    expect(buildArtifactAICreateGenerateParams(draft, 'run-2')).toEqual(
+      expect.objectContaining({
+        title: '用户校正后的复盘文档',
+        description: '更准确的说明',
+        tags: ['复盘', '验收'],
+        contentSummary: 'HTML · 可交互复盘文档',
+        source: { type: 'action_run', id: 'run-2', name: 'AI 魔法创建' },
+      }),
+    );
   });
 
   it('keeps legacy ai-action result parsing for simple artifacts', () => {

@@ -65,26 +65,37 @@ export function parseArtifactAICreatePreviews(response: string | undefined): Art
   return parseLegacyAiActionPreviews(response);
 }
 
+export function normalizeArtifactAICreatePreviewDraft(preview: ArtifactAICreatePreview): ArtifactAICreatePreview {
+  return {
+    ...preview,
+    title: preview.title.trim(),
+    description: trimmedStringValue(preview.description),
+    tags: normalizeTags(preview.tags),
+    contentSummary: trimmedStringValue(preview.contentSummary),
+  };
+}
+
 export function buildArtifactAICreateGenerateParams(
   preview: ArtifactAICreatePreview,
   sourceRunId?: string,
 ): GenerateParams {
+  const normalizedPreview = normalizeArtifactAICreatePreviewDraft(preview);
   return {
-    title: preview.title,
-    type: preview.type,
-    description: preview.description,
-    tags: preview.tags,
-    html: preview.html,
-    url: preview.url,
-    command: preview.command,
-    filePath: preview.filePath,
-    fileName: preview.fileName,
-    fileSize: preview.fileSize,
-    mimeType: preview.mimeType,
-    externalFormat: preview.externalFormat,
-    contentSummary: preview.contentSummary,
-    reuseKind: preview.reuseKind,
-    importFile: preview.importFile,
+    title: normalizedPreview.title,
+    type: normalizedPreview.type,
+    description: normalizedPreview.description,
+    tags: normalizedPreview.tags,
+    html: normalizedPreview.html,
+    url: normalizedPreview.url,
+    command: normalizedPreview.command,
+    filePath: normalizedPreview.filePath,
+    fileName: normalizedPreview.fileName,
+    fileSize: normalizedPreview.fileSize,
+    mimeType: normalizedPreview.mimeType,
+    externalFormat: normalizedPreview.externalFormat,
+    contentSummary: normalizedPreview.contentSummary,
+    reuseKind: normalizedPreview.reuseKind,
+    importFile: normalizedPreview.importFile,
     source: { type: 'action_run', id: sourceRunId, name: 'AI 魔法创建' },
   };
 }
@@ -153,6 +164,18 @@ function isValidReuseKind(kind: unknown): kind is ArtifactReuseKind {
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function trimmedStringValue(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function normalizeTags(tags: string[] | undefined): string[] | undefined {
+  if (!Array.isArray(tags)) return undefined;
+  const normalized = tags.map((tag) => tag.trim()).filter(Boolean);
+  return normalized.length > 0 ? Array.from(new Set(normalized)) : undefined;
 }
 
 function numberValue(value: unknown): number | undefined {

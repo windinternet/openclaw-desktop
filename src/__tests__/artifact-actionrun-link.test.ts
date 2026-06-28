@@ -39,6 +39,21 @@ describe('artifact ActionRun linkage', () => {
     expect(drawer).toContain('候选');
   });
 
+  it('lets users edit selected AI-created artifact metadata before saving', () => {
+    const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
+    const preview = readFileSync('src/lib/artifact-ai-create-preview.ts', 'utf8');
+
+    expect(preview).toContain('normalizeArtifactAICreatePreviewDraft');
+    expect(drawer).toContain('updateSelectedPreview');
+    expect(drawer).toContain('保存前可编辑');
+    expect(drawer).toContain('Input');
+    expect(drawer).toContain('Select');
+    expect(drawer).toContain('TagInput');
+    expect(drawer).toContain('updateSelectedPreview({ title: value })');
+    expect(drawer).toContain('updateSelectedPreview({ type: value as ArtifactType })');
+    expect(drawer).toContain('updateSelectedPreview({ contentSummary: value })');
+  });
+
   it('notifies ActionRun observers after saving an AI-created artifact output', () => {
     const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
     const store = readFileSync('src/lib/store.ts', 'utf8');
