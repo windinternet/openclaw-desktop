@@ -96,6 +96,18 @@ export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string
     previewCard.location ? `previewCardLocation: ${previewCard.location}` : undefined,
     `previewCardAction: ${previewCard.primaryAction}`,
     previewCard.safetyNote ? `previewCardSafety: ${previewCard.safetyNote}` : undefined,
+    artifact.previewPlan ? `previewPlanStrategy: ${artifact.previewPlan.strategy}` : undefined,
+    artifact.previewPlan ? `previewPlanSurface: ${artifact.previewPlan.surface}` : undefined,
+    artifact.previewPlan ? `previewPlanAction: ${artifact.previewPlan.primaryAction}` : undefined,
+    artifact.previewPlan ? `previewPlanSummary: ${artifact.previewPlan.summary}` : undefined,
+    artifact.previewPlan?.safetyNote ? `previewPlanSafety: ${artifact.previewPlan.safetyNote}` : undefined,
+    artifact.previewPlan?.limitations.length
+      ? `previewPlanLimitations: ${artifact.previewPlan.limitations.join(', ')}`
+      : undefined,
+    artifact.previewPlan?.nextSteps.length
+      ? `previewPlanNextSteps: ${artifact.previewPlan.nextSteps.join(', ')}`
+      : undefined,
+    artifact.previewPlan ? `previewPlanAt: ${new Date(artifact.previewPlan.plannedAt).toISOString()}` : undefined,
     artifact.reuseKind ? `reuseKind: ${artifact.reuseKind}` : undefined,
     artifact.htmlAudit ? `htmlSelfContained: ${artifact.htmlAudit.selfContained}` : undefined,
     artifact.htmlAudit ? `htmlRequiresApproval: ${artifact.htmlAudit.requiresApproval}` : undefined,
@@ -217,6 +229,9 @@ function buildOutputIndexEntry(artifact: ArtifactMeta, outputPath: string, previ
       : undefined,
     artifact.fileInspection
       ? `  - inspection: ${artifact.fileInspection.sourceKind}, ${artifact.fileInspection.previewStatus}`
+      : undefined,
+    artifact.previewPlan
+      ? `  - previewPlan: ${artifact.previewPlan.strategy}, ${artifact.previewPlan.primaryAction}`
       : undefined,
     `  - previewCard: ${previewCard.thumbnailLabel} · ${previewCard.actionLabel}`,
     artifact.reuseKind ? `  - reuseKind: ${artifact.reuseKind}` : undefined,

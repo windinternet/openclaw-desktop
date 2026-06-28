@@ -374,6 +374,17 @@ describe('desktop node commands', () => {
         { version: 2, label: 'Refined report', createdBy: 'ai', createdAt: 2 },
       ],
       reuseKind: 'workflow',
+      previewPlan: {
+        plannedAt: 20,
+        format: 'html',
+        sourceKind: 'metadata_only',
+        strategy: 'artifact_html_preview',
+        surface: 'artifact_window',
+        primaryAction: 'preview_html',
+        summary: 'HTML · 交互式报告',
+        limitations: [],
+        nextSteps: ['open-preview-window'],
+      },
       reuseEvents: [
         {
           id: 'reuse_1',
@@ -406,6 +417,10 @@ describe('desktop node commands', () => {
           primaryAction: 'preview_html',
         }),
         reuseKind: 'workflow',
+        previewPlan: expect.objectContaining({
+          strategy: 'artifact_html_preview',
+          primaryAction: 'preview_html',
+        }),
         versionCount: 2,
         latestVersion: expect.objectContaining({ version: 2, label: 'Refined report' }),
         reuseEventCount: 1,
@@ -468,6 +483,18 @@ describe('desktop node commands', () => {
         fileName: 'roadmap.pptx',
         repositoryOutputPath: 'outputs/files/art_roadmap.md',
         repositoryPreviewPath: 'outputs/html/art_roadmap.html',
+        previewPlan: {
+          plannedAt: 20,
+          format: 'powerpoint',
+          sourceKind: 'imported_file',
+          strategy: 'system_file_handler',
+          surface: 'system_default_app',
+          primaryAction: 'open_file',
+          summary: 'PowerPoint · roadmap.pptx · 4 KB',
+          safetyNote: '本地文件通过系统默认应用打开，不会在 Desktop 内静默执行。',
+          limitations: ['native-preview-missing', 'thumbnail-missing', 'content-extraction-missing'],
+          nextSteps: ['open-with-system-app', 'add-native-preview', 'add-thumbnail', 'add-content-extraction'],
+        },
       },
     ]);
 
@@ -503,6 +530,12 @@ describe('desktop node commands', () => {
             location: 'outputs/files/art_roadmap.md',
             primaryAction: 'open_file',
             actionLabel: '查看文件',
+          }),
+          previewPlan: expect.objectContaining({
+            strategy: 'system_file_handler',
+            surface: 'system_default_app',
+            primaryAction: 'open_file',
+            nextSteps: ['open-with-system-app', 'add-native-preview', 'add-thumbnail', 'add-content-extraction'],
           }),
           updatedAt: 20,
           reference: expect.stringContaining('artifactId: art_roadmap'),
@@ -560,6 +593,14 @@ describe('desktop node commands', () => {
         originalPath: '/Users/deepin/Documents/roadmap.pptx',
         limitations: ['native-preview-missing', 'thumbnail-missing', 'content-extraction-missing'],
       }),
+      previewPlan: expect.objectContaining({
+        plannedAt: 50,
+        format: 'powerpoint',
+        strategy: 'system_file_handler',
+        surface: 'system_default_app',
+        primaryAction: 'open_file',
+        limitations: ['native-preview-missing', 'thumbnail-missing', 'content-extraction-missing'],
+      }),
       output: {
         outputId: 'art_file',
         path: 'outputs/files/art_file.md',
@@ -573,12 +614,18 @@ describe('desktop node commands', () => {
         format: 'powerpoint',
         previewStatus: 'external_app',
       }),
+      previewPlan: expect.objectContaining({
+        plannedAt: 50,
+        strategy: 'system_file_handler',
+        primaryAction: 'open_file',
+      }),
     });
     expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(
       expect.objectContaining({
         artifact: expect.objectContaining({
           id: 'art_file',
           fileInspection: expect.objectContaining({ format: 'powerpoint' }),
+          previewPlan: expect.objectContaining({ strategy: 'system_file_handler' }),
         }),
         binding: expect.objectContaining({ repoPath: '/repo', gatewayInstanceId: 'inst-1' }),
       }),

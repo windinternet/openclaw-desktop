@@ -44,6 +44,18 @@ describe('artifact display helpers', () => {
         source: { type: 'chat', id: 'chat-1', name: '产品会' },
         reuseKind: 'template',
         repositoryPreviewPath: 'outputs/html/art_file.html',
+        previewPlan: {
+          plannedAt: 20,
+          format: 'powerpoint',
+          sourceKind: 'imported_file',
+          strategy: 'system_file_handler',
+          surface: 'system_default_app',
+          primaryAction: 'open_file',
+          summary: 'PowerPoint · roadmap.pptx · 4 KB',
+          safetyNote: '本地文件通过系统默认应用打开，不会在 Desktop 内静默执行。',
+          limitations: ['native-preview-missing', 'thumbnail-missing', 'content-extraction-missing'],
+          nextSteps: ['open-with-system-app', 'add-native-preview', 'add-thumbnail', 'add-content-extraction'],
+        },
       }),
     );
 
@@ -56,6 +68,9 @@ describe('artifact display helpers', () => {
     expect(text).toContain('产品会');
     expect(text).toContain('outputs/files/art_file.md');
     expect(text).toContain('outputs/html/art_file.html');
+    expect(text).toContain('system_file_handler');
+    expect(text).toContain('system_default_app');
+    expect(text).toContain('add-native-preview');
   });
 
   it('prefers reusable value clues over generic artifact type descriptions', () => {

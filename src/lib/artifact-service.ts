@@ -3,6 +3,7 @@ import { artifactPersistence } from './artifact-persistence';
 import { auditArtifactHtml } from './artifact-html-audit';
 import { buildArtifactContentExtract, resolveArtifactContentExtractEligibility } from './artifact-content-extract';
 import { buildArtifactFileInspection, shouldInspectArtifactFile } from './artifact-file-inspection';
+import { buildArtifactPreviewPlan } from './artifact-preview-plan';
 import { buildArtifactValueSummary, inferArtifactExternalFormat } from './artifact-value-summary';
 import {
   artifactVersionCreator,
@@ -168,6 +169,7 @@ export const artifactService = {
         // Artifact creation should not fail just because content extraction is unavailable.
       }
     }
+    meta.previewPlan = buildArtifactPreviewPlan(meta, now);
 
     await artifactPersistence.saveMeta(id, meta);
     if (html !== null) {

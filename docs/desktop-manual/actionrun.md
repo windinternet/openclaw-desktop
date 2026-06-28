@@ -54,7 +54,7 @@ ActionRun 的结果可以是：
 
 文件型 `<artifact>` 可以显式携带 `filePath`、`fileName`、`mimeType`、`fileSize`、`externalFormat`、`contentSummary`、`reuseKind` 和 `importFile`。当 `importFile: true` 时，Desktop 会导入本地文件；仓库绑定就绪时会把产物元数据镜像到 `outputs/files/` 并让 ActionRun 摘要链接该 output。`reuseKind` 可标记 `asset`、`template`、`tool`、`script` 或 `workflow`，用于后续复用和审计分类，不代表自动获得执行权限。
 
-当 ActionRun 生成或复用文件型、Office、PDF、媒体、链接、应用入口或命令型产物后，可以调用 `desktop.artifacts.inspect` 写入 `fileInspection`，把格式、来源、打开方式、预览状态、路径和当前限制同步到 Artifact metadata 与 Repository output。该命令不读取文件内容、不渲染 Office，也不执行命令。
+当 ActionRun 生成或复用文件型、Office、PDF、媒体、链接、应用入口或命令型产物后，可以调用 `desktop.artifacts.inspect` 写入 `fileInspection` 并刷新 `previewPlan`，把格式、来源、打开方式、预览状态、安全预览策略、路径、当前限制和下一步预览缺口同步到 Artifact metadata 与 Repository output。该命令不读取文件内容、不渲染 Office，也不执行命令。
 
 当 ActionRun 生成已导入的文本、代码或 HTML 文件副本时，Desktop 会在安全可读时自动写入 `contentExtract`，把读取字节数、文本长度、截断状态和抽取片段同步到 Artifact metadata；也可以调用 `desktop.artifacts.content.extract` 刷新既有产物并同步到 Repository output。该能力只读取 Artifact storage 中的导入副本，不读取任意本地路径，不解析 Office/PDF/媒体文件，也不执行命令。
 

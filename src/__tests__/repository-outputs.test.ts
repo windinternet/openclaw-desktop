@@ -38,6 +38,18 @@ describe('repository outputs', () => {
         originalPath: '/Users/deepin/Documents/budget.xlsx',
         limitations: ['native-preview-missing', 'thumbnail-missing', 'content-extraction-missing'],
       },
+      previewPlan: {
+        plannedAt: 20,
+        format: 'excel',
+        sourceKind: 'imported_file',
+        strategy: 'system_file_handler',
+        surface: 'system_default_app',
+        primaryAction: 'open_file',
+        summary: 'Excel · budget.xlsx · 12 KB',
+        safetyNote: '本地文件通过系统默认应用打开，不会在 Desktop 内静默执行。',
+        limitations: ['native-preview-missing', 'thumbnail-missing', 'content-extraction-missing'],
+        nextSteps: ['open-with-system-app', 'add-native-preview', 'add-thumbnail', 'add-content-extraction'],
+      },
     });
 
     expect(markdown).toContain('externalFormat: excel');
@@ -51,6 +63,15 @@ describe('repository outputs', () => {
     expect(markdown).toContain('previewCardFormat: Excel');
     expect(markdown).toContain('previewCardSummary: Excel · budget.xlsx · 12 KB');
     expect(markdown).toContain('previewCardAction: open_file');
+    expect(markdown).toContain('previewPlanStrategy: system_file_handler');
+    expect(markdown).toContain('previewPlanSurface: system_default_app');
+    expect(markdown).toContain('previewPlanAction: open_file');
+    expect(markdown).toContain(
+      'previewPlanLimitations: native-preview-missing, thumbnail-missing, content-extraction-missing',
+    );
+    expect(markdown).toContain(
+      'previewPlanNextSteps: open-with-system-app, add-native-preview, add-thumbnail, add-content-extraction',
+    );
   });
 
   it('includes extracted artifact text snippets in repository output markdown', () => {
@@ -255,6 +276,17 @@ describe('repository outputs', () => {
         externalFormat: 'powerpoint',
         contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
         reuseKind: 'template',
+        previewPlan: {
+          plannedAt: 20,
+          format: 'powerpoint',
+          sourceKind: 'imported_file',
+          strategy: 'system_file_handler',
+          surface: 'system_default_app',
+          primaryAction: 'open_file',
+          summary: 'PowerPoint · roadmap.pptx · 4 KB',
+          limitations: ['native-preview-missing', 'thumbnail-missing', 'content-extraction-missing'],
+          nextSteps: ['open-with-system-app', 'add-native-preview', 'add-thumbnail', 'add-content-extraction'],
+        },
       }),
     });
 
@@ -265,6 +297,7 @@ describe('repository outputs', () => {
     expect(indexWrite).toContain('  - source: chat / agent:main:demo / msg-1');
     expect(indexWrite).toContain('  - format: powerpoint');
     expect(indexWrite).toContain('  - summary: PowerPoint · roadmap.pptx · 4 KB');
+    expect(indexWrite).toContain('  - previewPlan: system_file_handler, open_file');
     expect(indexWrite).toContain('  - reuseKind: template');
     expect(indexWrite).toContain('- [Other](outputs/reports/art_other.md)');
   });

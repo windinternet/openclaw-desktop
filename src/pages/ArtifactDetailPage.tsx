@@ -305,6 +305,38 @@ export default function ArtifactDetailPage() {
                   )}
                 </div>
               )}
+              {meta.previewPlan && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div>
+                    <Text type="tertiary">{t('artifact.previewPlan')}: </Text>
+                    <Tag size="small">{meta.previewPlan.strategy}</Tag>
+                    <Tag size="small" type="light">
+                      {meta.previewPlan.surface}
+                    </Tag>
+                    <Tag size="small" type="light">
+                      {meta.previewPlan.primaryAction}
+                    </Tag>
+                  </div>
+                  <Text type="secondary">{meta.previewPlan.summary}</Text>
+                  {meta.previewPlan.safetyNote && (
+                    <Text type="tertiary" size="small">
+                      {meta.previewPlan.safetyNote}
+                    </Text>
+                  )}
+                  {meta.previewPlan.limitations.length > 0 && (
+                    <div>
+                      <Text type="tertiary">{t('artifact.previewPlanLimitations')}: </Text>
+                      <Text>{meta.previewPlan.limitations.join(', ')}</Text>
+                    </div>
+                  )}
+                  {meta.previewPlan.nextSteps.length > 0 && (
+                    <div>
+                      <Text type="tertiary">{t('artifact.previewPlanNextSteps')}: </Text>
+                      <Text>{meta.previewPlan.nextSteps.join(', ')}</Text>
+                    </div>
+                  )}
+                </div>
+              )}
               {meta.contentExtract && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <div>

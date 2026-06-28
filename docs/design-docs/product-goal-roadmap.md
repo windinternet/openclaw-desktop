@@ -118,6 +118,7 @@ HTML 产物是特色能力：
 - 任何有价值的结果都能保存为产物。
 - 产物能清楚标注来源：chat / workflow / agent_team / manual / mcp_tool / action_run。
 - HTML 产物可预览、可打开、可版本化、可沉淀到仓库。
+- 新产物和 `desktop.artifacts.inspect` 刷新的文件型产物会记录 `previewPlan`，把 Office/PDF/媒体等当前可用的安全预览策略、限制和下一步缺口沉淀到 Artifact 详情、Gateway 搜索和 Repository outputs。
 - 已导入文本、代码和 HTML 文件副本可自动安全抽取 `contentExtract`，并进入 Artifact 详情、Gateway 命令、搜索、复用引用和 Repository outputs；Office/PDF/媒体内容级解析仍作为后续能力推进。
 
 ### P0-3 ActionRun 定位统一

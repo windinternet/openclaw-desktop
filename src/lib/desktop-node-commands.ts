@@ -4,6 +4,7 @@ import type {
   ArtifactExternalFormat,
   ArtifactFileInspection,
   ArtifactMeta,
+  ArtifactPreviewPlan,
   ArtifactReuseContext,
   ArtifactReuseKind,
   ArtifactReuseStatus,
@@ -14,6 +15,7 @@ import { artifactPersistence } from './artifact-persistence';
 import { buildArtifactPreviewCard, buildArtifactSearchText } from './artifact-display';
 import { buildArtifactContentExtract, resolveArtifactContentExtractEligibility } from './artifact-content-extract';
 import { buildArtifactFileInspection, shouldInspectArtifactFile } from './artifact-file-inspection';
+import { buildArtifactPreviewPlan } from './artifact-preview-plan';
 import { buildArtifactReuseReference } from './artifact-reference';
 import { recordArtifactExecutionEvent } from './artifact-execution-record';
 import { recordArtifactReuseEvent } from './artifact-reuse-record';
@@ -263,6 +265,7 @@ function buildArtifactSearchResult(artifact: ArtifactMeta) {
   const lastExecutionEvent = artifact.executionEvents?.[artifact.executionEvents.length - 1];
   const fileInspection = artifact.fileInspection;
   const contentExtract = artifact.contentExtract;
+  const previewPlan = artifact.previewPlan;
   return {
     id: artifact.id,
     title: artifact.title,
@@ -283,6 +286,7 @@ function buildArtifactSearchResult(artifact: ArtifactMeta) {
     command: artifact.command,
     fileInspection,
     contentExtract,
+    previewPlan,
     previewCard: buildArtifactPreviewCard(artifact),
     executionEventCount: artifact.executionEvents?.length ?? 0,
     lastExecutionEvent,
@@ -654,17 +658,20 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
       return { ok: false, error: 'not-file-like-artifact', artifactId, type: artifact.type };
     }
 
-    const inspection: ArtifactFileInspection = buildArtifactFileInspection(
-      artifact,
-      numberValue(params.inspectedAt) ?? Date.now(),
+    const inspectedAt = numberValue(params.inspectedAt) ?? Date.now();
+    const inspection: ArtifactFileInspection = buildArtifactFileInspection(artifact, inspectedAt);
+    const previewPlan: ArtifactPreviewPlan = buildArtifactPreviewPlan(
+      { ...artifact, fileInspection: inspection },
+      inspectedAt,
     );
     await artifactService.update(artifactId, {
       fileInspection: inspection,
+      previewPlan,
     });
     const persistedArtifact = await artifactPersistence.loadMeta(artifactId);
     const outputArtifact = persistedArtifact
-      ? { ...persistedArtifact, fileInspection: inspection }
-      : { ...artifact, fileInspection: inspection };
+      ? { ...persistedArtifact, fileInspection: inspection, previewPlan }
+      : { ...artifact, fileInspection: inspection, previewPlan };
 
     const repoPath = stringValue(params.repoPath);
     let output: RepositoryOutputResult | null = null;
@@ -681,6 +688,7 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
       ok: true,
       artifactId,
       inspection,
+      previewPlan,
       ...(output
         ? {
             output: {
@@ -782,6 +790,7 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
         externalFormat: artifact.externalFormat,
         contentSummary: artifact.contentSummary,
         fileInspection: artifact.fileInspection,
+        previewPlan: artifact.previewPlan,
         contentExtract: artifact.contentExtract,
         reuseKind: artifact.reuseKind,
         reuseEventCount: artifact.reuseEvents?.length ?? 0,

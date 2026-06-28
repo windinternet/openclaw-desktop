@@ -64,6 +64,32 @@ export interface ArtifactFileInspection {
   limitations: string[];
 }
 
+export type ArtifactPreviewPlanStrategy =
+  | 'artifact_html_preview'
+  | 'system_file_handler'
+  | 'external_link'
+  | 'command_copy'
+  | 'metadata_detail';
+export type ArtifactPreviewPlanSurface =
+  | 'artifact_window'
+  | 'system_default_app'
+  | 'external_browser'
+  | 'clipboard'
+  | 'artifact_detail';
+
+export interface ArtifactPreviewPlan {
+  plannedAt: number;
+  format: ArtifactExternalFormat;
+  sourceKind: ArtifactFileInspectionSourceKind;
+  strategy: ArtifactPreviewPlanStrategy;
+  surface: ArtifactPreviewPlanSurface;
+  primaryAction: ArtifactFileInspectionOpenBehavior;
+  summary: string;
+  safetyNote?: string;
+  limitations: string[];
+  nextSteps: string[];
+}
+
 export type ArtifactContentExtractStatus = 'extracted';
 export type ArtifactContentExtractSourceKind = 'imported_file';
 
@@ -220,6 +246,7 @@ export interface ArtifactMeta {
   externalFormat?: ArtifactExternalFormat;
   contentSummary?: string;
   fileInspection?: ArtifactFileInspection;
+  previewPlan?: ArtifactPreviewPlan;
   contentExtract?: ArtifactContentExtract;
   reuseKind?: ArtifactReuseKind;
   repositoryOutputPath?: string;

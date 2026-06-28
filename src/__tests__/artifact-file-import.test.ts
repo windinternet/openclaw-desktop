@@ -69,6 +69,12 @@ describe('artifact file import', () => {
           originalPath: '/Users/deepin/Documents/roadmap.pptx',
           limitations: ['native-preview-missing', 'thumbnail-missing', 'content-extraction-missing'],
         }),
+        previewPlan: expect.objectContaining({
+          strategy: 'system_file_handler',
+          surface: 'system_default_app',
+          primaryAction: 'open_file',
+          limitations: ['native-preview-missing', 'thumbnail-missing', 'content-extraction-missing'],
+        }),
       }),
     );
     expect(mockedPersistence.saveMeta).toHaveBeenCalledWith(
@@ -82,6 +88,10 @@ describe('artifact file import', () => {
           format: 'powerpoint',
           sourceKind: 'imported_file',
           previewStatus: 'external_app',
+        }),
+        previewPlan: expect.objectContaining({
+          strategy: 'system_file_handler',
+          primaryAction: 'open_file',
         }),
       }),
     );
@@ -110,6 +120,11 @@ describe('artifact file import', () => {
         filePath: '/user-data/storage/artifacts/art_1/files/plan.md',
         originalFilePath: '/Users/deepin/Documents/plan.md',
         externalFormat: 'text',
+        previewPlan: expect.objectContaining({
+          strategy: 'system_file_handler',
+          surface: 'system_default_app',
+          primaryAction: 'open_file',
+        }),
         contentExtract: expect.objectContaining({
           status: 'extracted',
           format: 'text',
