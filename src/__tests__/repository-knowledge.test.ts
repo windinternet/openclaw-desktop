@@ -157,6 +157,7 @@ describe('repository knowledge', () => {
         expect.objectContaining({ kind: 'wiki_without_source_reference', path: 'wiki/topic.md' }),
       ]),
     );
+    expect(snapshot.undigestedSources.map((file) => file.path)).toEqual(['sources/orphan.md']);
   });
 
   it('parses wiki index links into navigable knowledge entries', async () => {

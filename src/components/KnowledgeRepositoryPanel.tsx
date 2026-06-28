@@ -29,6 +29,7 @@ export type KnowledgeSection =
   | 'entries'
   | 'wiki'
   | 'sources'
+  | 'digest'
   | 'recent'
   | 'relationships'
   | 'health'
@@ -119,7 +120,10 @@ export default function KnowledgeRepositoryPanel({
     void openDocument(file.path);
   };
 
-  const handleKnowledgeRewrite = async (intent: 'digest-source' | 'refresh-index' | 'update-selected') => {
+  const handleKnowledgeRewrite = async (
+    intent: 'digest-source' | 'refresh-index' | 'update-selected',
+    selectedPathOverride?: string,
+  ) => {
     if (!activeClient || !currentInstanceId) {
       Toast.error(t('knowledge.rewriteNotConnected'));
       return;
@@ -130,7 +134,13 @@ export default function KnowledgeRepositoryPanel({
       return;
     }
 
-    const selectedPath = selectedDocument?.path;
+    const selectedPath = selectedPathOverride ?? selectedDocument?.path;
+    const sourcePath =
+      intent === 'digest-source'
+        ? selectedPath
+        : selectedDocument?.sourceType === 'sources'
+          ? selectedDocument.path
+          : undefined;
     setRewriteLoading(true);
     try {
       const input = [
@@ -158,7 +168,7 @@ export default function KnowledgeRepositoryPanel({
           binding,
           intent,
           selectedPath,
-          sourcePath: selectedDocument?.sourceType === 'sources' ? selectedDocument.path : undefined,
+          sourcePath,
         }),
       });
       await upsertAiActionRun(currentInstanceId, runningRun);
@@ -217,6 +227,63 @@ export default function KnowledgeRepositoryPanel({
     ) : (
       <Empty description={emptyText} />
     );
+
+  const renderDigestQueue = () => {
+    const queue = snapshot?.undigestedSources ?? [];
+    if (queue.length === 0) return <Empty description={t('knowledge.emptyDigestQueue')} />;
+
+    return (
+      <Space vertical align="start" style={{ width: '100%' }}>
+        {queue.map((file) => (
+          <div
+            key={file.path}
+            role="button"
+            tabIndex={0}
+            onClick={() => openFile(file)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') openFile(file);
+            }}
+            style={{
+              width: '100%',
+              border:
+                selectedDocument?.path === file.path
+                  ? '1px solid var(--semi-color-primary)'
+                  : '1px solid var(--semi-color-border)',
+              background:
+                selectedDocument?.path === file.path
+                  ? 'var(--semi-color-primary-light-default)'
+                  : 'var(--semi-color-bg-0)',
+              borderRadius: 6,
+              padding: '8px 10px',
+              cursor: 'pointer',
+            }}
+          >
+            <Space align="center" style={{ justifyContent: 'space-between', width: '100%' }}>
+              <span style={{ minWidth: 0 }}>
+                <Text strong ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>
+                  {file.name}
+                </Text>
+                <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>
+                  {file.path}
+                </Text>
+              </span>
+              <Button
+                size="small"
+                icon={<IconBolt />}
+                loading={rewriteLoading}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void handleKnowledgeRewrite('digest-source', file.path);
+                }}
+              >
+                {t('knowledge.digestThisSource')}
+              </Button>
+            </Space>
+          </div>
+        ))}
+      </Space>
+    );
+  };
 
   const renderEntryList = () =>
     snapshot?.indexEntries && snapshot.indexEntries.length > 0 ? (
@@ -347,6 +414,7 @@ export default function KnowledgeRepositoryPanel({
     if (activeSection === 'entries') return renderEntryList();
     if (activeSection === 'wiki') return renderFileList(snapshot?.wiki ?? [], t('knowledge.emptyWiki'));
     if (activeSection === 'sources') return renderFileList(snapshot?.sources ?? [], t('knowledge.emptySources'));
+    if (activeSection === 'digest') return renderDigestQueue();
     if (activeSection === 'recent') return renderFileList(snapshot?.recentFiles ?? [], t('common.noData'));
     if (activeSection === 'relationships') return renderRelationships();
     if (activeSection === 'health') return renderHealthIssues();
@@ -491,6 +559,7 @@ export default function KnowledgeRepositoryPanel({
     const stats = [
       { label: t('knowledge.sources'), value: snapshot?.sources.length ?? 0, color: 'blue' as const },
       { label: t('knowledge.wiki'), value: snapshot?.wiki.length ?? 0, color: 'green' as const },
+      { label: t('knowledge.digestQueue'), value: snapshot?.undigestedSources.length ?? 0, color: 'orange' as const },
       { label: t('knowledge.recentUpdates'), value: snapshot?.recentFiles.length ?? 0, color: 'grey' as const },
       { label: t('knowledge.relationships'), value: relationshipCount, color: 'orange' as const },
     ];
@@ -695,6 +764,7 @@ export default function KnowledgeRepositoryPanel({
                 <Tabs.TabPane tab={t('knowledge.indexEntries')} itemKey="entries" />
                 <Tabs.TabPane tab={t('knowledge.wiki')} itemKey="wiki" />
                 <Tabs.TabPane tab={t('knowledge.sources')} itemKey="sources" />
+                <Tabs.TabPane tab={t('knowledge.digestQueue')} itemKey="digest" />
                 <Tabs.TabPane tab={t('knowledge.recentUpdates')} itemKey="recent" />
                 <Tabs.TabPane tab={t('knowledge.relationships')} itemKey="relationships" />
                 <Tabs.TabPane tab={t('knowledge.health')} itemKey="health" />

@@ -241,6 +241,8 @@ HTML 产物是特色能力：
 - 第一片健康检查已覆盖孤立资料、未进入索引的 Wiki、陈旧索引条目、知识库内断链、没有来源引用的 Wiki。
 - Knowledge 页面新增“健康检查”视图，`/knowledge?section=health` 会直接打开问题列表。
 - Dashboard 会把知识健康问题作为 `knowledgeUpdates` 展示，并通过 `/knowledge?section=health` 跳转到 Knowledge 健康检查。
+- `loadKnowledgeSnapshot` 现在会生成 `undigestedSources`，把未出现在索引、也未被 Wiki 引用的资料源列为未消化资料。
+- Knowledge 页面新增“未消化资料”视图，`/knowledge?section=digest` 会打开队列，并支持对单条资料发起 `knowledge_rewrite` 消化 ActionRun。
 - 当前健康检查只做可观测事实，不自动写入 `reviews/weekly/`，也不自动修复索引、Wiki 或资料来源。
 
 验收：

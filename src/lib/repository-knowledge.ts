@@ -41,6 +41,7 @@ export interface RepositoryGitLogEntry {
 export interface KnowledgeSnapshot {
   sources: RepositoryMarkdownFile[];
   wiki: RepositoryMarkdownFile[];
+  undigestedSources: RepositoryMarkdownFile[];
   indexEntries: KnowledgeIndexEntry[];
   indexMarkdown: string;
   logMarkdown: string;
@@ -137,6 +138,7 @@ export async function loadKnowledgeSnapshot(binding: RepositoryBinding): Promise
     indexPath: mapping.indexPath,
     markdown: indexMarkdown,
   });
+  const indexedKnowledgePaths = new Set(indexEntries.map((entry) => entry.path));
   const backlinks: RepositoryBacklink[] = [];
   const relatedRepositoryLinks: RepositoryRelatedLink[] = [];
   const linkedKnowledgePaths = new Set<string>();
@@ -175,6 +177,9 @@ export async function loadKnowledgeSnapshot(binding: RepositoryBinding): Promise
   return {
     sources,
     wiki,
+    undigestedSources: sources
+      .filter((source) => !indexedKnowledgePaths.has(source.path) && !linkedKnowledgePaths.has(source.path))
+      .sort((a, b) => b.updatedAt - a.updatedAt),
     indexEntries,
     indexMarkdown,
     logMarkdown,

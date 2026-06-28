@@ -5,6 +5,7 @@
 | 用户意图 | 推荐路径 |
 |---|---|
 | “帮我整理这份资料到知识库” | 先确认 Repository Context；读取 `sources/` 和 `wiki/` 规则；必要时发起 Knowledge ActionRun。 |
+| “有哪些资料还没整理” | 打开 Knowledge 未消化资料队列 `/knowledge?section=digest`；选择资料后发起消化 ActionRun，写入前请求审批。 |
 | “检查知识库健康” | 查看 Knowledge 健康检查或 Dashboard 知识动态；关注孤立资料、陈旧索引、断链、无来源引用 Wiki；修复前先请求审批。 |
 | “生成一个可交互报告” | 使用 Artifact 协议生成自包含 HTML；如需写入仓库 outputs，先请求审批。 |
 | “检查我的工作系统状态” | 汇总 Workbench、Knowledge、ActionRun、Artifacts 和待审批项，不只回答 Gateway 健康状态。 |

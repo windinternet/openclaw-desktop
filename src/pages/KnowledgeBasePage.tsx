@@ -10,6 +10,7 @@ const { Title, Text } = Typography;
 
 function getRequestedKnowledgeSection(search: string): KnowledgeSection | undefined {
   const section = new URLSearchParams(search).get('section');
+  if (section === 'digest') return 'digest';
   return section === 'health' ? 'health' : undefined;
 }
 
@@ -92,6 +93,9 @@ export default function KnowledgeBasePage() {
         </Tabs.TabPane>
         <Tabs.TabPane tab={t('knowledge.sources')} itemKey="sources">
           {activeTab === 'sources' && renderKnowledgeSection('sources')}
+        </Tabs.TabPane>
+        <Tabs.TabPane tab={t('knowledge.digestQueue')} itemKey="digest">
+          {activeTab === 'digest' && renderKnowledgeSection('digest')}
         </Tabs.TabPane>
         <Tabs.TabPane tab={t('knowledge.relationships')} itemKey="relationships">
           {activeTab === 'relationships' && renderKnowledgeSection('relationships')}
