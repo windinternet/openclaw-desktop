@@ -4,6 +4,9 @@ import type { WorkbenchSnapshot } from './repository-workbench';
 import type { AiActionRun, SessionInfo } from './types';
 import { buildDashboardTailActionTarget, type DashboardTailActionRouteKind } from './dashboard-tail-action-routing';
 
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+const CROSS_WORK_STALE_AFTER_DAYS = 14;
+
 export type DashboardWorkSystemItemKind =
   | 'session'
   | 'work'
@@ -172,6 +175,15 @@ export function buildDashboardWorkSystemSummary(
     ...(params.workbench?.completedWork ?? []).map((file) => file.path),
     ...(params.workbench?.completedPlans ?? []).map((file) => file.path),
   ]);
+  const activeCrossWorkDependencyFiles = new Map(
+    [...(params.workbench?.activeWork ?? []), ...(params.workbench?.activePlans ?? [])].map((file) => [
+      file.path,
+      file,
+    ]),
+  );
+  const planMetadataByPath = new Map(
+    (params.workbench?.planMetadata ?? []).map((metadata) => [metadata.path, metadata]),
+  );
   const blockedPlanItems = (params.workbench?.planMetadata ?? []).filter(isBlockedPlanMetadata).map((metadata) => {
     const plan = params.workbench?.activePlans.find((file) => file.path === metadata.path);
     return {
@@ -204,7 +216,15 @@ export function buildDashboardWorkSystemSummary(
         target: '/workbench?view=plans',
         updatedAt: plan?.updatedAt,
         path: metadata.path,
-        detail: formatCrossWorkRiskDetail(unresolvedDependencies),
+        detail: formatCrossWorkRiskDetail(
+          unresolvedDependencies.map((dependency) =>
+            formatCrossWorkDependencyDetail(dependency, {
+              activeFiles: activeCrossWorkDependencyFiles,
+              now,
+              planMetadataByPath,
+            }),
+          ),
+        ),
         status: 'plan:cross-work-risk',
       };
     });
@@ -600,6 +620,36 @@ function isCompletedCrossWorkDependency(dependency: string, completedDependencyP
 
 function formatCrossWorkRiskDetail(dependencies: string[]): string {
   return `跨事项依赖 · ${dependencies.join(', ')}`;
+}
+
+function formatCrossWorkDependencyDetail(
+  dependency: string,
+  context: {
+    activeFiles: Map<string, RepositoryMarkdownFile>;
+    now: number;
+    planMetadataByPath: Map<string, WorkbenchSnapshot['planMetadata'][number]>;
+  },
+): string {
+  const notes: string[] = [];
+  const activeFile = context.activeFiles.get(dependency);
+  const staleDays = activeFile ? getCrossWorkDependencyStaleDays(activeFile.updatedAt, context.now) : null;
+  if (staleDays !== null) notes.push(`停滞 ${staleDays} 天`);
+
+  if (isActivePlanDependencyPath(dependency) && !context.planMetadataByPath.get(dependency)?.blockerOwner) {
+    notes.push('负责人未知');
+  }
+
+  return notes.length ? `${dependency} (${notes.join('，')})` : dependency;
+}
+
+function getCrossWorkDependencyStaleDays(updatedAt: number, now: number): number | null {
+  if (!updatedAt) return null;
+  const elapsedDays = Math.floor((now - updatedAt) / DAY_IN_MS);
+  return elapsedDays >= CROSS_WORK_STALE_AFTER_DAYS ? elapsedDays : null;
+}
+
+function isActivePlanDependencyPath(dependency: string): boolean {
+  return /(^|\/)plans\/active\//.test(dependency);
 }
 
 function formatBlockedPlanDetail(metadata: WorkbenchSnapshot['planMetadata'][number]): string | undefined {

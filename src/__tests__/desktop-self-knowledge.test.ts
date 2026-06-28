@@ -113,6 +113,10 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('Completed dependency paths from `completedWork`, `completedPlans`');
     expect(skillContent).toContain('`work/completed/`, or `plans/completed/`');
     expect(skillContent).toContain('only unresolved dependencies remain visible');
+    expect(skillContent).toContain('Unresolved dependency paths that have not changed for 14 days');
+    expect(skillContent).toContain(
+      'active plan dependencies without explicit owner metadata are marked as missing owner',
+    );
     expect(skillContent).toContain('does not infer cross-work risk from plan prose');
     expect(skillContent).toContain('/workbench?view=plans');
     expect(skillContent).toContain('Terminal work-item ActionRuns that are missing from `runs/action-runs/index.md`');

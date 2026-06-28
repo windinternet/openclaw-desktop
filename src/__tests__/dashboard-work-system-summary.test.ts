@@ -627,6 +627,53 @@ describe('dashboard work system summary', () => {
     ]);
   });
 
+  it('surfaces stale and missing-owner clues on cross-work dependency risks', () => {
+    const now = Date.parse('2026-06-28T00:00:00.000Z');
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [],
+      now,
+      workbench: {
+        activeWork: [createMarkdownFile('work/active/design.md', '设计确认', Date.parse('2026-06-01T00:00:00.000Z'))],
+        completedWork: [],
+        activePlans: [
+          createMarkdownFile('plans/active/cross-work.md', '跨事项发布计划', now),
+          createMarkdownFile('plans/active/api.md', 'API 计划', Date.parse('2026-06-27T00:00:00.000Z')),
+          createMarkdownFile('plans/active/owned.md', '有负责人计划', Date.parse('2026-06-27T00:00:00.000Z')),
+        ],
+        completedPlans: [],
+        planMetadata: [
+          {
+            path: 'plans/active/cross-work.md',
+            status: 'active',
+            dependencies: ['work/active/design.md', 'plans/active/api.md', 'plans/active/owned.md'],
+          },
+          {
+            path: 'plans/active/api.md',
+            status: 'active',
+          },
+          {
+            path: 'plans/active/owned.md',
+            status: 'active',
+            blockerOwner: '@owner',
+          },
+        ],
+        tailActions: [],
+        reviews: [],
+      },
+    });
+
+    expect(summary.stuckItems).toEqual([
+      expect.objectContaining({
+        id: 'cross-work-risk:plans/active/cross-work.md',
+        detail:
+          '跨事项依赖 · work/active/design.md (停滞 27 天), plans/active/api.md (负责人未知), plans/active/owned.md',
+        status: 'plan:cross-work-risk',
+      }),
+    ]);
+  });
+
   it('does not surface cross-work risks whose dependencies are already completed', () => {
     const summary = buildDashboardWorkSystemSummary({
       sessions: [],

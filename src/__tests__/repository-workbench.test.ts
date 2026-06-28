@@ -23,7 +23,10 @@ describe('repository workbench', () => {
       if (directory === 'work/someday')
         return [{ path: 'work/someday/later.md', name: 'later.md', size: 12, updatedAt: 3 }];
       if (directory === 'plans/active')
-        return [{ path: 'plans/active/plan.md', name: 'plan.md', size: 20, updatedAt: 2 }];
+        return [
+          { path: 'plans/active/plan.md', name: 'plan.md', size: 20, updatedAt: 2 },
+          { path: 'plans/active/owner-only.md', name: 'owner-only.md', size: 18, updatedAt: 5 },
+        ];
       if (directory === 'plans/completed')
         return [{ path: 'plans/completed/plan-done.md', name: 'plan-done.md', size: 21, updatedAt: 4 }];
       if (directory === 'reviews')
@@ -58,6 +61,7 @@ describe('repository workbench', () => {
           '- [ ] 这里不是收尾动作。',
         ].join('\n');
       if (relativePath === 'plans/active/plan.md') return 'status: approved\napproval: user-approved\n# Plan';
+      if (relativePath === 'plans/active/owner-only.md') return 'owner: @api\n# Owner Only';
       if (relativePath === 'plans/completed/plan-done.md') return 'status: done\n# Plan Done';
       return '';
     });
@@ -76,10 +80,11 @@ describe('repository workbench', () => {
     expect(snapshot.activeWork).toHaveLength(1);
     expect(snapshot.completedWork).toHaveLength(1);
     expect(snapshot.somedayWork).toHaveLength(1);
-    expect(snapshot.activePlans).toHaveLength(1);
+    expect(snapshot.activePlans).toHaveLength(2);
     expect(snapshot.completedPlans).toHaveLength(1);
     expect(snapshot.planMetadata).toEqual([
       { path: 'plans/active/plan.md', status: 'approved', approval: 'user-approved' },
+      { path: 'plans/active/owner-only.md', blockerOwner: '@api' },
       { path: 'plans/completed/plan-done.md', status: 'done' },
     ]);
     expect(snapshot.tailActions).toEqual([

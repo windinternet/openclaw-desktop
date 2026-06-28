@@ -142,7 +142,9 @@ export async function loadWorkbenchSnapshot(binding: RepositoryBinding): Promise
     outputsMarkdown,
     reviews,
     reviewDocuments,
-    planMetadata: planMetadata.filter((item) => item.status || item.approval || item.dependencies?.length),
+    planMetadata: planMetadata.filter(
+      (item) => item.status || item.approval || item.blockerOwner || item.dependencies?.length,
+    ),
     reviewGroups: groupReviewsByFolder(reviews),
     semanticSections: [],
     projects: [],
