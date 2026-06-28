@@ -27,11 +27,13 @@ import type { AiActionRun, AiActionRunStatus } from '../lib/types';
 import { extractWorkbenchMatterId, isWorkbenchMatterPath } from '../lib/workbench-matter';
 import {
   findPlanExecutionKnowledgeFollowUpRuns,
+  findPlanExecutionKnowledgeUpdateState,
   findLatestPlanExecutionRun,
   findPlanExecutionReviewState,
   shouldOfferPlanExecutionKnowledgeUpdate,
   shouldOfferPlanExecutionOutputPreservation,
   shouldOfferPlanExecutionReview,
+  type PlanExecutionKnowledgeUpdateState,
 } from '../lib/workbench-plan-execution';
 import { ArtifactAICreateDrawer } from './ArtifactAICreateDrawer';
 import MarkdownView from './MarkdownView';
@@ -60,8 +62,27 @@ const ACTION_STATUS_LABEL_KEYS: Record<AiActionRunStatus, string> = {
   cancelled: 'actions.statusCancelled',
 };
 
+const PLAN_EXECUTION_KNOWLEDGE_STATUS_LABEL_KEYS: Record<PlanExecutionKnowledgeUpdateState['status'], string> = {
+  running: 'workbench.planExecutionKnowledgeRunning',
+  awaiting_approval: 'workbench.planExecutionKnowledgeAwaitingApproval',
+  done: 'workbench.planExecutionKnowledgeDone',
+  no_write_needed: 'workbench.planExecutionKnowledgeNoWrite',
+  failed: 'workbench.planExecutionKnowledgeFailed',
+  cancelled: 'workbench.planExecutionKnowledgeCancelled',
+};
+
 function actionStatusColor(status: AiActionRunStatus): 'blue' | 'green' | 'orange' | 'red' | 'grey' {
   if (status === 'done') return 'green';
+  if (status === 'failed') return 'red';
+  if (status === 'cancelled') return 'grey';
+  if (status === 'awaiting_approval') return 'orange';
+  return 'blue';
+}
+
+function knowledgeUpdateStatusColor(
+  status: PlanExecutionKnowledgeUpdateState['status'],
+): 'blue' | 'green' | 'orange' | 'red' | 'grey' {
+  if (status === 'done' || status === 'no_write_needed') return 'green';
   if (status === 'failed') return 'red';
   if (status === 'cancelled') return 'grey';
   if (status === 'awaiting_approval') return 'orange';
@@ -1538,6 +1559,9 @@ export default function WorkbenchRepositoryPanel({
   const selectedPlanRelatedKnowledgeRunIds = findPlanExecutionKnowledgeFollowUpRuns(selectedPlanLatestRun, {
     actionRuns: activityRuns,
   }).map((run) => run.id);
+  const selectedPlanKnowledgeUpdateState = findPlanExecutionKnowledgeUpdateState(selectedPlanLatestRun, {
+    actionRuns: activityRuns,
+  });
   const selectedPlanCanPreserveOutput = shouldOfferPlanExecutionOutputPreservation(selectedPlanLatestRun);
   const selectedPlanCanUpdateKnowledge = shouldOfferPlanExecutionKnowledgeUpdate(selectedPlanLatestRun, {
     actionRuns: activityRuns,
@@ -1720,6 +1744,11 @@ export default function WorkbenchRepositoryPanel({
                           <Tag color={actionStatusColor(selectedPlanLatestRun.status)}>
                             {t(ACTION_STATUS_LABEL_KEYS[selectedPlanLatestRun.status])}
                           </Tag>
+                          {selectedPlanKnowledgeUpdateState && (
+                            <Tag color={knowledgeUpdateStatusColor(selectedPlanKnowledgeUpdateState.status)}>
+                              {t(PLAN_EXECUTION_KNOWLEDGE_STATUS_LABEL_KEYS[selectedPlanKnowledgeUpdateState.status])}
+                            </Tag>
+                          )}
                           {selectedPlanReviewState && (
                             <Tag color={selectedPlanReviewState.status === 'confirmed' ? 'green' : 'orange'}>
                               {t(

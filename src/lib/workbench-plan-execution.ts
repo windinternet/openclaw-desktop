@@ -9,6 +9,13 @@ export interface PlanExecutionReviewState {
   reviewedAt?: string;
 }
 
+export interface PlanExecutionKnowledgeUpdateState {
+  status: 'running' | 'awaiting_approval' | 'done' | 'no_write_needed' | 'failed' | 'cancelled';
+  runId: string;
+  summary?: string;
+  updatedAt: number;
+}
+
 export interface PlanExecutionFollowUpContext {
   actionRuns?: readonly AiActionRun[];
   reviewDocuments?: readonly PlanExecutionReviewDocument[];
@@ -78,15 +85,24 @@ export function findPlanExecutionKnowledgeFollowUpRuns(
   run: AiActionRun | undefined,
   context: PlanExecutionFollowUpContext,
 ): AiActionRun[] {
-  if (!run?.workItemPath) return [];
-  const sourceExecutionId = `action-run-knowledge:${run.id}`;
-  return (context.actionRuns ?? []).filter(
-    (candidate) =>
-      candidate.type === 'knowledge_rewrite' &&
-      candidate.workItemPath === run.workItemPath &&
-      isActiveFollowUpRun(candidate) &&
-      candidate.input.includes(sourceExecutionId),
-  );
+  return findPlanExecutionKnowledgeFollowUpCandidates(run, context).filter(isActiveFollowUpRun);
+}
+
+export function findPlanExecutionKnowledgeUpdateState(
+  run: AiActionRun | undefined,
+  context: PlanExecutionFollowUpContext = {},
+): PlanExecutionKnowledgeUpdateState | undefined {
+  const latest = findPlanExecutionKnowledgeFollowUpCandidates(run, context).sort(
+    (a, b) => b.updatedAt - a.updatedAt || b.createdAt - a.createdAt,
+  )[0];
+  if (!latest) return undefined;
+
+  return {
+    status: normalizeKnowledgeUpdateStatus(latest),
+    runId: latest.id,
+    summary: latest.resultSummary,
+    updatedAt: latest.updatedAt,
+  };
 }
 
 export function findPlanExecutionReviewState(
@@ -103,6 +119,28 @@ function hasPlanExecutionKnowledgeFollowUp(run: AiActionRun, context: PlanExecut
 
 function hasPlanExecutionReviewFollowUp(run: AiActionRun, context: PlanExecutionFollowUpContext): boolean {
   return Boolean(findPlanExecutionReviewState(run, context));
+}
+
+function findPlanExecutionKnowledgeFollowUpCandidates(
+  run: AiActionRun | undefined,
+  context: PlanExecutionFollowUpContext,
+): AiActionRun[] {
+  if (!run?.workItemPath) return [];
+  const sourceExecutionId = `action-run-knowledge:${run.id}`;
+  return (context.actionRuns ?? []).filter(
+    (candidate) =>
+      candidate.type === 'knowledge_rewrite' &&
+      candidate.workItemPath === run.workItemPath &&
+      candidate.input.includes(sourceExecutionId),
+  );
+}
+
+function normalizeKnowledgeUpdateStatus(run: AiActionRun): PlanExecutionKnowledgeUpdateState['status'] {
+  if (run.status === 'failed') return 'failed';
+  if (run.status === 'cancelled') return 'cancelled';
+  if (run.status === 'awaiting_approval') return 'awaiting_approval';
+  if (run.status === 'done') return isNoWriteNeededKnowledgeRun(run) ? 'no_write_needed' : 'done';
+  return 'running';
 }
 
 function findPlanExecutionReviewStates(
@@ -132,6 +170,11 @@ function findPlanExecutionReviewStates(
 
 function isActiveFollowUpRun(run: AiActionRun): boolean {
   return run.status !== 'failed' && run.status !== 'cancelled';
+}
+
+function isNoWriteNeededKnowledgeRun(run: AiActionRun): boolean {
+  const text = [run.lastAssistantResponse, run.resultSummary].filter(Boolean).join('\n');
+  return /"kind"\s*:\s*"no_write_needed"|no_write_needed|无需写入|不需要写入|no write needed/i.test(text);
 }
 
 function hasFrontmatterValue(markdown: string, key: string, value?: string): boolean {

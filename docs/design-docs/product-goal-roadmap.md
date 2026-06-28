@@ -356,6 +356,7 @@ HTML 产物是特色能力：
 - “更新知识 / Update Knowledge”会打开 Knowledge 的 `tailAction=knowledge` 上下文，携带 `tailActionId=action-run-knowledge:<runId>` 和来源 `workItemPath`；Knowledge 的 prompt 会保留来源事项和来源执行记录 `action-run-knowledge:<runId>`。
 - `action-run-knowledge:<runId>` 是来源执行记录，不是事项 `## 收尾动作` checklist ID；Knowledge 可基于它发起 `knowledge_rewrite`，但不会显示或执行“确认已处理并完成尾动作”。
 - 如果同一来源事项下已经存在未失败/未取消的 `knowledge_rewrite` ActionRun，并且输入包含 `action-run-knowledge:<runId>`，Workbench 不再重复显示该计划执行的“更新知识”入口。
+- 计划执行知识更新状态标签已接入：Workbench 通过 `findPlanExecutionKnowledgeUpdateState` 读取最新同源 `knowledge_rewrite` ActionRun，在计划预览中显示知识更新中、知识待审批、知识已更新、知识无需写入、知识更新失败或知识更新取消；“知识无需写入”只来自明确 `no_write_needed` 或无须写入摘要线索。
 - 计划执行复盘草稿入口已接入 Workbench：`shouldOfferPlanExecutionReview` 会在最近一次 `plan_execute` 已完成、有 `resultSummary` 且有安全 `workItemPath` 时，在计划预览头部显示“写复盘 / Write Review”。
 - “写复盘 / Write Review”会打开 Workbench reviews 的 `tailAction=review` 上下文，携带 `tailActionId=action-run-review:<runId>` 和来源 `workItemPath`；复盘草稿会记录来源执行记录 `action-run-review:<runId>`。
 - 创建复盘草稿时，Desktop 会把草稿相对链接写回来源事项的 `## 复盘` 小节；如果原小节只有 `- 暂无` 占位，会先移除占位。
@@ -368,7 +369,7 @@ HTML 产物是特色能力：
 
 仍未完成：
 
-- 执行后的成果、知识更新和复盘已有发起入口；成果保存后的 Dashboard 重复提醒、知识更新发起后的 Workbench 重复入口、复盘草稿存在后的 Workbench 重复入口已按仓库事实消除；计划执行复盘草稿也会带入同源知识更新 ActionRun 供复盘核对，计划预览会把这类后续显示为“复盘知识更新”，并能把同源复盘文档显示为复盘草稿或已复盘；成果候选提取已能从显式 `resultSummary` 线索进入 Artifacts 初始提示。但真正 Wiki 写入后的复盘建议、复盘确认后的后续联动和更自然的端到端体验仍需继续接上；更丰富的候选来源和保存表单也仍需继续打磨。
+- 执行后的成果、知识更新和复盘已有发起入口；成果保存后的 Dashboard 重复提醒、知识更新发起后的 Workbench 重复入口、复盘草稿存在后的 Workbench 重复入口已按仓库事实消除；计划执行复盘草稿也会带入同源知识更新 ActionRun 供复盘核对，计划预览会把这类后续显示为“复盘知识更新”，并能把同源知识更新显示为待审批、已更新、知识无需写入等状态，把同源复盘文档显示为复盘草稿或已复盘；成果候选提取已能从显式 `resultSummary` 线索进入 Artifacts 初始提示。但真正 Wiki 写入后的复盘建议、复盘确认后的后续联动和更自然的端到端体验仍需继续接上；更丰富的候选来源和保存表单也仍需继续打磨。
 - 新用户从开箱第一事项自然进入计划、执行和产物沉淀的端到端体验仍未完整闭环。
 
 ### P0-7 可复用资产一等对象

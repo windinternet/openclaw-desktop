@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   findPlanExecutionKnowledgeFollowUpRuns,
+  findPlanExecutionKnowledgeUpdateState,
   findLatestPlanExecutionRun,
   findPlanExecutionReviewState,
   getPlanExecutionPlanPath,
@@ -246,6 +247,55 @@ describe('workbench plan execution observability', () => {
     });
 
     expect(shouldOfferPlanExecutionKnowledgeUpdate(planRun, { actionRuns: [failedKnowledgeRun] })).toBe(true);
+  });
+
+  it('reports the latest source-bound knowledge update state for a plan execution', () => {
+    const planRun = createRun({
+      id: 'run-plan',
+      status: 'done',
+      resultSummary: '完成打包验证，发现发布知识需要补充',
+      workItemPath: 'work/active/release.md',
+    });
+    const awaitingApprovalRun = createRun({
+      id: 'run-knowledge-approval',
+      type: 'knowledge_rewrite',
+      status: 'awaiting_approval',
+      input: '知识更新\n来源执行记录 action-run-knowledge:run-plan',
+      workItemPath: 'work/active/release.md',
+      resultSummary: '准备写入 wiki/release.md',
+      updatedAt: 20,
+    });
+    const noWriteRun = createRun({
+      id: 'run-knowledge-no-write',
+      type: 'knowledge_rewrite',
+      status: 'done',
+      input: '知识更新\n来源执行记录 action-run-knowledge:run-plan',
+      workItemPath: 'work/active/release.md',
+      resultSummary: '索引和日志已经同步，本次无需写入。',
+      lastAssistantResponse:
+        '```ai-action\n{"version":1,"kind":"no_write_needed","summary":"索引和日志已经同步，本次无需写入。"}\n```',
+      updatedAt: 30,
+    });
+    const otherMatterRun = createRun({
+      id: 'run-knowledge-other',
+      type: 'knowledge_rewrite',
+      status: 'done',
+      input: '知识更新\n来源执行记录 action-run-knowledge:run-plan',
+      workItemPath: 'work/active/other.md',
+      resultSummary: '已更新其它事项知识',
+      updatedAt: 40,
+    });
+
+    expect(
+      findPlanExecutionKnowledgeUpdateState(planRun, {
+        actionRuns: [awaitingApprovalRun, noWriteRun, otherMatterRun],
+      }),
+    ).toEqual({
+      status: 'no_write_needed',
+      runId: 'run-knowledge-no-write',
+      summary: '索引和日志已经同步，本次无需写入。',
+      updatedAt: 30,
+    });
   });
 
   it('offers review draft creation for completed work-bound plan execution with a result summary', () => {

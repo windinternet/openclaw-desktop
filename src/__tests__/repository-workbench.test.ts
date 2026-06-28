@@ -1341,8 +1341,12 @@ describe('repository workbench', () => {
     const en = readFileSync('src/locales/en.json', 'utf8');
 
     expect(source).toContain('shouldOfferPlanExecutionReview');
+    expect(source).toContain('findPlanExecutionKnowledgeUpdateState');
+    expect(source).toContain('selectedPlanKnowledgeUpdateState');
     expect(source).toContain('findPlanExecutionReviewState');
     expect(source).toContain('selectedPlanReviewState');
+    expect(source).toContain('workbench.planExecutionKnowledgeNoWrite');
+    expect(source).toContain('workbench.planExecutionKnowledgeAwaitingApproval');
     expect(source).toContain('workbench.planExecutionReviewDraft');
     expect(source).toContain('workbench.planExecutionReviewConfirmed');
     expect(source).toContain('reviewDocuments: snapshot?.reviewDocuments');
@@ -1358,6 +1362,8 @@ describe('repository workbench', () => {
     expect(zh).toContain('"writePlanExecutionReview": "写复盘"');
     expect(zh).toContain('"writePlanExecutionReviewWithKnowledge": "复盘知识更新"');
     expect(zh).toContain('"writePlanExecutionReviewWithKnowledgeHint": "复盘草稿会带入同源知识更新记录"');
+    expect(zh).toContain('"planExecutionKnowledgeNoWrite": "知识无需写入"');
+    expect(zh).toContain('"planExecutionKnowledgeAwaitingApproval": "知识待审批"');
     expect(zh).toContain('"planExecutionReviewDraft": "复盘草稿"');
     expect(zh).toContain('"planExecutionReviewConfirmed": "已复盘"');
     expect(en).toContain('"writePlanExecutionReview": "Write Review"');
@@ -1365,6 +1371,8 @@ describe('repository workbench', () => {
     expect(en).toContain(
       '"writePlanExecutionReviewWithKnowledgeHint": "The review draft will include source-bound knowledge updates"',
     );
+    expect(en).toContain('"planExecutionKnowledgeNoWrite": "Knowledge No Write"');
+    expect(en).toContain('"planExecutionKnowledgeAwaitingApproval": "Knowledge Approval"');
     expect(en).toContain('"planExecutionReviewDraft": "Review Draft"');
     expect(en).toContain('"planExecutionReviewConfirmed": "Review Confirmed"');
   });
