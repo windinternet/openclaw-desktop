@@ -13,8 +13,8 @@
 - HTML 类产物可保存版本并通过独立窗口预览。
 - UI 创建和 Desktop node 创建的产物在仓库绑定就绪时可镜像到 Repository `outputs/`。
 - 镜像完成后，本地 Artifact meta 会记录 `repositoryOutputPath` 和 `repositoryPreviewPath`。
-- Repository output markdown 会记录 artifactId、类型、状态、版本、更新时间、来源和预览路径。
-- Repository `outputs/index.md` 会写入可扫读的富条目，包含 Artifact 链接、`artifact://` 引用、来源、更新时间、预览、格式、摘要、复用分类和标签；同一路径再次镜像时会刷新旧条目。
+- Repository output markdown 会记录 artifactId、类型、状态、版本、创建时间、更新时间、来源和预览路径。
+- Repository `outputs/index.md` 会写入可扫读的富条目，包含 Artifact 链接、`artifact://` 引用、来源、创建时间、更新时间、预览、格式、摘要、复用分类和标签；同一路径再次镜像时会刷新旧条目。
 - Artifacts 页面和详情页会展示仓库输出状态与路径。
 - AI 魔法创建保存产物时会以 `action_run` 作为来源，并把产物 ID 回写到对应 ActionRun。
 - ActionRun 仓库摘要会尽量解析本次运行生成的 Artifact meta，列出产物标题、类型、价值摘要、`valueHealth` 状态/缺口/建议动作、`previewPlan` 线索、`reuseKind`、Artifact 引用和 Repository output / preview 路径；读取不到 meta 时退回产物 ID。
@@ -165,7 +165,7 @@ Repository 中至少保存：
 - 与 work / plan / run 的关联。
 - 文件检查和安全内容抽取事实。
 
-`outputs/index.md` 用作快速目录，不替代单个产物的 markdown 审计记录。目录条目应尽量暴露 `artifact://` 引用、来源、更新时间、预览路径、外部格式、价值摘要、内容抽取状态、复用分类和标签，让 Agent 不必逐个打开文件也能识别关键成果。
+`outputs/index.md` 用作快速目录，不替代单个产物的 markdown 审计记录。目录条目应尽量暴露 `artifact://` 引用、来源、创建时间、更新时间、预览路径、外部格式、价值摘要、内容抽取状态、复用分类和标签，让 Agent 不必逐个打开文件也能识别关键成果。
 
 ## 5. 与 ActionRun 的关系
 

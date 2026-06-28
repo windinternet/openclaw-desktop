@@ -4,7 +4,14 @@ import type { WorkbenchSnapshot } from './repository-workbench';
 import type { AiActionRun, SessionInfo } from './types';
 import { buildDashboardTailActionTarget, type DashboardTailActionRouteKind } from './dashboard-tail-action-routing';
 
-export type DashboardWorkSystemItemKind = 'session' | 'work' | 'plan' | 'action_run' | 'artifact' | 'knowledge';
+export type DashboardWorkSystemItemKind =
+  | 'session'
+  | 'work'
+  | 'plan'
+  | 'action_run'
+  | 'artifact'
+  | 'output'
+  | 'knowledge';
 
 export interface DashboardWorkSystemSummaryItem {
   id: string;
@@ -38,7 +45,11 @@ export interface BuildDashboardWorkSystemSummaryParams {
   sessions: SessionInfo[];
   actionRuns: AiActionRun[];
   artifacts: ArtifactMeta[];
-  workbench?: Pick<WorkbenchSnapshot, 'activeWork' | 'activePlans' | 'planMetadata' | 'reviews' | 'tailActions'> | null;
+  workbench?:
+    | (Pick<WorkbenchSnapshot, 'activeWork' | 'activePlans' | 'planMetadata' | 'reviews' | 'tailActions'> & {
+        outputsMarkdown?: string;
+      })
+    | null;
   knowledge?: { recentFiles: RepositoryMarkdownFile[]; health?: KnowledgeHealthReport } | null;
   limit?: number;
   now?: number | Date;
@@ -136,7 +147,7 @@ export function buildDashboardWorkSystemSummary(
       };
     });
 
-  const outputItems = params.artifacts.map((artifact) => ({
+  const artifactOutputItems = params.artifacts.map((artifact) => ({
     artifact,
     item: {
       id: artifact.id,
@@ -148,10 +159,36 @@ export function buildDashboardWorkSystemSummary(
       status: artifact.status,
     },
   }));
-  const recentOutputItems = outputItems.map(({ item }) => item);
-  const weeklyOutputItems = outputItems
-    .filter(({ artifact }) => artifact.createdAt >= weekStart)
-    .map(({ item }) => item);
+  const artifactOutputPaths = new Set(
+    params.artifacts.map((artifact) => artifact.repositoryOutputPath).filter(Boolean),
+  );
+  const artifactIds = new Set(params.artifacts.map((artifact) => artifact.id));
+  const repositoryOutputItems = parseRepositoryOutputIndex(params.workbench?.outputsMarkdown ?? '')
+    .filter(
+      (output) => !artifactOutputPaths.has(output.path) && (!output.artifactId || !artifactIds.has(output.artifactId)),
+    )
+    .map((output) => ({
+      output,
+      item: {
+        id: `repository-output:${output.path}`,
+        kind: 'output' as const,
+        title: output.title,
+        target: '/workbench?view=outputs',
+        updatedAt: output.updatedAt,
+        path: output.path,
+        detail: output.summary ?? output.format ?? output.path,
+      },
+    }));
+  const recentOutputItems = [
+    ...artifactOutputItems.map(({ item }) => item),
+    ...repositoryOutputItems.map(({ item }) => item),
+  ];
+  const weeklyOutputItems = [
+    ...artifactOutputItems.filter(({ artifact }) => artifact.createdAt >= weekStart).map(({ item }) => item),
+    ...repositoryOutputItems
+      .filter(({ output }) => (output.createdAt ?? output.updatedAt ?? 0) >= weekStart)
+      .map(({ item }) => item),
+  ];
   const knowledgeHealthItems = (params.knowledge?.health?.issues ?? []).map((issue) => ({
     id: issue.id,
     kind: 'knowledge' as const,
@@ -192,6 +229,65 @@ export function buildDashboardWorkSystemSummary(
       knowledgeUpdates: knowledgeUpdates.length,
     },
   };
+}
+
+interface RepositoryOutputIndexItem {
+  title: string;
+  path: string;
+  artifactId?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  format?: string;
+  summary?: string;
+}
+
+function parseRepositoryOutputIndex(markdown: string): RepositoryOutputIndexItem[] {
+  const items: RepositoryOutputIndexItem[] = [];
+  let current: (RepositoryOutputIndexItem & { metadata: Record<string, string> }) | null = null;
+
+  const pushCurrent = () => {
+    if (!current) return;
+    const artifactReference = current.metadata.artifact?.match(/^artifact:\/\/(.+)$/);
+    const next: RepositoryOutputIndexItem = {
+      title: current.title,
+      path: current.path,
+      artifactId: artifactReference?.[1] ?? current.artifactId,
+      createdAt: parseTimestamp(current.metadata.createdAt),
+      updatedAt: parseTimestamp(current.metadata.updatedAt),
+      format: current.metadata.format,
+      summary: current.metadata.summary,
+    };
+    items.push(next);
+  };
+
+  for (const line of markdown.split('\n')) {
+    const outputMatch = line.match(/^- \[([^\]]+)]\(([^)]+)\)(?:\s+\((.*)\))?/);
+    if (outputMatch) {
+      pushCurrent();
+      const inlineArtifactId = outputMatch[3]?.match(/`([^`]+)`/)?.[1];
+      current = {
+        title: outputMatch[1],
+        path: outputMatch[2],
+        artifactId: inlineArtifactId,
+        metadata: {},
+      };
+      continue;
+    }
+
+    const metadataMatch = line.match(/^\s+-\s+([^:]+):\s*(.*)$/);
+    if (current && metadataMatch) {
+      current.metadata[metadataMatch[1].trim()] = metadataMatch[2].trim();
+    }
+  }
+
+  pushCurrent();
+  return items;
+}
+
+function parseTimestamp(value?: string): number | undefined {
+  if (!value) return undefined;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? undefined : parsed;
 }
 
 function startOfUtcWeek(timestamp: number): number {

@@ -603,4 +603,20 @@ HTML 的独特优势：
 仍未完成的 P0 后续：
 
 - 更完整的工作状态诊断仍需继续补齐，例如跨事项风险、计划阻塞原因、未归档运行记录和成果沉淀缺口。
-- `weeklyOutputs` 当前来源是 Artifacts；后续可继续并入 Repository outputs、ActionRun 摘要和事项复盘中的价值成果线索。
+- ActionRun 摘要和事项复盘中的价值成果线索仍待继续并入 Dashboard 成果观察。
+
+### 10.20 2026-06-28 当前实施记录：Repository outputs 纳入 Dashboard 成果观察
+
+围绕“仓库即记录系统”和“Dashboard 显示真实推进状态”的 P0 内容，当前继续落地一段代码事实：
+
+- Dashboard work-system summary 会解析 Workbench Snapshot 中的 Repository `outputs/index.md`。
+- 当仓库 output index 条目没有对应的本地 Artifact 时，Dashboard 会把它补进“最近成果”和“本周新增成果”。
+- 仓库 output 条目会读取 `createdAt`、`updatedAt`、`summary` 和 `format`；本周新增优先按 `createdAt` 判断，旧索引没有 `createdAt` 时回退使用 `updatedAt`。
+- 为避免重复，同一个 Artifact id 或 `repositoryOutputPath` 已在 Artifacts 中出现时，Dashboard 不再重复显示对应仓库 output。
+- 点击仓库 output 会进入 `/workbench?view=outputs`，Workbench 会根据 `view=outputs` 直接打开成果视图。
+- 新生成的 Repository output markdown 和 `outputs/index.md` 会写入 `createdAt`，让后续“新增成果”判断有更稳定的事实来源。
+
+仍未完成的 P0 后续：
+
+- ActionRun 摘要和事项复盘中的价值成果线索仍需继续并入 Dashboard 成果观察。
+- 更完整的工作状态诊断仍需继续补齐，例如跨事项风险、计划阻塞原因、未归档运行记录和成果沉淀缺口。

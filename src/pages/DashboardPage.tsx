@@ -123,6 +123,7 @@ function workSystemIcon(kind: DashboardWorkSystemSummaryItem['kind']): ReactNode
     case 'plan':
       return <IconBranch />;
     case 'artifact':
+    case 'output':
       return <IconFile />;
     case 'knowledge':
       return <IconSearch />;

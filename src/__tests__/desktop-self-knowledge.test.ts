@@ -80,6 +80,8 @@ describe('desktop self-knowledge helpers', () => {
       'todayContinue, pendingConfirmations, stuckItems, recentOutputs, weeklyOutputs, and knowledgeUpdates',
     );
     expect(skillContent).toContain('Artifact outputs created during the current UTC week');
+    expect(skillContent).toContain('Repository `outputs/index.md` entries whose `createdAt`');
+    expect(skillContent).toContain('/workbench?view=outputs');
     expect(skillContent).toContain('Knowledge health issues');
     expect(skillContent).toContain('orphan sources, stale index entries, broken knowledge links');
     expect(skillContent).toContain('undigested sources queue');
@@ -124,7 +126,7 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('desktop.outputs.create');
     expect(skillContent).toContain('Repository `outputs/index.md`');
     expect(skillContent).toContain(
-      'artifact URI, source, updated time, preview, format, summary, thumbnail availability, value health, preview plan, content extraction status, content facts status, PDF facts, preview card, reuse kind, and tags',
+      'artifact URI, source, created time, updated time, preview, format, summary, thumbnail availability, value health, preview plan, content extraction status, content facts status, PDF facts, preview card, reuse kind, and tags',
     );
     expect(skillContent).toContain('externalFormat');
     expect(skillContent).toContain('reuseKind');
@@ -140,7 +142,7 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('tool`, `script`, or `workflow`');
     expect(skillContent).toContain('does not execute commands or grant execution permission');
     expect(skillContent).toContain(
-      'Artifacts list search, Dashboard recent Artifacts, and Workbench outputs surface value summaries',
+      'Artifacts list search, Dashboard recent/weekly outputs, and Workbench outputs surface value summaries',
     );
     expect(skillContent).toContain('Repository output / preview clues');
     expect(skillContent).toContain('system file handler');

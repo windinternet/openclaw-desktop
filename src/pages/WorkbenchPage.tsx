@@ -13,12 +13,44 @@ import {
 } from '../lib/dashboard-tail-action-routing';
 
 const { Title, Text } = Typography;
+const WORKBENCH_TAB_KEYS = [
+  'dashboard',
+  'projects',
+  'tasks',
+  'kanban',
+  'plans',
+  'actions',
+  'outputs',
+  'reviews',
+  'binding',
+] as const;
+
+type WorkbenchTabKey = (typeof WORKBENCH_TAB_KEYS)[number];
+
+function isWorkbenchTabKey(value?: string): value is WorkbenchTabKey {
+  return WORKBENCH_TAB_KEYS.includes(value as WorkbenchTabKey);
+}
+
+function getWorkbenchSearchTab(search: string): WorkbenchTabKey | undefined {
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  const view = params.get('view') ?? undefined;
+  return isWorkbenchTabKey(view) ? view : undefined;
+}
+
+function getWorkbenchInitialTab(context: DashboardTailActionRouteContext | null, search: string): WorkbenchTabKey {
+  const tailActionTab = getWorkbenchTailActionTab(context);
+  if (isWorkbenchTabKey(tailActionTab)) return tailActionTab;
+  return getWorkbenchSearchTab(search) ?? 'dashboard';
+}
 
 export default function WorkbenchPage() {
   const { t } = useTranslation();
   const location = useLocation();
   const tailActionContext = useMemo(() => parseDashboardTailActionRoute(location.search), [location.search]);
-  const [activeTab, setActiveTab] = useState(() => getWorkbenchTailActionTab(tailActionContext) ?? 'dashboard');
+  const searchTab = getWorkbenchSearchTab(location.search);
+  const [activeTab, setActiveTab] = useState<WorkbenchTabKey>(() =>
+    getWorkbenchInitialTab(tailActionContext, location.search),
+  );
   const [tabActions, setTabActions] = useState<ReactNode | null>(null);
   const activeMeta = {
     dashboard: { title: t('workbench.dashboard'), desc: t('workbench.dashboardDesc') },
@@ -33,14 +65,19 @@ export default function WorkbenchPage() {
   }[activeTab] ?? { title: t('nav.workbench'), desc: t('workbench.pageDesc') };
 
   const handleTabChange = (key: string) => {
+    if (!isWorkbenchTabKey(key)) return;
     setActiveTab(key);
     setTabActions(null);
   };
 
   useEffect(() => {
     const nextTab = getWorkbenchTailActionTab(tailActionContext);
-    if (nextTab) setActiveTab(nextTab);
-  }, [tailActionContext]);
+    if (isWorkbenchTabKey(nextTab)) {
+      setActiveTab(nextTab);
+      return;
+    }
+    if (searchTab) setActiveTab(searchTab);
+  }, [tailActionContext, searchTab]);
 
   const renderTailActionContext = (context: DashboardTailActionRouteContext | null) => {
     if (!context) return null;

@@ -209,6 +209,53 @@ describe('dashboard work system summary', () => {
     expect(summary.recentOutputs.map((item) => item.id)).toEqual(['art_weekly', 'art_old']);
   });
 
+  it('surfaces repository outputs from the workbench output index', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [],
+      workbench: {
+        activeWork: [],
+        activePlans: [],
+        planMetadata: [],
+        tailActions: [],
+        reviews: [],
+        outputsMarkdown: [
+          '# Outputs',
+          '- [仓库交互报告](outputs/reports/repo-weekly.md) (`repo_weekly`, report, published)',
+          '  - artifact: artifact://repo_weekly',
+          '  - createdAt: 2026-06-27T10:00:00.000Z',
+          '  - updatedAt: 2026-06-27T11:00:00.000Z',
+          '  - format: html',
+          '  - summary: 本周新增的仓库成果',
+          '- [旧仓库报告](outputs/reports/repo-old.md) (`repo_old`, report, published)',
+          '  - artifact: artifact://repo_old',
+          '  - createdAt: 2026-06-10T10:00:00.000Z',
+          '  - updatedAt: 2026-06-27T09:00:00.000Z',
+          '  - summary: 旧成果本周更新',
+        ].join('\n'),
+      },
+      now: Date.parse('2026-06-28T12:00:00.000Z'),
+    });
+
+    expect(summary.recentOutputs.map((item) => item.id)).toEqual([
+      'repository-output:outputs/reports/repo-weekly.md',
+      'repository-output:outputs/reports/repo-old.md',
+    ]);
+    expect(summary.weeklyOutputs).toEqual([
+      expect.objectContaining({
+        id: 'repository-output:outputs/reports/repo-weekly.md',
+        kind: 'output',
+        title: '仓库交互报告',
+        target: '/workbench?view=outputs',
+        path: 'outputs/reports/repo-weekly.md',
+        detail: '本周新增的仓库成果',
+      }),
+    ]);
+    expect(summary.counts.recentOutputs).toBe(2);
+    expect(summary.counts.weeklyOutputs).toBe(1);
+  });
+
   it('surfaces knowledge health issues as first-class dashboard knowledge updates', () => {
     const summary = buildDashboardWorkSystemSummary({
       sessions: [],
