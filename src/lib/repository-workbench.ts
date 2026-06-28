@@ -69,6 +69,16 @@ export interface WorkbenchReviewDraftInput {
   createdAt?: Date;
 }
 
+export interface WorkbenchAssetRunReviewDraftInput {
+  assetRunPath: string;
+  workItemPath?: string;
+  reviewSummary?: string;
+  reuseDecision?: string;
+  nextActions?: string[];
+  reviewer?: string;
+  createdAt?: Date;
+}
+
 export interface WorkbenchReviewDraftKnowledgeRun {
   id: string;
   status: string;
@@ -540,6 +550,54 @@ export async function writeWorkbenchReviewDraft(
   return { path, content };
 }
 
+export async function writeWorkbenchAssetRunReviewDraft(
+  binding: RepositoryBinding,
+  input: WorkbenchAssetRunReviewDraftInput,
+): Promise<WorkbenchReviewDraftResult> {
+  const assetRunPath = normalizeWritableWorkbenchMarkdownPath(input.assetRunPath);
+  if (!assetRunPath || !assetRunPath.startsWith('runs/assets/')) {
+    throw new Error('Asset execution review source must be a runs/assets markdown path');
+  }
+
+  const repository = getWorkbenchWriteApi();
+  const runMarkdown = await repository.readText(binding.repoPath, assetRunPath);
+  const runFacts = parseWorkbenchAssetRunReviewFacts(assetRunPath, runMarkdown);
+  const createdAt = input.createdAt ?? new Date();
+  const date = createdAt.toISOString().slice(0, 10);
+  const assetSlug = slugifyPathSegment(runFacts.assetId || assetRunPath.split('/').pop()?.replace(/\.md$/i, '') || '');
+  const path = `reviews/weekly/${date}-asset-run-${assetSlug}-review.md`;
+  const workItemPath = normalizeWorkbenchReviewWorkItemPath(input.workItemPath ?? runFacts.workItemPath);
+  const content = buildWorkbenchAssetRunReviewDraftMarkdown({
+    ...runFacts,
+    assetRunPath,
+    workItemPath,
+    reviewSummary: input.reviewSummary,
+    reuseDecision: input.reuseDecision,
+    nextActions: input.nextActions,
+    reviewer: input.reviewer,
+    createdAt,
+  });
+
+  await repository.writeText(binding.repoPath, path, content);
+
+  if (workItemPath) {
+    const markdown = await repository.readText(binding.repoPath, workItemPath);
+    const nextMarkdown = appendWorkbenchMatterReviewDraft(markdown, {
+      workItemPath,
+      reviewPath: path,
+      sourceLabel: '来源资产运行',
+      sourceId: assetRunPath,
+      linkLabel: '资产运行复盘草稿',
+      createdAt,
+    });
+    if (nextMarkdown !== markdown) {
+      await repository.writeText(binding.repoPath, workItemPath, nextMarkdown);
+    }
+  }
+
+  return { path, content };
+}
+
 export async function confirmWorkbenchReviewDraft(
   binding: RepositoryBinding,
   input: WorkbenchReviewConfirmInput,
@@ -798,14 +856,25 @@ function buildWorkbenchMatterOutputLine(
 
 function appendWorkbenchMatterReviewDraft(
   markdown: string,
-  input: { workItemPath: string; reviewPath: string; tailActionId?: string; createdAt: Date },
+  input: {
+    workItemPath: string;
+    reviewPath: string;
+    tailActionId?: string;
+    sourceLabel?: string;
+    sourceId?: string;
+    linkLabel?: string;
+    createdAt: Date;
+  },
 ): string {
   const href = relativeWorkbenchMarkdownLink(input.workItemPath, input.reviewPath);
   if (markdown.includes(input.reviewPath) || markdown.includes(href)) return markdown;
 
-  const sourceLabel = isActionRunReviewTailActionId(input.tailActionId) ? '来源执行记录' : '来源尾动作';
-  const sourceSuffix = input.tailActionId ? ` - ${sourceLabel}: \`${input.tailActionId}\`` : '';
-  const reviewLine = `- [${input.createdAt.toISOString().slice(0, 10)} 复盘草稿](${href})${sourceSuffix}`;
+  const sourceLabel =
+    input.sourceLabel ?? (isActionRunReviewTailActionId(input.tailActionId) ? '来源执行记录' : '来源尾动作');
+  const sourceId = input.sourceId ?? input.tailActionId;
+  const sourceSuffix = sourceId ? ` - ${sourceLabel}: \`${sourceId}\`` : '';
+  const linkLabel = input.linkLabel ?? '复盘草稿';
+  const reviewLine = `- [${input.createdAt.toISOString().slice(0, 10)} ${linkLabel}](${href})${sourceSuffix}`;
   const lines = markdown.split(/\r?\n/);
   const headerIndex = lines.findIndex((line) => line.trim() === '## 复盘');
   if (headerIndex === -1) return `${markdown.trimEnd()}\n\n## 复盘\n\n${reviewLine}\n`;
@@ -1027,6 +1096,139 @@ function buildWorkbenchReviewDraftMarkdown(input: {
   ]
     .filter((line): line is string => line !== undefined)
     .join('\n');
+}
+
+interface WorkbenchAssetRunReviewFacts {
+  assetRunPath: string;
+  title: string;
+  assetId?: string;
+  assetPath?: string;
+  assetReuseKind?: string;
+  status?: string;
+  runner?: string;
+  command?: string;
+  repositoryOutputPath?: string;
+  outputArtifactId?: string;
+  workItemPath?: string;
+  executedAt?: string;
+  resultSummary?: string;
+}
+
+function parseWorkbenchAssetRunReviewFacts(
+  assetRunPath: string,
+  markdown: string,
+): Omit<WorkbenchAssetRunReviewFacts, 'assetRunPath'> {
+  if (readWorkbenchFrontmatterValue(markdown, 'source') !== 'desktop-repository-asset-execution') {
+    throw new Error('Asset execution review source must be a desktop repository asset execution record');
+  }
+
+  const title = extractWorkbenchAssetRunTitle(markdown);
+  return {
+    title: title || readWorkbenchFrontmatterValue(markdown, 'assetId') || assetRunPath,
+    assetId: readWorkbenchFrontmatterValue(markdown, 'assetId') ?? undefined,
+    assetPath: readWorkbenchFrontmatterValue(markdown, 'assetPath') ?? undefined,
+    assetReuseKind: readWorkbenchFrontmatterValue(markdown, 'assetReuseKind') ?? undefined,
+    status: readWorkbenchFrontmatterValue(markdown, 'status') ?? undefined,
+    runner: readWorkbenchFrontmatterValue(markdown, 'runner') ?? undefined,
+    command: readWorkbenchFrontmatterValue(markdown, 'command') ?? undefined,
+    repositoryOutputPath: readWorkbenchFrontmatterValue(markdown, 'repositoryOutputPath') ?? undefined,
+    outputArtifactId: readWorkbenchFrontmatterValue(markdown, 'outputArtifactId') ?? undefined,
+    workItemPath: readWorkbenchFrontmatterValue(markdown, 'workItemPath') ?? undefined,
+    executedAt: readWorkbenchFrontmatterValue(markdown, 'executedAt') ?? undefined,
+    resultSummary: extractWorkbenchAssetRunResultSummary(markdown),
+  };
+}
+
+function buildWorkbenchAssetRunReviewDraftMarkdown(
+  input: WorkbenchAssetRunReviewFacts & {
+    workItemPath?: string;
+    reviewSummary?: string;
+    reuseDecision?: string;
+    nextActions?: string[];
+    reviewer?: string;
+    createdAt: Date;
+  },
+): string {
+  const nextActions = input.nextActions?.filter((action) => action.trim().length > 0) ?? [];
+  return [
+    '---',
+    `title: ${JSON.stringify(`仓库资产执行复盘 ${input.createdAt.toISOString().slice(0, 10)} - ${input.title}`)}`,
+    'source: desktop-repository-asset-execution-review',
+    `assetRunPath: ${input.assetRunPath}`,
+    input.assetId ? `assetId: ${input.assetId}` : undefined,
+    input.assetPath ? `assetPath: ${input.assetPath}` : undefined,
+    input.assetReuseKind ? `assetReuseKind: ${input.assetReuseKind}` : undefined,
+    input.status ? `executionStatus: ${input.status}` : undefined,
+    input.repositoryOutputPath ? `repositoryOutputPath: ${input.repositoryOutputPath}` : undefined,
+    input.outputArtifactId ? `outputArtifactId: ${input.outputArtifactId}` : undefined,
+    input.workItemPath ? `workItemPath: ${input.workItemPath}` : undefined,
+    input.reviewer ? `reviewer: ${input.reviewer}` : undefined,
+    `createdAt: ${input.createdAt.toISOString()}`,
+    'status: draft',
+    'recordOnly: true',
+    'desktopExecutes: false',
+    'grantsPermission: false',
+    '---',
+    '',
+    `# 仓库资产执行复盘：${input.title}`,
+    '',
+    `来源运行: \`${input.assetRunPath}\``,
+    input.workItemPath ? `关联事项: \`${input.workItemPath}\`` : undefined,
+    '',
+    '## 执行事实',
+    '',
+    input.assetId ? `- 资产：${input.assetId}` : undefined,
+    input.assetPath ? `- 路径：${input.assetPath}` : undefined,
+    input.assetReuseKind ? `- 类型：${input.assetReuseKind}` : undefined,
+    input.status ? `- 状态：${input.status}` : undefined,
+    input.executedAt ? `- 执行时间：${input.executedAt}` : undefined,
+    input.runner ? `- 运行器：${input.runner}` : undefined,
+    input.command ? `- 命令：\`${input.command}\`` : undefined,
+    input.resultSummary ? `- 执行结果：${input.resultSummary}` : undefined,
+    input.outputArtifactId ? `- 输出产物：artifact://${input.outputArtifactId}` : undefined,
+    input.repositoryOutputPath ? `- 仓库输出：${input.repositoryOutputPath}` : undefined,
+    '',
+    '## 核对清单',
+    '',
+    '- [ ] 判断本次运行结果是否应该沉淀为成果或关联到既有成果。',
+    '- [ ] 判断该资产是否继续复用、需要改进、还是暂停使用。',
+    '- [ ] 判断是否需要更新来源事项状态、知识库、计划或后续事项。',
+    '- [ ] 确认 Desktop 只写入复盘记录，不执行资产、不授予权限。',
+    '',
+    '## 复盘正文',
+    '',
+    `- 本次推进：${input.reviewSummary ?? ''}`,
+    `- 复用判断：${input.reuseDecision ?? ''}`,
+    '- 产生的成果：',
+    '- 风险和遗留问题：',
+    '- 下一步：',
+    ...nextActions.map((action) => `  - ${action}`),
+    '',
+    '## 边界',
+    '',
+    '- Desktop 只写入复盘记录，不执行资产、不授予权限。',
+    '- 后续状态更新、成果沉淀、知识库更新仍需要用户显式确认。',
+    '',
+  ]
+    .filter((line): line is string => line !== undefined)
+    .join('\n');
+}
+
+function normalizeWorkbenchReviewWorkItemPath(value?: string): string | undefined {
+  if (!value) return undefined;
+  const workItemPath = normalizeWritableWorkbenchMarkdownPath(value);
+  return workItemPath?.startsWith('work/') ? workItemPath : undefined;
+}
+
+function extractWorkbenchAssetRunTitle(markdown: string): string {
+  const headingTitle = /^#\s+仓库资产执行[：:]\s*(.+)$/m.exec(markdown)?.[1]?.trim();
+  if (headingTitle) return headingTitle;
+  const frontmatterTitle = readWorkbenchFrontmatterValue(markdown, 'title') ?? '';
+  return frontmatterTitle.replace(/^仓库资产执行\s*[-：:]\s*/, '').trim();
+}
+
+function extractWorkbenchAssetRunResultSummary(markdown: string): string | undefined {
+  return /^-\s*执行结果[：:]\s*(.+)$/m.exec(markdown)?.[1]?.trim();
 }
 
 function dedupeRelatedRunIds(values?: string[]): string[] {

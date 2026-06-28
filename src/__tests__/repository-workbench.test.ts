@@ -13,6 +13,7 @@ import {
   preserveWorkbenchOutputFromTailAction,
   readWorkbenchMarkdown,
   updateWorkbenchMatterStatusFromTailAction,
+  writeWorkbenchAssetRunReviewDraft,
   writeWorkbenchReviewDraft,
 } from '../lib/repository-workbench';
 
@@ -706,6 +707,83 @@ describe('repository workbench', () => {
       '| `run-knowledge-done` | done | 已更新 wiki/release.md、wiki/index.md 和 wiki/log.md。 |',
     );
     expect(draft.content).toContain('| `run-knowledge-no-write` | done | no_write_needed：现有知识库已经覆盖。 |');
+  });
+
+  it('writes a review draft for a repository asset execution run and links it to the work item', async () => {
+    const runPath = 'runs/assets/20260629-010203-tools-release-check-sh.md';
+    const reviewPath = 'reviews/weekly/2026-06-29-asset-run-tools-release-check-sh-review.md';
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === runPath) {
+        return [
+          '---',
+          'title: "仓库资产执行 - 发布检查脚本"',
+          'source: desktop-repository-asset-execution',
+          'assetId: tools-release-check-sh',
+          'assetPath: tools/release-check.sh',
+          'assetReuseKind: script',
+          'status: succeeded',
+          'runner: Gateway Agent',
+          'command: bash tools/release-check.sh',
+          'repositoryOutputPath: outputs/reports/release-check.md',
+          'workItemPath: work/active/release.md',
+          `runPath: ${runPath}`,
+          'executedAt: 2026-06-29T01:02:03.000Z',
+          'recordOnly: true',
+          'desktopExecutes: false',
+          'grantsPermission: false',
+          '---',
+          '',
+          '# 仓库资产执行：发布检查脚本',
+          '',
+          '## 摘要',
+          '',
+          '- 执行结果：发布检查通过',
+        ].join('\n');
+      }
+      if (relativePath === 'work/active/release.md') {
+        return ['# 发布推进', '', '## 复盘', '', '- 暂无'].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const draft = await writeWorkbenchAssetRunReviewDraft(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        assetRunPath: runPath,
+        createdAt: new Date('2026-06-29T08:00:00.000Z'),
+      },
+    );
+
+    expect(draft.path).toBe(reviewPath);
+    expect(draft.content).toContain('source: desktop-repository-asset-execution-review');
+    expect(draft.content).toContain(`assetRunPath: ${runPath}`);
+    expect(draft.content).toContain('assetId: tools-release-check-sh');
+    expect(draft.content).toContain('assetReuseKind: script');
+    expect(draft.content).toContain('executionStatus: succeeded');
+    expect(draft.content).toContain('repositoryOutputPath: outputs/reports/release-check.md');
+    expect(draft.content).toContain('workItemPath: work/active/release.md');
+    expect(draft.content).toContain('# 仓库资产执行复盘：发布检查脚本');
+    expect(draft.content).toContain('- 执行结果：发布检查通过');
+    expect(draft.content).toContain('- [ ] 判断本次运行结果是否应该沉淀为成果或关联到既有成果。');
+    expect(draft.content).toContain('- Desktop 只写入复盘记录，不执行资产、不授予权限。');
+    expect(writeText).toHaveBeenCalledWith('/repo', reviewPath, draft.content);
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'work/active/release.md',
+      [
+        '# 发布推进',
+        '',
+        '## 复盘',
+        '',
+        `- [2026-06-29 资产运行复盘草稿](../../${reviewPath}) - 来源资产运行: \`${runPath}\``,
+      ].join('\n'),
+    );
   });
 
   it('confirms a review draft and completes the matching source tail action', async () => {

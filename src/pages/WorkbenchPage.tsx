@@ -37,6 +37,12 @@ function getWorkbenchSearchTab(search: string): WorkbenchTabKey | undefined {
   return isWorkbenchTabKey(view) ? view : undefined;
 }
 
+function getWorkbenchAssetRunPath(search: string): string | null {
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  const assetRunPath = params.get('assetRunPath');
+  return assetRunPath?.startsWith('runs/assets/') && assetRunPath.endsWith('.md') ? assetRunPath : null;
+}
+
 function getWorkbenchInitialTab(context: DashboardTailActionRouteContext | null, search: string): WorkbenchTabKey {
   const tailActionTab = getWorkbenchTailActionTab(context);
   if (isWorkbenchTabKey(tailActionTab)) return tailActionTab;
@@ -47,6 +53,7 @@ export default function WorkbenchPage() {
   const { t } = useTranslation();
   const location = useLocation();
   const tailActionContext = useMemo(() => parseDashboardTailActionRoute(location.search), [location.search]);
+  const assetRunPath = useMemo(() => getWorkbenchAssetRunPath(location.search), [location.search]);
   const searchTab = getWorkbenchSearchTab(location.search);
   const [activeTab, setActiveTab] = useState<WorkbenchTabKey>(() =>
     getWorkbenchInitialTab(tailActionContext, location.search),
@@ -130,7 +137,12 @@ export default function WorkbenchPage() {
       }
     >
       {(binding) => (
-        <WorkbenchRepositoryPanel binding={binding} panelView={panelView} tailActionContext={tailActionContext} />
+        <WorkbenchRepositoryPanel
+          binding={binding}
+          panelView={panelView}
+          tailActionContext={tailActionContext}
+          assetRunPath={assetRunPath}
+        />
       )}
     </RepositoryGate>
   );

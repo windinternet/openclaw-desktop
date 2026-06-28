@@ -127,6 +127,7 @@ describe('desktop bridge instance connections', () => {
           'desktop.repository.assets.record',
           'desktop.repository.assets.search',
           'desktop.repository.assets.execution.record',
+          'desktop.repository.assets.execution.review.write',
           'desktop.repository.search',
           'desktop.repository.git.status',
           'desktop.repository.git.diff',

@@ -307,7 +307,7 @@ export function buildDashboardWorkSystemSummary(
       id: `asset-run-review:${run.runPath}`,
       kind: 'output' as const,
       title: run.title,
-      target: '/workbench?view=reviews',
+      target: buildRepositoryAssetRunReviewTarget(run),
       updatedAt: run.executedAt,
       path: run.runPath,
       detail: ['资产运行待复盘', run.reuseKind, run.result].filter(Boolean).join(' · '),
@@ -462,6 +462,14 @@ interface RepositoryAssetRunIndexItem {
   outputPath?: string;
   workItemPath?: string;
   reviewPending: boolean;
+}
+
+function buildRepositoryAssetRunReviewTarget(run: RepositoryAssetRunIndexItem): string {
+  const params = new URLSearchParams();
+  params.set('view', 'reviews');
+  params.set('assetRunPath', run.runPath);
+  if (run.workItemPath) params.set('workItemPath', run.workItemPath);
+  return `/workbench?${params.toString()}`;
 }
 
 function parseRepositoryOutputIndex(markdown: string): RepositoryOutputIndexItem[] {

@@ -1650,3 +1650,18 @@ HTML 的独特优势：
 仍未完成的 P0 后续：
 
 - 仍需要更明确的资产运行详情 UI、资产权限面板、从资产运行直接进入成果沉淀/知识更新/执行复盘的显式入口，以及与“开始一件事”金线的更自然衔接。
+
+### 10.82 2026-06-29 当前实施记录：Repository 资产运行复盘草稿入口
+
+围绕“资产运行后的 `review: pending` 不能只停留在提示，还要能进入 `reviews/weekly/`”的 P0 缺口，当前继续补齐一段明确闭环：
+
+- Dashboard 的 `asset-run:review-pending` 待确认现在打开 Workbench reviews 时会携带具体 `assetRunPath`，并在有来源事项时同时携带 `workItemPath`。
+- Workbench reviews 会显示“资产运行复盘”卡片，保留来源 `runs/assets/*.md`、目标 `reviews/weekly/` 和命令线索 `desktop.repository.assets.execution.review.write`。
+- 用户可从卡片创建 `reviews/weekly/YYYY-MM-DD-asset-run-*-review.md` 草稿；草稿 frontmatter 记录 `source: desktop-repository-asset-execution-review`、`assetRunPath`、资产 id、复用分类、执行状态、输出线索、可选事项和只记录/不执行/不授权边界。
+- 如果运行记录或入口携带当前仓库 `work/` 下安全的 `workItemPath`，Desktop 会把草稿链接写回来源事项 `## 复盘`。
+- Desktop node 新增 `desktop.repository.assets.execution.review.write`，Gateway 可传入 `repoPath`、`assetRunPath`，以及可选 `reviewSummary`、`reuseDecision`、`nextActions`、`workItemPath`、`reviewer` 和 `reviewedAt`，在聊天中完成同类复盘草稿写入。
+- 该能力以当前代码事实为准：只观察、路由和写入复盘草稿，不执行资产、不授予权限、不自动更新事项状态、不自动沉淀成果、不更新知识库、不勾选事项尾动作。
+
+仍未完成的 P0 后续：
+
+- 仍需要更明确的资产运行详情 UI、从资产运行直接进入成果沉淀/知识更新的显式入口、资产权限面板，以及与“开始一件事”金线的更自然衔接。

@@ -237,6 +237,11 @@
     "reviewDraftConfirmFailed": "确认复盘失败",
     "reviewDraftConfirmUnavailable": "当前复盘草稿无法确认",
     "openReviewFolder": "打开复盘目录",
+    "assetRunReviewTitle": "资产运行复盘",
+    "assetRunReviewDesc": "基于这次仓库资产运行记录创建复盘草稿，核对成果、复用判断和后续动作。",
+    "assetRunReviewSource": "来源资产运行",
+    "assetRunReviewMissingSource": "缺少资产运行记录，无法创建复盘草稿",
+    "openAssetRunRecord": "打开运行记录",
     "viewMarkdown": "查看 Markdown"
   },
   "knowledge": {

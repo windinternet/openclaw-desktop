@@ -359,7 +359,8 @@ describe('dashboard work system summary', () => {
         id: 'asset-run-review:runs/assets/20260629-010203-tools-release-check-sh.md',
         kind: 'output',
         title: '发布检查脚本',
-        target: '/workbench?view=reviews',
+        target:
+          '/workbench?view=reviews&assetRunPath=runs%2Fassets%2F20260629-010203-tools-release-check-sh.md&workItemPath=work%2Factive%2Frelease.md',
         path: 'runs/assets/20260629-010203-tools-release-check-sh.md',
         detail: '资产运行待复盘 · script · 发布检查通过',
         status: 'asset-run:review-pending',

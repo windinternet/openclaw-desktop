@@ -237,6 +237,11 @@
     "reviewDraftConfirmFailed": "Failed to confirm review",
     "reviewDraftConfirmUnavailable": "This review draft cannot be confirmed now",
     "openReviewFolder": "Open Review Folder",
+    "assetRunReviewTitle": "Asset Run Review",
+    "assetRunReviewDesc": "Create a review draft from this repository asset run, then check outputs, reuse decisions, and follow-up actions.",
+    "assetRunReviewSource": "Source asset run",
+    "assetRunReviewMissingSource": "Asset run record is missing, so a review draft cannot be created",
+    "openAssetRunRecord": "Open Run Record",
     "viewMarkdown": "View Markdown"
   },
   "knowledge": {

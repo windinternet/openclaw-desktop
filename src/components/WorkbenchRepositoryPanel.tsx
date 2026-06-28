@@ -21,6 +21,7 @@ import {
   loadWorkbenchSnapshot,
   readWorkbenchMarkdown,
   updateWorkbenchMatterStatusFromTailAction,
+  writeWorkbenchAssetRunReviewDraft,
   writeWorkbenchReviewDraft,
 } from '../lib/repository-workbench';
 import type { AiActionRun, AiActionRunStatus } from '../lib/types';
@@ -175,10 +176,12 @@ export default function WorkbenchRepositoryPanel({
   binding,
   panelView = 'projects',
   tailActionContext,
+  assetRunPath,
 }: {
   binding: RepositoryBinding;
   panelView?: WorkbenchPanelView;
   tailActionContext?: DashboardTailActionRouteContext | null;
+  assetRunPath?: string | null;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -319,6 +322,26 @@ export default function WorkbenchRepositoryPanel({
           error: run.error,
         })),
       });
+      setSelectedPreviewPath(draft.path);
+      setSelectedPreviewContent(draft.content);
+      setSnapshot(await loadWorkbenchSnapshot(binding));
+      Toast.success(t('workbench.reviewDraftCreated'));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('workbench.reviewDraftCreateFailed'));
+    } finally {
+      setReviewDraftWriting(false);
+    }
+  };
+
+  const handleCreateAssetRunReviewDraft = async () => {
+    if (!assetRunPath) {
+      Toast.warning(t('workbench.assetRunReviewMissingSource'));
+      return;
+    }
+
+    setReviewDraftWriting(true);
+    try {
+      const draft = await writeWorkbenchAssetRunReviewDraft(binding, { assetRunPath });
       setSelectedPreviewPath(draft.path);
       setSelectedPreviewContent(draft.content);
       setSnapshot(await loadWorkbenchSnapshot(binding));
@@ -1429,6 +1452,51 @@ export default function WorkbenchRepositoryPanel({
     );
   };
 
+  const renderAssetRunReviewCard = () => {
+    if (!assetRunPath) return null;
+    return (
+      <div
+        style={{
+          border: '1px solid var(--semi-color-border)',
+          borderRadius: 8,
+          padding: 12,
+          marginBottom: 12,
+          background: 'var(--semi-color-fill-0)',
+        }}
+      >
+        <Space vertical align="start" style={{ width: '100%' }}>
+          <Space align="center" wrap>
+            <Tag color="orange">{t('workbench.assetRunReviewTitle')}</Tag>
+            <Tag color="blue">reviews/weekly/</Tag>
+          </Space>
+          <Text size="small">{t('workbench.assetRunReviewDesc')}</Text>
+          <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }}>
+            {t('workbench.assetRunReviewSource')}: {assetRunPath}
+          </Text>
+          <Text type="tertiary" size="small" style={{ fontFamily: 'var(--semi-font-family-monospace)' }}>
+            {t('workbench.reviewTailActionWriteCommand')}: desktop.repository.assets.execution.review.write
+          </Text>
+          <Space align="center" wrap>
+            <Button
+              size="small"
+              type="primary"
+              loading={reviewDraftWriting}
+              onClick={() => void handleCreateAssetRunReviewDraft()}
+            >
+              {t('workbench.createReviewDraft')}
+            </Button>
+            <Button size="small" type="tertiary" onClick={() => openRepositoryFile(assetRunPath)}>
+              {t('workbench.openAssetRunRecord')}
+            </Button>
+            <Button size="small" type="tertiary" onClick={() => openRepositoryFile('reviews/weekly/')}>
+              {t('workbench.openReviewFolder')}
+            </Button>
+          </Space>
+        </Space>
+      </div>
+    );
+  };
+
   const renderReviewTailActionCard = () => {
     const reviewTailActionContext = tailActionContext?.kind === 'review' ? tailActionContext : null;
     if (!reviewTailActionContext) return null;
@@ -1531,6 +1599,7 @@ export default function WorkbenchRepositoryPanel({
         <Title heading={6} style={{ marginTop: 0 }}>
           {t('workbench.reviews')}
         </Title>
+        {renderAssetRunReviewCard()}
         {renderReviewTailActionCard()}
         {snapshot?.reviewGroups && snapshot.reviewGroups.length > 0 ? (
           <Space vertical align="start" style={{ width: '100%' }}>

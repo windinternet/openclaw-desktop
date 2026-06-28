@@ -2283,6 +2283,77 @@ describe('desktop node commands', () => {
     );
   });
 
+  it('writes repository reusable asset execution review through a structured repository command', async () => {
+    const runPath = 'runs/assets/20260629-010203-tools-release-check-sh.md';
+    const reviewPath = 'reviews/weekly/2026-06-29-asset-run-tools-release-check-sh-review.md';
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === runPath) {
+        return [
+          '---',
+          'title: "仓库资产执行 - 发布检查脚本"',
+          'source: desktop-repository-asset-execution',
+          'assetId: tools-release-check-sh',
+          'assetPath: tools/release-check.sh',
+          'assetReuseKind: script',
+          'status: succeeded',
+          'runner: Gateway Agent',
+          'command: bash tools/release-check.sh',
+          'repositoryOutputPath: outputs/reports/release-check.md',
+          'workItemPath: work/active/release.md',
+          `runPath: ${runPath}`,
+          'executedAt: 2026-06-29T01:02:03.000Z',
+          'recordOnly: true',
+          'desktopExecutes: false',
+          'grantsPermission: false',
+          '---',
+          '',
+          '# 仓库资产执行：发布检查脚本',
+          '',
+          '## 摘要',
+          '',
+          '- 执行结果：发布检查通过',
+        ].join('\n');
+      }
+      if (relativePath === 'work/active/release.md') return ['# 发布推进', '', '## 复盘', '', '- 暂无'].join('\n');
+      return '';
+    });
+    const writeText = vi.fn(async (_repoPath: string, _relativePath: string, _content: string) => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    await expect(
+      handleDesktopNodeCommand('desktop.repository.assets.execution.review.write', {
+        repoPath: '/repo',
+        assetRunPath: runPath,
+        reviewedAt: '2026-06-29T08:00:00.000Z',
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      assetRunPath: runPath,
+      path: reviewPath,
+      boundary: {
+        recordOnly: true,
+        desktopExecutes: false,
+        grantsPermission: false,
+      },
+    });
+
+    expect(writeText).toHaveBeenCalledWith('/repo', reviewPath, expect.any(String));
+    const markdown = writeText.mock.calls.find((call) => call[1] === reviewPath)?.[2] as string;
+    expect(markdown).toContain('source: desktop-repository-asset-execution-review');
+    expect(markdown).toContain(`assetRunPath: ${runPath}`);
+    expect(markdown).toContain('# 仓库资产执行复盘：发布检查脚本');
+    expect(markdown).toContain('- 执行结果：发布检查通过');
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'work/active/release.md',
+      expect.stringContaining(`来源资产运行: \`${runPath}\``),
+    );
+  });
+
   it('initializes and commits repository changes through structured repository commands', async () => {
     const init = vi.fn(async () => ({
       pathExists: true,

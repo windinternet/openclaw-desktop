@@ -35,6 +35,7 @@ import {
   searchRepositoryAssetIndex,
   type RepositoryOutputResult,
 } from './repository-outputs';
+import { writeWorkbenchAssetRunReviewDraft } from './repository-workbench';
 
 const ARTIFACT_TYPES = new Set<ArtifactType>([
   'report',
@@ -731,6 +732,42 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
     });
 
     return { ok: true, execution };
+  }
+
+  if (command === 'desktop.repository.assets.execution.review.write') {
+    const repoPath = stringValue(params.repoPath);
+    const assetRunPath = stringValue(params.assetRunPath);
+    if (!repoPath) return invalidParams('repoPath is required');
+    if (!assetRunPath) return invalidParams('assetRunPath is required');
+    const repository = repositoryApi();
+    if (!repository?.readText || !repository.writeText) return { ok: false, error: 'repository-api-unavailable' };
+
+    const draft = await writeWorkbenchAssetRunReviewDraft(
+      createDefaultRepositoryBinding({
+        gatewayInstanceId: stringValue(params.gatewayInstanceId) ?? 'desktop-node',
+        repoPath,
+      }),
+      {
+        assetRunPath,
+        workItemPath: stringValue(params.workItemPath),
+        reviewSummary: stringValue(params.reviewSummary) ?? stringValue(params.summary),
+        reuseDecision: stringValue(params.reuseDecision),
+        nextActions: stringArrayValue(params.nextActions),
+        reviewer: stringValue(params.reviewer),
+        createdAt: dateValue(params.reviewedAt) ?? new Date(),
+      },
+    );
+
+    return {
+      ok: true,
+      assetRunPath,
+      path: draft.path,
+      boundary: {
+        recordOnly: true,
+        desktopExecutes: false,
+        grantsPermission: false,
+      },
+    };
   }
 
   if (command === 'desktop.repository.search') {

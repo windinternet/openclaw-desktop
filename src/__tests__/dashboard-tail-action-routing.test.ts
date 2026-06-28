@@ -13,7 +13,9 @@ describe('dashboard tail action routing', () => {
     expect(workbench).toContain('getWorkbenchTailActionTab(tailActionContext)');
     expect(workbench).toContain("t('workbench.tailActionContextTitle')");
     expect(workbench).toContain('context.workItemPath');
+    expect(workbench).toContain('assetRunPath');
     expect(workbench).toContain('tailActionContext={tailActionContext}');
+    expect(workbench).toContain('assetRunPath={assetRunPath}');
 
     expect(workbenchPanel).toContain("tailActionContext?.kind === 'status'");
     expect(workbenchPanel).toContain('updateWorkbenchMatterStatusFromTailAction');
@@ -41,6 +43,9 @@ describe('dashboard tail action routing', () => {
     expect(workbenchPanel).toContain('reviewTailActionRunId');
     expect(workbenchPanel).toContain('action-run-review:');
     expect(workbenchPanel).toContain("t('workbench.reviewTailActionRunSource')");
+    expect(workbenchPanel).toContain('writeWorkbenchAssetRunReviewDraft');
+    expect(workbenchPanel).toContain("t('workbench.assetRunReviewTitle')");
+    expect(workbenchPanel).toContain('desktop.repository.assets.execution.review.write');
 
     expect(artifacts).toContain('parseDashboardTailActionRoute(location.search)');
     expect(artifacts).toContain("tailActionContext?.kind === 'output'");
