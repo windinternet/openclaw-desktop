@@ -1458,11 +1458,25 @@ HTML 的独特优势：
 - 多候选场景下，每个候选保留自己的编辑状态；用户切换候选时，保存按钮仍只保存当前 selected candidate。
 - 新增 `normalizeArtifactAICreatePreviewDraft`，在保存前裁剪标题、说明和 `contentSummary` 的首尾空白，移除空标签，并保留 HTML 正文、URL、命令、文件元数据、`externalFormat`、`reuseKind`、`importFile` 和来源 ActionRun。
 - 如果标题被清空，保存按钮会禁用，保存动作也会提示用户输入标题。
-- 该能力以当前代码事实为准：支持 edit title, type, description, tags, and content summary before saving，但不会编辑 HTML 正文、文件路径、链接、来源 ActionRun 或权限边界，不会自动批量创建 Artifact，不会自动写 Repository output，不会读取任意本地文件，不会执行资产，不会授予权限，不会写 Wiki/index/log，不会写复盘，不会更新事项状态，不会移动事项文件。
+- 该能力以当前代码事实为准：支持 edit title, type, description, tags, and content summary before saving；HTML 正文编辑在后续实施片中单独补齐。该基础编辑片不会编辑文件路径、链接、来源 ActionRun 或权限边界，不会自动批量创建 Artifact，不会自动写 Repository output，不会读取任意本地文件，不会执行资产，不会授予权限，不会写 Wiki/index/log，不会写复盘，不会更新事项状态，不会移动事项文件。
 
 仍未完成的 P0 后续：
 
-- 仍需要更完整的正文/文件细节编辑体验、真正 Wiki 写入后的复盘建议/确认状态、复盘确认后的后续联动，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
+- 仍需要保存前 HTML 正文编辑、更完整的文件/链接细节编辑体验、真正 Wiki 写入后的复盘建议/确认状态、复盘确认后的后续联动，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
+
+### 10.70 2026-06-29 当前实施记录：AI 产物创建保存前 HTML 正文编辑
+
+围绕“HTML 是 Desktop 特色产物，具备可视性与交互性，保存前不能把正文当成不可校正黑盒”的 P0 体验缺口，当前继续补齐 HTML 候选产物的保存前正文编辑：
+
+- AI 创建保存表单已支持保存前 HTML 正文编辑；当 selected candidate 携带 HTML 正文或 HTML 格式线索时，`ArtifactAICreateDrawer` 会显示 `artifact.aiCreateHtmlBody` 编辑区。
+- 用户校正后的 HTML 正文仍保存在同一个 selected candidate 草稿里；多候选场景下，每个候选保留自己的 HTML 草稿，保存按钮仍只保存当前 selected candidate。
+- `normalizeArtifactAICreatePreviewDraft` 会继续裁剪标题、说明和 `contentSummary` 的首尾空白、移除空标签，但会原样保留 HTML 正文，不裁剪正文首尾字符。
+- `buildArtifactAICreateGenerateParams` 会把校正后的 HTML 正文传给 `generateArtifact`；后续仍沿用现有 Artifact 保存、HTML 审计、ActionRun `artifactIds` 回填和 `notifyActionRunsChanged` 观察刷新。
+- 该能力以当前代码事实为准：支持保存前可编辑 HTML 正文，但不会自动检查或修复 HTML，不会编辑文件路径、链接、来源 ActionRun 或权限边界，不会自动批量创建 Artifact，不会自动写 Repository output，不会读取任意本地文件，不会执行资产，不会授予权限，不会写 Wiki/index/log，不会写复盘，不会更新事项状态，不会移动事项文件。
+
+仍未完成的 P0 后续：
+
+- 仍需要更完整的文件/链接细节编辑体验、真正 Wiki 写入后的复盘建议/确认状态、复盘确认后的后续联动，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
 
 ### 10.66 2026-06-29 当前实施记录：ActionRun 成果保存后状态刷新
 

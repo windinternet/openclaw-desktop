@@ -54,6 +54,21 @@ describe('artifact ActionRun linkage', () => {
     expect(drawer).toContain('updateSelectedPreview({ contentSummary: value })');
   });
 
+  it('lets users edit selected AI-created HTML body before saving', () => {
+    const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
+    const preview = readFileSync('src/lib/artifact-ai-create-preview.ts', 'utf8');
+    const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
+    const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
+
+    expect(drawer).toContain("t('artifact.aiCreateHtmlBody')");
+    expect(drawer).toContain("t('artifact.aiCreateHtmlBodyHint')");
+    expect(drawer).toContain('value={preview.html ??');
+    expect(drawer).toContain('updateSelectedPreview({ html: value })');
+    expect(preview).toContain('html: normalizedPreview.html');
+    expect(zh.artifact.aiCreateHtmlBody).toBeTruthy();
+    expect(en.artifact.aiCreateHtmlBody).toBeTruthy();
+  });
+
   it('notifies ActionRun observers after saving an AI-created artifact output', () => {
     const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
     const store = readFileSync('src/lib/store.ts', 'utf8');

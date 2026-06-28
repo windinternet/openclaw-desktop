@@ -972,6 +972,8 @@
     "aiCreateNewWorkItem": "Create and attach",
     "aiCreateNewWorkItemPlaceholder": "No matching work item? Enter a new title",
     "aiCreateNewWorkItemSuccess": "Work item created and attached",
+    "aiCreateHtmlBody": "HTML body",
+    "aiCreateHtmlBodyHint": "You can correct the HTML body before saving. File, link, source record, and permission boundaries are not changed automatically here.",
     "openLink": "Open in Browser",
     "copyCommand": "Copy Command",
     "commandCopied": "Command copied"

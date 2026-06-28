@@ -49,6 +49,18 @@ const ARTIFACT_TYPE_OPTIONS: { value: ArtifactType; label: string }[] = [
   { value: 'video', label: '视频' },
 ];
 
+const HTML_PREVIEW_TYPES = new Set<ArtifactType>([
+  'report',
+  'dashboard',
+  'analysis',
+  'checklist',
+  'code',
+  'document',
+  'slide',
+  'form',
+  'other',
+]);
+
 const editLabelStyle = { marginBottom: 4, fontSize: 13, fontWeight: 500, color: 'var(--semi-color-text-0)' } as const;
 
 interface Props {
@@ -97,6 +109,11 @@ export function ArtifactAICreateDrawer({
   const isGeneratingRef = useRef(false);
   const preview = previews[selectedPreviewIndex] ?? null;
   const canSavePreview = Boolean(preview?.title.trim());
+  const canEditHtmlBody = Boolean(
+    preview &&
+    preview.html !== undefined &&
+    (preview.externalFormat === 'html' || HTML_PREVIEW_TYPES.has(preview.type) || preview.html.trim()),
+  );
 
   useEffect(() => {
     if (visible && initialInput !== undefined) setInput(initialInput);
@@ -334,7 +351,7 @@ export function ArtifactAICreateDrawer({
             )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <Text type="tertiary" size="small">
-                保存前可编辑标题、类型、说明、标签和价值摘要；正文、文件、链接和来源记录保持 AI 生成事实。
+                保存前可编辑标题、类型、说明、标签、价值摘要和 HTML 正文；文件、链接和来源记录保持 AI 生成事实。
               </Text>
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 132px', gap: 8 }}>
                 <div>
@@ -375,6 +392,22 @@ export function ArtifactAICreateDrawer({
                   onChange={(value) => updateSelectedPreview({ tags: Array.isArray(value) ? value.map(String) : [] })}
                 />
               </div>
+              {canEditHtmlBody && (
+                <div>
+                  <div style={editLabelStyle}>{t('artifact.aiCreateHtmlBody')}</div>
+                  <TextArea
+                    value={preview.html ?? ''}
+                    onChange={(value) => updateSelectedPreview({ html: value })}
+                    placeholder={t('artifact.htmlPlaceholder')}
+                    autosize={{ minRows: 8, maxRows: 18 }}
+                    maxCount={200000}
+                    style={{ fontFamily: 'var(--semi-font-family-monospace)' }}
+                  />
+                  <Text type="tertiary" size="small">
+                    {t('artifact.aiCreateHtmlBodyHint')}
+                  </Text>
+                </div>
+              )}
             </div>
             <div
               style={{

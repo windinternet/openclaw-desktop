@@ -972,6 +972,8 @@
     "aiCreateNewWorkItem": "新建并关联",
     "aiCreateNewWorkItemPlaceholder": "没有合适事项时，输入新事项标题",
     "aiCreateNewWorkItemSuccess": "事项已创建并关联",
+    "aiCreateHtmlBody": "HTML 正文",
+    "aiCreateHtmlBodyHint": "保存前可校正 HTML 正文；文件、链接、来源记录和权限边界不会随此处编辑自动改变。",
     "openLink": "在浏览器打开",
     "copyCommand": "复制命令",
     "commandCopied": "命令已复制"

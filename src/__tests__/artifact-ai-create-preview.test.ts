@@ -119,6 +119,28 @@ describe('artifact AI create preview', () => {
     );
   });
 
+  it('preserves user-edited HTML body exactly when saving', () => {
+    const editedHtml = '\n<!doctype html>\n<html><body><main>用户校正正文</main></body></html>\n';
+    const draft = normalizeArtifactAICreatePreviewDraft({
+      title: '  用户校正后的 HTML 产物  ',
+      type: 'dashboard',
+      html: editedHtml,
+      externalFormat: 'html',
+      contentSummary: '  HTML · 用户校正正文  ',
+    });
+
+    expect(draft.html).toBe(editedHtml);
+    expect(buildArtifactAICreateGenerateParams(draft, 'run-html')).toEqual(
+      expect.objectContaining({
+        title: '用户校正后的 HTML 产物',
+        html: editedHtml,
+        externalFormat: 'html',
+        contentSummary: 'HTML · 用户校正正文',
+        source: { type: 'action_run', id: 'run-html', name: 'AI 魔法创建' },
+      }),
+    );
+  });
+
   it('keeps legacy ai-action result parsing for simple artifacts', () => {
     const preview = parseArtifactAICreatePreview(
       [
