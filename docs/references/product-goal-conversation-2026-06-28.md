@@ -1171,3 +1171,19 @@ HTML 的独特优势：
 仍未完成的 P0 后续：
 
 - 仍需要把计划执行入口、执行状态观测、执行后的产物沉淀、知识更新和复盘金线继续接上。
+
+### 10.52 2026-06-28 当前实施记录：活跃计划发起执行 ActionRun
+
+围绕“开始一件事闭环”中“计划 -> 执行 ActionRun -> 写入运行记录”的 P0 缺口，当前继续落地一段代码事实：
+
+- `parsePlanMetadata` 现在会读取计划前置元数据中的 `workItemPath`，让计划能保留来源事项上下文。
+- Workbench 预览 `plans/active/` 下的活跃计划时，显示“执行计划”入口。
+- 点击“执行计划”会创建 `plan_execute` ActionRun，`sourcePage: workbench`，输入中记录 `planPath`，并在计划元数据有关联且通过 `work/(active|completed|someday)/*.md` 边界校验的事项时带入 `workItemPath` / frontmatter `id`。
+- 新增 `plan-execute.md` 和 `buildPlanExecutePrompt`，要求 Agent 读取计划、来源事项、验收标准、执行记录和关联成果，再推进计划。
+- 如果执行涉及仓库写入、产物生成、本地命令、知识库更新或复盘写入，Agent 仍必须先返回 `approval_required`。
+- `plan_execute` 终态后复用已有 ActionRun 终态镜像：写入 `runs/action-runs/`，并在有关联事项时回写来源事项 `## 执行记录` 和 `## 收尾动作`。
+- 该入口不自动沉淀成果、不更新知识库、不写复盘、不移动事项文件；后续仍由尾动作和用户确认接上。
+
+仍未完成的 P0 后续：
+
+- 仍需要更清晰的执行状态观测、执行后的产物沉淀、知识更新和复盘金线。

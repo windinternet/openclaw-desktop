@@ -55,8 +55,11 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('ActionRunWorkItemPicker');
     expect(source).toContain('工作事项发起计划 ActionRun');
     expect(source).toContain('事项计划审批写入与互链');
+    expect(source).toContain('活跃计划发起执行 ActionRun');
     expect(source).toContain('work_matter_plan');
+    expect(source).toContain('plan_execute');
     expect(source).toContain('applyWorkbenchMatterPlanApproval');
+    expect(source).toContain('buildPlanExecutePrompt');
     expect(source).toContain('repositoryWrite');
     expect(source).toContain('Knowledge 发起前事项选择');
     expect(source).toContain('Teams 发起前事项选择');
@@ -79,8 +82,11 @@ describe('product goal P0 traceability', () => {
     expect(plans).toContain('ActionRunWorkItemPicker');
     expect(plans).toContain('工作事项发起计划 ActionRun');
     expect(plans).toContain('事项计划审批写入与互链');
+    expect(plans).toContain('活跃计划发起执行 ActionRun');
     expect(plans).toContain('work_matter_plan');
+    expect(plans).toContain('plan_execute');
     expect(plans).toContain('applyWorkbenchMatterPlanApproval');
+    expect(plans).toContain('buildPlanExecutePrompt');
     expect(plans).toContain('repositoryWrite.path/content/workItemPath');
     expect(plans).toContain('Knowledge 普通自动改写发起前事项选择');
     expect(plans).toContain('Teams 自然语言编排发起前事项选择');
@@ -98,7 +104,9 @@ describe('product goal P0 traceability', () => {
     expect(roadmap).toContain('RepositoryGate 的知识库语义映射和工作台语义映射入口');
     expect(roadmap).toContain('ActionRunWorkItemPicker');
     expect(roadmap).toContain('work_matter_plan');
+    expect(roadmap).toContain('plan_execute');
     expect(roadmap).toContain('buildWorkMatterPlanPrompt');
+    expect(roadmap).toContain('buildPlanExecutePrompt');
     expect(roadmap).toContain('applyWorkbenchMatterPlanApproval');
     expect(roadmap).toContain('repositoryWrite.path/content/workItemPath');
     expect(skillContent).toContain('Screenshot-confirmed P0 baseline');
@@ -119,7 +127,9 @@ describe('product goal P0 traceability', () => {
     expect(skillContent).toContain('ActionRunWorkItemPicker');
     expect(skillContent).toContain('shared pre-run matter picker');
     expect(skillContent).toContain('work_matter_plan');
+    expect(skillContent).toContain('plan_execute');
     expect(skillContent).toContain('buildWorkMatterPlanPrompt');
+    expect(skillContent).toContain('buildPlanExecutePrompt');
     expect(skillContent).toContain('applyWorkbenchMatterPlanApproval');
     expect(skillContent).toContain('repositoryWrite.path/content/workItemPath');
     expect(skillContent).toContain('Artifacts UI also exposes a reuse-kind filter');

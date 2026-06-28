@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway, useStore } from '../lib';
 import type { RepositoryBinding } from '../lib/agentic-repository';
 import { loadAiActionRuns, upsertAiActionRun } from '../lib/ai-action-run-store';
-import { buildWorkMatterPlanPrompt } from '../lib/ai-action-prompts';
+import { buildPlanExecutePrompt, buildWorkMatterPlanPrompt } from '../lib/ai-action-prompts';
 import { buildArtifactOutputDescription } from '../lib/artifact-display';
 import type { ArtifactMeta } from '../lib/artifact-types';
 import type { DashboardTailActionRouteContext } from '../lib/dashboard-tail-action-routing';
@@ -165,6 +165,7 @@ export default function WorkbenchRepositoryPanel({
   const [outputGroupBy, setOutputGroupBy] = useState<OutputGroupBy>('none');
   const [showMatterArtifactDrawer, setShowMatterArtifactDrawer] = useState(false);
   const [planActionSubmitting, setPlanActionSubmitting] = useState(false);
+  const [planExecutionSubmitting, setPlanExecutionSubmitting] = useState(false);
   const [reviewDraftWriting, setReviewDraftWriting] = useState(false);
   const [reviewDraftConfirming, setReviewDraftConfirming] = useState(false);
   const [statusTailActionValue, setStatusTailActionValue] =
@@ -423,6 +424,90 @@ export default function WorkbenchRepositoryPanel({
       Toast.error(error);
     } finally {
       setPlanActionSubmitting(false);
+    }
+  };
+
+  const handleExecutePlanActionRun = async () => {
+    if (!selectedPlanPath) {
+      Toast.warning(t('workbench.executePlanMissingPlan'));
+      return;
+    }
+    if (!activeClient) {
+      Toast.error(t('workbench.executePlanNotConnected'));
+      return;
+    }
+    const agent = agents[0];
+    if (!agent) {
+      Toast.error(t('workbench.executePlanNoAgent'));
+      return;
+    }
+
+    setPlanExecutionSubmitting(true);
+    let workItemContent = '';
+    let workItemId: string | undefined;
+    if (safeSelectedPlanWorkItemPath) {
+      try {
+        workItemContent = await readWorkbenchMarkdown(binding, safeSelectedPlanWorkItemPath);
+        workItemId = extractWorkbenchMatterId(workItemContent);
+      } catch {
+        workItemContent = '';
+      }
+    }
+
+    const input = [
+      t('workbench.executePlanActionTitle'),
+      `planPath: ${selectedPlanPath}`,
+      safeSelectedPlanWorkItemPath ? `workItemPath: ${safeSelectedPlanWorkItemPath}` : undefined,
+    ]
+      .filter(Boolean)
+      .join('\n');
+    const actionRun = createAiActionRun({
+      type: 'plan_execute',
+      sourcePage: 'workbench',
+      instanceId: binding.gatewayInstanceId,
+      agentId: agent.id,
+      executionMode: 'isolated-session',
+      input,
+      workItemId,
+      workItemPath: safeSelectedPlanWorkItemPath,
+    });
+
+    await upsertAiActionRun(binding.gatewayInstanceId, { ...actionRun, status: 'planning', updatedAt: Date.now() });
+    try {
+      const runningRun = await executeAiActionRunWithGateway(activeClient, actionRun, {
+        title: t('workbench.executePlanActionTitle'),
+        prompt: buildPlanExecutePrompt({
+          planPath: selectedPlanPath,
+          planContent: selectedPreviewContent,
+          workItemPath: safeSelectedPlanWorkItemPath,
+          workItemContent,
+        }),
+      });
+      await upsertAiActionRun(binding.gatewayInstanceId, runningRun);
+
+      let latestRun = runningRun;
+      for (let index = 0; index < 4; index += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        latestRun = await syncAiActionRunWithGateway(activeClient, latestRun);
+        await upsertAiActionRun(binding.gatewayInstanceId, latestRun);
+        if (latestRun.status === 'awaiting_approval' || latestRun.status === 'done' || latestRun.status === 'failed')
+          break;
+      }
+
+      useStore.getState().fetchSessions();
+      Toast.success(t('workbench.executePlanStarted'));
+      navigate('/actions');
+    } catch (err) {
+      const error = err instanceof Error ? err.message : t('workbench.executePlanFailed');
+      await upsertAiActionRun(binding.gatewayInstanceId, {
+        ...actionRun,
+        status: 'failed',
+        error,
+        updatedAt: Date.now(),
+      });
+      Toast.error(error);
+    } finally {
+      setPlanExecutionSubmitting(false);
     }
   };
 
@@ -1358,6 +1443,16 @@ export default function WorkbenchRepositoryPanel({
   const selectedProject = snapshot?.projects.find((project) => project.path === selectedPreviewPath);
   const selectedWorkItemPath = isWorkbenchMatterPath(selectedPreviewPath) ? selectedPreviewPath : undefined;
   const selectedWorkItemId = selectedWorkItemPath ? extractWorkbenchMatterId(selectedPreviewContent) : undefined;
+  const selectedPlanPath = snapshot?.activePlans.some((plan) => plan.path === selectedPreviewPath)
+    ? selectedPreviewPath
+    : undefined;
+  const selectedPlanMetadata = selectedPlanPath
+    ? snapshot?.planMetadata.find((item) => item.path === selectedPlanPath)
+    : undefined;
+  const safeSelectedPlanWorkItemPath =
+    selectedPlanMetadata?.workItemPath && isWorkbenchMatterPath(selectedPlanMetadata.workItemPath)
+      ? selectedPlanMetadata.workItemPath
+      : undefined;
   const previewTitle =
     panelView === 'projects' ? t('workbench.projectPreview') : selectedPreviewPath || t('workbench.preview');
   const standaloneView = panelView === 'dashboard' || panelView === 'outputs';
@@ -1520,25 +1615,40 @@ export default function WorkbenchRepositoryPanel({
               <Title heading={5} style={{ margin: 0 }} ellipsis={{ showTooltip: true }}>
                 {previewTitle}
               </Title>
-              {selectedWorkItemPath && (
+              {(selectedWorkItemPath || selectedPlanPath) && (
                 <Space align="center" spacing={8}>
-                  <Button
-                    size="small"
-                    type="tertiary"
-                    icon={<IconCheckList />}
-                    loading={planActionSubmitting}
-                    onClick={() => void handleCreateMatterPlanActionRun()}
-                  >
-                    {t('workbench.generatePlanForMatter')}
-                  </Button>
-                  <Button
-                    size="small"
-                    type="tertiary"
-                    icon={<IconBolt />}
-                    onClick={() => setShowMatterArtifactDrawer(true)}
-                  >
-                    {t('workbench.createArtifactForMatter')}
-                  </Button>
+                  {selectedPlanPath && (
+                    <Button
+                      size="small"
+                      type="tertiary"
+                      icon={<IconBolt />}
+                      loading={planExecutionSubmitting}
+                      onClick={() => void handleExecutePlanActionRun()}
+                    >
+                      {t('workbench.executePlanForMatter')}
+                    </Button>
+                  )}
+                  {selectedWorkItemPath && (
+                    <>
+                      <Button
+                        size="small"
+                        type="tertiary"
+                        icon={<IconCheckList />}
+                        loading={planActionSubmitting}
+                        onClick={() => void handleCreateMatterPlanActionRun()}
+                      >
+                        {t('workbench.generatePlanForMatter')}
+                      </Button>
+                      <Button
+                        size="small"
+                        type="tertiary"
+                        icon={<IconBolt />}
+                        onClick={() => setShowMatterArtifactDrawer(true)}
+                      >
+                        {t('workbench.createArtifactForMatter')}
+                      </Button>
+                    </>
+                  )}
                 </Space>
               )}
             </Space>

@@ -210,6 +210,7 @@ src/prompts/ai-actions/gateway-agent-create.md
 src/prompts/ai-actions/agent-team-compose.md
 src/prompts/ai-actions/approval-decision.md
 src/prompts/ai-actions/work-matter-plan.md
+src/prompts/ai-actions/plan-execute.md
 ```
 
 模板通过 `src/lib/ai-action-prompts.ts` 渲染。模板负责约束只读探查、副作用前审批、结构化回复和审批后的继续执行；页面只负责提供用户输入和本地扩展画像。

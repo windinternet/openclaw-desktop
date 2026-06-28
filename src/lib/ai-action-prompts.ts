@@ -2,6 +2,7 @@ import agentTeamComposeTemplate from '../prompts/ai-actions/agent-team-compose.m
 import approvalDecisionTemplate from '../prompts/ai-actions/approval-decision.md?raw';
 import artifactCreateTemplate from '../prompts/ai-actions/artifact-create.md?raw';
 import gatewayAgentCreateTemplate from '../prompts/ai-actions/gateway-agent-create.md?raw';
+import planExecuteTemplate from '../prompts/ai-actions/plan-execute.md?raw';
 import workMatterPlanTemplate from '../prompts/ai-actions/work-matter-plan.md?raw';
 import type { AgentLocalProfile } from './types';
 
@@ -46,6 +47,20 @@ export function buildWorkMatterPlanPrompt(options: { workItemPath: string; workI
   return renderTemplate(workMatterPlanTemplate, {
     workItemPath: options.workItemPath.trim(),
     workItemContent: options.workItemContent.trim(),
+  });
+}
+
+export function buildPlanExecutePrompt(options: {
+  planPath: string;
+  planContent: string;
+  workItemPath?: string;
+  workItemContent?: string;
+}): string {
+  return renderTemplate(planExecuteTemplate, {
+    planPath: options.planPath.trim(),
+    planContent: options.planContent.trim(),
+    workItemPath: options.workItemPath?.trim() || '未关联事项',
+    workItemContent: options.workItemContent?.trim() || '未关联事项内容。',
   });
 }
 

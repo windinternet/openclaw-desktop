@@ -89,6 +89,7 @@ const RUN_TITLE_KEYS: Record<string, string> = {
   gateway_agent_create: 'actions.typeGatewayCreate',
   desktop_bridge_register: 'actions.typeDesktopBridge',
   work_matter_plan: 'actions.typeWorkMatterPlan',
+  plan_execute: 'actions.typePlanExecute',
 };
 
 interface EmbeddedPageProps {

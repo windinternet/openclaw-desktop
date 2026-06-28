@@ -17,6 +17,7 @@ import {
   buildAgentTeamComposePrompt,
   buildApprovalDecisionPrompt,
   buildGatewayAgentCreatePrompt,
+  buildPlanExecutePrompt,
   buildWorkMatterPlanPrompt,
 } from '../lib/ai-action-prompts';
 import type { SessionInfo } from '../lib/types';
@@ -470,6 +471,12 @@ describe('AI Action Center session rules', () => {
       workItemPath: 'work/active/release.md',
       workItemContent: '# 发布事项\n\n## 目标\n\n完成桌面版发布。',
     });
+    const planExecutePrompt = buildPlanExecutePrompt({
+      planPath: 'plans/active/release-plan.md',
+      planContent: '# 发布计划\n\n## 关键步骤\n\n1. 完成打包。',
+      workItemPath: 'work/active/release.md',
+      workItemContent: '# 发布事项\n\n## 验收标准\n\n- 可下载。',
+    });
 
     expect(matterPlanPrompt).toContain('work/active/release.md');
     expect(matterPlanPrompt).toContain('plans/active/');
@@ -478,8 +485,13 @@ describe('AI Action Center session rules', () => {
     expect(matterPlanPrompt).toContain('"workItemPath":"work/active/release.md"');
     expect(matterPlanPrompt).toContain('关联资料');
     expect(matterPlanPrompt).toContain('关联成果');
+    expect(planExecutePrompt).toContain('plans/active/release-plan.md');
+    expect(planExecutePrompt).toContain('work/active/release.md');
+    expect(planExecutePrompt).toContain('approval_required');
+    expect(planExecutePrompt).toContain('执行记录');
+    expect(planExecutePrompt).toContain('关联成果');
 
-    for (const prompt of [createPrompt, composePrompt, decisionPrompt, matterPlanPrompt]) {
+    for (const prompt of [createPrompt, composePrompt, decisionPrompt, matterPlanPrompt, planExecutePrompt]) {
       expect(prompt).toContain('```ai-action');
       expect(prompt).not.toMatch(/\{\{[^}]+\}\}/);
     }

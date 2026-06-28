@@ -60,6 +60,8 @@ Workbench 预览工作事项 Markdown 时，用户可以从该事项直接发起
 
 Workbench 预览工作事项 Markdown 时，用户也可以从该事项直接发起“生成计划”。这会创建 `sourcePage: workbench` 的 `work_matter_plan` ActionRun，并把当前 `workItemPath` 与事项 frontmatter `id` 写入运行记录。该 ActionRun 使用 `work-matter-plan.md` 提示词，要求先读取来源事项、关联资料、关联计划、执行记录和关联成果，再提出计划草案与建议 `plans/active/<slug>.md` 路径。写入或更新计划文件前必须返回 `approval_required`，并携带结构化 `repositoryWrite.path/content/workItemPath`；用户在 Action Center 批准后，Desktop 会校验目标只在 `plans/active/`、来源事项只在 `work/`，写入计划 Markdown，并把计划链接回来源事项 `## 关联计划`。该入口不会自动执行计划、沉淀成果、更新知识库、写复盘或移动事项文件。
 
+Workbench 预览活跃计划 Markdown 时，用户可以从该计划直接发起“执行计划”。这会创建 `sourcePage: workbench` 的 `plan_execute` ActionRun，并把 `planPath`、计划内容以及计划前置元数据中的 `workItemPath` / 事项内容交给 `plan-execute.md` 提示词。计划执行涉及仓库写入、产物生成、本地命令、知识库更新或复盘写入时仍必须先进入审批；终态 ActionRun 会复用现有运行记录和事项收尾动作机制。该入口不自动沉淀成果、不更新知识库、不写复盘或移动事项文件。
+
 Artifacts 普通“AI 魔法创建”入口在没有外部来源事项时，会加载当前绑定 Repository 的 Workbench Snapshot，从 `work/active`、`work/someday` 和 `work/completed` 列出已有事项。用户可以在发起前选择关联事项；Desktop 会读取事项 frontmatter `id`，创建 `artifact_create` ActionRun 时写入 `workItemPath` 和 `workItemId`。如果没有合适事项，用户也可以在同一入口输入标题并显式创建 `work/active/YYYY-MM-DD-HHmmss-*.md`，新事项会标记 `source: desktop-action-run`，并自动作为本次 `artifact_create` ActionRun 的事项上下文。如果用户跳过选择和创建，运行仍会按 `workItemRequired: true` 和 `workItemUnassignedReason: pending_work_item_assignment` 进入未归属诊断；该入口不会自动猜测归属或绕过 Repository Context。
 
 Knowledge 普通“消化资料 / 自动改写 / 刷新索引日志”入口在没有 Dashboard 尾动作来源事项时，也会加载同一批 Workbench 事项候选。用户可以在发起 `knowledge_rewrite` ActionRun 前选择关联事项，也可以输入标题显式创建新的 `work/active` 事项；Desktop 会写入 `workItemPath` 和 `workItemId`。Dashboard 知识尾动作入口已有来源 `workItemPath` 时，仍以该来源事项为准，不用普通选择器覆盖。

@@ -445,6 +445,7 @@ describe('repository workbench', () => {
         'plans/active/cross-work.md',
         [
           'status: active',
+          'workItemPath: work/active/release.md',
           'dependsOn: work/active/design.md, [API 计划](plans/active/api.md)',
           '关联事项: work/active/release.md；work/someday/legal.md',
           '# 跨事项计划',
@@ -453,6 +454,7 @@ describe('repository workbench', () => {
     ).toEqual({
       path: 'plans/active/cross-work.md',
       status: 'active',
+      workItemPath: 'work/active/release.md',
       dependencies: ['work/active/design.md', 'plans/active/api.md', 'work/active/release.md', 'work/someday/legal.md'],
     });
 
@@ -1159,6 +1161,28 @@ describe('repository workbench', () => {
     expect(zh).toContain('"typeWorkMatterPlan": "事项计划生成"');
     expect(en).toContain('"generatePlanForMatter": "Generate Plan"');
     expect(en).toContain('"typeWorkMatterPlan": "Matter Plan Generation"');
+  });
+
+  it('lets an active plan start an execution ActionRun with plan and work context', () => {
+    const source = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
+    const promptSource = readFileSync('src/lib/ai-action-prompts.ts', 'utf8');
+    const zh = readFileSync('src/locales/zh.json', 'utf8');
+    const en = readFileSync('src/locales/en.json', 'utf8');
+
+    expect(source).toContain('buildPlanExecutePrompt');
+    expect(source).toContain("type: 'plan_execute'");
+    expect(source).toContain("sourcePage: 'workbench'");
+    expect(source).toContain('planPath: selectedPlanPath');
+    expect(source).toContain('safeSelectedPlanWorkItemPath');
+    expect(source).toContain('isWorkbenchMatterPath(selectedPlanMetadata.workItemPath)');
+    expect(source).toContain('workItemPath: safeSelectedPlanWorkItemPath');
+    expect(source).toContain("t('workbench.executePlanForMatter')");
+    expect(source).toContain("t('workbench.executePlanActionTitle')");
+    expect(source).toContain("navigate('/actions')");
+    expect(promptSource).toContain('planExecuteTemplate');
+    expect(promptSource).toContain('buildPlanExecutePrompt');
+    expect(zh).toContain('"executePlanForMatter": "执行计划"');
+    expect(en).toContain('"executePlanForMatter": "Execute Plan"');
   });
 
   it('wires ActionCenter unassigned ActionRun backfill to repository work items', () => {

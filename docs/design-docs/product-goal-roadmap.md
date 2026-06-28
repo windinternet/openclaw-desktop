@@ -344,10 +344,14 @@ HTML 产物是特色能力：
 - 写入或更新 `plans/active/` 必须通过 `approval_required` 请求 Action Center 审批；审批块必须携带结构化 `repositoryWrite.path/content/workItemPath`。
 - Action Center 批准 `work_matter_plan` 后，Desktop 调用 `applyWorkbenchMatterPlanApproval`，校验目标只能位于 `plans/active/`、来源事项必须位于 `work/`，写入计划 Markdown，并把计划相对链接回写到来源事项 `## 关联计划`。
 - 该审批写入只处理计划落盘和事项互链，不自动执行计划、不沉淀成果、不更新知识库、不写复盘、不移动事项文件。
+- Workbench 预览 `plans/active/` 下的活跃计划时，已提供“执行计划”入口。
+- 该入口创建 `plan_execute` ActionRun，`sourcePage: workbench`，并使用 `buildPlanExecutePrompt` / `plan-execute.md` 带入 `planPath`、计划内容，以及计划元数据中通过 `work/(active|completed|someday)/*.md` 边界校验的 `workItemPath` 和来源事项内容。
+- 如果计划有关联且安全的来源事项，`plan_execute` 会写入 `workItemPath` / `workItemId`，终态后复用现有 ActionRun 仓库镜像、事项 `## 执行记录` 和 `## 收尾动作` 机制；没有来源事项或来源事项路径不在工作事项边界内时仍进入未归属诊断，不猜测事项。
+- 该入口只启动执行 ActionRun，不自动沉淀成果、不更新知识库、不写复盘、不移动事项文件。
 
 仍未完成：
 
-- 计划执行入口、执行状态观测和后续成果/知识/复盘金线仍需继续接上。
+- 执行状态观测和后续成果/知识/复盘金线仍需继续接上。
 - 新用户从开箱第一事项自然进入计划、执行和产物沉淀的端到端体验仍未完整闭环。
 
 ### P0-7 可复用资产一等对象
