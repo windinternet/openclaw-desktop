@@ -31,6 +31,7 @@ export type KnowledgeSection =
   | 'sources'
   | 'recent'
   | 'relationships'
+  | 'health'
   | 'index'
   | 'log';
 
@@ -348,6 +349,7 @@ export default function KnowledgeRepositoryPanel({
     if (activeSection === 'sources') return renderFileList(snapshot?.sources ?? [], t('knowledge.emptySources'));
     if (activeSection === 'recent') return renderFileList(snapshot?.recentFiles ?? [], t('common.noData'));
     if (activeSection === 'relationships') return renderRelationships();
+    if (activeSection === 'health') return renderHealthIssues();
     return (
       <Empty
         title={activeSection === 'index' ? t('knowledge.index') : t('knowledge.log')}
@@ -531,6 +533,12 @@ export default function KnowledgeRepositoryPanel({
             </Title>
             {renderFileList(snapshot?.recentFiles.slice(0, 5) ?? [], t('common.noData'))}
           </div>
+          <div style={{ borderTop: '1px solid var(--semi-color-border)', paddingTop: 12, marginTop: 12 }}>
+            <Title heading={6} style={{ marginTop: 0 }}>
+              {t('knowledge.health')}
+            </Title>
+            {renderHealthIssues(3)}
+          </div>
         </Card>
         <Card bodyStyle={{ minHeight: 460 }}>
           <Title heading={5} style={{ marginTop: 0 }}>
@@ -539,6 +547,53 @@ export default function KnowledgeRepositoryPanel({
           {hasEntries ? renderEntryList() : renderFileList(snapshot?.wiki.slice(0, 8) ?? [], t('knowledge.emptyWiki'))}
         </Card>
       </div>
+    );
+  };
+
+  const renderHealthIssues = (limit?: number) => {
+    const issues = snapshot?.health.issues ?? [];
+    const visibleIssues = limit ? issues.slice(0, limit) : issues;
+    if (visibleIssues.length === 0) return <Empty description={t('knowledge.noHealthIssues')} />;
+
+    return (
+      <Space vertical align="start" style={{ width: '100%' }}>
+        {visibleIssues.map((issue) => (
+          <button
+            key={issue.id}
+            type="button"
+            onClick={() => void openDocument(issue.path)}
+            style={{
+              width: '100%',
+              border: '1px solid var(--semi-color-border)',
+              background: 'var(--semi-color-bg-0)',
+              borderRadius: 6,
+              padding: '8px 10px',
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            <Space align="center" wrap>
+              <Tag color={issue.severity === 'critical' ? 'red' : issue.severity === 'warning' ? 'orange' : 'blue'}>
+                {issue.severity}
+              </Tag>
+              <Text strong size="small">
+                {issue.title}
+              </Text>
+            </Space>
+            <Text size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block', marginTop: 4 }}>
+              {issue.path}
+            </Text>
+            {issue.targetPath ? (
+              <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>
+                {issue.targetPath}
+              </Text>
+            ) : null}
+            <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>
+              {issue.detail}
+            </Text>
+          </button>
+        ))}
+      </Space>
     );
   };
 
@@ -599,6 +654,18 @@ export default function KnowledgeRepositoryPanel({
           {renderSearchResults()}
           {renderReader()}
         </>
+      ) : activeSection === 'health' ? (
+        <Card style={{ width: '100%' }}>
+          <Space align="center" style={{ justifyContent: 'space-between', width: '100%', marginBottom: 12 }}>
+            <Title heading={5} style={{ margin: 0 }}>
+              {t('knowledge.health')}
+            </Title>
+            <Tag color={(snapshot?.health.counts.total ?? 0) > 0 ? 'orange' : 'green'}>
+              {t('knowledge.healthIssueCount', { count: snapshot?.health.counts.total ?? 0 })}
+            </Tag>
+          </Space>
+          {renderHealthIssues()}
+        </Card>
       ) : (
         <div
           style={{
@@ -630,6 +697,7 @@ export default function KnowledgeRepositoryPanel({
                 <Tabs.TabPane tab={t('knowledge.sources')} itemKey="sources" />
                 <Tabs.TabPane tab={t('knowledge.recentUpdates')} itemKey="recent" />
                 <Tabs.TabPane tab={t('knowledge.relationships')} itemKey="relationships" />
+                <Tabs.TabPane tab={t('knowledge.health')} itemKey="health" />
                 <Tabs.TabPane tab={t('knowledge.index')} itemKey="index" />
                 <Tabs.TabPane tab={t('knowledge.log')} itemKey="log" />
               </Tabs>

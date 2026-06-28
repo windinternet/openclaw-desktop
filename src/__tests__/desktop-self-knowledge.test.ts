@@ -79,6 +79,8 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain(
       'todayContinue, pendingConfirmations, stuckItems, recentOutputs, and knowledgeUpdates',
     );
+    expect(skillContent).toContain('Knowledge health issues');
+    expect(skillContent).toContain('orphan sources, stale index entries, broken knowledge links');
     expect(skillContent).toContain('not the primary answer to "what is my system state?"');
     expect(skillContent).toContain('Dashboard surfaces a "create your work system" onboarding path');
     expect(skillContent).toContain('writes the first user-entered matter into `work/active/YYYY-MM-DD-HHmmss-*.md`');

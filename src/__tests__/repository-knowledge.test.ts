@@ -92,6 +92,73 @@ describe('repository knowledge', () => {
     ]);
   });
 
+  it('computes knowledge health issues from repository markdown facts', async () => {
+    const listMarkdown = vi.fn(async (_repoPath: string, directory: string) => {
+      if (directory === 'sources') {
+        return [
+          { path: 'sources/raw.md', name: 'raw.md', size: 20, updatedAt: 3 },
+          { path: 'sources/indexed.md', name: 'indexed.md', size: 22, updatedAt: 2 },
+          { path: 'sources/orphan.md', name: 'orphan.md', size: 24, updatedAt: 1 },
+        ];
+      }
+      if (directory === 'wiki') {
+        return [
+          { path: 'wiki/topic.md', name: 'topic.md', size: 40, updatedAt: 5 },
+          { path: 'wiki/healthy.md', name: 'healthy.md', size: 42, updatedAt: 4 },
+        ];
+      }
+      return [];
+    });
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'wiki/index.md') {
+        return [
+          '# Knowledge Index',
+          '- [Topic](topic.md)',
+          '- [Missing](missing.md)',
+          '- [Indexed Source](../sources/indexed.md)',
+        ].join('\n');
+      }
+      if (relativePath === 'wiki/log.md') return '# Wiki Log';
+      if (relativePath === 'wiki/topic.md') return '# Topic\n\n[Broken](missing.md)';
+      if (relativePath === 'wiki/healthy.md') return '# Healthy\n\n[Raw](../sources/raw.md)';
+      return '';
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { listMarkdown, readText },
+      },
+    });
+
+    const snapshot = await loadKnowledgeSnapshot({
+      ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      status: 'repo_ready',
+    });
+    const health = (
+      snapshot as {
+        health?: {
+          issues: Array<{ kind: string; path: string; targetPath?: string; severity: string }>;
+          counts: { total: number; warning: number };
+        };
+      }
+    ).health;
+
+    expect(health?.counts.total).toBe(5);
+    expect(health?.counts.warning).toBe(5);
+    expect(health?.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'orphan_source', path: 'sources/orphan.md', severity: 'warning' }),
+        expect.objectContaining({ kind: 'unindexed_wiki', path: 'wiki/healthy.md', severity: 'warning' }),
+        expect.objectContaining({ kind: 'stale_index_entry', path: 'wiki/index.md', targetPath: 'wiki/missing.md' }),
+        expect.objectContaining({
+          kind: 'broken_knowledge_link',
+          path: 'wiki/topic.md',
+          targetPath: 'wiki/missing.md',
+        }),
+        expect.objectContaining({ kind: 'wiki_without_source_reference', path: 'wiki/topic.md' }),
+      ]),
+    );
+  });
+
   it('parses wiki index links into navigable knowledge entries', async () => {
     const listMarkdown = vi.fn(async (_repoPath: string, directory: string) => {
       if (directory === 'sources') return [{ path: 'sources/raw.md', name: 'raw.md', size: 20, updatedAt: 3 }];

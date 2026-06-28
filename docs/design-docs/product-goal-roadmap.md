@@ -235,6 +235,14 @@ HTML 产物是特色能力：
 - 自动更新 `wiki/index.md` 和 `wiki/log.md`。
 - 健康检查：孤立资料、断链、过期索引、无来源 Wiki、长期未复盘项目。
 
+当前代码事实：
+
+- `loadKnowledgeSnapshot` 会基于 `sources/`、`wiki/`、`wiki/index.md` 和 Wiki 内部链接生成只读 `health` 报告。
+- 第一片健康检查已覆盖孤立资料、未进入索引的 Wiki、陈旧索引条目、知识库内断链、没有来源引用的 Wiki。
+- Knowledge 页面新增“健康检查”视图，`/knowledge?section=health` 会直接打开问题列表。
+- Dashboard 会把知识健康问题作为 `knowledgeUpdates` 展示，并通过 `/knowledge?section=health` 跳转到 Knowledge 健康检查。
+- 当前健康检查只做可观测事实，不自动写入 `reviews/weekly/`，也不自动修复索引、Wiki 或资料来源。
+
 验收：
 
 - 新资料能进入 `sources/`。

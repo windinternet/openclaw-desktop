@@ -1,5 +1,5 @@
 import type { ArtifactMeta } from './artifact-types';
-import type { RepositoryMarkdownFile } from './repository-knowledge';
+import type { KnowledgeHealthReport, RepositoryMarkdownFile } from './repository-knowledge';
 import type { WorkbenchSnapshot } from './repository-workbench';
 import type { AiActionRun, SessionInfo } from './types';
 import { buildDashboardTailActionTarget, type DashboardTailActionRouteKind } from './dashboard-tail-action-routing';
@@ -37,7 +37,7 @@ export interface BuildDashboardWorkSystemSummaryParams {
   actionRuns: AiActionRun[];
   artifacts: ArtifactMeta[];
   workbench?: Pick<WorkbenchSnapshot, 'activeWork' | 'activePlans' | 'planMetadata' | 'reviews' | 'tailActions'> | null;
-  knowledge?: { recentFiles: RepositoryMarkdownFile[] } | null;
+  knowledge?: { recentFiles: RepositoryMarkdownFile[]; health?: KnowledgeHealthReport } | null;
   limit?: number;
 }
 
@@ -140,6 +140,16 @@ export function buildDashboardWorkSystemSummary(
     detail: artifact.repositoryOutputPath ?? artifact.contentSummary ?? artifact.type,
     status: artifact.status,
   }));
+  const knowledgeHealthItems = (params.knowledge?.health?.issues ?? []).map((issue) => ({
+    id: issue.id,
+    kind: 'knowledge' as const,
+    title: issue.title,
+    target: '/knowledge?section=health',
+    updatedAt: issue.updatedAt,
+    path: issue.path,
+    detail: `知识健康 · ${issue.detail}`,
+    status: `knowledge-health:${issue.kind}`,
+  }));
   const knowledgeItems = (params.knowledge?.recentFiles ?? []).map((file) =>
     markdownItem(file, 'knowledge', '/knowledge'),
   );
@@ -151,7 +161,7 @@ export function buildDashboardWorkSystemSummary(
   );
   const stuckItems = sortItems([...failedRunItems, ...blockedPlanItems]).slice(0, limit);
   const recentOutputs = sortItems(recentOutputItems).slice(0, limit);
-  const knowledgeUpdates = sortItems(knowledgeItems).slice(0, limit);
+  const knowledgeUpdates = sortItems([...knowledgeHealthItems, ...knowledgeItems]).slice(0, limit);
 
   return {
     todayContinue,

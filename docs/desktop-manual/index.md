@@ -21,6 +21,6 @@ OpenClaw Desktop 是连接 OpenClaw Gateway 的桌面产品界面。它把 Gatew
 - `navigation.md`
 - `actionrun.md`
 - `artifacts.md`
+- `knowledge.md`
 - `repository-tools.md`
 - `intents.md`
-

@@ -168,6 +168,53 @@ describe('dashboard work system summary', () => {
       knowledgeUpdates: 1,
     });
   });
+
+  it('surfaces knowledge health issues as first-class dashboard knowledge updates', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [],
+      workbench: {
+        activeWork: [],
+        activePlans: [],
+        planMetadata: [],
+        tailActions: [],
+        reviews: [],
+      },
+      knowledge: {
+        recentFiles: [createMarkdownFile('wiki/projects/release.md', '发布知识', 130)],
+        health: {
+          issues: [
+            {
+              id: 'orphan-source:sources/raw.md',
+              kind: 'orphan_source',
+              severity: 'warning',
+              title: '孤立资料',
+              detail: '资料还没有被索引或 Wiki 引用。',
+              path: 'sources/raw.md',
+              updatedAt: 180,
+            },
+          ],
+          counts: { total: 1, warning: 1, critical: 0, info: 0 },
+        },
+      } as unknown as Parameters<typeof buildDashboardWorkSystemSummary>[0]['knowledge'],
+    });
+
+    expect(summary.knowledgeUpdates[0]).toMatchObject({
+      id: 'orphan-source:sources/raw.md',
+      kind: 'knowledge',
+      title: '孤立资料',
+      path: 'sources/raw.md',
+      target: '/knowledge?section=health',
+      detail: '知识健康 · 资料还没有被索引或 Wiki 引用。',
+      status: 'knowledge-health:orphan_source',
+    });
+    expect(summary.knowledgeUpdates[1]).toMatchObject({
+      title: '发布知识',
+      target: '/knowledge',
+    });
+    expect(summary.counts.knowledgeUpdates).toBe(2);
+  });
 });
 
 function createMarkdownFile(path: string, name: string, updatedAt: number): RepositoryMarkdownFile {

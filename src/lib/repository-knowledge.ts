@@ -47,6 +47,7 @@ export interface KnowledgeSnapshot {
   recentFiles: RepositoryMarkdownFile[];
   backlinks: RepositoryBacklink[];
   relatedRepositoryLinks: RepositoryRelatedLink[];
+  health: KnowledgeHealthReport;
 }
 
 export interface RepositoryBacklink {
@@ -58,6 +59,34 @@ export interface RepositoryRelatedLink {
   sourcePath: string;
   targetPath: string;
   type: 'work' | 'output';
+}
+
+export type KnowledgeHealthIssueKind =
+  | 'orphan_source'
+  | 'unindexed_wiki'
+  | 'stale_index_entry'
+  | 'broken_knowledge_link'
+  | 'wiki_without_source_reference';
+
+export interface KnowledgeHealthIssue {
+  id: string;
+  kind: KnowledgeHealthIssueKind;
+  severity: 'info' | 'warning' | 'critical';
+  title: string;
+  detail: string;
+  path: string;
+  targetPath?: string;
+  updatedAt?: number;
+}
+
+export interface KnowledgeHealthReport {
+  issues: KnowledgeHealthIssue[];
+  counts: {
+    total: number;
+    critical: number;
+    warning: number;
+    info: number;
+  };
 }
 
 export interface KnowledgeRepositoryMappingResponse {
@@ -101,13 +130,38 @@ export async function loadKnowledgeSnapshot(binding: RepositoryBinding): Promise
     })),
   );
   const wikiPaths = new Set(wiki.map((file) => file.path));
+  const sourcePaths = new Set(sources.map((file) => file.path));
+  const knowledgePaths = new Set([...sourcePaths, ...wikiPaths]);
+  const indexEntries = parseKnowledgeIndexEntries({
+    binding,
+    indexPath: mapping.indexPath,
+    markdown: indexMarkdown,
+  });
   const backlinks: RepositoryBacklink[] = [];
   const relatedRepositoryLinks: RepositoryRelatedLink[] = [];
+  const linkedKnowledgePaths = new Set<string>();
+  const brokenKnowledgeLinks: KnowledgeHealthIssue[] = [];
 
   for (const file of wikiContents) {
     for (const href of extractMarkdownLinks(file.content)) {
       const targetPath = normalizeKnowledgeLink(binding, file.path, href);
       if (!targetPath) continue;
+      if (isKnowledgePath(binding, targetPath)) {
+        if (knowledgePaths.has(targetPath)) {
+          linkedKnowledgePaths.add(targetPath);
+        } else {
+          brokenKnowledgeLinks.push({
+            id: `broken-link:${file.path}->${targetPath}`,
+            kind: 'broken_knowledge_link',
+            severity: 'warning',
+            title: '知识库断链',
+            detail: `Wiki 链接指向不存在的知识文件：${targetPath}`,
+            path: file.path,
+            targetPath,
+            updatedAt: wiki.find((item) => item.path === file.path)?.updatedAt,
+          });
+        }
+      }
       if (targetPath.startsWith(`${mapping.wikiRoot}/`) && wikiPaths.has(targetPath)) {
         backlinks.push({ sourcePath: file.path, targetPath });
       } else if (targetPath.startsWith(`${binding.paths.work}/`)) {
@@ -121,16 +175,21 @@ export async function loadKnowledgeSnapshot(binding: RepositoryBinding): Promise
   return {
     sources,
     wiki,
-    indexEntries: parseKnowledgeIndexEntries({
-      binding,
-      indexPath: mapping.indexPath,
-      markdown: indexMarkdown,
-    }),
+    indexEntries,
     indexMarkdown,
     logMarkdown,
     recentFiles: [...sources, ...wiki].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 12),
     backlinks,
     relatedRepositoryLinks,
+    health: buildKnowledgeHealthReport({
+      binding,
+      sources,
+      wiki,
+      wikiContents,
+      indexEntries,
+      linkedKnowledgePaths,
+      brokenKnowledgeLinks,
+    }),
   };
 }
 
@@ -201,6 +260,117 @@ export function parseKnowledgeIndexEntries(options: {
   }
 
   return entries;
+}
+
+function buildKnowledgeHealthReport(options: {
+  binding: RepositoryBinding;
+  sources: RepositoryMarkdownFile[];
+  wiki: RepositoryMarkdownFile[];
+  wikiContents: Array<{ path: string; content: string }>;
+  indexEntries: KnowledgeIndexEntry[];
+  linkedKnowledgePaths: Set<string>;
+  brokenKnowledgeLinks: KnowledgeHealthIssue[];
+}): KnowledgeHealthReport {
+  const mapping = options.binding.knowledge;
+  const sourcePaths = new Set(options.sources.map((file) => file.path));
+  const wikiPaths = new Set(options.wiki.map((file) => file.path));
+  const knowledgePaths = new Set([...sourcePaths, ...wikiPaths]);
+  const indexedPaths = new Set(options.indexEntries.map((entry) => entry.path));
+  const wikiFileByPath = new Map(options.wiki.map((file) => [file.path, file]));
+  const issues: KnowledgeHealthIssue[] = [];
+
+  for (const source of options.sources) {
+    if (indexedPaths.has(source.path) || options.linkedKnowledgePaths.has(source.path)) continue;
+    issues.push({
+      id: `orphan-source:${source.path}`,
+      kind: 'orphan_source',
+      severity: 'warning',
+      title: '孤立资料',
+      detail: '资料还没有被索引或 Wiki 引用。',
+      path: source.path,
+      updatedAt: source.updatedAt,
+    });
+  }
+
+  for (const wiki of options.wiki) {
+    if (wiki.path === mapping.indexPath || wiki.path === mapping.logPath || indexedPaths.has(wiki.path)) continue;
+    issues.push({
+      id: `unindexed-wiki:${wiki.path}`,
+      kind: 'unindexed_wiki',
+      severity: 'warning',
+      title: '未进入索引的 Wiki',
+      detail: 'Wiki 页面还没有出现在知识索引中。',
+      path: wiki.path,
+      updatedAt: wiki.updatedAt,
+    });
+  }
+
+  for (const entry of options.indexEntries) {
+    if (knowledgePaths.has(entry.path)) continue;
+    issues.push({
+      id: `stale-index:${mapping.indexPath}->${entry.path}`,
+      kind: 'stale_index_entry',
+      severity: 'warning',
+      title: '索引陈旧',
+      detail: `知识索引指向不存在的文件：${entry.path}`,
+      path: mapping.indexPath,
+      targetPath: entry.path,
+      updatedAt: wikiFileByPath.get(mapping.indexPath)?.updatedAt,
+    });
+  }
+
+  issues.push(...dedupeKnowledgeHealthIssues(options.brokenKnowledgeLinks));
+
+  for (const file of options.wikiContents) {
+    if (file.path === mapping.indexPath || file.path === mapping.logPath) continue;
+    const linksToSource = extractMarkdownLinks(file.content)
+      .map((href) => normalizeKnowledgeLink(options.binding, file.path, href))
+      .some((targetPath) => Boolean(targetPath && sourcePaths.has(targetPath)));
+    if (linksToSource) continue;
+
+    issues.push({
+      id: `wiki-no-source:${file.path}`,
+      kind: 'wiki_without_source_reference',
+      severity: 'warning',
+      title: 'Wiki 缺少来源引用',
+      detail: 'Wiki 页面没有直接引用资料源，后续难以追溯事实来源。',
+      path: file.path,
+      updatedAt: wikiFileByPath.get(file.path)?.updatedAt,
+    });
+  }
+
+  const sortedIssues = dedupeKnowledgeHealthIssues(issues).sort((a, b) => {
+    const severityDiff = severityRank(b.severity) - severityRank(a.severity);
+    if (severityDiff !== 0) return severityDiff;
+    return (b.updatedAt ?? 0) - (a.updatedAt ?? 0) || a.id.localeCompare(b.id);
+  });
+
+  return {
+    issues: sortedIssues,
+    counts: {
+      total: sortedIssues.length,
+      critical: sortedIssues.filter((issue) => issue.severity === 'critical').length,
+      warning: sortedIssues.filter((issue) => issue.severity === 'warning').length,
+      info: sortedIssues.filter((issue) => issue.severity === 'info').length,
+    },
+  };
+}
+
+function dedupeKnowledgeHealthIssues(issues: KnowledgeHealthIssue[]): KnowledgeHealthIssue[] {
+  const seen = new Set<string>();
+  const result: KnowledgeHealthIssue[] = [];
+  for (const issue of issues) {
+    if (seen.has(issue.id)) continue;
+    seen.add(issue.id);
+    result.push(issue);
+  }
+  return result;
+}
+
+function severityRank(severity: KnowledgeHealthIssue['severity']): number {
+  if (severity === 'critical') return 3;
+  if (severity === 'warning') return 2;
+  return 1;
 }
 
 export function buildKnowledgeRewritePrompt(options: {
@@ -326,6 +496,10 @@ function classifyKnowledgePath(binding: RepositoryBinding, path: string): 'sourc
     return 'wiki';
   }
   return undefined;
+}
+
+function isKnowledgePath(binding: RepositoryBinding, path: string): boolean {
+  return Boolean(classifyKnowledgePath(binding, path));
 }
 
 function isNestedKnowledgeSource(binding: RepositoryBinding, path: string): boolean {

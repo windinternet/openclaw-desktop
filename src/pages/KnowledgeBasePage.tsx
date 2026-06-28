@@ -8,18 +8,24 @@ import { getKnowledgeTailActionTab, parseDashboardTailActionRoute } from '../lib
 
 const { Title, Text } = Typography;
 
+function getRequestedKnowledgeSection(search: string): KnowledgeSection | undefined {
+  const section = new URLSearchParams(search).get('section');
+  return section === 'health' ? 'health' : undefined;
+}
+
 export default function KnowledgeBasePage() {
   const { t } = useTranslation();
   const location = useLocation();
   const tailActionContext = useMemo(() => parseDashboardTailActionRoute(location.search), [location.search]);
+  const requestedSection = useMemo(() => getRequestedKnowledgeSection(location.search), [location.search]);
   const [activeTab, setActiveTab] = useState<KnowledgeSection | 'repository'>(
-    (getKnowledgeTailActionTab(tailActionContext) as KnowledgeSection | undefined) ?? 'dashboard',
+    (getKnowledgeTailActionTab(tailActionContext) as KnowledgeSection | undefined) ?? requestedSection ?? 'dashboard',
   );
 
   useEffect(() => {
-    const nextTab = getKnowledgeTailActionTab(tailActionContext);
+    const nextTab = getKnowledgeTailActionTab(tailActionContext) ?? requestedSection;
     if (nextTab) setActiveTab(nextTab as KnowledgeSection);
-  }, [tailActionContext]);
+  }, [requestedSection, tailActionContext]);
 
   const repositoryFallback = (
     <Empty title={t('knowledge.repositoryRequiredTitle')} description={t('knowledge.repositoryRequiredDesc')}>
@@ -89,6 +95,9 @@ export default function KnowledgeBasePage() {
         </Tabs.TabPane>
         <Tabs.TabPane tab={t('knowledge.relationships')} itemKey="relationships">
           {activeTab === 'relationships' && renderKnowledgeSection('relationships')}
+        </Tabs.TabPane>
+        <Tabs.TabPane tab={t('knowledge.health')} itemKey="health">
+          {activeTab === 'health' && renderKnowledgeSection('health')}
         </Tabs.TabPane>
         <Tabs.TabPane tab={t('knowledge.maintenanceTab')} itemKey="log">
           {activeTab === 'log' && renderKnowledgeSection('log')}
