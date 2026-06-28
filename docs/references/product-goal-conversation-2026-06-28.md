@@ -462,3 +462,20 @@ HTML 的独特优势：
 - 可复用资产一等对象。
 
 这些范围可以拆成多个增量切片实现，但不得因为某个切片已经落地而把整体 P0 判定为完成，也不得在后续推进中降级为 P1/P2。
+
+### 10.11 2026-06-28 当前实施记录：Knowledge 导入文本入口
+
+围绕“Knowledge 导入/消化/健康检查是 P0”中的导入中心，当前继续落地一段代码事实：
+
+- Knowledge 页面新增“导入文本”入口。
+- 用户可以粘贴原始资料、会议记录、想法或网页摘录。
+- Desktop 会把内容写入当前绑定仓库的 `sources/imported/YYYY-MM-DD-HHmmss-*.md`。
+- 生成的 Markdown frontmatter 会标记 `source: desktop-paste`、`importedAt` 和标题。
+- 导入成功后，Knowledge 会刷新 Snapshot、切到“未消化资料”视图，并打开刚导入的资料源。
+- 该入口只保存原始资料，不自动生成 Wiki、不更新 `wiki/index.md`、不写入 `wiki/log.md`；后续消化仍通过 `knowledge_rewrite` ActionRun 走计划与审批。
+
+仍未完成的 P0 后续：
+
+- 文件拖拽导入、URL 剪藏和文件夹导入仍待补齐。
+- “AI 先提出消化计划，批准后写入 `wiki/`、更新 `wiki/index.md` 和 `wiki/log.md`”仍需更完整的 UI 承接。
+- 健康检查结果写入 `reviews/weekly/`、长期未复盘项目和相互矛盾记录仍待继续推进。

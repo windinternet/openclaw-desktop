@@ -245,6 +245,7 @@ HTML 产物是特色能力：
 - Dashboard 会把知识健康问题作为 `knowledgeUpdates` 展示，并通过 `/knowledge?section=health` 跳转到 Knowledge 健康检查。
 - `loadKnowledgeSnapshot` 现在会生成 `undigestedSources`，把未出现在索引、也未被 Wiki 引用的资料源列为未消化资料。
 - Knowledge 页面新增“未消化资料”视图，`/knowledge?section=digest` 会打开队列，并支持对单条资料发起 `knowledge_rewrite` 消化 ActionRun。
+- Knowledge 页面新增“导入文本”入口，可把粘贴内容写入 `sources/imported/YYYY-MM-DD-HHmmss-*.md`，frontmatter 标记 `source: desktop-paste`，导入后刷新 Snapshot、切到未消化资料队列并打开新资料源。
 - 当前健康检查只做可观测事实，不自动写入 `reviews/weekly/`，也不自动修复索引、Wiki 或资料来源。
 
 验收：

@@ -2,11 +2,13 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
 import {
+  buildKnowledgeTextSourceImport,
   buildKnowledgeRepositoryMappingPrompt,
   buildKnowledgeRewritePrompt,
   classifyKnowledgeSearchResult,
   extractMarkdownLinks,
   findBacklinks,
+  importKnowledgeTextSource,
   loadKnowledgeSnapshot,
   parseKnowledgeRepositoryMappingResponse,
   parseKnowledgeIndexEntries,
@@ -17,6 +19,55 @@ import {
 describe('repository knowledge', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('builds and writes pasted text as a source markdown file', async () => {
+    const now = new Date('2026-06-28T04:05:06.000Z');
+    const imported = buildKnowledgeTextSourceImport({
+      title: '  My Raw Idea  ',
+      body: 'Line 1\n\nLine 2',
+      now,
+      sourceRoot: 'sources',
+    });
+
+    expect(imported).toEqual({
+      title: 'My Raw Idea',
+      path: 'sources/imported/2026-06-28-040506-my-raw-idea.md',
+      markdown: [
+        '---',
+        'title: "My Raw Idea"',
+        'source: desktop-paste',
+        'importedAt: 2026-06-28T04:05:06.000Z',
+        '---',
+        '',
+        '# My Raw Idea',
+        '',
+        '## 原始内容',
+        '',
+        'Line 1',
+        '',
+        'Line 2',
+        '',
+      ].join('\n'),
+    });
+
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { writeText },
+      },
+    });
+
+    const written = await importKnowledgeTextSource(
+      {
+        ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+        status: 'repo_ready',
+      },
+      { title: 'My Raw Idea', body: 'Line 1\n\nLine 2', now },
+    );
+
+    expect(written.path).toBe('sources/imported/2026-06-28-040506-my-raw-idea.md');
+    expect(writeText).toHaveBeenCalledWith('/repo', written.path, written.markdown);
   });
 
   it('loads sources, wiki files, index, and log from a ready repository binding', async () => {

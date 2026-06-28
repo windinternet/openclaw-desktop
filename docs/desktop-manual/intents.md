@@ -4,6 +4,7 @@
 
 | 用户意图 | 推荐路径 |
 |---|---|
+| “把这段文字加入资料库” | 先确认 Repository Context；通过 Knowledge 导入文本入口或 Desktop repository write 写入 `sources/imported/`；导入后进入未消化资料队列，不自动改写 Wiki。 |
 | “帮我整理这份资料到知识库” | 先确认 Repository Context；读取 `sources/` 和 `wiki/` 规则；必要时发起 Knowledge ActionRun。 |
 | “有哪些资料还没整理” | 打开 Knowledge 未消化资料队列 `/knowledge?section=digest`；选择资料后发起消化 ActionRun，写入前请求审批。 |
 | “检查知识库健康” | 查看 Knowledge 健康检查或 Dashboard 知识动态；关注孤立资料、陈旧索引、断链、无来源引用 Wiki；修复前先请求审批。 |

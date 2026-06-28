@@ -1,6 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Button, Card, Empty, Input, Space, Spin, Tabs, Tag, Toast, Typography } from '@douyinfe/semi-ui';
-import { IconBolt, IconFile, IconSearch } from '@douyinfe/semi-icons';
+import {
+  Button,
+  Card,
+  Empty,
+  Input,
+  Modal,
+  Space,
+  Spin,
+  Tabs,
+  Tag,
+  TextArea,
+  Toast,
+  Typography,
+} from '@douyinfe/semi-ui';
+import { IconBolt, IconFile, IconPlus, IconSearch } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway, useStore } from '../lib';
@@ -15,6 +28,7 @@ import type {
 } from '../lib/repository-knowledge';
 import {
   buildKnowledgeRewritePrompt,
+  importKnowledgeTextSource,
   loadKnowledgeDocumentHistory,
   loadKnowledgeSnapshot,
   readKnowledgeDocument,
@@ -56,9 +70,13 @@ export default function KnowledgeRepositoryPanel({
   const [documentLoading, setDocumentLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [rewriteLoading, setRewriteLoading] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<KnowledgeDocument | null>(null);
   const [documentHistory, setDocumentHistory] = useState<RepositoryGitLogEntry[]>([]);
   const [activeSection, setActiveSection] = useState<KnowledgeSection>(section ?? 'wiki');
+  const [showImportText, setShowImportText] = useState(false);
+  const [importTitle, setImportTitle] = useState('');
+  const [importBody, setImportBody] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -118,6 +136,33 @@ export default function KnowledgeRepositoryPanel({
 
   const openFile = (file: RepositoryMarkdownFile) => {
     void openDocument(file.path);
+  };
+
+  const handleImportTextSource = async () => {
+    if (!importBody.trim()) {
+      Toast.warning(t('knowledge.importTextRequired'));
+      return;
+    }
+    setImportLoading(true);
+    setError(null);
+    try {
+      const imported = await importKnowledgeTextSource(binding, {
+        title: importTitle,
+        body: importBody,
+      });
+      const nextSnapshot = await loadKnowledgeSnapshot(binding);
+      setSnapshot(nextSnapshot);
+      setImportTitle('');
+      setImportBody('');
+      setShowImportText(false);
+      setActiveSection('digest');
+      await openDocument(imported.path);
+      Toast.success(t('knowledge.importTextDone'));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('knowledge.importTextFailed'));
+    } finally {
+      setImportLoading(false);
+    }
   };
 
   const handleKnowledgeRewrite = async (
@@ -677,6 +722,9 @@ export default function KnowledgeRepositoryPanel({
           <Tag color="green">{t('knowledge.wikiCount', { count: snapshot?.wiki.length ?? 0 })}</Tag>
         </Space>
         <Space wrap>
+          <Button icon={<IconPlus />} onClick={() => setShowImportText(true)}>
+            {t('knowledge.importTextSource')}
+          </Button>
           <Button
             icon={<IconBolt />}
             loading={rewriteLoading}
@@ -829,6 +877,46 @@ export default function KnowledgeRepositoryPanel({
           {renderReader()}
         </div>
       )}
+      <Modal
+        title={t('knowledge.importTextSource')}
+        visible={showImportText}
+        onCancel={() => {
+          if (!importLoading) setShowImportText(false);
+        }}
+        footer={
+          <Space>
+            <Button disabled={importLoading} onClick={() => setShowImportText(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              type="primary"
+              theme="solid"
+              loading={importLoading}
+              disabled={!importBody.trim()}
+              onClick={() => void handleImportTextSource()}
+            >
+              {t('knowledge.importTextConfirm')}
+            </Button>
+          </Space>
+        }
+      >
+        <Space vertical align="start" style={{ width: '100%' }}>
+          <Input
+            value={importTitle}
+            onChange={setImportTitle}
+            placeholder={t('knowledge.importTextTitlePlaceholder')}
+          />
+          <TextArea
+            value={importBody}
+            onChange={setImportBody}
+            autosize={{ minRows: 8, maxRows: 16 }}
+            placeholder={t('knowledge.importTextBodyPlaceholder')}
+          />
+          <Text type="tertiary" size="small">
+            {t('knowledge.importTextDesc')}
+          </Text>
+        </Space>
+      </Modal>
     </Space>
   );
 }

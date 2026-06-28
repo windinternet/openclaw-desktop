@@ -106,6 +106,10 @@ interface KnowledgeTextApi {
   readText: (repoPath: string, relativePath: string) => Promise<string>;
 }
 
+interface KnowledgeWriteApi {
+  writeText: (repoPath: string, relativePath: string, content: string) => Promise<void>;
+}
+
 interface KnowledgeSearchApi {
   search: (repoPath: string, query: string, directories: string[]) => Promise<RepositorySearchResult[]>;
 }
@@ -209,6 +213,57 @@ export async function readKnowledgeDocument(
     content,
     sourceType: classifyKnowledgePath(binding, relativePath),
   };
+}
+
+export interface KnowledgeTextSourceImportInput {
+  title?: string;
+  body: string;
+  now?: Date;
+  sourceRoot?: string;
+}
+
+export interface KnowledgeTextSourceImport {
+  title: string;
+  path: string;
+  markdown: string;
+}
+
+export function buildKnowledgeTextSourceImport(input: KnowledgeTextSourceImportInput): KnowledgeTextSourceImport {
+  const body = normalizeSourceBody(input.body);
+  const title = normalizeSourceTitle(input.title, body);
+  const now = input.now ?? new Date();
+  const date = now.toISOString().slice(0, 10);
+  const time = now.toISOString().slice(11, 19).replace(/:/g, '');
+  const sourceRoot = normalizeSourceRoot(input.sourceRoot ?? 'sources');
+  const path = `${sourceRoot}/imported/${date}-${time}-${slugifyKnowledgeTitle(title)}.md`;
+  const markdown = [
+    '---',
+    `title: ${JSON.stringify(title)}`,
+    'source: desktop-paste',
+    `importedAt: ${now.toISOString()}`,
+    '---',
+    '',
+    `# ${title}`,
+    '',
+    '## 原始内容',
+    '',
+    body,
+    '',
+  ].join('\n');
+
+  return { title, path, markdown };
+}
+
+export async function importKnowledgeTextSource(
+  binding: RepositoryBinding,
+  input: Omit<KnowledgeTextSourceImportInput, 'sourceRoot'>,
+): Promise<KnowledgeTextSourceImport> {
+  const imported = buildKnowledgeTextSourceImport({
+    ...input,
+    sourceRoot: binding.knowledge.sourceRoot,
+  });
+  await getKnowledgeWriteApi().writeText(binding.repoPath, imported.path, imported.markdown);
+  return imported;
 }
 
 export async function loadKnowledgeDocumentHistory(
@@ -568,6 +623,44 @@ function extractMarkdownTitle(content: string): string {
   return content.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? '';
 }
 
+function normalizeSourceBody(value: string): string {
+  const body = value.replace(/\r\n/g, '\n').trim();
+  if (!body) throw new Error('Knowledge source body is required');
+  return body;
+}
+
+function normalizeSourceTitle(title: string | undefined, body: string): string {
+  const explicit = title?.replace(/\s+/g, ' ').trim();
+  const firstLine = body
+    .split('\n')
+    .map((line) =>
+      line
+        .replace(/^#+\s*/, '')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    )
+    .find(Boolean);
+  return (explicit || firstLine || '粘贴资料').slice(0, 160);
+}
+
+function slugifyKnowledgeTitle(value: string): string {
+  const slug = value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64)
+    .replace(/-+$/g, '');
+  return slug || 'pasted-source';
+}
+
+function normalizeSourceRoot(value: string): string {
+  const root = value.trim().replace(/^\/+|\/+$/g, '');
+  if (!root || root.includes('..')) throw new Error('Unsafe knowledge source root');
+  return root;
+}
+
 function cleanMarkdownCell(cell: string): string {
   return cell
     .replace(/\[[^\]]+\]\([^)]+\)/g, (match) => match.match(/^\[([^\]]+)\]/)?.[1] ?? '')
@@ -640,6 +733,16 @@ function getKnowledgeTextApi(): KnowledgeTextApi {
   }
   return {
     readText: repository.readText,
+  };
+}
+
+function getKnowledgeWriteApi(): KnowledgeWriteApi {
+  const repository = (globalThis as { window?: Window }).window?.electronAPI?.repository;
+  if (!repository?.writeText) {
+    throw new Error('electronAPI.repository knowledge write method not available');
+  }
+  return {
+    writeText: repository.writeText,
   };
 }
 
