@@ -89,6 +89,7 @@ interface Window {
       ) => Promise<import('./lib/repository-knowledge').RepositoryMarkdownFile[]>;
       readText?: (repoPath: string, relativePath: string) => Promise<string>;
       writeText?: (repoPath: string, relativePath: string, content: string) => Promise<void>;
+      moveText?: (repoPath: string, fromRelativePath: string, toRelativePath: string) => Promise<void>;
       search?: (
         repoPath: string,
         query: string,

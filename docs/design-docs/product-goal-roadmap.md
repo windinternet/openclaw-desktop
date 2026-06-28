@@ -292,7 +292,7 @@ HTML 产物是特色能力：
 - Workbench 快照会解析工作事项里的 `## 收尾动作`，Dashboard “待确认”会显示未勾选收尾动作，让 ActionRun 结束后的后续判断进入每日推进面板。
 - Dashboard 会把未完成收尾动作分类为 `tail-action:status`、`tail-action:output`、`tail-action:knowledge` 或 `tail-action:review`，分别导向 Workbench 状态处理、Artifacts、Knowledge 或 Workbench 复盘后续。
 - 这些目标 URL 会携带 `tailAction`、`tailActionId` 和 `workItemPath`；Artifacts 会据此打开 AI 产物创建入口并带上来源事项，成果类尾动作会预填基于来源事项和最近执行记录沉淀成果的提示；用户显式保存产物后，Desktop 会把 Artifact 或 Repository output 链接写入来源事项的 `## 关联成果`，如果 `tailActionId` 指向事项 checklist，则只勾选匹配成果尾动作；Knowledge 会进入维护上下文并显示来源事项，可发起携带 `workItemPath` / `tailActionId` 的 `knowledge_rewrite` ActionRun，写入前仍需审批；完成知识更新或确认无需写入后，用户可显式确认并只勾选匹配知识尾动作；Workbench 会切到状态或复盘相关 tab 并显示来源事项。
-- Workbench tasks 视图已接收 `tailAction=status` 上下文，并显示“状态收尾动作”卡片；用户可显式选择 `active`、`blocked`、`done` 或 `paused`，Desktop 会更新来源事项 Markdown 的 `status` 并只勾选匹配的状态尾动作。该入口不移动事项文件，不自动判断完成，不沉淀成果，不更新知识库，也不写复盘。
+- Workbench tasks 视图已接收 `tailAction=status` 上下文，并显示“状态收尾动作”卡片；用户可显式选择 `active`、`blocked`、`done` 或 `paused`，Desktop 会更新来源事项 Markdown 的 `status` 并只勾选匹配的状态尾动作。状态更新本身不自动移动事项文件；当来源事项已经是 `done` 且路径位于 `work/active/*.md` 时，用户可在同一卡片显式点击“归档完成事项”，Desktop 会通过安全 repository move 把它移到 `work/completed/*.md`，并拒绝非 done 状态、非 `work/active/` 路径或目标已存在的移动。该归档入口不自动判断完成，不沉淀成果，不更新知识库，也不写复盘。
 - Workbench 复盘视图已接收 `tailAction=review` 上下文，并显示“复盘收尾动作”卡片；卡片保留来源事项 `workItemPath`、建议目标 `reviews/weekly/` 和复盘写入命令线索 `desktop.artifacts.execution.review.write`，可打开复盘目录，也可创建 `reviews/weekly/YYYY-MM-DD-work-*-tail-action-*-review.md` 事项复盘草稿。草稿记录来源事项、尾动作 ID、创建时间和核对清单，创建时不会自动确认复盘或勾选尾动作；用户显式确认该草稿后，Desktop 会把草稿改为 `status: confirmed`、写入 `reviewedAt`，并只勾选匹配来源尾动作。
 - Dashboard 会读取 Workbench Snapshot 中的 `runs/action-runs/index.md`；已归属事项的终态 ActionRun 如果没有被索引，会作为 `action-run:unarchived` 待确认展示，并跳转到 `/workbench?view=actions` 让用户回到执行记录视图检查。
 - Dashboard 会把没有 `workItemPath` 的终态 ActionRun 作为 `action-run:unassigned` 待确认展示，并跳转到 `/workbench?view=actions`；这是对“每次 AI 执行应归属事项”的只读诊断，不自动创建事项或改写运行记录。
@@ -301,7 +301,7 @@ HTML 产物是特色能力：
 - 用户可在 Dashboard 将单条收尾动作标记完成；Desktop 会读取来源事项 Markdown，只把对应 `## 收尾动作` 行写回为 `[x]`，不自动执行更新状态、沉淀成果、更新知识库或写入复盘。成果类尾动作可在 Artifacts 显式保存产物后写入 `## 关联成果` 并勾选匹配行；知识类尾动作可在 Knowledge 完成知识更新或确认无需写入后显式勾选匹配行；状态类尾动作可在 Workbench 显式更新 `status` 后勾选匹配行；复盘类尾动作也可在 Workbench 明确确认复盘草稿后勾选匹配行，但这些都不触发其他尾动作。
 - 回写只允许发生在当前绑定仓库的 `work/` 下 Markdown，且同一个 run 路径已存在时不会重复追加。
 - Workbench 预览 `work/active/`、`work/completed/`、`work/someday/` 下的事项 Markdown 时，已提供“生成成果”入口；该入口复用 Artifact AI 创建抽屉，创建 `artifact_create` ActionRun 时写入 `sourcePage: workbench`、当前 `workItemPath`，并在事项 frontmatter 有 `id` 时写入 `workItemId`。
-- 这只是硬连接早期切片：全局 UI 侧强制归属、事项选择器、事项计划、完成后移动事项文件，以及知识更新后的复盘建议和结构化上下文带入仍未完成。
+- 这只是硬连接早期切片：全局 UI 侧强制归属、事项选择器、事项计划，以及知识更新后的复盘建议和结构化上下文带入仍未完成。
 
 验收：
 

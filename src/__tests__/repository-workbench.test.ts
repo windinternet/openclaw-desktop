@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
 import {
+  archiveCompletedWorkbenchMatter,
   confirmWorkbenchKnowledgeTailAction,
   confirmWorkbenchReviewDraft,
   completeWorkbenchTailAction,
@@ -703,6 +704,58 @@ describe('repository workbench', () => {
     expect(updated).toBe(false);
     expect(readText).not.toHaveBeenCalled();
     expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it('archives a done active work item into completed work through an explicit move', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'work/active/release.md') {
+        return [
+          '---',
+          'id: release',
+          'status: done',
+          '---',
+          '',
+          '# 发布推进',
+          '',
+          '## 执行记录',
+          '',
+          '- 已完成验收。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const moveText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, moveText },
+      },
+    });
+
+    const archived = await archiveCompletedWorkbenchMatter(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      { workItemPath: 'work/active/release.md' },
+    );
+
+    expect(archived).toEqual({ archived: true, archivedPath: 'work/completed/release.md' });
+    expect(moveText).toHaveBeenCalledWith('/repo', 'work/active/release.md', 'work/completed/release.md');
+  });
+
+  it('refuses to archive active work items before the status is done', async () => {
+    const readText = vi.fn(async () => ['---', 'status: active', '---', '', '# 发布推进'].join('\n'));
+    const moveText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, moveText },
+      },
+    });
+
+    const archived = await archiveCompletedWorkbenchMatter(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      { workItemPath: 'work/active/release.md' },
+    );
+
+    expect(archived).toEqual({ archived: false });
+    expect(moveText).not.toHaveBeenCalled();
   });
 
   it('links a preserved artifact to the work item and completes the matching output tail action', async () => {

@@ -12,6 +12,7 @@ import type { DashboardTailActionRouteContext } from '../lib/dashboard-tail-acti
 import type { RepositoryMarkdownFile } from '../lib/repository-knowledge';
 import type { WorkbenchSnapshot } from '../lib/repository-workbench';
 import {
+  archiveCompletedWorkbenchMatter,
   confirmWorkbenchReviewDraft,
   loadWorkbenchSnapshot,
   readWorkbenchMarkdown,
@@ -165,6 +166,7 @@ export default function WorkbenchRepositoryPanel({
   const [statusTailActionValue, setStatusTailActionValue] =
     useState<(typeof WORKBENCH_STATUS_OPTIONS)[number]>('active');
   const [statusTailActionUpdating, setStatusTailActionUpdating] = useState(false);
+  const [completedMatterArchiving, setCompletedMatterArchiving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -328,6 +330,30 @@ export default function WorkbenchRepositoryPanel({
       Toast.error(err instanceof Error ? err.message : t('workbench.matterStatusUpdateFailed'));
     } finally {
       setStatusTailActionUpdating(false);
+    }
+  };
+
+  const handleArchiveCompletedMatter = async (context: DashboardTailActionRouteContext) => {
+    if (!context.workItemPath) {
+      Toast.warning(t('workbench.archiveCompletedMatterUnavailable'));
+      return;
+    }
+
+    setCompletedMatterArchiving(true);
+    try {
+      const result = await archiveCompletedWorkbenchMatter(binding, { workItemPath: context.workItemPath });
+      if (!result.archived || !result.archivedPath) {
+        Toast.warning(t('workbench.archiveCompletedMatterUnavailable'));
+        return;
+      }
+      setSelectedPreviewPath(result.archivedPath);
+      setSelectedPreviewContent(await readWorkbenchMarkdown(binding, result.archivedPath));
+      setSnapshot(await loadWorkbenchSnapshot(binding));
+      Toast.success(t('workbench.completedMatterArchived'));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('workbench.completedMatterArchiveFailed'));
+    } finally {
+      setCompletedMatterArchiving(false);
     }
   };
 
@@ -698,6 +724,8 @@ export default function WorkbenchRepositoryPanel({
   const renderStatusTailActionCard = () => {
     const statusTailActionContext = tailActionContext?.kind === 'status' ? tailActionContext : null;
     if (!statusTailActionContext) return null;
+    const canArchiveCompletedMatter =
+      statusTailActionValue === 'done' && Boolean(statusTailActionContext.workItemPath?.startsWith('work/active/'));
     return (
       <div
         style={{
@@ -739,6 +767,15 @@ export default function WorkbenchRepositoryPanel({
               onClick={() => void handleUpdateMatterStatus(statusTailActionContext)}
             >
               {t('workbench.updateMatterStatus')}
+            </Button>
+            <Button
+              size="small"
+              type="secondary"
+              loading={completedMatterArchiving}
+              disabled={!canArchiveCompletedMatter}
+              onClick={() => void handleArchiveCompletedMatter(statusTailActionContext)}
+            >
+              {t('workbench.archiveCompletedMatter')}
             </Button>
           </Space>
         </Space>

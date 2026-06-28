@@ -50,6 +50,8 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain(
       'Status tail actions can update the source matter `status` and check off only the matching status tail action',
     );
+    expect(skillContent).toContain('does not automatically move the matter file');
+    expect(skillContent).toContain('explicitly archive a `work/active/*.md` matter into `work/completed/*.md`');
     expect(skillContent).toContain(
       'Knowledge tail actions open Knowledge with the source matter preserved and can start a `knowledge_rewrite` ActionRun',
     );
@@ -155,6 +157,7 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain(
       'After the user explicitly saves an Artifact from an output tail action, Desktop can link it back to `## 关联成果`',
     );
+    expect(skillContent).toContain('Dashboard checkoff alone does not perform this archive');
     expect(skillContent).toContain('Knowledge tail actions can start a source-bound `knowledge_rewrite` ActionRun');
     expect(skillContent).toContain(
       'this explicit confirmation does not write Wiki/index/log, update matter status, preserve outputs, or write a review',

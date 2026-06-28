@@ -17,8 +17,10 @@ describe('dashboard tail action routing', () => {
 
     expect(workbenchPanel).toContain("tailActionContext?.kind === 'status'");
     expect(workbenchPanel).toContain('updateWorkbenchMatterStatusFromTailAction');
+    expect(workbenchPanel).toContain('archiveCompletedWorkbenchMatter');
     expect(workbenchPanel).toContain("t('workbench.statusTailActionTitle')");
     expect(workbenchPanel).toContain("t('workbench.updateMatterStatus')");
+    expect(workbenchPanel).toContain("t('workbench.archiveCompletedMatter')");
     expect(workbenchPanel).toContain("tailActionContext?.kind === 'review'");
     expect(workbenchPanel).toContain("t('workbench.reviewTailActionTitle')");
     expect(workbenchPanel).toContain("t('workbench.reviewTailActionWriteCommand')");

@@ -48,6 +48,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     readText: (repoPath: string, relativePath: string) => ipcRenderer.invoke('repository:readText', repoPath, relativePath),
     writeText: (repoPath: string, relativePath: string, content: string) =>
       ipcRenderer.invoke('repository:writeText', repoPath, relativePath, content),
+    moveText: (repoPath: string, fromRelativePath: string, toRelativePath: string) =>
+      ipcRenderer.invoke('repository:moveText', repoPath, fromRelativePath, toRelativePath),
     search: (repoPath: string, query: string, directories: string[]) =>
       ipcRenderer.invoke('repository:search', repoPath, query, directories),
     gitStatus: (repoPath: string) => ipcRenderer.invoke('repository:gitStatus', repoPath),

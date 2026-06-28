@@ -84,6 +84,15 @@ export interface WorkbenchMatterStatusUpdateInput {
   status: string;
 }
 
+export interface WorkbenchMatterArchiveInput {
+  workItemPath: string;
+}
+
+export interface WorkbenchMatterArchiveResult {
+  archived: boolean;
+  archivedPath?: string;
+}
+
 export interface WorkbenchKnowledgeTailActionConfirmInput {
   workItemPath: string;
   tailActionId: string;
@@ -340,6 +349,24 @@ export async function updateWorkbenchMatterStatusFromTailAction(
 
   await repository.writeText(binding.repoPath, workItemPath, next);
   return true;
+}
+
+export async function archiveCompletedWorkbenchMatter(
+  binding: RepositoryBinding,
+  input: WorkbenchMatterArchiveInput,
+): Promise<WorkbenchMatterArchiveResult> {
+  const workItemPath = normalizeWritableWorkbenchMarkdownPath(input.workItemPath);
+  if (!workItemPath || !workItemPath.startsWith('work/active/')) return { archived: false };
+
+  const repository = getWorkbenchMoveApi();
+  const markdown = await repository.readText(binding.repoPath, workItemPath);
+  if (!isWorkbenchMatterDone(markdown)) return { archived: false };
+
+  const archivedPath = workItemPath.replace(/^work\/active\//, 'work/completed/');
+  if (archivedPath === workItemPath) return { archived: false };
+
+  await repository.moveText(binding.repoPath, workItemPath, archivedPath);
+  return { archived: true, archivedPath };
 }
 
 export async function confirmWorkbenchKnowledgeTailAction(
@@ -666,6 +693,12 @@ function normalizeWorkbenchMatterStatus(value: string): string | null {
   return status;
 }
 
+function isWorkbenchMatterDone(markdown: string): boolean {
+  const frontmatterStatus = readWorkbenchFrontmatterValue(markdown, 'status')?.toLowerCase();
+  if (frontmatterStatus === 'done') return true;
+  return /^状态[：:]\s*(done|已完成|完成)\s*$/im.test(markdown);
+}
+
 function isKnowledgeTailActionText(text: string): boolean {
   return /知识库|知识|wiki|knowledge/i.test(text);
 }
@@ -909,6 +942,17 @@ function getWorkbenchWriteApi() {
   return {
     readText: repository.readText,
     writeText: repository.writeText,
+  };
+}
+
+function getWorkbenchMoveApi() {
+  const repository = (globalThis as { window?: Window }).window?.electronAPI?.repository;
+  if (!repository?.readText || !repository.moveText) {
+    throw new Error('electronAPI.repository workbench move methods not available');
+  }
+  return {
+    readText: repository.readText,
+    moveText: repository.moveText,
   };
 }
 

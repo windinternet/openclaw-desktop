@@ -3,7 +3,7 @@ import path from 'node:path'
 import { execFile } from 'node:child_process'
 import * as fs from 'node:fs'
 import { promisify } from 'node:util'
-import { access, cp, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
+import { access, cp, mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promises'
 import {
   resolveRepoPath,
   resolveSafeExistingRepoPath,
@@ -344,6 +344,18 @@ async function writeText(repoPath: string, relativePath: string, content: string
   await writeFile(target, content, 'utf-8')
 }
 
+async function moveText(repoPath: string, fromRelativePath: string, toRelativePath: string): Promise<void> {
+  const source = await resolveSafeExistingRepoPath(repoPath, fromRelativePath)
+  const target = await resolveSafeWritableRepoPath(repoPath, toRelativePath)
+  if (!fromRelativePath.endsWith('.md') || !toRelativePath.endsWith('.md')) {
+    throw new Error('Only markdown repository files can be moved')
+  }
+  const existingTarget = await stat(target).catch(() => null)
+  if (existingTarget) throw new Error('Target repository path already exists')
+  await mkdir(path.dirname(target), { recursive: true })
+  await rename(source, target)
+}
+
 async function searchRepository(repoPath: string, query: string, directories: string[]): Promise<RepositorySearchResult[]> {
   const trimmed = query.trim().toLowerCase()
   if (!trimmed) return []
@@ -470,6 +482,9 @@ export function registerRepositoryIpcHandlers(): void {
   ipcMain.handle('repository:readText', (_event, repoPath: string, relativePath: string) => readText(repoPath, relativePath))
   ipcMain.handle('repository:writeText', (_event, repoPath: string, relativePath: string, content: string) =>
     writeText(repoPath, relativePath, content),
+  )
+  ipcMain.handle('repository:moveText', (_event, repoPath: string, fromRelativePath: string, toRelativePath: string) =>
+    moveText(repoPath, fromRelativePath, toRelativePath),
   )
   ipcMain.handle('repository:search', (_event, repoPath: string, query: string, directories: string[]) =>
     searchRepository(repoPath, query, directories),
