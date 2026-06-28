@@ -780,6 +780,24 @@ HTML 的独特优势：
 - 仍需要把普通 Knowledge rewrite 结束后的复盘建议和结构化上下文带入做深。
 - 仍需要把计划、执行、产物和复盘串成“开始一件事”专题金线。
 
+### 10.45 2026-06-28 当前实施记录：Teams 发起前事项选择
+
+围绕“ActionRun 是 Desktop 在普通聊天之外调用大模型的通用操作单元”和“每次 AI 执行应归属事项”的 P0 验收，当前继续落地一段代码事实：
+
+- Teams 页面自然语言编排入口已复用共享 `useWorkbenchWorkItemOptions` 事项候选。
+- Teams 快速创建 Gateway Agent 入口也复用同一事项候选。
+- 共享候选来自当前绑定 Repository 的 `work/active`、`work/someday` 和 `work/completed`，并读取事项 frontmatter 中的 `id`。
+- 用户可在发起 `agent_team_compose` 或 `gateway_agent_create` ActionRun 前选择关联事项；Desktop 会写入 `workItemPath` 和 `workItemId`。
+- 用户跳过选择时，运行仍按 `workItemRequired: true` 与 `workItemUnassignedReason: pending_work_item_assignment` 进入未归属诊断，后续可通过 ActionCenter 补归属。
+- 该入口不自动创建事项、不猜测归属、不替代 Repository Context、不绕过 Gateway 执行与审批。
+
+仍未完成的 P0 后续：
+
+- 仍需要把共享事项选择接入 Repository 语义映射等其它非聊天式 AI 入口。
+- 仍需要发起前直接创建新事项的产品流。
+- 仍需要把 Teams ActionRun 结束后的成果、知识和复盘尾动作联动做深。
+- 仍需要把计划、执行、产物和复盘串成“开始一件事”专题金线。
+
 ### 10.55 2026-06-28 当前实施记录：ActionRun 补归属流程
 
 围绕“每次 AI 执行必须归属事项”和“已有无事项 ActionRun 不能只停留在 Dashboard 告警”的 P0 验收，当前继续落地一段代码事实：

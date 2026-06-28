@@ -73,6 +73,8 @@ export function buildDesktopSelfKnowledgeSkillContent(): string {
     '',
     'Shared `useWorkbenchWorkItemOptions` / `loadWorkbenchWorkItemOptions` loads existing work matters from `work/active`, `work/someday`, and `work/completed` and extracts each matter frontmatter id. Ordinary Knowledge rewrite entry points such as digest source, rewrite selected document, and refresh index/log can let the user choose a work matter before starting `knowledge_rewrite`, then attach `workItemPath` and `workItemId` to the ActionRun. Dashboard knowledge tail actions still use the source `workItemPath` and `tailActionId` from the route context. These pickers provide assignment context only; they do not create matters, guess assignment, write Wiki, check off tail actions, or bypass approval.',
     '',
+    'Teams natural-language compose and quick Agent creation entry points also use the shared work matter picker before starting `agent_team_compose` or `gateway_agent_create`. When the user chooses an existing matter, Desktop attaches `workItemPath` and the matter frontmatter id as `workItemId`; if the user skips selection, the run remains observable through the unassigned ActionRun diagnostics. This does not create matters, guess assignment, replace Repository Context, or bypass approval.',
+    '',
     '## Artifacts',
     '',
     'Artifacts are OpenClaw Desktop P0 value objects. Any valuable result can become an Artifact when it can be saved, previewed, reused, delivered, or tracked.',

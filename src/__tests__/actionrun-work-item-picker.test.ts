@@ -8,6 +8,7 @@ describe('ActionRun work item picker', () => {
     const helper = readFileSync('src/lib/workbench-work-items.ts', 'utf8');
     const artifactDrawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
     const knowledgePanel = readFileSync('src/components/KnowledgeRepositoryPanel.tsx', 'utf8');
+    const teamsPage = readFileSync('src/pages/TeamsPage.tsx', 'utf8');
     const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
     const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
 
@@ -30,11 +31,24 @@ describe('ActionRun work item picker', () => {
     expect(knowledgePanel).toContain('workItemId: resolvedWorkItemId');
     expect(knowledgePanel).toContain('workItemPath: resolvedWorkItemPath');
 
+    expect(teamsPage).toContain('useWorkbenchWorkItemOptions');
+    expect(teamsPage).toContain('selectedTeamWorkItemPath');
+    expect(teamsPage).toContain('selectedTeamWorkItemId');
+    expect(teamsPage).toContain("t('teams.actionWorkItemPlaceholder')");
+    expect(teamsPage).toContain('workItemId: resolvedWorkItemId');
+    expect(teamsPage).toContain('workItemPath: resolvedWorkItemPath');
+
     expect(zh.knowledge.rewriteWorkItem).toBeTruthy();
     expect(zh.knowledge.rewriteWorkItemDesc).toBeTruthy();
     expect(zh.knowledge.rewriteWorkItemPlaceholder).toBeTruthy();
     expect(en.knowledge.rewriteWorkItem).toBeTruthy();
     expect(en.knowledge.rewriteWorkItemDesc).toBeTruthy();
     expect(en.knowledge.rewriteWorkItemPlaceholder).toBeTruthy();
+    expect(zh.teams.actionWorkItem).toBeTruthy();
+    expect(zh.teams.actionWorkItemDesc).toBeTruthy();
+    expect(zh.teams.actionWorkItemPlaceholder).toBeTruthy();
+    expect(en.teams.actionWorkItem).toBeTruthy();
+    expect(en.teams.actionWorkItemDesc).toBeTruthy();
+    expect(en.teams.actionWorkItemPlaceholder).toBeTruthy();
   });
 });

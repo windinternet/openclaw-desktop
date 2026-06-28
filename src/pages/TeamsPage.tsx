@@ -48,6 +48,7 @@ import { upsertAiActionRun } from '../lib/ai-action-run-store';
 import { buildAgentTeamComposePrompt, buildGatewayAgentCreatePrompt } from '../lib/ai-action-prompts';
 import { loadInstanceData, saveInstanceDataAwaited } from '../lib/local-persistence';
 import { useStore } from '../lib';
+import { useWorkbenchWorkItemOptions } from '../lib/workbench-work-items';
 import AgentFilesPanel from '../components/AgentFilesPanel';
 import type { AiActionRun, AgentLocalProfile, AgentOfficeZone, AgentTeamProfile } from '../lib/types';
 
@@ -273,6 +274,17 @@ export default function TeamsPage({ embedded = false, onHeaderActionsChange }: E
   const failedProfileCount = Object.values(teamProfile.agents).filter(
     (profile) => profile.bindingStatus === 'failed',
   ).length;
+  const {
+    loading: teamWorkItemLoading,
+    options: teamWorkItemOptions,
+    selectedPath: selectedTeamWorkItemPath,
+    setSelectedPath: setSelectedTeamWorkItemPath,
+    selectedWorkItem: selectedTeamWorkItem,
+    selectedWorkItemId: selectedTeamWorkItemId,
+  } = useWorkbenchWorkItemOptions({
+    instanceId: currentInstanceId,
+    enabled: composerModalVisible || quickModalVisible,
+  });
 
   const persistProfile = useCallback(
     async (nextProfile: AgentTeamProfile) => {
@@ -394,6 +406,8 @@ export default function TeamsPage({ embedded = false, onHeaderActionsChange }: E
 
     setActionSubmitting(true);
     const createsAgent = shouldCreateAgentFromInstruction(text);
+    const resolvedWorkItemPath = selectedTeamWorkItem?.path;
+    const resolvedWorkItemId = selectedTeamWorkItemId;
     const baseActionRun = createAiActionRun({
       type: createsAgent ? 'gateway_agent_create' : 'agent_team_compose',
       sourcePage: 'teams',
@@ -401,6 +415,8 @@ export default function TeamsPage({ embedded = false, onHeaderActionsChange }: E
       agentId: selectedMember?.agent.id || agents.find((agent) => agent.default)?.id || agents[0]?.id || 'main',
       input: text,
       executionMode: 'isolated-session',
+      workItemId: resolvedWorkItemId,
+      workItemPath: resolvedWorkItemPath,
     });
     let nextProfile = teamProfile;
     let desiredProfile: AgentLocalProfile | undefined;
@@ -468,6 +484,8 @@ export default function TeamsPage({ embedded = false, onHeaderActionsChange }: E
     currentInstanceId,
     persistProfile,
     selectedMember,
+    selectedTeamWorkItem,
+    selectedTeamWorkItemId,
     teamProfile,
     upsertActionRun,
     t,
@@ -489,6 +507,8 @@ export default function TeamsPage({ embedded = false, onHeaderActionsChange }: E
 
     setActionSubmitting(true);
     const desiredProfile = buildQuickAgentProfile(quickDraft, teamProfile);
+    const resolvedWorkItemPath = selectedTeamWorkItem?.path;
+    const resolvedWorkItemId = selectedTeamWorkItemId;
     const input = `${t('teams.createAgentTitle')}：${desiredProfile.displayName}${desiredProfile.role ? `，${t('teams.role')}：${desiredProfile.role}` : ''}`;
     const instruction = createInstruction(input, desiredProfile.agentId);
     const pendingProfile = {
@@ -503,6 +523,8 @@ export default function TeamsPage({ embedded = false, onHeaderActionsChange }: E
       agentId: agents.find((agent) => agent.default)?.id || agents[0]?.id || 'main',
       input,
       executionMode: 'isolated-session',
+      workItemId: resolvedWorkItemId,
+      workItemPath: resolvedWorkItemPath,
     });
     actionRun.targetAgentId = desiredProfile.agentId;
     await upsertActionRun({ ...actionRun, status: 'planning', updatedAt: Date.now() });
@@ -537,10 +559,35 @@ export default function TeamsPage({ embedded = false, onHeaderActionsChange }: E
     currentInstanceId,
     persistProfile,
     quickDraft,
+    selectedTeamWorkItem,
+    selectedTeamWorkItemId,
     teamProfile,
     upsertActionRun,
     t,
   ]);
+
+  const renderActionWorkItemPicker = () =>
+    teamWorkItemOptions.length > 0 ? (
+      <div style={{ display: 'grid', gap: 6 }}>
+        <Text type="tertiary" size="small">
+          {t('teams.actionWorkItemDesc')}
+        </Text>
+        <Select
+          value={selectedTeamWorkItemPath}
+          placeholder={t('teams.actionWorkItemPlaceholder')}
+          onChange={(value) => setSelectedTeamWorkItemPath(String(value))}
+          loading={teamWorkItemLoading}
+          disabled={actionSubmitting}
+          style={{ width: '100%' }}
+        >
+          {teamWorkItemOptions.map((item) => (
+            <Select.Option key={item.path} value={item.path}>
+              {item.name} · {item.path}
+            </Select.Option>
+          ))}
+        </Select>
+      </div>
+    ) : null;
 
   const renderOverview = () => {
     if (!selectedMember) return <Empty description={t('teams.selectAgent')} />;
@@ -926,6 +973,7 @@ export default function TeamsPage({ embedded = false, onHeaderActionsChange }: E
           <Text type="tertiary" size="small">
             {t('teams.composeDesc')}
           </Text>
+          {renderActionWorkItemPicker()}
         </div>
       </Modal>
 
@@ -960,6 +1008,7 @@ export default function TeamsPage({ embedded = false, onHeaderActionsChange }: E
           <Text type="tertiary" size="small">
             {t('teams.createAgentDesc')}
           </Text>
+          {renderActionWorkItemPicker()}
         </div>
       </Modal>
     </div>
