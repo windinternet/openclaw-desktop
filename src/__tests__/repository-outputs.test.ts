@@ -5,6 +5,7 @@ import {
   createRepositoryOutput,
   mirrorArtifactToReadyRepositoryOutput,
   recordRepositoryAssetIndexEntry,
+  searchRepositoryAssetIndex,
 } from '../lib/repository-outputs';
 import type { ArtifactMeta } from '../lib/artifact-types';
 
@@ -644,6 +645,95 @@ describe('repository outputs', () => {
     expect(assetIndexWrite).toContain('  - summary: 发布前检查脚本');
     expect(assetIndexWrite).toContain('  - boundary: recordOnly, desktopExecutes=false, grantsPermission=false');
     expect(assetIndexWrite).toContain('  - tags: release, check');
+  });
+
+  it('searches repository-local and mirrored reusable assets from the asset index', async () => {
+    const writeText = vi.fn();
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'outputs/assets/index.md') {
+        return [
+          '# Reusable Assets',
+          '- [发布检查脚本](../../tools/release-check.sh) (`tools-release-check-sh`, script, repository-manual)',
+          '  - source: repository-manual',
+          '  - path: tools/release-check.sh',
+          '  - version: 1',
+          '  - summary: 发布前检查脚本',
+          '  - boundary: recordOnly, desktopExecutes=false, grantsPermission=false',
+          '  - tags: release, check',
+          '- [路线图模板](outputs/files/art_template.md) (`art_template`, template, file, draft)',
+          '  - artifact: artifact://art_template',
+          '  - output: outputs/files/art_template.md',
+          '  - source: action_run / run_plan / 计划生成',
+          '  - version: 2',
+          '  - summary: 可复用路线图模板',
+          '  - valueHealth: ready',
+          '  - boundary: recordOnly, desktopExecutes=false, grantsPermission=false',
+          '  - tags: roadmap',
+          '',
+        ].join('\n');
+      }
+      return '';
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: {
+          writeText,
+          readText,
+        },
+      },
+    });
+
+    const result = await searchRepositoryAssetIndex({
+      binding: createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      query: '发布',
+      reuseKind: 'script',
+    });
+
+    expect(readText).toHaveBeenCalledWith('/repo', 'outputs/assets/index.md');
+    expect(result).toEqual({
+      indexPath: 'outputs/assets/index.md',
+      total: 1,
+      results: [
+        {
+          id: 'tools-release-check-sh',
+          title: '发布检查脚本',
+          link: '../../tools/release-check.sh',
+          reuseKind: 'script',
+          source: 'repository-manual',
+          path: 'tools/release-check.sh',
+          version: '1',
+          summary: '发布前检查脚本',
+          tags: ['release', 'check'],
+          boundary: {
+            recordOnly: true,
+            desktopExecutes: false,
+            grantsPermission: false,
+          },
+        },
+      ],
+    });
+
+    const allTemplates = await searchRepositoryAssetIndex({
+      binding: createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      reuseKind: 'template',
+    });
+    expect(allTemplates.results).toEqual([
+      expect.objectContaining({
+        id: 'art_template',
+        title: '路线图模板',
+        reuseKind: 'template',
+        artifactUri: 'artifact://art_template',
+        output: 'outputs/files/art_template.md',
+        source: 'action_run / run_plan / 计划生成',
+        valueHealth: 'ready',
+        tags: ['roadmap'],
+        boundary: {
+          recordOnly: true,
+          desktopExecutes: false,
+          grantsPermission: false,
+        },
+      }),
+    ]);
   });
 
   it('writes file artifacts into the repository files output bucket', async () => {

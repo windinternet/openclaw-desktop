@@ -31,6 +31,7 @@ import {
   buildArtifactRepositoryOutputUpdates,
   createRepositoryOutput,
   recordRepositoryAssetIndexEntry,
+  searchRepositoryAssetIndex,
   type RepositoryOutputResult,
 } from './repository-outputs';
 
@@ -684,6 +685,24 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
     });
 
     return { ok: true, asset };
+  }
+
+  if (command === 'desktop.repository.assets.search') {
+    const repoPath = stringValue(params.repoPath);
+    const reuseKind = artifactReuseKindValue(params.reuseKind);
+    if (!repoPath) return invalidParams('repoPath is required');
+
+    const assets = await searchRepositoryAssetIndex({
+      binding: createDefaultRepositoryBinding({
+        gatewayInstanceId: stringValue(params.gatewayInstanceId) ?? 'desktop-node',
+        repoPath,
+      }),
+      query: stringValue(params.query),
+      reuseKind,
+      limit: numberValue(params.limit),
+    });
+
+    return { ok: true, assets };
   }
 
   if (command === 'desktop.repository.search') {

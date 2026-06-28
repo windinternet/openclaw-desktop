@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleDesktopNodeCommand } from '../lib/desktop-node-commands';
 import { artifactService } from '../lib/artifact-service';
 import { artifactPersistence } from '../lib/artifact-persistence';
-import { createRepositoryOutput, recordRepositoryAssetIndexEntry } from '../lib/repository-outputs';
+import {
+  createRepositoryOutput,
+  recordRepositoryAssetIndexEntry,
+  searchRepositoryAssetIndex,
+} from '../lib/repository-outputs';
 
 vi.mock('../lib/artifact-service', () => ({
   artifactService: {
@@ -31,12 +35,14 @@ vi.mock('../lib/repository-outputs', () => ({
   }),
   createRepositoryOutput: vi.fn(),
   recordRepositoryAssetIndexEntry: vi.fn(),
+  searchRepositoryAssetIndex: vi.fn(),
 }));
 
 const mockedArtifactService = vi.mocked(artifactService);
 const mockedArtifactPersistence = vi.mocked(artifactPersistence);
 const mockedCreateRepositoryOutput = vi.mocked(createRepositoryOutput);
 const mockedRecordRepositoryAssetIndexEntry = vi.mocked(recordRepositoryAssetIndexEntry);
+const mockedSearchRepositoryAssetIndex = vi.mocked(searchRepositoryAssetIndex);
 
 describe('desktop node commands', () => {
   beforeEach(() => {
@@ -2140,6 +2146,72 @@ describe('desktop node commands', () => {
         version: '1',
         tags: ['release', 'check'],
         updatedAt: new Date('2026-06-29T01:02:03.000Z'),
+      }),
+    );
+  });
+
+  it('searches repository reusable assets through a structured repository command', async () => {
+    mockedSearchRepositoryAssetIndex.mockResolvedValue({
+      indexPath: 'outputs/assets/index.md',
+      total: 1,
+      results: [
+        {
+          id: 'tools-release-check-sh',
+          title: '发布检查脚本',
+          link: '../../tools/release-check.sh',
+          reuseKind: 'script',
+          source: 'repository-manual',
+          path: 'tools/release-check.sh',
+          summary: '发布前检查脚本',
+          tags: ['release', 'check'],
+          boundary: {
+            recordOnly: true,
+            desktopExecutes: false,
+            grantsPermission: false,
+          },
+        },
+      ],
+    });
+
+    await expect(
+      handleDesktopNodeCommand('desktop.repository.assets.search', {
+        repoPath: '/repo',
+        gatewayInstanceId: 'inst-1',
+        query: '发布',
+        reuseKind: 'script',
+        limit: 5,
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      assets: {
+        indexPath: 'outputs/assets/index.md',
+        total: 1,
+        results: [
+          {
+            id: 'tools-release-check-sh',
+            title: '发布检查脚本',
+            link: '../../tools/release-check.sh',
+            reuseKind: 'script',
+            source: 'repository-manual',
+            path: 'tools/release-check.sh',
+            summary: '发布前检查脚本',
+            tags: ['release', 'check'],
+            boundary: {
+              recordOnly: true,
+              desktopExecutes: false,
+              grantsPermission: false,
+            },
+          },
+        ],
+      },
+    });
+
+    expect(mockedSearchRepositoryAssetIndex).toHaveBeenCalledWith(
+      expect.objectContaining({
+        binding: expect.objectContaining({ repoPath: '/repo', gatewayInstanceId: 'inst-1' }),
+        query: '发布',
+        reuseKind: 'script',
+        limit: 5,
       }),
     );
   });

@@ -43,7 +43,46 @@ export interface RepositoryAssetIndexEntryResult {
   grantsPermission: false;
 }
 
+export interface SearchRepositoryAssetIndexParams {
+  binding: RepositoryBinding;
+  query?: string;
+  reuseKind?: ArtifactReuseKind;
+  limit?: number;
+}
+
+export interface RepositoryAssetSearchResult {
+  id: string;
+  title: string;
+  link: string;
+  reuseKind: ArtifactReuseKind;
+  source?: string;
+  path?: string;
+  artifactUri?: string;
+  output?: string;
+  preview?: string;
+  version?: string;
+  updatedAt?: string;
+  summary?: string;
+  valueHealth?: string;
+  execution?: string;
+  review?: string;
+  reviewResult?: string;
+  tags: string[];
+  boundary: {
+    recordOnly: true;
+    desktopExecutes: false;
+    grantsPermission: false;
+  };
+}
+
+export interface RepositoryAssetSearchResultSet {
+  indexPath: string;
+  total: number;
+  results: RepositoryAssetSearchResult[];
+}
+
 const DEFAULT_REPOSITORY_ASSET_INDEX_PATH = 'outputs/assets/index.md';
+const REPOSITORY_ASSET_REUSE_KINDS = new Set<ArtifactReuseKind>(['asset', 'template', 'tool', 'script', 'workflow']);
 
 const TYPE_DIR: Record<string, string> = {
   report: 'reports',
@@ -299,6 +338,27 @@ export async function recordRepositoryAssetIndexEntry(
   };
 }
 
+export async function searchRepositoryAssetIndex(
+  params: SearchRepositoryAssetIndexParams,
+): Promise<RepositoryAssetSearchResultSet> {
+  const repository = getRepositoryReadApi();
+  const indexPath = getRepositoryAssetIndexPath(params.binding);
+  const existingAssetIndex = await repository.readText(params.binding.repoPath, indexPath);
+  const query = params.query?.trim().toLowerCase();
+  const limit = normalizeRepositoryAssetSearchLimit(params.limit);
+  const matches = parseRepositoryAssetIndex(existingAssetIndex).filter((asset) => {
+    if (params.reuseKind && asset.reuseKind !== params.reuseKind) return false;
+    if (query && !buildRepositoryAssetSearchText(asset).includes(query)) return false;
+    return true;
+  });
+
+  return {
+    indexPath,
+    total: matches.length,
+    results: matches.slice(0, limit),
+  };
+}
+
 export async function mirrorArtifactToReadyRepositoryOutput(
   instanceId: string,
   artifact: ArtifactMeta,
@@ -408,6 +468,65 @@ function buildRepositoryAssetIndexEntry(
     .join('\n');
 }
 
+function parseRepositoryAssetIndex(indexMarkdown: string): RepositoryAssetSearchResult[] {
+  const lines = indexMarkdown.split(/\r?\n/);
+  const assets: RepositoryAssetSearchResult[] = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const entryMatch = /^- \[([^\]]+)]\(([^)]+)\) \(`([^`]+)`,\s*(.+)\)$/.exec(lines[index]);
+    if (!entryMatch) continue;
+
+    const [, title, link, id, rest] = entryMatch;
+    const metadata = new Map<string, string>();
+    let next = index + 1;
+    while (next < lines.length && lines[next].startsWith('  - ')) {
+      const line = lines[next].slice('  - '.length);
+      const separator = line.indexOf(':');
+      if (separator > -1) {
+        metadata.set(line.slice(0, separator).trim(), line.slice(separator + 1).trim());
+      }
+      next += 1;
+    }
+    index = next - 1;
+
+    const parts = rest
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean);
+    const reuseKind = parseRepositoryAssetReuseKind(metadata.get('reuseKind') ?? parts[0]);
+    if (!reuseKind) continue;
+
+    assets.push({
+      id,
+      title,
+      link,
+      reuseKind,
+      ...definedRepositoryAssetMetadata({
+        source: metadata.get('source') ?? parts[1],
+        path: metadata.get('path'),
+        artifactUri: metadata.get('artifact'),
+        output: metadata.get('output'),
+        preview: metadata.get('preview'),
+        version: metadata.get('version'),
+        updatedAt: metadata.get('updatedAt'),
+        summary: metadata.get('summary'),
+        valueHealth: metadata.get('valueHealth'),
+        execution: metadata.get('execution'),
+        review: metadata.get('review'),
+        reviewResult: metadata.get('reviewResult'),
+      }),
+      tags: parseRepositoryAssetTags(metadata.get('tags')),
+      boundary: {
+        recordOnly: true,
+        desktopExecutes: false,
+        grantsPermission: false,
+      },
+    });
+  }
+
+  return assets;
+}
+
 function ensureIndexTitle(existingIndex: string, title: string): string {
   const trimmed = existingIndex.trimEnd();
   if (!trimmed) return `${title}\n`;
@@ -473,6 +592,68 @@ function formatRepositoryAssetDate(value: Date | string | number | undefined): s
   return Number.isFinite(date.getTime()) ? date.toISOString() : undefined;
 }
 
+function parseRepositoryAssetReuseKind(value: string | undefined): ArtifactReuseKind | undefined {
+  return value && REPOSITORY_ASSET_REUSE_KINDS.has(value as ArtifactReuseKind)
+    ? (value as ArtifactReuseKind)
+    : undefined;
+}
+
+function parseRepositoryAssetTags(value: string | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter((tag) => tag.length > 0);
+}
+
+function definedRepositoryAssetMetadata<T extends Record<string, string | undefined>>(metadata: T) {
+  return Object.fromEntries(Object.entries(metadata).filter(([, value]) => value !== undefined)) as {
+    [K in keyof T as T[K] extends string ? K : never]: string;
+  };
+}
+
+function normalizeRepositoryAssetSearchLimit(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value)) return 20;
+  return Math.max(1, Math.min(Math.trunc(value), 50));
+}
+
+function buildRepositoryAssetSearchText(asset: RepositoryAssetSearchResult): string {
+  return [
+    asset.id,
+    asset.title,
+    asset.link,
+    asset.reuseKind,
+    ...getRepositoryAssetReuseKindAliases(asset.reuseKind),
+    asset.source,
+    asset.path,
+    asset.artifactUri,
+    asset.output,
+    asset.preview,
+    asset.version,
+    asset.updatedAt,
+    asset.summary,
+    asset.valueHealth,
+    asset.execution,
+    asset.review,
+    asset.reviewResult,
+    ...asset.tags,
+  ]
+    .filter((part): part is string => typeof part === 'string' && part.length > 0)
+    .join(' ')
+    .toLowerCase();
+}
+
+function getRepositoryAssetReuseKindAliases(reuseKind: ArtifactReuseKind): string[] {
+  const aliases: Record<ArtifactReuseKind, string[]> = {
+    asset: ['可复用资产', '通用资产'],
+    template: ['模板', '可复用模板', '可复用的模板'],
+    tool: ['工具', '可复用工具', '可复用的工具'],
+    script: ['脚本', '可复用脚本', '可复用的脚本'],
+    workflow: ['工作流', '流程', '可复用工作流', '可复用的工作流'],
+  };
+  return aliases[reuseKind];
+}
+
 function formatArtifactSource(artifact: ArtifactMeta): string {
   return [artifact.source.type, artifact.source.id, artifact.source.name]
     .filter((part): part is string => typeof part === 'string' && part.length > 0)
@@ -490,6 +671,16 @@ function getRepositoryWriteApi() {
   }
   return {
     writeText: repository.writeText,
+    readText: repository.readText,
+  };
+}
+
+function getRepositoryReadApi() {
+  const repository = (globalThis as { window?: Window }).window?.electronAPI?.repository;
+  if (!repository?.readText) {
+    throw new Error('electronAPI.repository read methods not available');
+  }
+  return {
     readText: repository.readText,
   };
 }
