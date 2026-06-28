@@ -226,6 +226,17 @@ export async function createRepositoryOutput(params: CreateRepositoryOutputParam
   );
   await repository.writeText(params.binding.repoPath, indexPath, nextIndex);
 
+  if (params.artifact.reuseKind) {
+    const assetIndexPath = `${params.binding.paths.outputs}/assets/index.md`;
+    const existingAssetIndex = await repository.readText(params.binding.repoPath, assetIndexPath);
+    const nextAssetIndex = upsertOutputIndexEntry(
+      ensureIndexTitle(existingAssetIndex, '# Reusable Assets'),
+      outputPath,
+      buildReusableAssetIndexEntry(params.artifact, outputPath, previewPath),
+    );
+    await repository.writeText(params.binding.repoPath, assetIndexPath, nextAssetIndex);
+  }
+
   return { outputId: params.artifact.id, outputPath, previewPath };
 }
 
@@ -295,6 +306,34 @@ function buildOutputIndexEntry(artifact: ArtifactMeta, outputPath: string, previ
   ]
     .filter((line): line is string => typeof line === 'string')
     .join('\n');
+}
+
+function buildReusableAssetIndexEntry(artifact: ArtifactMeta, outputPath: string, previewPath?: string): string {
+  const valueHealth = buildArtifactValueHealth(artifact);
+  const executionCount = artifact.executionEvents?.length ?? 0;
+  const lastExecutionEvent = artifact.executionEvents?.[executionCount - 1];
+  return [
+    `- [${artifact.title}](${outputPath}) (\`${artifact.id}\`, ${artifact.reuseKind}, ${artifact.type}, ${artifact.status})`,
+    `  - artifact: artifact://${artifact.id}`,
+    `  - output: ${outputPath}`,
+    previewPath ? `  - preview: ${previewPath}` : undefined,
+    `  - source: ${formatArtifactSource(artifact)}`,
+    `  - version: ${artifact.currentVersion}`,
+    `  - updatedAt: ${new Date(artifact.updatedAt).toISOString()}`,
+    artifact.contentSummary ? `  - summary: ${artifact.contentSummary}` : undefined,
+    `  - valueHealth: ${valueHealth.status}`,
+    lastExecutionEvent ? `  - execution: ${executionCount} events, last ${lastExecutionEvent.status}` : undefined,
+    '  - boundary: recordOnly, desktopExecutes=false, grantsPermission=false',
+    artifact.tags.length > 0 ? `  - tags: ${artifact.tags.join(', ')}` : undefined,
+  ]
+    .filter((line): line is string => typeof line === 'string')
+    .join('\n');
+}
+
+function ensureIndexTitle(existingIndex: string, title: string): string {
+  const trimmed = existingIndex.trimEnd();
+  if (!trimmed) return `${title}\n`;
+  return trimmed.startsWith(title) ? `${trimmed}\n` : `${title}\n${trimmed}\n`;
 }
 
 function upsertOutputIndexEntry(existingIndex: string, outputPath: string, indexEntry: string): string {

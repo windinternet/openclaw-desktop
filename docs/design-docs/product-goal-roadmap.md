@@ -338,10 +338,11 @@ HTML 产物是特色能力：
 - Artifact 已可通过 `reuseKind: asset / template / tool / script / workflow` 标记可复用资产，并在 Artifact metadata、Repository output markdown、`outputs/index.md`、搜索/描述和 `artifact://` 引用中保留分类。
 - Artifact 搜索索引会把 `reuseKind` 映射为普通中文可复用资产查询词；Artifacts 页面搜索和 `desktop.artifacts.search` 均可用“可复用的脚本 / 可复用的模板 / 可复用的工具 / 可复用的工作流”找到对应资产。
 - Artifacts 页面已提供复用分类筛选，可按全部复用、通用资产、模板、工具、脚本和工作流筛选，并与产物类型和文本搜索共同生效后按最近更新排序。
+- Repository output 镜像已为带 `reuseKind` 的 Artifact 维护 `outputs/assets/index.md`，在 "Reusable Assets" 下记录 artifact URI、output 路径、来源、版本、更新时间、摘要、价值健康、最近执行状态、标签和只记录/不执行/不授权边界。
 - 执行型复用资产（`tool / script / workflow`）已有 `desktop.artifacts.execution.prepare` 和 `desktop.artifacts.execution.record` 审批/运行事实记录，不直接执行命令、不绕过审批。
 - `desktop.artifacts.search` 和 `desktop.artifacts.describe` 会返回 `assetExecutionSummary`，把执行型资产的审批要求、最近执行状态/结果/输出线索，以及 Desktop 只记录、不执行、不授予权限的边界直接暴露给 Gateway。
 - Dashboard 最近产物和本周新增成果会把带 `reuseKind` 的 Artifact 与 Repository output 标为“可复用资产”，并在详情中展示复用分类、最近执行状态或待审批边界。
-- 这仍是第一片可观测入口；完整 Repository 资产目录、资产权限面板、运行后复盘线索和更细的处理工作流仍需继续补齐。
+- 这仍是第一片可观测入口；更完整的 Repository 资产目录协议、资产权限面板、运行后复盘线索和更细的处理工作流仍需继续补齐。
 
 验收：
 

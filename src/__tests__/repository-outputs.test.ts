@@ -468,6 +468,84 @@ describe('repository outputs', () => {
     expect(indexWrite).toContain('- [Other](outputs/reports/art_other.md)');
   });
 
+  it('writes reusable artifacts into a repository asset index', async () => {
+    const writeText = vi.fn();
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'outputs/index.md') return '# Outputs\n';
+      if (relativePath === 'outputs/assets/index.md') return '# Reusable Assets\n';
+      return '';
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: {
+          writeText,
+          readText,
+        },
+      },
+    });
+
+    await createRepositoryOutput({
+      binding: createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      artifact: createArtifact({
+        id: 'art_script',
+        title: '部署脚本',
+        type: 'code',
+        source: { type: 'action_run', id: 'run_deploy', name: '部署生产' },
+        tags: ['deploy'],
+        currentVersion: 3,
+        reuseKind: 'script',
+        contentSummary: '可复用部署脚本',
+        executionEvents: [
+          {
+            id: 'exec_1',
+            status: 'approval_required',
+            artifactVersion: 3,
+            requestedAt: 10,
+            runner: 'Gateway Agent',
+            command: 'npm run deploy -- --dry-run',
+            approvalTitle: '运行部署脚本',
+            approvalRisk: 'high',
+            approvalReason: '需要用户审批后交给外部 runner',
+          },
+        ],
+      }),
+    });
+
+    expect(readText).toHaveBeenCalledWith('/repo', 'outputs/assets/index.md');
+    const assetIndexWrite = writeText.mock.calls.find((call) => call[1] === 'outputs/assets/index.md')?.[2] as string;
+    expect(assetIndexWrite).toContain('# Reusable Assets');
+    expect(assetIndexWrite).toContain('- [部署脚本](outputs/code/art_script.md) (`art_script`, script, code, draft)');
+    expect(assetIndexWrite).toContain('  - artifact: artifact://art_script');
+    expect(assetIndexWrite).toContain('  - output: outputs/code/art_script.md');
+    expect(assetIndexWrite).toContain('  - source: action_run / run_deploy / 部署生产');
+    expect(assetIndexWrite).toContain('  - version: 3');
+    expect(assetIndexWrite).toContain('  - summary: 可复用部署脚本');
+    expect(assetIndexWrite).toContain('  - execution: 1 events, last approval_required');
+    expect(assetIndexWrite).toContain('  - boundary: recordOnly, desktopExecutes=false, grantsPermission=false');
+    expect(assetIndexWrite).toContain('  - tags: deploy');
+  });
+
+  it('does not write the repository asset index for ordinary non-reusable outputs', async () => {
+    const writeText = vi.fn();
+    const readText = vi.fn(async () => '# Outputs\n');
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: {
+          writeText,
+          readText,
+        },
+      },
+    });
+
+    await createRepositoryOutput({
+      binding: createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      artifact: createArtifact({ reuseKind: undefined }),
+    });
+
+    expect(readText).not.toHaveBeenCalledWith('/repo', 'outputs/assets/index.md');
+    expect(writeText.mock.calls.some((call) => call[1] === 'outputs/assets/index.md')).toBe(false);
+  });
+
   it('writes file artifacts into the repository files output bucket', async () => {
     const writeText = vi.fn();
     const readText = vi.fn(async () => '# Outputs\n');

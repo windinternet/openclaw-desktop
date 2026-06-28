@@ -182,6 +182,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain(
       'artifact URI, source, created time, updated time, preview, format, summary, thumbnail availability, value health, preview plan, content extraction status, content facts status, PDF facts, preview card, reuse kind, and tags',
     );
+    expect(skillContent).toContain('Repository `outputs/assets/index.md`');
+    expect(skillContent).toContain('under the "Reusable Assets" heading');
+    expect(skillContent).toContain('recordOnly, desktopExecutes=false, grantsPermission=false');
     expect(skillContent).toContain('externalFormat');
     expect(skillContent).toContain('reuseKind');
     expect(skillContent).toContain('asset`, `template`, `tool`, `script`, or `workflow`');
