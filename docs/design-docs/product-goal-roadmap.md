@@ -152,7 +152,7 @@ OpenClaw Desktop
 - Dashboard 识别 `onboarding=work-system` 后会优先显示工作系统开箱引导，并用稳定锚点 `work-system-onboarding` 定位。
 - 仓库就绪后，引导中的“输入第一件事”会调用 Desktop 仓库写入能力，生成 `work/active/YYYY-MM-DD-HHmmss-*.md`。
 - 生成的事项 Markdown 包含唯一 ID、`status: active`、`source: desktop-onboarding`、目标、验收标准、关联资料、关联计划、执行记录、关联成果和复盘占位。
-- 第一件事写入成功后会自动进入 `/workbench`，让用户看到刚创建的工作事项。
+- 第一件事写入成功后会自动进入 `/workbench?view=tasks&workItemPath=<matter>`；Workbench 只接受 `work/(active|completed|someday)/*.md` 事项路径，并在 tasks 视图自动打开刚创建的事项预览，让用户直接看到“生成计划 / 生成成果”入口。
 - 这只是 P0-0 核心金线：后续仍需在“开始一件事”专题中补齐事项计划、ActionRun 执行、产物沉淀和复盘尾动作。
 
 验收：
@@ -338,6 +338,7 @@ HTML 产物是特色能力：
 
 当前代码事实：
 
+- 开箱第一事项写入成功后，Dashboard 会带 `view=tasks` 和安全 `workItemPath` 打开 Workbench；Workbench tasks 视图会自动打开该事项预览，让用户从第一句话自然看到“生成计划 / 生成成果”入口。该定位只应用一次，不会阻止用户随后选择其他事项。
 - Workbench 预览工作事项 Markdown 时，已提供“生成计划”入口。
 - 该入口创建 `work_matter_plan` ActionRun，`sourcePage: workbench`，并写入来源事项 `workItemPath` 和 frontmatter `id`。
 - `buildWorkMatterPlanPrompt` 使用落盘模板 `work-matter-plan.md`，要求 Agent 读取来源事项的目标、状态、验收标准、关联资料、关联计划、执行记录和关联成果，再提出计划草案。

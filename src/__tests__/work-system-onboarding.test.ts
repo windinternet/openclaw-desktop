@@ -41,6 +41,21 @@ describe('work system onboarding route', () => {
     expect(dashboard).toContain('createFirstWorkbenchMatter');
     expect(dashboard).toContain('firstMatterDraft');
     expect(dashboard).toContain('dashboard.firstMatterPlaceholder');
-    expect(dashboard).toContain("navigate('/workbench')");
+    expect(dashboard).toContain('`/workbench?view=tasks&workItemPath=${encodeURIComponent(matter.path)}`');
+  });
+
+  it('opens the newly created first matter in Workbench tasks preview', () => {
+    const dashboard = readFileSync('src/pages/DashboardPage.tsx', 'utf8');
+    const workbench = readFileSync('src/pages/WorkbenchPage.tsx', 'utf8');
+    const panel = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
+
+    expect(dashboard).toContain('const matter = await createFirstWorkbenchMatter');
+    expect(dashboard).toContain('encodeURIComponent(matter.path)');
+    expect(dashboard).toContain('`/workbench?view=tasks&workItemPath=${encodeURIComponent(matter.path)}`');
+    expect(workbench).toContain('getWorkbenchSearchWorkItemPath');
+    expect(workbench).toContain('initialWorkItemPath={searchWorkItemPath}');
+    expect(panel).toContain('initialWorkItemPath');
+    expect(panel).toContain('openedInitialWorkItemPath');
+    expect(panel).toContain('setSelectedPreviewPath(initialWorkItemPath)');
   });
 });

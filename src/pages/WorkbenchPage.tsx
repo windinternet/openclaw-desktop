@@ -11,6 +11,7 @@ import {
   parseDashboardTailActionRoute,
   type DashboardTailActionRouteContext,
 } from '../lib/dashboard-tail-action-routing';
+import { isWorkbenchMatterPath } from '../lib/workbench-matter';
 
 const { Title, Text } = Typography;
 const WORKBENCH_TAB_KEYS = [
@@ -43,6 +44,12 @@ function getWorkbenchAssetRunPath(search: string): string | null {
   return assetRunPath?.startsWith('runs/assets/') && assetRunPath.endsWith('.md') ? assetRunPath : null;
 }
 
+function getWorkbenchSearchWorkItemPath(search: string): string | null {
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  const workItemPath = params.get('workItemPath') ?? '';
+  return isWorkbenchMatterPath(workItemPath) ? workItemPath : null;
+}
+
 function getWorkbenchInitialTab(context: DashboardTailActionRouteContext | null, search: string): WorkbenchTabKey {
   const tailActionTab = getWorkbenchTailActionTab(context);
   if (isWorkbenchTabKey(tailActionTab)) return tailActionTab;
@@ -54,6 +61,7 @@ export default function WorkbenchPage() {
   const location = useLocation();
   const tailActionContext = useMemo(() => parseDashboardTailActionRoute(location.search), [location.search]);
   const assetRunPath = useMemo(() => getWorkbenchAssetRunPath(location.search), [location.search]);
+  const searchWorkItemPath = useMemo(() => getWorkbenchSearchWorkItemPath(location.search), [location.search]);
   const searchTab = getWorkbenchSearchTab(location.search);
   const [activeTab, setActiveTab] = useState<WorkbenchTabKey>(() =>
     getWorkbenchInitialTab(tailActionContext, location.search),
@@ -142,6 +150,7 @@ export default function WorkbenchPage() {
           panelView={panelView}
           tailActionContext={tailActionContext}
           assetRunPath={assetRunPath}
+          initialWorkItemPath={searchWorkItemPath}
         />
       )}
     </RepositoryGate>

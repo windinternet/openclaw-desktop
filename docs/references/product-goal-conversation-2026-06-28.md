@@ -371,7 +371,7 @@ HTML 的独特优势：
 - 仓库就绪后，用户可以在 Dashboard 输入“第一件事”。
 - Desktop 会把该输入写入 `work/active/YYYY-MM-DD-HHmmss-*.md`，避免同一天同名事项覆盖。
 - 事项 Markdown 包含唯一 ID、`status: active`、`source: desktop-onboarding`、目标、验收标准、关联资料、关联计划、执行记录、关联成果和复盘占位。
-- 写入成功后，Desktop 自动进入 Workbench。
+- 写入成功后，Desktop 自动进入 `/workbench?view=tasks&workItemPath=<matter>`，Workbench 会在 tasks 视图自动打开刚创建的事项预览，让用户直接看到“生成计划 / 生成成果”入口。
 
 仍未完成的 P0 后续：
 

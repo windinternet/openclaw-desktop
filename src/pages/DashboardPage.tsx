@@ -491,11 +491,11 @@ export default function DashboardPage() {
 
     setFirstMatterCreating(true);
     try {
-      await createFirstWorkbenchMatter(binding, title);
+      const matter = await createFirstWorkbenchMatter(binding, title);
       setFirstMatterDraft('');
       setRefreshTick((value) => value + 1);
       Toast.success(t('dashboard.firstMatterCreated'));
-      navigate('/workbench');
+      navigate(`/workbench?view=tasks&workItemPath=${encodeURIComponent(matter.path)}`);
     } catch (err) {
       Toast.error(err instanceof Error ? err.message : t('dashboard.firstMatterCreateFailed'));
     } finally {

@@ -88,6 +88,10 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('事项页会在 `## 执行记录` 中追加一条资产执行记录');
     expect(source).toContain('事项页会在 `## 收尾动作` 中追加四条后续检查');
     expect(source).toContain('repository:extractKnowledgeFileText');
+    expect(source).toContain('/workbench?view=tasks&workItemPath=<matter>');
+    expect(source).toContain('生成计划 / 生成成果');
+    expect(plans).toContain('开箱第一事项直接进入事项预览');
+    expect(roadmap).toContain('/workbench?view=tasks&workItemPath=<matter>');
     expect(source).toContain('artifact-execution-review-command');
     expect(source).toContain('ActionRun 成果沉淀后的 Dashboard 去重');
     expect(source).toContain('notifyActionRunsChanged');
@@ -355,6 +359,8 @@ describe('product goal P0 traceability', () => {
     expect(skillContent).toContain('<artifact>');
     expect(skillContent).toContain('explicit output candidates');
     expect(skillContent).toContain('source.type=action_run');
+    expect(skillContent).toContain('/workbench?view=tasks&workItemPath=<matter>');
+    expect(skillContent).toContain('Generate Plan / Create Artifact');
     expect(skillContent).toContain('shouldOfferPlanExecutionKnowledgeUpdate');
     expect(skillContent).toContain('`action-run-knowledge:<runId>`');
     expect(skillContent).toContain('Update Knowledge');

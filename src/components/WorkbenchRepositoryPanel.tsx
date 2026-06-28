@@ -178,11 +178,13 @@ export default function WorkbenchRepositoryPanel({
   panelView = 'projects',
   tailActionContext,
   assetRunPath,
+  initialWorkItemPath,
 }: {
   binding: RepositoryBinding;
   panelView?: WorkbenchPanelView;
   tailActionContext?: DashboardTailActionRouteContext | null;
   assetRunPath?: string | null;
+  initialWorkItemPath?: string | null;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -197,6 +199,7 @@ export default function WorkbenchRepositoryPanel({
   const [repositoryTree, setRepositoryTree] = useState<string[]>([]);
   const [selectedPreviewPath, setSelectedPreviewPath] = useState('');
   const [selectedPreviewContent, setSelectedPreviewContent] = useState('');
+  const [openedInitialWorkItemPath, setOpenedInitialWorkItemPath] = useState('');
   const [selectedProjectDocumentPath, setSelectedProjectDocumentPath] = useState('');
   const [outputSourceFilters, setOutputSourceFilters] = useState<string[]>([]);
   const [outputTypeFilters, setOutputTypeFilters] = useState<string[]>([]);
@@ -271,6 +274,24 @@ export default function WorkbenchRepositoryPanel({
     setSelectedProjectDocumentPath(firstProject.path);
     readWorkbenchMarkdown(binding, firstProject.path).then(setSelectedPreviewContent);
   }, [binding, panelView, selectedPreviewPath, snapshot]);
+
+  useEffect(() => {
+    if (panelView !== 'tasks' || !initialWorkItemPath || !snapshot) return;
+    if (openedInitialWorkItemPath === initialWorkItemPath) return;
+    if (selectedPreviewPath === initialWorkItemPath) return;
+    const workItems = [...snapshot.activeWork, ...snapshot.completedWork, ...snapshot.somedayWork];
+    if (!workItems.some((item) => item.path === initialWorkItemPath)) return;
+
+    let cancelled = false;
+    setSelectedPreviewPath(initialWorkItemPath);
+    setOpenedInitialWorkItemPath(initialWorkItemPath);
+    readWorkbenchMarkdown(binding, initialWorkItemPath).then((content) => {
+      if (!cancelled) setSelectedPreviewContent(content);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [binding, initialWorkItemPath, openedInitialWorkItemPath, panelView, selectedPreviewPath, snapshot]);
 
   const openPreview = async (file: RepositoryMarkdownFile) => {
     setSelectedPreviewPath(file.path);
