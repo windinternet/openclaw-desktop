@@ -5,6 +5,7 @@ import {
   findLatestPlanExecutionRun,
   findPlanExecutionReviewState,
   getPlanExecutionKnowledgeReviewSuggestion,
+  getPlanExecutionPostReviewActionSuggestion,
   getPlanExecutionPlanPath,
   shouldOfferPlanExecutionKnowledgeUpdate,
   shouldOfferPlanExecutionOutputPreservation,
@@ -337,6 +338,29 @@ describe('workbench plan execution observability', () => {
 
     expect(getPlanExecutionKnowledgeReviewSuggestion(undefined)).toEqual({
       labelKey: 'workbench.writePlanExecutionReview',
+    });
+  });
+
+  it('suggests clearer follow-up action copy after a source-bound review is confirmed', () => {
+    expect(getPlanExecutionPostReviewActionSuggestion('output', undefined)).toEqual({
+      labelKey: 'workbench.preservePlanExecutionOutput',
+    });
+    expect(getPlanExecutionPostReviewActionSuggestion('knowledge', { status: 'draft' })).toEqual({
+      labelKey: 'workbench.updatePlanExecutionKnowledge',
+    });
+
+    expect(getPlanExecutionPostReviewActionSuggestion('output', { status: 'confirmed' })).toEqual({
+      labelKey: 'workbench.preserveReviewedPlanExecutionOutput',
+      hintKey: 'workbench.preserveReviewedPlanExecutionOutputHint',
+    });
+    expect(
+      getPlanExecutionPostReviewActionSuggestion('knowledge', {
+        status: 'confirmed',
+        reviewedAt: '2026-06-28T11:00:00.000Z',
+      }),
+    ).toEqual({
+      labelKey: 'workbench.updateReviewedPlanExecutionKnowledge',
+      hintKey: 'workbench.updateReviewedPlanExecutionKnowledgeHint',
     });
   });
 

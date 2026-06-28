@@ -88,6 +88,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('confirmReviewSourceDraft');
     expect(skillContent).toContain('reviewSourceDraftConfirmed');
     expect(skillContent).toContain('does not check off a matter tail action for `action-run-review:<runId>`');
+    expect(skillContent).toContain('Preserve Reviewed Output');
+    expect(skillContent).toContain('Update Reviewed Knowledge');
+    expect(skillContent).toContain('getPlanExecutionPostReviewActionSuggestion');
     expect(skillContent).toContain('adds a `## 收尾动作` checklist');
     expect(skillContent).toContain('missing from the repository run index');
     expect(skillContent).toContain('`action-run:unarchived` pending confirmation');

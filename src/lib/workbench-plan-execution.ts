@@ -21,6 +21,8 @@ export interface PlanExecutionKnowledgeReviewSuggestion {
   hintKey?: string;
 }
 
+export type PlanExecutionPostReviewAction = 'output' | 'knowledge';
+
 export interface PlanExecutionFollowUpContext {
   actionRuns?: readonly AiActionRun[];
   reviewDocuments?: readonly PlanExecutionReviewDocument[];
@@ -137,6 +139,28 @@ export function getPlanExecutionKnowledgeReviewSuggestion(
   return {
     labelKey: 'workbench.writePlanExecutionReviewWithKnowledge',
     hintKey: 'workbench.writePlanExecutionReviewWithKnowledgeHint',
+  };
+}
+
+export function getPlanExecutionPostReviewActionSuggestion(
+  action: PlanExecutionPostReviewAction,
+  reviewState: PlanExecutionReviewState | undefined,
+): PlanExecutionKnowledgeReviewSuggestion {
+  if (reviewState?.status !== 'confirmed') {
+    return {
+      labelKey:
+        action === 'output' ? 'workbench.preservePlanExecutionOutput' : 'workbench.updatePlanExecutionKnowledge',
+    };
+  }
+  if (action === 'output') {
+    return {
+      labelKey: 'workbench.preserveReviewedPlanExecutionOutput',
+      hintKey: 'workbench.preserveReviewedPlanExecutionOutputHint',
+    };
+  }
+  return {
+    labelKey: 'workbench.updateReviewedPlanExecutionKnowledge',
+    hintKey: 'workbench.updateReviewedPlanExecutionKnowledgeHint',
   };
 }
 

@@ -369,12 +369,13 @@ HTML 产物是特色能力：
 - 计划执行知识更新后的复盘入口强化已接入：当同一计划执行已经存在同源未失败/未取消的 `knowledge_rewrite` ActionRun 且仍可写复盘时，Workbench 计划预览将复盘按钮显示为“复盘知识更新 / Review Knowledge Update”（`writePlanExecutionReviewWithKnowledge`），仍走 `action-run-review:<runId>` 路由，让用户更自然地进入会携带知识更新上下文的复盘草稿。
 - 计划执行知识更新后的精准复盘建议已接入：Workbench 计划预览通过 `getPlanExecutionKnowledgeReviewSuggestion` 读取 `findPlanExecutionKnowledgeUpdateState`；当同源知识更新已写入时，复盘按钮显示“复盘知识写入 / Review Knowledge Write”，当同源知识更新明确 `no_write_needed` 时，复盘按钮显示“复盘无需写入 / Review No-Write Decision”。该能力只根据已有 ActionRun 状态调整复盘入口建议，不自动写 Wiki/index/log、不自动创建或确认复盘、不勾选事项尾动作。
 - 计划执行复盘草稿显式确认已接入：Workbench reviews 视图区分真实事项尾动作复盘和 `action-run-review:<runId>` 来源执行复盘；计划执行来源草稿仍为 `status: draft` 时显示“确认计划执行复盘 / Confirm Plan Execution Review”（`confirmReviewSourceDraft`），确认后只把该复盘文档改为 `status: confirmed` 并写入 `reviewedAt`，成功提示为 `reviewSourceDraftConfirmed`。该能力不会勾选来源事项尾动作、不更新事项状态、不沉淀成果、不写 Wiki/index/log、不移动事项文件。
+- 计划执行复盘确认后的后续动作文案已接入：Workbench 计划预览通过 `getPlanExecutionPostReviewActionSuggestion` 读取同源复盘状态；当复盘已确认且成果仍可沉淀时，按钮显示“复盘后沉淀成果 / Preserve Reviewed Output”，当复盘已确认且知识仍可更新时，按钮显示“复盘后更新知识 / Update Reviewed Knowledge”。该能力只强化确认复盘后的下一步表达，不自动保存成果、不自动发起知识更新、不写 Wiki/index/log、不勾选事项尾动作、不更新事项状态、不移动事项文件。
 - 计划执行复盘状态标签已接入：Workbench 通过 `findPlanExecutionReviewState` 读取同源复盘文档，匹配同一 `workItemPath` 和 `sourceExecutionId` / `tailActionId: action-run-review:<runId>`，在计划预览中显示“复盘草稿 / Review Draft”或优先显示“已复盘 / Review Confirmed”。
 - 这些入口只提示用户显式判断并进入后续流程，不自动创建 Artifact 或 Repository output、不自动写 Wiki/index/log、不自动勾选事项 checklist 尾动作、不自动确认复盘、不移动事项文件。
 
 仍未完成：
 
-- 执行后的成果、知识更新和复盘已有发起入口；成果保存后的 Dashboard 重复提醒、知识更新发起后的 Workbench 重复入口、复盘草稿存在后的 Workbench 重复入口已按仓库事实消除；计划执行复盘草稿也会带入同源知识更新 ActionRun 供复盘核对，计划预览会把这类后续显示为“复盘知识更新”，在知识已更新或无需写入后也会显示更具体的复盘建议，并能把同源知识更新显示为待审批、已更新、知识无需写入等状态，把同源复盘文档显示为复盘草稿或已复盘；计划执行来源复盘草稿也可显式确认并回到已复盘状态；成果候选提取已能从显式 `resultSummary`、`lastAssistantResponse` 和 `<artifact>` 结构块进入 Artifacts 初始提示，AI 创建保存表单已能让用户在多个候选产物中选择一个保存并做基础元数据编辑，保存后也会通过 `notifyActionRunsChanged` 刷新 Dashboard/Workbench 的本地 ActionRun 观察状态。但复盘确认后的更自然刷新体验、更自然的端到端体验和更完整的正文/文件细节编辑体验仍需继续接上。
+- 执行后的成果、知识更新和复盘已有发起入口；成果保存后的 Dashboard 重复提醒、知识更新发起后的 Workbench 重复入口、复盘草稿存在后的 Workbench 重复入口已按仓库事实消除；计划执行复盘草稿也会带入同源知识更新 ActionRun 供复盘核对，计划预览会把这类后续显示为“复盘知识更新”，在知识已更新或无需写入后也会显示更具体的复盘建议，并能把同源知识更新显示为待审批、已更新、知识无需写入等状态，把同源复盘文档显示为复盘草稿或已复盘；计划执行来源复盘草稿也可显式确认并回到已复盘状态，复盘确认后仍未完成的成果沉淀和知识更新按钮会显示“复盘后”上下文；成果候选提取已能从显式 `resultSummary`、`lastAssistantResponse` 和 `<artifact>` 结构块进入 Artifacts 初始提示，AI 创建保存表单已能让用户在多个候选产物中选择一个保存并做基础元数据编辑，保存后也会通过 `notifyActionRunsChanged` 刷新 Dashboard/Workbench 的本地 ActionRun 观察状态。但更自然的端到端体验和更完整的正文/文件细节编辑体验仍需继续接上。
 - 新用户从开箱第一事项自然进入计划、执行和产物沉淀的端到端体验仍未完整闭环。
 
 ### P0-7 可复用资产一等对象

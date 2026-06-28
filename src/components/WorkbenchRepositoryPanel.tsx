@@ -31,6 +31,7 @@ import {
   findLatestPlanExecutionRun,
   findPlanExecutionReviewState,
   getPlanExecutionKnowledgeReviewSuggestion,
+  getPlanExecutionPostReviewActionSuggestion,
   shouldOfferPlanExecutionKnowledgeUpdate,
   shouldOfferPlanExecutionOutputPreservation,
   shouldOfferPlanExecutionReview,
@@ -1586,6 +1587,11 @@ export default function WorkbenchRepositoryPanel({
   const selectedPlanReviewState = findPlanExecutionReviewState(selectedPlanLatestRun, {
     reviewDocuments: snapshot?.reviewDocuments,
   });
+  const selectedPlanOutputSuggestion = getPlanExecutionPostReviewActionSuggestion('output', selectedPlanReviewState);
+  const selectedPlanKnowledgeSuggestion = getPlanExecutionPostReviewActionSuggestion(
+    'knowledge',
+    selectedPlanReviewState,
+  );
   const selectedPlanReviewHasKnowledgeContext = selectedPlanRelatedKnowledgeRunIds.length > 0;
   const selectedPlanReviewSuggestion = getPlanExecutionKnowledgeReviewSuggestion(
     selectedPlanReviewHasKnowledgeContext ? selectedPlanKnowledgeUpdateState : undefined,
@@ -1783,6 +1789,11 @@ export default function WorkbenchRepositoryPanel({
                               size="small"
                               type="tertiary"
                               icon={<IconBox />}
+                              title={
+                                selectedPlanOutputSuggestion.hintKey
+                                  ? t(selectedPlanOutputSuggestion.hintKey)
+                                  : undefined
+                              }
                               onClick={() =>
                                 navigate(
                                   buildDashboardTailActionTarget('/artifacts', {
@@ -1793,7 +1804,7 @@ export default function WorkbenchRepositoryPanel({
                                 )
                               }
                             >
-                              {t('workbench.preservePlanExecutionOutput')}
+                              {t(selectedPlanOutputSuggestion.labelKey)}
                             </Button>
                           )}
                           {selectedPlanCanUpdateKnowledge && (
@@ -1801,6 +1812,11 @@ export default function WorkbenchRepositoryPanel({
                               size="small"
                               type="tertiary"
                               icon={<IconFile />}
+                              title={
+                                selectedPlanKnowledgeSuggestion.hintKey
+                                  ? t(selectedPlanKnowledgeSuggestion.hintKey)
+                                  : undefined
+                              }
                               onClick={() =>
                                 navigate(
                                   buildDashboardTailActionTarget('/knowledge', {
@@ -1811,7 +1827,7 @@ export default function WorkbenchRepositoryPanel({
                                 )
                               }
                             >
-                              {t('workbench.updatePlanExecutionKnowledge')}
+                              {t(selectedPlanKnowledgeSuggestion.labelKey)}
                             </Button>
                           )}
                           {selectedPlanCanWriteReview && (

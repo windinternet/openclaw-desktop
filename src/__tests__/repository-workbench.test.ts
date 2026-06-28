@@ -1371,13 +1371,22 @@ describe('repository workbench', () => {
     const en = readFileSync('src/locales/en.json', 'utf8');
 
     expect(source).toContain('shouldOfferPlanExecutionOutputPreservation');
+    expect(source).toContain('getPlanExecutionPostReviewActionSuggestion');
+    expect(source).toContain('selectedPlanOutputSuggestion');
+    expect(source).toContain('selectedPlanReviewState');
     expect(source).toContain('buildDashboardTailActionTarget');
     expect(source).toContain("kind: 'output'");
     expect(source).toContain('`action-run-output:${selectedPlanLatestRun.id}`');
     expect(source).toContain('workItemPath: selectedPlanLatestRun.workItemPath');
-    expect(source).toContain("t('workbench.preservePlanExecutionOutput')");
+    expect(source).toContain('selectedPlanOutputSuggestion.labelKey');
     expect(zh).toContain('"preservePlanExecutionOutput": "沉淀成果"');
+    expect(zh).toContain('"preserveReviewedPlanExecutionOutput": "复盘后沉淀成果"');
+    expect(zh).toContain('"preserveReviewedPlanExecutionOutputHint": "复盘已确认，仍需显式保存成果后才会写回来源事项"');
     expect(en).toContain('"preservePlanExecutionOutput": "Preserve Output"');
+    expect(en).toContain('"preserveReviewedPlanExecutionOutput": "Preserve Reviewed Output"');
+    expect(en).toContain(
+      '"preserveReviewedPlanExecutionOutputHint": "Review is confirmed; explicitly save the output before Desktop links it back to the source matter"',
+    );
   });
 
   it('lets completed plan execution start knowledge update through the existing Knowledge tail-action route', () => {
@@ -1386,14 +1395,23 @@ describe('repository workbench', () => {
     const en = readFileSync('src/locales/en.json', 'utf8');
 
     expect(source).toContain('shouldOfferPlanExecutionKnowledgeUpdate');
+    expect(source).toContain('getPlanExecutionPostReviewActionSuggestion');
+    expect(source).toContain('selectedPlanKnowledgeSuggestion');
+    expect(source).toContain('selectedPlanReviewState');
     expect(source).toContain('actionRuns: activityRuns');
     expect(source).toContain('buildDashboardTailActionTarget');
     expect(source).toContain("kind: 'knowledge'");
     expect(source).toContain('`action-run-knowledge:${selectedPlanLatestRun.id}`');
     expect(source).toContain('workItemPath: selectedPlanLatestRun.workItemPath');
-    expect(source).toContain("t('workbench.updatePlanExecutionKnowledge')");
+    expect(source).toContain('selectedPlanKnowledgeSuggestion.labelKey');
     expect(zh).toContain('"updatePlanExecutionKnowledge": "更新知识"');
+    expect(zh).toContain('"updateReviewedPlanExecutionKnowledge": "复盘后更新知识"');
+    expect(zh).toContain('"updateReviewedPlanExecutionKnowledgeHint": "复盘已确认，仍需显式发起知识更新并审批写入"');
     expect(en).toContain('"updatePlanExecutionKnowledge": "Update Knowledge"');
+    expect(en).toContain('"updateReviewedPlanExecutionKnowledge": "Update Reviewed Knowledge"');
+    expect(en).toContain(
+      '"updateReviewedPlanExecutionKnowledgeHint": "Review is confirmed; explicitly start the knowledge update and approve any repository write"',
+    );
   });
 
   it('lets completed plan execution start a review draft through the existing Workbench review route', () => {

@@ -92,6 +92,7 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('计划执行知识更新后的复盘入口强化');
     expect(source).toContain('计划执行知识更新后的精准复盘建议');
     expect(source).toContain('计划执行复盘草稿显式确认');
+    expect(source).toContain('计划执行复盘确认后的后续动作文案');
     expect(source).toContain('计划执行知识更新状态标签');
     expect(source).toContain('计划执行复盘状态标签');
     expect(source).toContain('shouldOfferPlanExecutionReview');
@@ -106,6 +107,8 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('复盘无需写入');
     expect(source).toContain('确认计划执行复盘');
     expect(source).toContain('计划执行复盘已确认');
+    expect(source).toContain('复盘后沉淀成果');
+    expect(source).toContain('复盘后更新知识');
     expect(source).toContain('未失败/未取消的 `knowledge_rewrite`');
     expect(source).toContain('来源事项 `## 复盘`');
     expect(source).toContain('repositoryWrite');
@@ -161,6 +164,7 @@ describe('product goal P0 traceability', () => {
     expect(plans).toContain('计划执行知识更新后的复盘入口强化');
     expect(plans).toContain('计划执行知识更新后的精准复盘建议');
     expect(plans).toContain('计划执行复盘草稿显式确认');
+    expect(plans).toContain('计划执行复盘确认后的后续动作文案');
     expect(plans).toContain('计划执行知识更新状态标签');
     expect(plans).toContain('计划执行复盘状态标签');
     expect(plans).toContain('shouldOfferPlanExecutionReview');
@@ -172,6 +176,7 @@ describe('product goal P0 traceability', () => {
     expect(plans).toContain('findPlanExecutionReviewState');
     expect(plans).toContain('知识无需写入');
     expect(plans).toContain('confirmReviewSourceDraft');
+    expect(plans).toContain('getPlanExecutionPostReviewActionSuggestion');
     expect(plans).toContain('repositoryWrite.path/content/workItemPath');
     expect(plans).toContain('Knowledge 普通自动改写发起前事项选择');
     expect(plans).toContain('Teams 自然语言编排发起前事项选择');
@@ -221,6 +226,8 @@ describe('product goal P0 traceability', () => {
     expect(roadmap).toContain('getPlanExecutionKnowledgeReviewSuggestion');
     expect(roadmap).toContain('计划执行复盘草稿显式确认');
     expect(roadmap).toContain('确认计划执行复盘');
+    expect(roadmap).toContain('计划执行复盘确认后的后续动作文案');
+    expect(roadmap).toContain('Preserve Reviewed Output');
     expect(roadmap).toContain('计划执行知识更新状态标签');
     expect(roadmap).toContain('findPlanExecutionKnowledgeUpdateState');
     expect(roadmap).toContain('知识无需写入');
@@ -288,6 +295,9 @@ describe('product goal P0 traceability', () => {
     expect(skillContent).toContain('getPlanExecutionKnowledgeReviewSuggestion');
     expect(skillContent).toContain('Confirm Plan Execution Review');
     expect(skillContent).toContain('confirmReviewSourceDraft');
+    expect(skillContent).toContain('Preserve Reviewed Output');
+    expect(skillContent).toContain('Update Reviewed Knowledge');
+    expect(skillContent).toContain('getPlanExecutionPostReviewActionSuggestion');
     expect(skillContent).toContain('findPlanExecutionKnowledgeUpdateState');
     expect(skillContent).toContain('Knowledge No Write');
     expect(skillContent).toContain('findPlanExecutionReviewState');

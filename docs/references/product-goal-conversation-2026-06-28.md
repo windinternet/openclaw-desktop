@@ -1349,6 +1349,20 @@ HTML 的独特优势：
 
 - 仍需要复盘确认后的 Dashboard/Workbench 刷新体验进一步自然化、更完整的执行结果候选提取，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
 
+### 10.72 2026-06-29 当前实施记录：计划执行复盘确认后的后续动作文案
+
+围绕“复盘确认后继续推进下一步”的 P0 体验，当前继续把已确认复盘后的剩余动作表达得更自然：
+
+- 新增 `getPlanExecutionPostReviewActionSuggestion`，读取同源 `findPlanExecutionReviewState` 结果，为计划执行后的成果沉淀和知识更新按钮返回 label/hint。
+- 当同源复盘已经 `status: confirmed`，但该 `plan_execute` 仍可沉淀成果时，Workbench 计划预览按钮显示“复盘后沉淀成果 / Preserve Reviewed Output”。
+- 当同源复盘已经 `status: confirmed`，但该 `plan_execute` 仍可更新知识时，Workbench 计划预览按钮显示“复盘后更新知识 / Update Reviewed Knowledge”。
+- 两个按钮仍走原有 `action-run-output:<runId>` 和 `action-run-knowledge:<runId>` 路由，只让用户更清楚：复盘确认不等于成果已保存或知识已写入。
+- 该能力以当前代码事实为准：不自动保存成果，不自动发起知识更新，不写 Wiki/index/log，不勾选事项尾动作，不更新事项状态，不移动事项文件，不执行资产，不授予权限。
+
+仍未完成的 P0 后续：
+
+- 仍需要更自然的端到端体验、更完整的执行结果候选提取和更完整的正文/文件细节编辑体验。
+
 ### 10.62 2026-06-29 当前实施记录：计划执行复盘状态标签
 
 围绕“开始一件事闭环”中“执行 -> 复盘 -> 回到 Workbench 可观测”的 P0 缺口，当前继续把已有复盘文档状态显示到计划预览：
