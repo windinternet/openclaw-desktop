@@ -690,7 +690,7 @@ describe('repository workbench', () => {
           {
             id: 'run-knowledge-done',
             status: 'done',
-            resultSummary: '已更新 wiki/release.md、wiki/index.md 和 wiki/log.md。',
+            resultSummary: '已写入知识库文件：3 个（wiki/release.md, wiki/index.md, wiki/log.md）',
           },
           {
             id: 'run-knowledge-no-write',
@@ -705,9 +705,12 @@ describe('repository workbench', () => {
     expect(draft.content).toContain('relatedKnowledgeRunIds: run-knowledge-done, run-knowledge-no-write');
     expect(draft.content).toContain('## 相关知识更新');
     expect(draft.content).toContain(
-      '| `run-knowledge-done` | done | 已更新 wiki/release.md、wiki/index.md 和 wiki/log.md。 |',
+      '| `run-knowledge-done` | done | 已写入知识库文件：3 个（wiki/release.md, wiki/index.md, wiki/log.md） |',
     );
     expect(draft.content).toContain('| `run-knowledge-no-write` | done | no_write_needed：现有知识库已经覆盖。 |');
+    expect(draft.content).toContain(
+      '- `run-knowledge-done` 写入路径: `wiki/release.md`, `wiki/index.md`, `wiki/log.md`',
+    );
   });
 
   it('writes a review draft for a repository asset execution run and links it to the work item', async () => {

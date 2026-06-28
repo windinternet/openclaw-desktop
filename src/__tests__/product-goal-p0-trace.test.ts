@@ -122,6 +122,7 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('relatedKnowledgeRunIds');
     expect(source).toContain('relatedKnowledgeRuns');
     expect(source).toContain('## 相关知识更新');
+    expect(plans).toContain('写入路径核对行');
     expect(source).toContain('findPlanExecutionKnowledgeUpdateState');
     expect(source).toContain('getPlanExecutionKnowledgeReviewSuggestion');
     expect(source).toContain('findPlanExecutionReviewState');
@@ -215,6 +216,7 @@ describe('product goal P0 traceability', () => {
     expect(plans).toContain('action-run-review:<runId>');
     expect(plans).toContain('relatedKnowledgeRunIds');
     expect(plans).toContain('## 相关知识更新');
+    expect(plans).toContain('写入路径核对行');
     expect(plans).toContain('writePlanExecutionReviewWithKnowledge');
     expect(plans).toContain('getPlanExecutionKnowledgeReviewSuggestion');
     expect(plans).toContain('findPlanExecutionKnowledgeUpdateState');
@@ -281,6 +283,7 @@ describe('product goal P0 traceability', () => {
     expect(roadmap).toContain('sourceExecutionId` 或 `tailActionId` 为 `action-run-review:<runId>`');
     expect(roadmap).toContain('relatedKnowledgeRunIds');
     expect(roadmap).toContain('## 相关知识更新');
+    expect(roadmap).toContain('写入路径核对行');
     expect(roadmap).toContain('计划执行知识更新后的复盘入口强化');
     expect(roadmap).toContain('writePlanExecutionReviewWithKnowledge');
     expect(roadmap).toContain('计划执行知识更新后的精准复盘建议');
@@ -363,6 +366,7 @@ describe('product goal P0 traceability', () => {
     expect(skillContent).toContain('sourceExecutionId` or `tailActionId` equal to `action-run-review:<runId>`');
     expect(skillContent).toContain('relatedKnowledgeRunIds');
     expect(skillContent).toContain('a `## 相关知识更新` table with status and result/error summary');
+    expect(skillContent).toContain('write-path checklist lines for completed Wiki/index/log writes');
     expect(skillContent).toContain('Review Knowledge Update');
     expect(skillContent).toContain('writePlanExecutionReviewWithKnowledge');
     expect(skillContent).toContain('Review Knowledge Write');

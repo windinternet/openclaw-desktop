@@ -1071,6 +1071,7 @@ function buildWorkbenchReviewDraftMarkdown(input: {
     ...(input.relatedKnowledgeRunIds ?? []),
     ...relatedKnowledgeRuns.map((run) => run.id),
   ]);
+  const relatedKnowledgeWritePathLines = buildRelatedKnowledgeWritePathLines(relatedKnowledgeRuns);
   return [
     '---',
     sourceExecutionId
@@ -1104,6 +1105,8 @@ function buildWorkbenchReviewDraftMarkdown(input: {
       (run) =>
         `| \`${run.id}\` | ${formatReviewTableCell(run.status)} | ${formatReviewTableCell(run.resultSummary ?? run.error ?? '暂无摘要')} |`,
     ),
+    relatedKnowledgeWritePathLines.length ? '' : undefined,
+    ...relatedKnowledgeWritePathLines,
     '',
     '## 核对清单',
     '',
@@ -1282,6 +1285,28 @@ function dedupeRelatedKnowledgeRuns(values?: WorkbenchReviewDraftKnowledgeRun[])
     if (!id || seen.has(id)) continue;
     seen.add(id);
     result.push({ ...value, id });
+  }
+  return result;
+}
+
+function buildRelatedKnowledgeWritePathLines(values: WorkbenchReviewDraftKnowledgeRun[]): string[] {
+  return values.flatMap((run) => {
+    if (run.status !== 'done') return [];
+    const paths = extractKnowledgeWritePaths(run.resultSummary);
+    if (paths.length === 0) return [];
+    return [`- \`${run.id}\` 写入路径: ${paths.map((path) => `\`${path}\``).join(', ')}`];
+  });
+}
+
+function extractKnowledgeWritePaths(value?: string): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  const matches = value?.match(/wiki\/[^\s`"'，,、。；;）)\]}]+\.md/g) ?? [];
+  for (const match of matches) {
+    const path = normalizeWritableWorkbenchMarkdownPath(match);
+    if (!path?.startsWith('wiki/') || seen.has(path)) continue;
+    seen.add(path);
+    result.push(path);
   }
   return result;
 }
