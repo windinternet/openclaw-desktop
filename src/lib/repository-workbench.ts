@@ -1,4 +1,5 @@
 import type { RepositoryBinding, SemanticSlot } from './agentic-repository';
+import type { ArtifactMeta } from './artifact-types';
 import type { RepositoryMarkdownFile } from './repository-knowledge';
 
 const WORKBENCH_MATTER_STATUSES = new Set(['active', 'blocked', 'done', 'paused']);
@@ -81,6 +82,12 @@ export interface WorkbenchMatterStatusUpdateInput {
   workItemPath: string;
   tailActionId: string;
   status: string;
+}
+
+export interface WorkbenchOutputPreservationInput {
+  workItemPath: string;
+  tailActionId?: string;
+  artifact: Pick<ArtifactMeta, 'id' | 'title' | 'type' | 'repositoryOutputPath' | 'repositoryPreviewPath'>;
 }
 
 export interface WorkbenchSnapshot {
@@ -330,6 +337,37 @@ export async function updateWorkbenchMatterStatusFromTailAction(
   return true;
 }
 
+export async function preserveWorkbenchOutputFromTailAction(
+  binding: RepositoryBinding,
+  input: WorkbenchOutputPreservationInput,
+): Promise<boolean> {
+  const workItemPath = normalizeWritableWorkbenchMarkdownPath(input.workItemPath);
+  if (!workItemPath || !workItemPath.startsWith('work/')) return false;
+
+  const tailActionIndex = input.tailActionId ? parseTailActionIndex(input.tailActionId) : null;
+  const mustCompleteTailAction = Boolean(input.tailActionId?.includes(':tail-action:'));
+  if (mustCompleteTailAction && tailActionIndex === null) return false;
+
+  const repository = getWorkbenchWriteApi();
+  const markdown = await repository.readText(binding.repoPath, workItemPath);
+  let tailAction: WorkbenchTailAction | undefined;
+  if (tailActionIndex !== null) {
+    tailAction = parseWorkbenchTailActions(workItemPath, markdown).find((action) => action.id === input.tailActionId);
+    if (!tailAction || tailAction.completed) return false;
+  }
+
+  let next = appendWorkbenchMatterOutput(markdown, workItemPath, input.artifact);
+  if (tailAction && tailActionIndex !== null) {
+    const completed = markWorkbenchTailActionCompleted(next, tailActionIndex, tailAction.text);
+    if (!completed) return false;
+    next = completed;
+  }
+  if (next === markdown) return false;
+
+  await repository.writeText(binding.repoPath, workItemPath, next);
+  return true;
+}
+
 export async function writeWorkbenchReviewDraft(
   binding: RepositoryBinding,
   input: WorkbenchReviewDraftInput,
@@ -551,6 +589,44 @@ function markWorkbenchMatterStatus(markdown: string, status: string): string | n
   return ['---', `status: ${status}`, '---', '', markdown].join('\n');
 }
 
+function appendWorkbenchMatterOutput(
+  markdown: string,
+  workItemPath: string,
+  artifact: WorkbenchOutputPreservationInput['artifact'],
+): string {
+  const artifactReference = artifact.repositoryOutputPath ?? `artifact://${artifact.id}`;
+  if (markdown.includes(`artifact://${artifact.id}`) || markdown.includes(artifactReference)) return markdown;
+
+  const outputLine = buildWorkbenchMatterOutputLine(workItemPath, artifact, artifactReference);
+  const lines = markdown.split(/\r?\n/);
+  const headerIndex = lines.findIndex((line) => line.trim() === '## 关联成果');
+  if (headerIndex === -1) return `${markdown.trimEnd()}\n\n## 关联成果\n\n${outputLine.join('\n')}\n`;
+
+  let insertIndex = headerIndex + 1;
+  while (insertIndex < lines.length && lines[insertIndex].trim() === '') insertIndex += 1;
+  while (insertIndex < lines.length && lines[insertIndex].trim() === '- 暂无') {
+    lines.splice(insertIndex, 1);
+    while (insertIndex < lines.length && lines[insertIndex].trim() === '') lines.splice(insertIndex, 1);
+  }
+  const insertLines = [...outputLine];
+  if (/^#{1,6}\s+/.test(lines[insertIndex]?.trim() ?? '')) insertLines.push('');
+  lines.splice(insertIndex, 0, ...insertLines);
+  return lines.join('\n').trimEnd();
+}
+
+function buildWorkbenchMatterOutputLine(
+  workItemPath: string,
+  artifact: WorkbenchOutputPreservationInput['artifact'],
+  artifactReference: string,
+): string[] {
+  const href = artifact.repositoryOutputPath
+    ? relativeWorkbenchMarkdownLink(workItemPath, artifact.repositoryOutputPath)
+    : artifactReference;
+  const lines = [`- [${escapeMarkdownLinkText(artifact.title)}](${href}) (\`${artifact.id}\`, ${artifact.type})`];
+  if (artifact.repositoryPreviewPath) lines.push(`  - preview: ${artifact.repositoryPreviewPath}`);
+  return lines;
+}
+
 function parseTailActionIndex(id: string): number | null {
   const match = /:tail-action:(\d+)$/.exec(id);
   if (!match) return null;
@@ -561,6 +637,18 @@ function normalizeWorkbenchMatterStatus(value: string): string | null {
   const status = value.trim();
   if (!WORKBENCH_MATTER_STATUSES.has(status)) return null;
   return status;
+}
+
+function relativeWorkbenchMarkdownLink(fromPath: string, toPath: string): string {
+  const from = fromPath.split('/').slice(0, -1);
+  const to = toPath.split('/');
+  let common = 0;
+  while (common < from.length && common < to.length && from[common] === to[common]) common += 1;
+  return [...Array(from.length - common).fill('..'), ...to.slice(common)].join('/');
+}
+
+function escapeMarkdownLinkText(value: string): string {
+  return value.replace(/[[\]]/g, '');
 }
 
 function normalizeWritableWorkbenchMarkdownPath(value: string): string | null {

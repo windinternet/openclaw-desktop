@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, type ReactNode } from 'react';
+import { useEffect, useState, useMemo, useCallback, type ReactNode } from 'react';
 import { Typography, Button, Input, Tag, Select, Empty, Card, Spin, Toast } from '@douyinfe/semi-ui';
 import { IconPlus, IconSearch, IconAppCenter, IconAIFilledLevel1 } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
@@ -10,7 +10,9 @@ import { filterArtifactList, type ArtifactReuseKindFilter } from '../lib/artifac
 import { buildArtifactValueHealth, type ArtifactValueHealthStatus } from '../lib/artifact-value-health';
 import { ArtifactCreateDialog } from '../components/ArtifactCreateDialog';
 import { ArtifactAICreateDrawer } from '../components/ArtifactAICreateDrawer';
+import { loadRepositoryBinding } from '../lib/agentic-repository-store';
 import { parseDashboardTailActionRoute } from '../lib/dashboard-tail-action-routing';
+import { preserveWorkbenchOutputFromTailAction } from '../lib/repository-workbench';
 
 const { Text } = Typography;
 
@@ -24,6 +26,7 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
   const artifacts = useStore((s) => s.artifacts);
   const fetchArtifacts = useStore((s) => s.fetchArtifacts);
   const openArtifactWindow = useStore((s) => s.openArtifactWindow);
+  const currentInstanceId = useStore((s) => s.currentInstanceId);
   const navigate = useNavigate();
   const location = useLocation();
   const tailActionContext = useMemo(() => parseDashboardTailActionRoute(location.search), [location.search]);
@@ -133,6 +136,29 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
     if (diff < 86400000) return t('artifact.hourAgo', { count: Math.floor(diff / 3600000) });
     return t('artifact.dayAgo', { count: Math.floor(diff / 86400000) });
   };
+
+  const handleArtifactTailActionSaved = useCallback(
+    async (artifact: ArtifactMeta) => {
+      if (!artifactTailActionContext?.workItemPath || !currentInstanceId) return;
+      try {
+        const binding = await loadRepositoryBinding(currentInstanceId);
+        if (!binding) {
+          Toast.warning(t('artifact.outputTailActionUnavailable'));
+          return;
+        }
+        const updated = await preserveWorkbenchOutputFromTailAction(binding, {
+          workItemPath: artifactTailActionContext.workItemPath,
+          tailActionId: artifactTailActionContext.id,
+          artifact,
+        });
+        if (updated) Toast.success(t('artifact.outputTailActionLinked'));
+        else Toast.warning(t('artifact.outputTailActionUnavailable'));
+      } catch (err) {
+        Toast.error(err instanceof Error ? err.message : t('artifact.outputTailActionLinkFailed'));
+      }
+    },
+    [artifactTailActionContext?.id, artifactTailActionContext?.workItemPath, currentInstanceId, t],
+  );
 
   const headerActions = useMemo(
     () => (
@@ -532,6 +558,7 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
         sourcePage={artifactTailActionContext ? 'workbench' : 'artifacts'}
         workItemPath={artifactTailActionContext?.workItemPath}
         initialInput={artifactTailActionInitialInput}
+        onSaved={handleArtifactTailActionSaved}
       />
     </div>
   );

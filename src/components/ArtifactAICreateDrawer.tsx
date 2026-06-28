@@ -6,7 +6,7 @@ import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGa
 import { buildArtifactCreatePrompt } from '../lib/ai-action-prompts';
 import { upsertAiActionRun } from '../lib/ai-action-run-store';
 import type { AiActionRun } from '../lib/types';
-import type { ArtifactType } from '../lib/artifact-types';
+import type { ArtifactMeta, ArtifactType } from '../lib/artifact-types';
 
 const { Text, Paragraph } = Typography;
 
@@ -27,6 +27,7 @@ interface Props {
   workItemId?: string;
   workItemPath?: string;
   initialInput?: string;
+  onSaved?: (artifact: ArtifactMeta) => void | Promise<void>;
 }
 
 export function ArtifactAICreateDrawer({
@@ -36,6 +37,7 @@ export function ArtifactAICreateDrawer({
   workItemId,
   workItemPath,
   initialInput,
+  onSaved,
 }: Props) {
   const generateArtifact = useStore((s) => s.generateArtifact);
   const activeClient = useStore((s) => s.activeClient);
@@ -181,6 +183,7 @@ export function ArtifactAICreateDrawer({
           updatedAt: Date.now(),
         });
       }
+      await onSaved?.(artifact);
       Toast.success('产物已创建');
       setInput('');
       setPreview(null);
@@ -189,7 +192,7 @@ export function ArtifactAICreateDrawer({
     } catch (e) {
       Toast.error(String(e));
     }
-  }, [currentInstanceId, preview, previewRun, generateArtifact, onClose]);
+  }, [currentInstanceId, preview, previewRun, generateArtifact, onClose, onSaved]);
 
   const handleClose = () => {
     if (!generating) {

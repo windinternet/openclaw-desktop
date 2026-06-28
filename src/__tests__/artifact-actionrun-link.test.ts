@@ -45,4 +45,16 @@ describe('artifact ActionRun linkage', () => {
     expect(artifacts).toContain('请根据来源事项');
     expect(artifacts).toContain('initialInput={artifactTailActionInitialInput}');
   });
+
+  it('writes back output tail action context after an AI-created artifact is saved', () => {
+    const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
+    const artifacts = readFileSync('src/pages/ArtifactsPage.tsx', 'utf8');
+
+    expect(drawer).toContain('onSaved?: (artifact: ArtifactMeta) => void | Promise<void>');
+    expect(drawer).toContain('await onSaved?.(artifact)');
+    expect(artifacts).toContain('preserveWorkbenchOutputFromTailAction');
+    expect(artifacts).toContain('loadRepositoryBinding(currentInstanceId)');
+    expect(artifacts).toContain('tailActionId: artifactTailActionContext.id');
+    expect(artifacts).toContain('onSaved={handleArtifactTailActionSaved}');
+  });
 });

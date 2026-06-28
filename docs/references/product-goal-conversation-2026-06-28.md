@@ -720,11 +720,11 @@ HTML 的独特优势：
 - 如果 Workbench Snapshot 提供了 `runs/action-runs/index.md`，这类提示要求该 ActionRun 已经能在运行索引中找到，避免在“运行记录未归档”之前重复提示成果沉淀。
 - 这类待确认条目的状态是 `action-run:output-unpreserved`，详情显示 `成果未沉淀 · <workItemPath>`。
 - 点击条目会进入 Artifacts 的 `tailAction=output` 成果沉淀入口，并携带 `tailActionId=action-run-output:<runId>` 和 `workItemPath`，让 Artifacts 能保留来源事项上下文。
-- 该能力只做观测和用户确认入口，不自动创建 Artifact，不自动写 Repository output，也不替代成果类收尾动作的真正处理流程。
+- 该能力当时只做观测和用户确认入口，不自动创建 Artifact，不自动写 Repository output，也不替代成果类收尾动作的真正处理流程；保存后写回事项的第一片已在 10.41 补入。
 
 仍未完成的 P0 后续：
 
-- 成果沉淀入口仍需要更具体的“一键把本次结果保存为 Artifact / output”流程，而不是只打开 AI 产物创建入口。
+- 成果沉淀入口已在 10.41 补入“用户显式保存产物后写回来源事项”的第一片；仍需要更完整的候选成果带入、保存表单和 Dashboard 刷新体验。
 - 跨事项风险的第一片显式依赖诊断已在后续 10.27 接入。
 
 ### 10.27 2026-06-28 当前实施记录：跨事项依赖风险进入 Dashboard 卡住项
@@ -877,6 +877,21 @@ HTML 的独特优势：
 仍未完成的 P0 后续：
 
 - 仍需要更完整的结构化复盘表单、从事项执行记录和成果线索自动带入复盘上下文、Artifact 详情到 `desktop.artifacts.execution.review.write` 的 UI 入口、资产权限/审批面板、更完整的 Repository 资产目录协议、更细的状态/成果/知识尾动作处理流程，以及从手动仓库文件导入资产的流程。
+
+### 10.41 2026-06-28 当前实施记录：事项成果尾动作保存后回写
+
+围绕“产物是 P0 价值沉淀对象”和“执行结束后的成果尾动作需要回到事项页闭环”的验收，当前继续落地一段代码事实：
+
+- Workbench 新增 `preserveWorkbenchOutputFromTailAction`，用于处理 Artifacts 保存后的来源事项写回。
+- Artifacts 从 Dashboard 成果类尾动作进入时，仍会打开 AI 产物创建入口并保留 `tailAction`、`tailActionId` 和 `workItemPath`。
+- 用户显式保存产物后，Artifacts 会加载当前 Repository binding，并把 Artifact 或 Repository output 链接写入来源事项的 `## 关联成果`。
+- 如果 `tailActionId` 是 `work/...:tail-action:N` 这种事项 checklist ID，Desktop 会只把匹配的成果尾动作勾选为 `[x]`。
+- 如果 `tailActionId` 是 `action-run-output:<runId>` 这种成果未沉淀诊断 ID，Desktop 只写回 `## 关联成果`，不会假装存在 checklist 行可勾选。
+- 该入口不会自动更新事项状态，不会更新知识库，不会写复盘，不会移动事项文件，不会执行资产，也不会授予权限。
+
+仍未完成的 P0 后续：
+
+- 仍需要更完整的成果保存表单、从最近 ActionRun 自动带入更强的成果候选、保存后刷新 Dashboard 待确认状态的更顺滑体验、知识更新尾动作入口，以及完成事项后的显式移动流程。
 
 ### 10.40 2026-06-28 当前实施记录：事项状态尾动作处理入口
 

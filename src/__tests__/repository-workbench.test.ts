@@ -7,6 +7,7 @@ import {
   groupReviewsByFolder,
   loadWorkbenchSnapshot,
   parsePlanMetadata,
+  preserveWorkbenchOutputFromTailAction,
   readWorkbenchMarkdown,
   updateWorkbenchMatterStatusFromTailAction,
   writeWorkbenchReviewDraft,
@@ -701,6 +702,120 @@ describe('repository workbench', () => {
     expect(updated).toBe(false);
     expect(readText).not.toHaveBeenCalled();
     expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it('links a preserved artifact to the work item and completes the matching output tail action', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'work/active/release.md') {
+        return [
+          '---',
+          'id: release',
+          'status: active',
+          '---',
+          '',
+          '# 发布推进',
+          '',
+          '## 关联成果',
+          '',
+          '- 暂无',
+          '',
+          '## 收尾动作',
+          '',
+          '- [ ] 根据 ActionRun 更新事项状态。',
+          '- [ ] 判断是否需要把本次执行结果沉淀为成果，并关联到事项。',
+          '- [ ] 判断是否需要更新知识库。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const updated = await preserveWorkbenchOutputFromTailAction(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'work/active/release.md:tail-action:1',
+        artifact: {
+          id: 'art_1',
+          title: '发布报告',
+          type: 'report',
+          repositoryOutputPath: 'outputs/reports/art_1.md',
+          repositoryPreviewPath: 'outputs/html/art_1.html',
+        },
+      },
+    );
+
+    expect(updated).toBe(true);
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'work/active/release.md',
+      [
+        '---',
+        'id: release',
+        'status: active',
+        '---',
+        '',
+        '# 发布推进',
+        '',
+        '## 关联成果',
+        '',
+        '- [发布报告](../../outputs/reports/art_1.md) (`art_1`, report)',
+        '  - preview: outputs/html/art_1.html',
+        '',
+        '## 收尾动作',
+        '',
+        '- [ ] 根据 ActionRun 更新事项状态。',
+        '- [x] 判断是否需要把本次执行结果沉淀为成果，并关联到事项。',
+        '- [ ] 判断是否需要更新知识库。',
+      ].join('\n'),
+    );
+  });
+
+  it('records an output-preservation diagnostic artifact without requiring a checklist tail action id', async () => {
+    const readText = vi.fn(async () =>
+      ['# 发布推进', '', '## 执行记录', '', '- 已生成发布报告', '', '## 关联成果', '', '- 暂无'].join('\n'),
+    );
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const updated = await preserveWorkbenchOutputFromTailAction(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'action-run-output:run_1',
+        artifact: {
+          id: 'art_1',
+          title: '发布报告',
+          type: 'report',
+        },
+      },
+    );
+
+    expect(updated).toBe(true);
+    expect(writeText.mock.calls[0]).toEqual([
+      '/repo',
+      'work/active/release.md',
+      [
+        '# 发布推进',
+        '',
+        '## 执行记录',
+        '',
+        '- 已生成发布报告',
+        '',
+        '## 关联成果',
+        '',
+        '- [发布报告](artifact://art_1) (`art_1`, report)',
+      ].join('\n'),
+    ]);
   });
 
   it('refuses to confirm a review draft that belongs to another tail action', async () => {

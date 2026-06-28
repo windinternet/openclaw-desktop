@@ -144,6 +144,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('Completed work-item ActionRuns with `resultSummary` and no Artifact ids');
     expect(skillContent).toContain('do not auto-create Artifacts or Repository outputs');
     expect(skillContent).toContain(
+      'After the user explicitly saves an Artifact from an output tail action, Desktop can link it back to `## 关联成果`',
+    );
+    expect(skillContent).toContain(
       'Dashboard recent and weekly outputs mark reusable Artifacts and Repository outputs',
     );
     expect(skillContent).toContain('latest execution status or approval-required boundary');
