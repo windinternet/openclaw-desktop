@@ -1295,6 +1295,7 @@ describe('repository workbench', () => {
     const en = readFileSync('src/locales/en.json', 'utf8');
 
     expect(source).toContain('shouldOfferPlanExecutionKnowledgeUpdate');
+    expect(source).toContain('actionRuns: activityRuns');
     expect(source).toContain('buildDashboardTailActionTarget');
     expect(source).toContain("kind: 'knowledge'");
     expect(source).toContain('`action-run-knowledge:${selectedPlanLatestRun.id}`');
@@ -1310,6 +1311,7 @@ describe('repository workbench', () => {
     const en = readFileSync('src/locales/en.json', 'utf8');
 
     expect(source).toContain('shouldOfferPlanExecutionReview');
+    expect(source).toContain('reviewDocuments: snapshot?.reviewDocuments');
     expect(source).toContain('buildDashboardTailActionTarget');
     expect(source).toContain("kind: 'review'");
     expect(source).toContain('`action-run-review:${selectedPlanLatestRun.id}`');

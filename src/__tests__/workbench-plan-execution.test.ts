@@ -169,6 +169,44 @@ describe('workbench plan execution observability', () => {
     ).toBe(false);
   });
 
+  it('does not offer knowledge update again when a source-bound knowledge ActionRun already exists', () => {
+    const planRun = createRun({
+      id: 'run-plan',
+      status: 'done',
+      resultSummary: '完成打包验证，发现发布文档需要补充',
+      workItemPath: 'work/active/release.md',
+    });
+    const knowledgeRun = createRun({
+      id: 'run-knowledge',
+      type: 'knowledge_rewrite',
+      status: 'running',
+      input: '知识更新\n来源执行记录 action-run-knowledge:run-plan',
+      workItemPath: 'work/active/release.md',
+      updatedAt: 10,
+    });
+
+    expect(shouldOfferPlanExecutionKnowledgeUpdate(planRun, { actionRuns: [knowledgeRun] })).toBe(false);
+  });
+
+  it('still offers knowledge update when the previous source-bound knowledge ActionRun failed', () => {
+    const planRun = createRun({
+      id: 'run-plan',
+      status: 'done',
+      resultSummary: '完成打包验证，发现发布文档需要补充',
+      workItemPath: 'work/active/release.md',
+    });
+    const failedKnowledgeRun = createRun({
+      id: 'run-knowledge',
+      type: 'knowledge_rewrite',
+      status: 'failed',
+      input: '知识更新\n来源执行记录 action-run-knowledge:run-plan',
+      workItemPath: 'work/active/release.md',
+      updatedAt: 10,
+    });
+
+    expect(shouldOfferPlanExecutionKnowledgeUpdate(planRun, { actionRuns: [failedKnowledgeRun] })).toBe(true);
+  });
+
   it('offers review draft creation for completed work-bound plan execution with a result summary', () => {
     expect(
       shouldOfferPlanExecutionReview(
@@ -217,5 +255,47 @@ describe('workbench plan execution observability', () => {
         }),
       ),
     ).toBe(false);
+  });
+
+  it('does not offer review draft creation again when a source-bound review draft already exists', () => {
+    const planRun = createRun({
+      id: 'run-plan',
+      status: 'done',
+      resultSummary: '完成打包验证，需要复盘遗留风险',
+      workItemPath: 'work/active/release.md',
+    });
+    const reviewMarkdown = [
+      '---',
+      'source: desktop-workbench-review-source-execution',
+      'workItemPath: work/active/release.md',
+      'tailActionId: action-run-review:run-plan',
+      'sourceExecutionId: action-run-review:run-plan',
+      'status: draft',
+      '---',
+      '',
+      '# release 复盘草稿',
+    ].join('\n');
+
+    expect(shouldOfferPlanExecutionReview(planRun, { reviewDocuments: [{ content: reviewMarkdown }] })).toBe(false);
+  });
+
+  it('still offers review draft creation when the existing source execution review belongs to another matter', () => {
+    const planRun = createRun({
+      id: 'run-plan',
+      status: 'done',
+      resultSummary: '完成打包验证，需要复盘遗留风险',
+      workItemPath: 'work/active/release.md',
+    });
+    const otherReviewMarkdown = [
+      '---',
+      'source: desktop-workbench-review-source-execution',
+      'workItemPath: work/active/other.md',
+      'tailActionId: action-run-review:run-plan',
+      'sourceExecutionId: action-run-review:run-plan',
+      'status: draft',
+      '---',
+    ].join('\n');
+
+    expect(shouldOfferPlanExecutionReview(planRun, { reviewDocuments: [otherReviewMarkdown] })).toBe(true);
   });
 });

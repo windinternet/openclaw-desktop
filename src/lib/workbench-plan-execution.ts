@@ -1,6 +1,13 @@
 import type { AiActionRun } from './types';
 import { isWorkbenchMatterPath } from './workbench-matter';
 
+export type PlanExecutionReviewDocument = string | { content: string };
+
+export interface PlanExecutionFollowUpContext {
+  actionRuns?: readonly AiActionRun[];
+  reviewDocuments?: readonly PlanExecutionReviewDocument[];
+}
+
 export function getPlanExecutionPlanPath(input: string): string | undefined {
   for (const rawLine of input.split('\n')) {
     const match = /^planPath:\s*(.+)$/.exec(rawLine.trim());
@@ -33,6 +40,7 @@ export function shouldOfferPlanExecutionOutputPreservation(
 
 export function shouldOfferPlanExecutionKnowledgeUpdate(
   run: AiActionRun | undefined,
+  context: PlanExecutionFollowUpContext = {},
 ): run is AiActionRun & { workItemPath: string } {
   return Boolean(
     run &&
@@ -40,12 +48,14 @@ export function shouldOfferPlanExecutionKnowledgeUpdate(
     run.status === 'done' &&
     run.resultSummary?.trim() &&
     run.workItemPath &&
-    isWorkbenchMatterPath(run.workItemPath),
+    isWorkbenchMatterPath(run.workItemPath) &&
+    !hasPlanExecutionKnowledgeFollowUp(run, context),
   );
 }
 
 export function shouldOfferPlanExecutionReview(
   run: AiActionRun | undefined,
+  context: PlanExecutionFollowUpContext = {},
 ): run is AiActionRun & { workItemPath: string } {
   return Boolean(
     run &&
@@ -53,6 +63,49 @@ export function shouldOfferPlanExecutionReview(
     run.status === 'done' &&
     run.resultSummary?.trim() &&
     run.workItemPath &&
-    isWorkbenchMatterPath(run.workItemPath),
+    isWorkbenchMatterPath(run.workItemPath) &&
+    !hasPlanExecutionReviewFollowUp(run, context),
   );
+}
+
+function hasPlanExecutionKnowledgeFollowUp(run: AiActionRun, context: PlanExecutionFollowUpContext): boolean {
+  const sourceExecutionId = `action-run-knowledge:${run.id}`;
+  return Boolean(
+    context.actionRuns?.some(
+      (candidate) =>
+        candidate.type === 'knowledge_rewrite' &&
+        candidate.workItemPath === run.workItemPath &&
+        isActiveFollowUpRun(candidate) &&
+        candidate.input.includes(sourceExecutionId),
+    ),
+  );
+}
+
+function hasPlanExecutionReviewFollowUp(run: AiActionRun, context: PlanExecutionFollowUpContext): boolean {
+  const sourceExecutionId = `action-run-review:${run.id}`;
+  return Boolean(
+    context.reviewDocuments?.some((document) => {
+      const content = typeof document === 'string' ? document : document.content;
+      return (
+        hasFrontmatterValue(content, 'workItemPath', run.workItemPath) &&
+        (hasFrontmatterValue(content, 'sourceExecutionId', sourceExecutionId) ||
+          hasFrontmatterValue(content, 'tailActionId', sourceExecutionId))
+      );
+    }),
+  );
+}
+
+function isActiveFollowUpRun(run: AiActionRun): boolean {
+  return run.status !== 'failed' && run.status !== 'cancelled';
+}
+
+function hasFrontmatterValue(markdown: string, key: string, value?: string): boolean {
+  if (!value) return false;
+  const escapedKey = escapeRegExp(key);
+  const escapedValue = escapeRegExp(value);
+  return new RegExp(`^${escapedKey}:\\s*${escapedValue}\\s*$`, 'm').test(markdown);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

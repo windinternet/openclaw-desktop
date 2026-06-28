@@ -1274,3 +1274,19 @@ HTML 的独特优势：
 仍未完成的 P0 后续：
 
 - 仍需要复盘草稿确认后的 Dashboard/Workbench 状态刷新体验、复盘与知识写入后的自然联动、更完整的执行结果候选提取，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
+
+### 10.59 2026-06-29 当前实施记录：计划执行知识/复盘后续入口去重
+
+围绕“开始一件事闭环”中“执行 -> 知识更新 / 复盘 -> 回到 Workbench 可观测”的 P0 缺口，当前继续补齐 Workbench 对已有后续事实的识别：
+
+- `shouldOfferPlanExecutionKnowledgeUpdate` 现在可接收 ActionRun 上下文。
+- 当同一来源事项下已经存在未失败/未取消的 `knowledge_rewrite` ActionRun，且该运行输入包含 `action-run-knowledge:<runId>` 时，Workbench 不再为同一个 `plan_execute` 重复显示“更新知识 / Update Knowledge”。
+- 失败或取消的知识更新运行不会阻止入口再次出现，用户仍可显式重试。
+- `shouldOfferPlanExecutionReview` 现在可接收已加载的复盘文档上下文。
+- 当 `reviews/weekly/` 中已有同一 `workItemPath`，且 frontmatter 记录 `sourceExecutionId` 或 `tailActionId` 为 `action-run-review:<runId>` 的复盘草稿或复盘文档时，Workbench 不再为同一个 `plan_execute` 重复显示“写复盘 / Write Review”。
+- 不同来源事项的同名来源执行记录不会影响当前计划，避免跨事项误隐藏入口。
+- 该能力只更新 Workbench 计划预览头部的后续入口判断，不自动写 Wiki/index/log、不自动确认复盘、不勾选事项尾动作、不更新状态、不沉淀成果、不移动事项文件。
+
+仍未完成的 P0 后续：
+
+- 仍需要真正 Wiki 写入后的复盘建议/联动、复盘确认后的更完整状态表达、更完整的执行结果候选提取，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。

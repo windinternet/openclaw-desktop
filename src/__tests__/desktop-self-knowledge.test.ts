@@ -56,6 +56,8 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('`action-run-review:<runId>`');
     expect(skillContent).toContain('Write Review');
     expect(skillContent).toContain('links the draft back to the source matter `## 复盘`');
+    expect(skillContent).toContain('non-failed, non-cancelled `knowledge_rewrite`');
+    expect(skillContent).toContain('sourceExecutionId` or `tailActionId` equal to `action-run-review:<runId>`');
     expect(skillContent).toContain('adds a `## 收尾动作` checklist');
     expect(skillContent).toContain('missing from the repository run index');
     expect(skillContent).toContain('`action-run:unarchived` pending confirmation');

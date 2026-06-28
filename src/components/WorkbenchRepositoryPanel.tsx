@@ -1527,8 +1527,12 @@ export default function WorkbenchRepositoryPanel({
     ? findLatestPlanExecutionRun(selectedPlanPath, activityRuns)
     : undefined;
   const selectedPlanCanPreserveOutput = shouldOfferPlanExecutionOutputPreservation(selectedPlanLatestRun);
-  const selectedPlanCanUpdateKnowledge = shouldOfferPlanExecutionKnowledgeUpdate(selectedPlanLatestRun);
-  const selectedPlanCanWriteReview = shouldOfferPlanExecutionReview(selectedPlanLatestRun);
+  const selectedPlanCanUpdateKnowledge = shouldOfferPlanExecutionKnowledgeUpdate(selectedPlanLatestRun, {
+    actionRuns: activityRuns,
+  });
+  const selectedPlanCanWriteReview = shouldOfferPlanExecutionReview(selectedPlanLatestRun, {
+    reviewDocuments: snapshot?.reviewDocuments,
+  });
   const previewTitle =
     panelView === 'projects' ? t('workbench.projectPreview') : selectedPreviewPath || t('workbench.preview');
   const standaloneView = panelView === 'dashboard' || panelView === 'outputs';
