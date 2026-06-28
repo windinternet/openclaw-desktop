@@ -1087,3 +1087,20 @@ HTML 的独特优势：
 仍未完成的 P0 后续：
 
 - 后续仍需要更完整的跨事项风险处理，例如提供可执行的收口动作，并把负责人解析扩展到工作事项等更多对象。
+
+### 10.47 2026-06-28 当前实施记录：Artifacts 发起前即时创建事项
+
+围绕“ActionRun 必须能关联或创建工作事项”和“开始一件事闭环”的 P0 缺口，当前继续落地一段代码事实：
+
+- 共享事项候选能力新增 `createWorkbenchWorkItemOption`，可在当前绑定 Repository 就绪时创建新的 `work/active/YYYY-MM-DD-HHmmss-*.md` 事项，并返回可直接选中的 `workItemPath` / `workItemId` / 名称。
+- 事项模板继续复用开箱第一事项结构，但可传入来源；Artifacts 发起前创建的事项会标记 `source: desktop-action-run`，区别于开箱路径的 `source: desktop-onboarding`。
+- Artifacts 普通“AI 魔法创建”入口在没有外部来源事项时，除了选择已有 `work/active`、`work/someday`、`work/completed` 事项，也可以输入新事项标题并点击“新建并关联”。
+- 新事项创建成功后会自动成为当前选中事项；随后发起 `artifact_create` ActionRun 时，Desktop 会把该事项 `workItemPath` 和 frontmatter `id` 写入运行记录。
+- 如果用户既不选择也不创建事项，运行仍会按 `workItemRequired: true` / `workItemUnassignedReason: pending_work_item_assignment` 进入未归属诊断。
+- 该能力只服务用户显式创建，不自动猜测事项归属，不自动生成计划，不自动执行产物创建之外的仓库写入，不绕过 Repository Context 或审批。
+
+仍未完成的 P0 后续：
+
+- 仍需要把“选择已有事项 / 即时创建事项”提升为所有新 ActionRun 入口的全局体验。
+- 仍需要“开始一件事”专题里的计划、执行、产物、知识更新和复盘金线。
+- 仍需要给 Knowledge、Teams、RepositoryGate 等入口补同等即时创建能力，或抽出统一的新 ActionRun 发起前事项面板。

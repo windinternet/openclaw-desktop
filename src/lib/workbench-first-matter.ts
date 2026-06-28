@@ -10,11 +10,13 @@ export interface FirstWorkbenchMatter {
 export interface FirstWorkbenchMatterInput {
   title: string;
   now?: Date;
+  source?: string;
   workRoot?: string;
 }
 
 export interface CreateFirstWorkbenchMatterOptions {
   now?: Date;
+  source?: string;
 }
 
 export function buildFirstWorkbenchMatter(input: FirstWorkbenchMatterInput): FirstWorkbenchMatter {
@@ -33,7 +35,7 @@ export function buildFirstWorkbenchMatter(input: FirstWorkbenchMatterInput): Fir
     `title: ${JSON.stringify(title)}`,
     'status: active',
     `createdAt: ${now.toISOString()}`,
-    'source: desktop-onboarding',
+    `source: ${normalizeSource(input.source ?? 'desktop-onboarding')}`,
     '---',
     '',
     `# ${title}`,
@@ -82,6 +84,7 @@ export async function createFirstWorkbenchMatter(
   const matter = buildFirstWorkbenchMatter({
     title,
     now: options.now,
+    source: options.source,
     workRoot: binding.paths.work,
   });
   await writeText(binding.repoPath, matter.path, matter.markdown);
@@ -110,4 +113,12 @@ function normalizeWorkRoot(value: string): string {
   const root = value.trim().replace(/^\/+|\/+$/g, '');
   if (!root || root.includes('..')) throw new Error('Unsafe work root');
   return root;
+}
+
+function normalizeSource(value: string): string {
+  const source = value
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-zA-Z0-9_-]/g, '');
+  return source || 'desktop-onboarding';
 }

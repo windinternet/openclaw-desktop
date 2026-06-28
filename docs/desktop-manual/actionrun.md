@@ -58,7 +58,7 @@ ActionRun 默认需要归属工作事项。本地记录会写入 `workItemRequir
 
 Workbench 预览工作事项 Markdown 时，用户可以从该事项直接发起“生成成果”。这会创建 `sourcePage: workbench` 的 `artifact_create` ActionRun，并把当前 `workItemPath` 写入运行记录；如果事项 frontmatter 中存在 `id`，也会同时写入 `workItemId`。事项内容、写入边界和具体仓库规则仍以 Repository Context 与仓库 `AGENTS.md` 为准。
 
-Artifacts 普通“AI 魔法创建”入口在没有外部来源事项时，会加载当前绑定 Repository 的 Workbench Snapshot，从 `work/active`、`work/someday` 和 `work/completed` 列出已有事项。用户可以在发起前选择关联事项；Desktop 会读取事项 frontmatter `id`，创建 `artifact_create` ActionRun 时写入 `workItemPath` 和 `workItemId`。如果用户跳过选择，运行仍会按 `workItemRequired: true` 和 `workItemUnassignedReason: pending_work_item_assignment` 进入未归属诊断；该入口不会自动创建事项、猜测归属或绕过 Repository Context。
+Artifacts 普通“AI 魔法创建”入口在没有外部来源事项时，会加载当前绑定 Repository 的 Workbench Snapshot，从 `work/active`、`work/someday` 和 `work/completed` 列出已有事项。用户可以在发起前选择关联事项；Desktop 会读取事项 frontmatter `id`，创建 `artifact_create` ActionRun 时写入 `workItemPath` 和 `workItemId`。如果没有合适事项，用户也可以在同一入口输入标题并显式创建 `work/active/YYYY-MM-DD-HHmmss-*.md`，新事项会标记 `source: desktop-action-run`，并自动作为本次 `artifact_create` ActionRun 的事项上下文。如果用户跳过选择和创建，运行仍会按 `workItemRequired: true` 和 `workItemUnassignedReason: pending_work_item_assignment` 进入未归属诊断；该入口不会自动猜测归属或绕过 Repository Context。
 
 Knowledge 普通“消化资料 / 自动改写 / 刷新索引日志”入口在没有 Dashboard 尾动作来源事项时，也会加载同一批 Workbench 事项候选。用户可以在发起 `knowledge_rewrite` ActionRun 前选择关联事项；Desktop 会写入 `workItemPath` 和 `workItemId`。Dashboard 知识尾动作入口已有来源 `workItemPath` 时，仍以该来源事项为准，不用普通选择器覆盖。
 

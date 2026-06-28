@@ -921,6 +921,9 @@
     "aiCreateWorkItem": "Work Item",
     "aiCreateWorkItemDesc": "Choose the work item this AI artifact should serve first. The ActionRun will start with that work context attached.",
     "aiCreateWorkItemPlaceholder": "Select a work item",
+    "aiCreateNewWorkItem": "Create and attach",
+    "aiCreateNewWorkItemPlaceholder": "No matching work item? Enter a new title",
+    "aiCreateNewWorkItemSuccess": "Work item created and attached",
     "openLink": "Open in Browser",
     "copyCommand": "Copy Command",
     "commandCopied": "Command copied"

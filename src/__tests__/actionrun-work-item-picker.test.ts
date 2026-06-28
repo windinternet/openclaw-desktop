@@ -14,6 +14,7 @@ describe('ActionRun work item picker', () => {
     const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
 
     expect(helper).toContain('loadWorkbenchWorkItemOptions');
+    expect(helper).toContain('createWorkbenchWorkItemOption');
     expect(helper).toContain('useWorkbenchWorkItemOptions');
     expect(helper).toContain('loadRepositoryBinding');
     expect(helper).toContain('loadWorkbenchSnapshot');
@@ -21,6 +22,9 @@ describe('ActionRun work item picker', () => {
     expect(helper).toContain('extractWorkbenchMatterId');
 
     expect(artifactDrawer).toContain('useWorkbenchWorkItemOptions');
+    expect(artifactDrawer).toContain('newWorkItemTitle');
+    expect(artifactDrawer).toContain('createWorkItem');
+    expect(artifactDrawer).toContain("t('artifact.aiCreateNewWorkItemPlaceholder')");
     expect(artifactDrawer).toContain('selectedWorkItemId');
     expect(artifactDrawer).toContain('workItemId: resolvedWorkItemId');
     expect(artifactDrawer).toContain('workItemPath: resolvedWorkItemPath');
@@ -49,9 +53,15 @@ describe('ActionRun work item picker', () => {
     expect(zh.knowledge.rewriteWorkItem).toBeTruthy();
     expect(zh.knowledge.rewriteWorkItemDesc).toBeTruthy();
     expect(zh.knowledge.rewriteWorkItemPlaceholder).toBeTruthy();
+    expect(zh.artifact.aiCreateNewWorkItem).toBeTruthy();
+    expect(zh.artifact.aiCreateNewWorkItemPlaceholder).toBeTruthy();
+    expect(zh.artifact.aiCreateNewWorkItemSuccess).toBeTruthy();
     expect(en.knowledge.rewriteWorkItem).toBeTruthy();
     expect(en.knowledge.rewriteWorkItemDesc).toBeTruthy();
     expect(en.knowledge.rewriteWorkItemPlaceholder).toBeTruthy();
+    expect(en.artifact.aiCreateNewWorkItem).toBeTruthy();
+    expect(en.artifact.aiCreateNewWorkItemPlaceholder).toBeTruthy();
+    expect(en.artifact.aiCreateNewWorkItemSuccess).toBeTruthy();
     expect(zh.teams.actionWorkItem).toBeTruthy();
     expect(zh.teams.actionWorkItemDesc).toBeTruthy();
     expect(zh.teams.actionWorkItemPlaceholder).toBeTruthy();

@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { RepositoryBinding } from './agentic-repository';
 import { loadRepositoryBinding } from './agentic-repository-store';
 import { loadWorkbenchSnapshot, readWorkbenchMarkdown } from './repository-workbench';
+import { createFirstWorkbenchMatter } from './workbench-first-matter';
 import { extractWorkbenchMatterId } from './workbench-matter';
 
 export interface WorkbenchWorkItemOption {
@@ -33,6 +34,28 @@ export async function loadWorkbenchWorkItemOptions(options: {
   );
 }
 
+export async function createWorkbenchWorkItemOption(options: {
+  binding?: RepositoryBinding | null;
+  instanceId?: string | null;
+  title: string;
+  now?: Date;
+}): Promise<WorkbenchWorkItemOption> {
+  const binding =
+    options.binding ??
+    (options.instanceId ? await loadRepositoryBinding(options.instanceId).catch(() => undefined) : undefined);
+  if (!binding || binding.status !== 'repo_ready') throw new Error('Repository binding unavailable');
+
+  const matter = await createFirstWorkbenchMatter(binding, options.title, {
+    now: options.now,
+    source: 'desktop-action-run',
+  });
+  return {
+    id: matter.id,
+    name: matter.title,
+    path: matter.path,
+  };
+}
+
 export function useWorkbenchWorkItemOptions(options: {
   binding?: RepositoryBinding | null;
   instanceId?: string | null;
@@ -42,6 +65,7 @@ export function useWorkbenchWorkItemOptions(options: {
   const [items, setItems] = useState<WorkbenchWorkItemOption[]>([]);
   const [selectedPath, setSelectedPath] = useState('');
   const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -72,10 +96,31 @@ export function useWorkbenchWorkItemOptions(options: {
     };
   }, [enabled, options.binding, options.instanceId]);
 
+  const createWorkItem = useCallback(
+    async (title: string) => {
+      setCreating(true);
+      try {
+        const item = await createWorkbenchWorkItemOption({
+          binding: options.binding,
+          instanceId: options.instanceId,
+          title,
+        });
+        setItems((current) => [item, ...current.filter((existing) => existing.path !== item.path)]);
+        setSelectedPath(item.path);
+        return item;
+      } finally {
+        setCreating(false);
+      }
+    },
+    [options.binding, options.instanceId],
+  );
+
   const selectedWorkItem = useMemo(() => items.find((item) => item.path === selectedPath), [items, selectedPath]);
   const selectedWorkItemId = selectedWorkItem?.id;
 
   return {
+    createWorkItem,
+    creating,
     loading,
     options: items,
     selectedPath,
