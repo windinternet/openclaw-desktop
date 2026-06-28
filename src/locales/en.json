@@ -171,6 +171,10 @@
     "reviewTailActionTitle": "Review Tail Action",
     "reviewTailActionDesc": "Check run records, outputs, and knowledge changes, then write the confirmed review into reviews/weekly/.",
     "reviewTailActionWriteCommand": "Reusable asset execution review command",
+    "createReviewDraft": "Create Review Draft",
+    "reviewDraftCreated": "Review draft written",
+    "reviewDraftCreateFailed": "Failed to create review draft",
+    "reviewDraftMissingSource": "Source matter is missing, so a review draft cannot be created",
     "openReviewFolder": "Open Review Folder",
     "viewMarkdown": "View Markdown"
   },

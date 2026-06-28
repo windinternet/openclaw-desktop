@@ -57,6 +57,17 @@ export interface WorkbenchTailAction {
   updatedAt: number;
 }
 
+export interface WorkbenchReviewDraftInput {
+  workItemPath: string;
+  tailActionId?: string;
+  createdAt?: Date;
+}
+
+export interface WorkbenchReviewDraftResult {
+  path: string;
+  content: string;
+}
+
 export interface WorkbenchSnapshot {
   inboxMarkdown: string;
   activeWork: RepositoryMarkdownFile[];
@@ -278,6 +289,31 @@ export async function completeWorkbenchTailAction(
   return true;
 }
 
+export async function writeWorkbenchReviewDraft(
+  binding: RepositoryBinding,
+  input: WorkbenchReviewDraftInput,
+): Promise<WorkbenchReviewDraftResult> {
+  const workItemPath = normalizeWritableWorkbenchMarkdownPath(input.workItemPath);
+  if (!workItemPath || !workItemPath.startsWith('work/')) {
+    throw new Error('Review draft source must be a work item markdown path');
+  }
+
+  const createdAt = input.createdAt ?? new Date();
+  const date = createdAt.toISOString().slice(0, 10);
+  const tailActionIndex = input.tailActionId ? parseTailActionIndex(input.tailActionId) : null;
+  const workSlug = slugifyPathSegment(workItemPath.replace(/\.md$/i, '').split('/').pop() ?? 'work-item');
+  const tailSlug = tailActionIndex === null ? 'tail-action' : `tail-action-${tailActionIndex}`;
+  const path = `reviews/weekly/${date}-work-${workSlug}-${tailSlug}-review.md`;
+  const content = buildWorkbenchReviewDraftMarkdown({
+    workItemPath,
+    tailActionId: input.tailActionId,
+    createdAt,
+  });
+
+  await getWorkbenchReviewWriteApi().writeText(binding.repoPath, path, content);
+  return { path, content };
+}
+
 export function parsePlanMetadata(path: string, markdown: string): RepositoryPlanMetadata {
   const metadata: RepositoryPlanMetadata = { path };
   for (const line of markdown.split('\n').slice(0, 24)) {
@@ -432,6 +468,55 @@ function normalizeWritableWorkbenchMarkdownPath(value: string): string | null {
   return path;
 }
 
+function slugifyPathSegment(value: string): string {
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return slug || 'work-item';
+}
+
+function buildWorkbenchReviewDraftMarkdown(input: {
+  workItemPath: string;
+  tailActionId?: string;
+  createdAt: Date;
+}): string {
+  return [
+    '---',
+    'source: desktop-workbench-review-tail-action',
+    `workItemPath: ${input.workItemPath}`,
+    input.tailActionId ? `tailActionId: ${input.tailActionId}` : undefined,
+    `createdAt: ${input.createdAt.toISOString()}`,
+    'status: draft',
+    '---',
+    '',
+    `# ${input.workItemPath.split('/').pop()?.replace(/\.md$/i, '') ?? '工作事项'} 复盘草稿`,
+    '',
+    `来源事项: \`${input.workItemPath}\``,
+    input.tailActionId ? `来源尾动作: \`${input.tailActionId}\`` : undefined,
+    '',
+    '## 核对清单',
+    '',
+    '- [ ] 核对来源事项目标、验收标准和当前状态。',
+    '- [ ] 核对关联执行记录、运行摘要和错误信息。',
+    '- [ ] 核对已经沉淀的成果、产物或 Repository output。',
+    '- [ ] 判断是否需要更新知识库、计划或后续事项。',
+    '- [ ] 判断是否需要把该尾动作标记完成。',
+    '',
+    '## 复盘正文',
+    '',
+    '- 背景：',
+    '- 本次推进：',
+    '- 产生的成果：',
+    '- 风险和遗留问题：',
+    '- 下一步：',
+    '',
+  ]
+    .filter((line): line is string => line !== undefined)
+    .join('\n');
+}
+
 export function deriveProjects(section?: WorkbenchSemanticSection): WorkbenchProject[] {
   if (!section) return [];
   return section.documents
@@ -562,6 +647,16 @@ function getWorkbenchWriteApi() {
   }
   return {
     readText: repository.readText,
+    writeText: repository.writeText,
+  };
+}
+
+function getWorkbenchReviewWriteApi() {
+  const repository = (globalThis as { window?: Window }).window?.electronAPI?.repository;
+  if (!repository?.writeText) {
+    throw new Error('electronAPI.repository workbench review write method not available');
+  }
+  return {
     writeText: repository.writeText,
   };
 }

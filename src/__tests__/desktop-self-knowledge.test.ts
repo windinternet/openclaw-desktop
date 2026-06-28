@@ -50,7 +50,8 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('Review tail actions open Workbench reviews with a review tail action card');
     expect(skillContent).toContain('points to `reviews/weekly/`');
     expect(skillContent).toContain('exposes `desktop.artifacts.execution.review.write`');
-    expect(skillContent).toContain('does not write the review or check off the tail action');
+    expect(skillContent).toContain('can create a draft work-item review in `reviews/weekly/`');
+    expect(skillContent).toContain('does not check off the tail action by itself');
     expect(skillContent).toContain(
       'Dashboard tail action targets carry `tailAction`, `tailActionId`, and `workItemPath`',
     );

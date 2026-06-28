@@ -7,6 +7,7 @@ import {
   loadWorkbenchSnapshot,
   parsePlanMetadata,
   readWorkbenchMarkdown,
+  writeWorkbenchReviewDraft,
 } from '../lib/repository-workbench';
 
 describe('repository workbench', () => {
@@ -511,6 +512,34 @@ describe('repository workbench', () => {
         '- [ ] 这里不是收尾动作。',
       ].join('\n'),
     );
+  });
+
+  it('writes a review draft for a Dashboard review tail action without checking off the source matter', async () => {
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { writeText },
+      },
+    });
+
+    const draft = await writeWorkbenchReviewDraft(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'work/active/release.md:tail-action:1',
+        createdAt: new Date('2026-06-28T10:00:00.000Z'),
+      },
+    );
+
+    expect(draft.path).toBe('reviews/weekly/2026-06-28-work-release-tail-action-1-review.md');
+    expect(draft.content).toContain('source: desktop-workbench-review-tail-action');
+    expect(draft.content).toContain('workItemPath: work/active/release.md');
+    expect(draft.content).toContain('tailActionId: work/active/release.md:tail-action:1');
+    expect(draft.content).toContain('## 核对清单');
+    expect(draft.content).toContain('- [ ] 核对来源事项目标、验收标准和当前状态。');
+    expect(draft.content).toContain('- [ ] 判断是否需要把该尾动作标记完成。');
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(writeText).toHaveBeenCalledWith('/repo', draft.path, draft.content);
   });
 
   it('reads selected workbench markdown for inline preview', async () => {

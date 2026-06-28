@@ -171,6 +171,10 @@
     "reviewTailActionTitle": "复盘收尾动作",
     "reviewTailActionDesc": "先核对执行记录、成果和知识变更，再把确认后的复盘写入 reviews/weekly/。",
     "reviewTailActionWriteCommand": "可复用资产执行复盘命令",
+    "createReviewDraft": "创建复盘草稿",
+    "reviewDraftCreated": "复盘草稿已写入",
+    "reviewDraftCreateFailed": "创建复盘草稿失败",
+    "reviewDraftMissingSource": "缺少来源事项，无法创建复盘草稿",
     "openReviewFolder": "打开复盘目录",
     "viewMarkdown": "查看 Markdown"
   },

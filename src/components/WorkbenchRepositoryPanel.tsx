@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Card, Checkbox, Empty, Select, Space, Tag, Typography } from '@douyinfe/semi-ui';
+import { Button, Card, Checkbox, Empty, Select, Space, Tag, Toast, Typography } from '@douyinfe/semi-ui';
 import { IconBolt, IconBox, IconCheckList, IconFile } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -11,7 +11,7 @@ import type { ArtifactMeta } from '../lib/artifact-types';
 import type { DashboardTailActionRouteContext } from '../lib/dashboard-tail-action-routing';
 import type { RepositoryMarkdownFile } from '../lib/repository-knowledge';
 import type { WorkbenchSnapshot } from '../lib/repository-workbench';
-import { loadWorkbenchSnapshot, readWorkbenchMarkdown } from '../lib/repository-workbench';
+import { loadWorkbenchSnapshot, readWorkbenchMarkdown, writeWorkbenchReviewDraft } from '../lib/repository-workbench';
 import type { AiActionRun, AiActionRunStatus } from '../lib/types';
 import { extractWorkbenchMatterId, isWorkbenchMatterPath } from '../lib/workbench-matter';
 import { ArtifactAICreateDrawer } from './ArtifactAICreateDrawer';
@@ -153,6 +153,7 @@ export default function WorkbenchRepositoryPanel({
   const [outputTypeFilters, setOutputTypeFilters] = useState<string[]>([]);
   const [outputGroupBy, setOutputGroupBy] = useState<OutputGroupBy>('none');
   const [showMatterArtifactDrawer, setShowMatterArtifactDrawer] = useState(false);
+  const [reviewDraftWriting, setReviewDraftWriting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -239,6 +240,29 @@ export default function WorkbenchRepositoryPanel({
     const repoPath = binding.repoPath.replace(/\/+$/, '');
     const filePath = `${repoPath}/${relativePath.replace(/^\/+/, '')}`;
     window.open(encodeURI(`file://${filePath}`), '_blank');
+  };
+
+  const handleCreateReviewDraft = async (context: DashboardTailActionRouteContext) => {
+    if (!context.workItemPath) {
+      Toast.warning(t('workbench.reviewDraftMissingSource'));
+      return;
+    }
+
+    setReviewDraftWriting(true);
+    try {
+      const draft = await writeWorkbenchReviewDraft(binding, {
+        workItemPath: context.workItemPath,
+        tailActionId: context.id,
+      });
+      setSelectedPreviewPath(draft.path);
+      setSelectedPreviewContent(draft.content);
+      setSnapshot(await loadWorkbenchSnapshot(binding));
+      Toast.success(t('workbench.reviewDraftCreated'));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('workbench.reviewDraftCreateFailed'));
+    } finally {
+      setReviewDraftWriting(false);
+    }
   };
 
   const renderFileButton = (file: RepositoryMarkdownFile) => (
@@ -1013,9 +1037,19 @@ export default function WorkbenchRepositoryPanel({
           <Text type="tertiary" size="small" style={{ fontFamily: 'var(--semi-font-family-monospace)' }}>
             {t('workbench.reviewTailActionWriteCommand')}: desktop.artifacts.execution.review.write
           </Text>
-          <Button size="small" type="tertiary" onClick={() => openRepositoryFile('reviews/weekly/')}>
-            {t('workbench.openReviewFolder')}
-          </Button>
+          <Space align="center" wrap>
+            <Button
+              size="small"
+              type="primary"
+              loading={reviewDraftWriting}
+              onClick={() => void handleCreateReviewDraft(reviewTailActionContext)}
+            >
+              {t('workbench.createReviewDraft')}
+            </Button>
+            <Button size="small" type="tertiary" onClick={() => openRepositoryFile('reviews/weekly/')}>
+              {t('workbench.openReviewFolder')}
+            </Button>
+          </Space>
         </Space>
       </div>
     );

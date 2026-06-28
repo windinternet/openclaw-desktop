@@ -847,7 +847,22 @@ HTML 的独特优势：
 
 仍未完成的 P0 后续：
 
-- 后续仍需要真正的复盘草稿/表单、从事项尾动作或 Artifact 详情带入 `artifactId` 并调用 `desktop.artifacts.execution.review.write`、写入成功后的尾动作勾选联动、资产权限/审批面板、更完整的 Repository 资产目录协议、更细的处理入口，以及从手动仓库文件导入资产的流程。
+- 后续仍需要更完整的复盘确认表单、从事项尾动作或 Artifact 详情带入 `artifactId` 并调用 `desktop.artifacts.execution.review.write`、写入成功后的尾动作勾选联动、资产权限/审批面板、更完整的 Repository 资产目录协议、更细的处理入口，以及从手动仓库文件导入资产的流程。
+
+### 10.38 2026-06-28 当前实施记录：事项尾动作复盘草稿写入
+
+围绕“ActionRun 结束后必须触发是否写入复盘”和“复盘要进入 `reviews/weekly/` 仓库事实源”的 P0 验收，当前继续落地一段代码事实：
+
+- Workbench 新增 `writeWorkbenchReviewDraft`，可根据 Dashboard 复盘尾动作上下文写入事项复盘草稿。
+- 草稿路径位于 `reviews/weekly/YYYY-MM-DD-work-*-tail-action-*-review.md`。
+- 草稿 frontmatter 记录 `source: desktop-workbench-review-tail-action`、来源 `workItemPath`、可选 `tailActionId`、创建时间和 `status: draft`。
+- 草稿正文包含核对来源事项目标/验收标准/状态、关联执行记录、成果产物、知识库/计划更新，以及是否把尾动作标记完成的检查清单。
+- Workbench 复盘尾动作卡片新增“创建复盘草稿”按钮；写入后会刷新 Workbench Snapshot，并在预览区打开新草稿。
+- 该入口只写草稿，不自动确认复盘、不更新事项状态、不自动勾选尾动作、不执行资产、不授予权限。
+
+仍未完成的 P0 后续：
+
+- 后续仍需要把草稿升级为确认表单或结构化编辑流程、从事项尾动作或 Artifact 详情带入 `artifactId` 并调用 `desktop.artifacts.execution.review.write`、写入成功后的尾动作勾选联动、资产权限/审批面板、更完整的 Repository 资产目录协议、更细的处理入口，以及从手动仓库文件导入资产的流程。
 
 ### 10.28 2026-06-28 当前实施记录：跨事项依赖风险过滤已完成依赖
 
