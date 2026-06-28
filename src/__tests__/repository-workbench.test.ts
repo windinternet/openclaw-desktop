@@ -403,6 +403,27 @@ describe('repository workbench', () => {
       status: 'awaiting-review',
       approval: 'required',
     });
+    expect(
+      parsePlanMetadata(
+        'plans/active/blocked.md',
+        ['status: blocked', 'blockedReason: 等待设计确认关键验收标准', 'blockerOwner: @owner', '# Blocked'].join('\n'),
+      ),
+    ).toEqual({
+      path: 'plans/active/blocked.md',
+      status: 'blocked',
+      blockedReason: '等待设计确认关键验收标准',
+      blockerOwner: '@owner',
+    });
+    expect(
+      parsePlanMetadata(
+        'plans/active/cn-blocked.md',
+        ['状态: 卡住', '阻塞原因: 依赖 Gateway 协议确认', '# 卡住计划'].join('\n'),
+      ),
+    ).toEqual({
+      path: 'plans/active/cn-blocked.md',
+      status: '卡住',
+      blockedReason: '依赖 Gateway 协议确认',
+    });
 
     expect(
       groupReviewsByFolder([

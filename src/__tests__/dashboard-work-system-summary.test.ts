@@ -367,6 +367,40 @@ describe('dashboard work system summary', () => {
     expect(summary.recentOutputs.some((item) => item.title === '普通事项，不应进入成果。')).toBe(false);
   });
 
+  it('surfaces explicit plan blocker reasons in stuck items', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [],
+      workbench: {
+        activeWork: [],
+        activePlans: [createMarkdownFile('plans/active/blocked.md', '发布阻塞计划', 220)],
+        planMetadata: [
+          {
+            path: 'plans/active/blocked.md',
+            status: 'blocked',
+            blockedReason: '等待设计确认关键验收标准',
+            blockerOwner: '@owner',
+          },
+        ],
+        tailActions: [],
+        reviews: [],
+      },
+    });
+
+    expect(summary.stuckItems).toEqual([
+      expect.objectContaining({
+        id: 'plans/active/blocked.md',
+        kind: 'plan',
+        title: '发布阻塞计划',
+        target: '/workbench?view=plans',
+        path: 'plans/active/blocked.md',
+        detail: 'blocked · 阻塞原因: 等待设计确认关键验收标准 · 负责人: @owner',
+        status: 'blocked',
+      }),
+    ]);
+  });
+
   it('surfaces knowledge health issues as first-class dashboard knowledge updates', () => {
     const summary = buildDashboardWorkSystemSummary({
       sessions: [],

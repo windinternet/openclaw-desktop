@@ -80,6 +80,8 @@ export interface RepositoryPlanMetadata {
   path: string;
   status?: string;
   approval?: string;
+  blockedReason?: string;
+  blockerOwner?: string;
 }
 
 export interface RepositoryReviewGroup {
@@ -273,14 +275,31 @@ export async function completeWorkbenchTailAction(
 export function parsePlanMetadata(path: string, markdown: string): RepositoryPlanMetadata {
   const metadata: RepositoryPlanMetadata = { path };
   for (const line of markdown.split('\n').slice(0, 24)) {
-    const match = /^([A-Za-z][\w-]*):\s*(.+)$/.exec(line.trim());
+    const match = /^([^:：]+)[：:]\s*(.+)$/.exec(line.trim());
     if (!match) continue;
-    const key = match[1].toLowerCase();
+    const key = normalizePlanMetadataKey(match[1]);
     const value = match[2].trim();
     if (key === 'status') metadata.status = value;
     if (key === 'approval') metadata.approval = value;
+    if (key === 'blockedreason') metadata.blockedReason = value;
+    if (key === 'blockerowner') metadata.blockerOwner = value;
   }
   return metadata;
+}
+
+function normalizePlanMetadataKey(value: string): string {
+  const key = value
+    .trim()
+    .replace(/^-\s+/, '')
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '');
+  if (key === '状态') return 'status';
+  if (key === '审批') return 'approval';
+  if (['blockedreason', 'blockreason', 'blocker', 'blockedby', '阻塞原因', '卡住原因', '阻塞', '卡住'].includes(key)) {
+    return 'blockedreason';
+  }
+  if (['blockerowner', 'owner', '负责人', '责任人'].includes(key)) return 'blockerowner';
+  return key;
 }
 
 async function loadWorkbenchTailActions(

@@ -134,21 +134,19 @@ export function buildDashboardWorkSystemSummary(
   const failedRunItems = params.actionRuns
     .filter((run) => run.status === 'failed' || run.status === 'cancelled')
     .map((run) => actionRunItem(run, 'action_run', '/workbench'));
-  const blockedPlanItems = (params.workbench?.planMetadata ?? [])
-    .filter((metadata) => isBlockedStatus(metadata.status))
-    .map((metadata) => {
-      const plan = params.workbench?.activePlans.find((file) => file.path === metadata.path);
-      return {
-        id: metadata.path,
-        kind: 'plan' as const,
-        title: plan ? markdownTitle(plan) : metadata.path,
-        target: '/workbench',
-        updatedAt: plan?.updatedAt,
-        path: metadata.path,
-        detail: metadata.status,
-        status: metadata.status,
-      };
-    });
+  const blockedPlanItems = (params.workbench?.planMetadata ?? []).filter(isBlockedPlanMetadata).map((metadata) => {
+    const plan = params.workbench?.activePlans.find((file) => file.path === metadata.path);
+    return {
+      id: metadata.path,
+      kind: 'plan' as const,
+      title: plan ? markdownTitle(plan) : metadata.path,
+      target: '/workbench?view=plans',
+      updatedAt: plan?.updatedAt,
+      path: metadata.path,
+      detail: formatBlockedPlanDetail(metadata),
+      status: metadata.status ?? 'blocked',
+    };
+  });
 
   const artifactOutputItems = params.artifacts.map((artifact) => ({
     artifact,
@@ -474,6 +472,20 @@ function isBlockedStatus(status?: string): boolean {
   if (!status) return false;
   const normalized = status.toLowerCase();
   return normalized.includes('blocked') || normalized.includes('stuck') || normalized.includes('卡住');
+}
+
+function isBlockedPlanMetadata(metadata: WorkbenchSnapshot['planMetadata'][number]): boolean {
+  return isBlockedStatus(metadata.status) || Boolean(metadata.blockedReason);
+}
+
+function formatBlockedPlanDetail(metadata: WorkbenchSnapshot['planMetadata'][number]): string | undefined {
+  return [
+    metadata.status ?? 'blocked',
+    metadata.blockedReason ? `阻塞原因: ${metadata.blockedReason}` : undefined,
+    metadata.blockerOwner ? `负责人: ${metadata.blockerOwner}` : undefined,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 function classifyTailAction(text: string): {

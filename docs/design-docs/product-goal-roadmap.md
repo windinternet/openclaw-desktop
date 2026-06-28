@@ -99,7 +99,7 @@ OpenClaw Desktop
    - Dashboard 首屏应从 Gateway 状态优先，改成用户工作优先。
    - 第一屏应展示今日继续、待确认、最近成果、知识动态、卡住事项和本周新增成果。
    - Gateway 健康状态应退到顶部小状态条，而不是主叙事。
-   - 当前代码第一片已落地：Dashboard 首屏新增“我的工作系统”摘要，从 Sessions、Workbench、Knowledge、ActionRun、Artifacts、Repository `outputs/index.md` 和 `reviews/` 复盘文档聚合今日继续、待确认、卡住事项、最近成果、本周新增成果和知识动态；本周新增成果会读取 Artifact `createdAt`、仓库 output index 的 `createdAt`（旧索引回退 `updatedAt`）、终态 ActionRun `updatedAt` 和复盘文档 `updatedAt`。仓库 output 条目会跳转到 `/workbench?view=outputs`，ActionRun 摘要条目会跳转到 `/workbench?view=actions`，复盘成果线索会跳转到 `/workbench?view=reviews`。Dashboard 只解析复盘中明确的 `成果` / `产物` / `输出` / deliverable 小节列表，不从全文做语义推断；事项 `## 收尾动作` 的未勾选项已进入“待确认”，并可在 Dashboard 标记完成、写回事项 Markdown。知识健康检查结果已进入知识动态；更完整的工作状态诊断仍待继续接入。
+   - 当前代码第一片已落地：Dashboard 首屏新增“我的工作系统”摘要，从 Sessions、Workbench、Knowledge、ActionRun、Artifacts、Repository `outputs/index.md` 和 `reviews/` 复盘文档聚合今日继续、待确认、卡住事项、最近成果、本周新增成果和知识动态；本周新增成果会读取 Artifact `createdAt`、仓库 output index 的 `createdAt`（旧索引回退 `updatedAt`）、终态 ActionRun `updatedAt` 和复盘文档 `updatedAt`。仓库 output 条目会跳转到 `/workbench?view=outputs`，ActionRun 摘要条目会跳转到 `/workbench?view=actions`，复盘成果线索会跳转到 `/workbench?view=reviews`。Dashboard 只解析复盘中明确的 `成果` / `产物` / `输出` / deliverable 小节列表，不从全文做语义推断；卡住项会读取计划 `status: blocked/stuck/卡住` 以及显式 `blockedReason` / `blocker` / `阻塞原因`，并展示阻塞原因和负责人；事项 `## 收尾动作` 的未勾选项已进入“待确认”，并可在 Dashboard 标记完成、写回事项 Markdown。知识健康检查结果已进入知识动态；跨事项风险、未归档运行记录和成果沉淀缺口等更完整诊断仍待继续接入。
 
 4. **Repository 初始化前置是 P0**
    - 仓库绑定不能只藏在 Workbench / Knowledge 里等用户发现。

@@ -91,6 +91,10 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('/workbench?view=reviews');
     expect(skillContent).toContain('Review output clues are read only from explicit `成果`, `产物`, `输出`');
     expect(skillContent).toContain('does not infer value outputs from arbitrary review prose');
+    expect(skillContent).toContain('Dashboard stuckItems include failed or cancelled ActionRuns and blocked plans');
+    expect(skillContent).toContain('blockedReason');
+    expect(skillContent).toContain('blockerOwner');
+    expect(skillContent).toContain('/workbench?view=plans');
     expect(skillContent).toContain('Knowledge health issues');
     expect(skillContent).toContain('orphan sources, stale index entries, broken knowledge links');
     expect(skillContent).toContain('undigested sources queue');
