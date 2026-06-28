@@ -523,10 +523,18 @@ describe('repository workbench', () => {
   });
 
   it('writes a review draft for a Dashboard review tail action without checking off the source matter', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'work/active/release.md') {
+        return ['# 发布推进', '', '## 复盘', '', '- 暂无', '', '## 收尾动作', '', '- [ ] 判断是否需要写入复盘。'].join(
+          '\n',
+        );
+      }
+      return '';
+    });
     const writeText = vi.fn(async () => undefined);
     vi.stubGlobal('window', {
       electronAPI: {
-        repository: { writeText },
+        repository: { readText, writeText },
       },
     });
 
@@ -546,15 +554,38 @@ describe('repository workbench', () => {
     expect(draft.content).toContain('## 核对清单');
     expect(draft.content).toContain('- [ ] 核对来源事项目标、验收标准和当前状态。');
     expect(draft.content).toContain('- [ ] 判断是否需要把该尾动作标记完成。');
-    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(writeText).toHaveBeenCalledTimes(2);
     expect(writeText).toHaveBeenCalledWith('/repo', draft.path, draft.content);
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'work/active/release.md',
+      [
+        '# 发布推进',
+        '',
+        '## 复盘',
+        '',
+        '- [2026-06-28 复盘草稿](../../reviews/weekly/2026-06-28-work-release-tail-action-1-review.md) - 来源尾动作: `work/active/release.md:tail-action:1`',
+        '',
+        '## 收尾动作',
+        '',
+        '- [ ] 判断是否需要写入复盘。',
+      ].join('\n'),
+    );
   });
 
   it('writes a review draft for a plan execution source record without pretending it is a checklist tail action', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'work/active/release.md') {
+        return ['# 发布推进', '', '## 复盘', '', '- 暂无', '', '## 收尾动作', '', '- [ ] 判断是否需要写入复盘。'].join(
+          '\n',
+        );
+      }
+      return '';
+    });
     const writeText = vi.fn(async () => undefined);
     vi.stubGlobal('window', {
       electronAPI: {
-        repository: { writeText },
+        repository: { readText, writeText },
       },
     });
 
@@ -575,6 +606,21 @@ describe('repository workbench', () => {
     expect(draft.content).toContain('来源执行记录: `action-run-review:run-1`');
     expect(draft.content).not.toContain('来源尾动作: `action-run-review:run-1`');
     expect(writeText).toHaveBeenCalledWith('/repo', draft.path, draft.content);
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'work/active/release.md',
+      [
+        '# 发布推进',
+        '',
+        '## 复盘',
+        '',
+        '- [2026-06-28 复盘草稿](../../reviews/weekly/2026-06-28-work-release-action-run-review-run-1-review.md) - 来源执行记录: `action-run-review:run-1`',
+        '',
+        '## 收尾动作',
+        '',
+        '- [ ] 判断是否需要写入复盘。',
+      ].join('\n'),
+    );
   });
 
   it('confirms a review draft and completes the matching source tail action', async () => {

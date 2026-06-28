@@ -355,12 +355,13 @@ HTML 产物是特色能力：
 - `action-run-knowledge:<runId>` 是来源执行记录，不是事项 `## 收尾动作` checklist ID；Knowledge 可基于它发起 `knowledge_rewrite`，但不会显示或执行“确认已处理并完成尾动作”。
 - 计划执行复盘草稿入口已接入 Workbench：`shouldOfferPlanExecutionReview` 会在最近一次 `plan_execute` 已完成、有 `resultSummary` 且有安全 `workItemPath` 时，在计划预览头部显示“写复盘 / Write Review”。
 - “写复盘 / Write Review”会打开 Workbench reviews 的 `tailAction=review` 上下文，携带 `tailActionId=action-run-review:<runId>` 和来源 `workItemPath`；复盘草稿会记录来源执行记录 `action-run-review:<runId>`。
+- 创建复盘草稿时，Desktop 会把草稿相对链接写回来源事项的 `## 复盘` 小节；如果原小节只有 `- 暂无` 占位，会先移除占位。
 - `action-run-review:<runId>` 是来源执行记录，不是事项 `## 收尾动作` checklist ID；Workbench 可基于它创建 `reviews/weekly/` 复盘草稿，但不会显示或执行“确认复盘并完成尾动作”。
 - 这些入口只提示用户显式判断并进入后续流程，不自动创建 Artifact 或 Repository output、不自动写 Wiki/index/log、不自动勾选事项 checklist 尾动作、不自动确认复盘、不移动事项文件。
 
 仍未完成：
 
-- 执行后的成果、知识更新和复盘已有发起入口，但写入/保存/草稿创建后的状态刷新、更自然的端到端体验仍需继续接上；成果候选提取和保存表单也仍需继续打磨。
+- 执行后的成果、知识更新和复盘已有发起入口，但写入/保存/草稿确认后的状态刷新、更自然的端到端体验仍需继续接上；成果候选提取和保存表单也仍需继续打磨。
 - 新用户从开箱第一事项自然进入计划、执行和产物沉淀的端到端体验仍未完整闭环。
 
 ### P0-7 可复用资产一等对象

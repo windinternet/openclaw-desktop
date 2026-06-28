@@ -509,7 +509,19 @@ export async function writeWorkbenchReviewDraft(
     createdAt,
   });
 
-  await getWorkbenchReviewWriteApi().writeText(binding.repoPath, path, content);
+  const repository = getWorkbenchWriteApi();
+  const markdown = await repository.readText(binding.repoPath, workItemPath);
+  const nextMarkdown = appendWorkbenchMatterReviewDraft(markdown, {
+    workItemPath,
+    reviewPath: path,
+    tailActionId: input.tailActionId,
+    createdAt,
+  });
+
+  await repository.writeText(binding.repoPath, path, content);
+  if (nextMarkdown !== markdown) {
+    await repository.writeText(binding.repoPath, workItemPath, nextMarkdown);
+  }
   return { path, content };
 }
 
@@ -749,6 +761,32 @@ function buildWorkbenchMatterOutputLine(
   const lines = [`- [${escapeMarkdownLinkText(artifact.title)}](${href}) (\`${artifact.id}\`, ${artifact.type})`];
   if (artifact.repositoryPreviewPath) lines.push(`  - preview: ${artifact.repositoryPreviewPath}`);
   return lines;
+}
+
+function appendWorkbenchMatterReviewDraft(
+  markdown: string,
+  input: { workItemPath: string; reviewPath: string; tailActionId?: string; createdAt: Date },
+): string {
+  const href = relativeWorkbenchMarkdownLink(input.workItemPath, input.reviewPath);
+  if (markdown.includes(input.reviewPath) || markdown.includes(href)) return markdown;
+
+  const sourceLabel = isActionRunReviewTailActionId(input.tailActionId) ? '来源执行记录' : '来源尾动作';
+  const sourceSuffix = input.tailActionId ? ` - ${sourceLabel}: \`${input.tailActionId}\`` : '';
+  const reviewLine = `- [${input.createdAt.toISOString().slice(0, 10)} 复盘草稿](${href})${sourceSuffix}`;
+  const lines = markdown.split(/\r?\n/);
+  const headerIndex = lines.findIndex((line) => line.trim() === '## 复盘');
+  if (headerIndex === -1) return `${markdown.trimEnd()}\n\n## 复盘\n\n${reviewLine}\n`;
+
+  let insertIndex = headerIndex + 1;
+  while (insertIndex < lines.length && lines[insertIndex].trim() === '') insertIndex += 1;
+  while (insertIndex < lines.length && lines[insertIndex].trim() === '- 暂无') {
+    lines.splice(insertIndex, 1);
+    while (insertIndex < lines.length && lines[insertIndex].trim() === '') lines.splice(insertIndex, 1);
+  }
+  const insertLines = [reviewLine];
+  if (/^#{1,6}\s+/.test(lines[insertIndex]?.trim() ?? '')) insertLines.push('');
+  lines.splice(insertIndex, 0, ...insertLines);
+  return lines.join('\n').trimEnd();
 }
 
 function appendWorkbenchMatterPlan(
@@ -1115,15 +1153,5 @@ function getWorkbenchMoveApi() {
   return {
     readText: repository.readText,
     moveText: repository.moveText,
-  };
-}
-
-function getWorkbenchReviewWriteApi() {
-  const repository = (globalThis as { window?: Window }).window?.electronAPI?.repository;
-  if (!repository?.writeText) {
-    throw new Error('electronAPI.repository workbench review write method not available');
-  }
-  return {
-    writeText: repository.writeText,
   };
 }

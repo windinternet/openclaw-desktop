@@ -55,6 +55,7 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('shouldOfferPlanExecutionReview');
     expect(skillContent).toContain('`action-run-review:<runId>`');
     expect(skillContent).toContain('Write Review');
+    expect(skillContent).toContain('links the draft back to the source matter `## 复盘`');
     expect(skillContent).toContain('adds a `## 收尾动作` checklist');
     expect(skillContent).toContain('missing from the repository run index');
     expect(skillContent).toContain('`action-run:unarchived` pending confirmation');
@@ -90,6 +91,7 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('points to `reviews/weekly/`');
     expect(skillContent).toContain('exposes `desktop.artifacts.execution.review.write`');
     expect(skillContent).toContain('can create a draft work-item review in `reviews/weekly/`');
+    expect(skillContent).toContain('links that draft back to the source matter `## 复盘`');
     expect(skillContent).toContain('does not check off the tail action by itself');
     expect(skillContent).toContain(
       'can confirm that draft, mark it as `status: confirmed`, add `reviewedAt`, and check off only the matching source tail action',
