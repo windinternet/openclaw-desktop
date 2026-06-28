@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { recordArtifactAuthDecision, recordArtifactBridgeCallResult } from '../lib/artifact-runtime-auth';
+import {
+  recordArtifactAuthDecision,
+  recordArtifactBridgeCallResult,
+  recordArtifactBridgeExecBlocked,
+} from '../lib/artifact-runtime-auth';
 import type { ArtifactMeta } from '../lib/artifact-types';
 
 function createArtifact(overrides: Partial<ArtifactMeta> = {}): ArtifactMeta {
@@ -65,6 +69,40 @@ describe('artifact runtime auth records', () => {
         resultSummary: 'read 42 bytes',
         startedAt: 30,
         endedAt: 40,
+      },
+    ]);
+  });
+
+  it('records unsupported artifactBridge.exec calls as blocked execution intents', () => {
+    const updated = recordArtifactBridgeExecBlocked(createArtifact(), {
+      id: 'exec_1',
+      command: 'npm run deploy',
+      startedAt: 50,
+      endedAt: 60,
+      error: 'Artifact bridge method exec is not implemented yet',
+    });
+
+    expect(updated.updatedAt).toBe(60);
+    expect(updated.executionEvents).toEqual([
+      {
+        id: 'exec_1',
+        status: 'denied',
+        artifactVersion: 1,
+        requestedAt: 50,
+        startedAt: 50,
+        endedAt: 60,
+        sourceId: undefined,
+        sourceName: 'artifactBridge.exec',
+        runner: 'artifactBridge.exec',
+        command: 'npm run deploy',
+        approvalTitle: 'Artifact Bridge command execution blocked',
+        approvalRisk: 'high',
+        approvalReason:
+          'artifactBridge.exec remains unsupported; use Desktop node execution approval commands and an external runner instead.',
+        outputArtifactId: undefined,
+        repositoryOutputPath: undefined,
+        resultSummary: 'Blocked unsupported artifactBridge.exec request',
+        error: 'Artifact bridge method exec is not implemented yet',
       },
     ]);
   });

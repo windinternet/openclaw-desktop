@@ -38,6 +38,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('requires `network.fetch` approval');
     expect(skillContent).toContain('Direct browser `fetch()` remains blocked by CSP');
     expect(skillContent).toContain('artifactBridge.exec()` remains unsupported');
+    expect(skillContent).toContain(
+      'unsupported exec attempts are recorded in both `bridgeEvents` and `executionEvents`',
+    );
     expect(skillContent).toContain('artifactBridge.exportAs');
     expect(skillContent).toContain('requires `export` approval');
     expect(skillContent).toContain('must not be used for silent file writes');

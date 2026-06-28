@@ -1,4 +1,5 @@
 import type { ArtifactBridgeCallStatus, ArtifactMeta } from './artifact-types';
+import { recordArtifactExecutionEvent } from './artifact-execution-record';
 
 export interface RecordArtifactAuthDecisionParams {
   capability: string;
@@ -61,4 +62,34 @@ export function recordArtifactBridgeCallResult(
     updatedAt: Math.max(meta.updatedAt, params.endedAt),
     bridgeEvents: [...bridgeEvents, event],
   };
+}
+
+export interface RecordArtifactBridgeExecBlockedParams {
+  startedAt: number;
+  endedAt: number;
+  command?: string;
+  error?: string;
+  id?: string;
+}
+
+export function recordArtifactBridgeExecBlocked(
+  meta: ArtifactMeta,
+  params: RecordArtifactBridgeExecBlockedParams,
+): ArtifactMeta {
+  return recordArtifactExecutionEvent(meta, {
+    id: params.id,
+    status: 'denied',
+    sourceName: 'artifactBridge.exec',
+    runner: 'artifactBridge.exec',
+    command: params.command,
+    approvalTitle: 'Artifact Bridge command execution blocked',
+    approvalRisk: 'high',
+    approvalReason:
+      'artifactBridge.exec remains unsupported; use Desktop node execution approval commands and an external runner instead.',
+    resultSummary: 'Blocked unsupported artifactBridge.exec request',
+    error: params.error,
+    requestedAt: params.startedAt,
+    startedAt: params.startedAt,
+    endedAt: params.endedAt,
+  });
 }

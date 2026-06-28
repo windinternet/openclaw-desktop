@@ -25,7 +25,7 @@
 - HTML 产物运行时授权决策会回写到 Artifact meta 的 `authEvents`，记录能力、目标、授权结果、授权级别和请求/决策时间。
 - HTML 产物预览窗口通过专用 preload 暴露受控 `window.artifactBridge`，Bridge 调用会进入主进程执行链路。
 - Desktop Bridge 当前支持 HTML 产物读取自身 meta / HTML 版本、经审批代理 `artifactBridge.fetch` 的 HTTP(S) 网络请求、读取本地文本文件、写入本地文本文件、导出 HTML / 文本 / Markdown / JSON 文件和发送系统通知；命令执行接口仍保持未实现，不会静默开放。
-- HTML 产物 Desktop Bridge 调用结果会回写到 Artifact meta 的 `bridgeEvents`，记录 method、detail、status、resultSummary、error 和起止时间。
+- HTML 产物 Desktop Bridge 调用结果会回写到 Artifact meta 的 `bridgeEvents`，记录 method、detail、status、resultSummary、error 和起止时间；当 `artifactBridge.exec()` 被拦截为 unsupported 时，Desktop 还会把被阻止的命令执行意图写入 `executionEvents`，但仍不执行命令、不授予权限。
 - Repository output markdown 会沉淀 HTML 审计摘要，Artifacts UI 会显示非自包含和需审批提示。
 - 文件、图片、音频、视频等非 HTML 产物可记录 `filePath` 或 `url`，打开时交给系统文件处理器或外部 URL 处理器。
 - 手动创建文件型产物时，填写本地 `filePath` 会复制一份到 Artifact storage，并记录 `originalFilePath`。

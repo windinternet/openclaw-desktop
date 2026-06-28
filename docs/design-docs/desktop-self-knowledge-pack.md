@@ -98,7 +98,7 @@ Skill 应包含：
 - HTML 产物必须自包含、可视化、可交互，不依赖外部 CDN。
 - Desktop 会为保存后的 HTML 产物记录 `htmlAudit`，暴露非自包含资源和需审批能力。
 - HTML 产物运行时授权或拒绝会写回 Artifact `authEvents`，用于审计 Desktop Bridge 权限边界。
-- HTML 产物可通过 `artifactBridge.fetch(url, init)` 请求 HTTP(S) 网络数据；这会触发 `network.fetch` 授权，由主进程代理请求，并把状态、响应摘要和裁剪后的文本结果写入 `bridgeEvents`。普通直连 `fetch()` 仍被 CSP 阻止，`artifactBridge.exec()` 仍保持未实现。
+- HTML 产物可通过 `artifactBridge.fetch(url, init)` 请求 HTTP(S) 网络数据；这会触发 `network.fetch` 授权，由主进程代理请求，并把状态、响应摘要和裁剪后的文本结果写入 `bridgeEvents`。普通直连 `fetch()` 仍被 CSP 阻止，`artifactBridge.exec()` 仍保持未实现；unsupported exec 尝试会同时写入 `bridgeEvents` 和 `executionEvents`，只做审计，不执行命令。
 - HTML 产物可通过 `artifactBridge.exportAs(typeOrOptions, content, fileName)` 请求导出 HTML、文本、Markdown 或 JSON；这会触发 `export` 授权和系统保存对话框，并把结果写入 `bridgeEvents`，不能用于静默写文件。
 - Artifact 会记录版本历史；新建产物是 v1，HTML 追加会增加版本，`desktop.artifacts.describe` 和 Repository output markdown 会暴露版本数量与最新版本信息。
 - 普通聊天里已完成的 assistant 消息可以包含一个或多个 `<artifact>` 块；Desktop 会逐个保存为 `source: chat` 的 Artifact，仓库绑定就绪时镜像到 Repository `outputs/`。

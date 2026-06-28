@@ -42,5 +42,7 @@ describe('artifact runtime authorization recording', () => {
     expect(source).toContain('buildArtifactBridgeFetchResponse(response');
     expect(source).toContain("case 'exec':");
     expect(source).toContain('Artifact bridge method exec is not implemented yet');
+    expect(source).toContain('recordArtifactBridgeExecBlocked');
+    expect(source).toContain("params.method === 'exec'");
   });
 });

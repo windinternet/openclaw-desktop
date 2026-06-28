@@ -16,7 +16,11 @@ import { ARTIFACT_IPC } from '../src/lib/artifact-ipc'
 import { buildArtifactBridgeFetchResponse, resolveArtifactBridgeFetchRequest } from '../src/lib/artifact-bridge-fetch'
 import { decideArtifactOpenTarget } from '../src/lib/artifact-open-target'
 import { resolveArtifactExportRequest } from '../src/lib/artifact-export'
-import { recordArtifactAuthDecision, recordArtifactBridgeCallResult } from '../src/lib/artifact-runtime-auth'
+import {
+  recordArtifactAuthDecision,
+  recordArtifactBridgeCallResult,
+  recordArtifactBridgeExecBlocked,
+} from '../src/lib/artifact-runtime-auth'
 import { inferArtifactExternalFormat } from '../src/lib/artifact-value-summary'
 import type { ArtifactBridgeCallStatus, ArtifactMeta } from '../src/lib/artifact-types'
 
@@ -338,7 +342,15 @@ function recordArtifactBridgeCall(
   const meta = readMeta(artifactId)
   if (!meta) return
 
-  const updatedMeta = recordArtifactBridgeCallResult(meta, params)
+  let updatedMeta = recordArtifactBridgeCallResult(meta, params)
+  if (params.method === 'exec' && params.status === 'unsupported') {
+    updatedMeta = recordArtifactBridgeExecBlocked(updatedMeta, {
+      command: params.detail,
+      startedAt: params.startedAt,
+      endedAt: params.endedAt,
+      error: params.error,
+    })
+  }
   writeMeta(artifactId, updatedMeta)
   writeIndexEntry(updatedMeta)
 }

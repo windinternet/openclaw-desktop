@@ -63,3 +63,5 @@ ActionRun 的结果可以是：
 当 ActionRun 准备把 `tool`、`script` 或 `workflow` 类产物交给外部 runner 前，应调用 `desktop.artifacts.execution.prepare` 记录 `approval_required` 执行意图，并把返回的 pending approval 载荷作为审批展示依据。该命令只建立审批锚点，不执行命令，也不代表用户已经批准。
 
 当 ActionRun 通过外部审批通道使用了 `tool`、`script` 或 `workflow` 类产物时，可以调用 `desktop.artifacts.execution.record` 归档审批、runner、命令文本、状态、结果摘要和输出线索。该命令只记录执行事实，不执行命令，也不绕过 ActionRun 审批。
+
+HTML 产物里的 `artifactBridge.exec()` 仍不是可用执行入口。若它被调用，Desktop 会拒绝执行，并把 unsupported bridge 调用和被阻止的命令执行意图分别写入 `bridgeEvents` 与 `executionEvents`；真正的命令使用仍应走 ActionRun 或外部 runner 的审批、执行和归档流程。
