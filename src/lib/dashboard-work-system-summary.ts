@@ -52,6 +52,8 @@ export interface BuildDashboardWorkSystemSummaryParams {
       > & {
         runsMarkdown?: string;
         outputsMarkdown?: string;
+        completedWork?: RepositoryMarkdownFile[];
+        completedPlans?: RepositoryMarkdownFile[];
       })
     | null;
   knowledge?: { recentFiles: RepositoryMarkdownFile[]; health?: KnowledgeHealthReport } | null;
@@ -166,6 +168,10 @@ export function buildDashboardWorkSystemSummary(
   const failedRunItems = params.actionRuns
     .filter((run) => run.status === 'failed' || run.status === 'cancelled')
     .map((run) => actionRunItem(run, 'action_run', '/workbench'));
+  const completedCrossWorkDependencyPaths = new Set([
+    ...(params.workbench?.completedWork ?? []).map((file) => file.path),
+    ...(params.workbench?.completedPlans ?? []).map((file) => file.path),
+  ]);
   const blockedPlanItems = (params.workbench?.planMetadata ?? []).filter(isBlockedPlanMetadata).map((metadata) => {
     const plan = params.workbench?.activePlans.find((file) => file.path === metadata.path);
     return {
@@ -182,7 +188,14 @@ export function buildDashboardWorkSystemSummary(
   const crossWorkRiskPlanItems = (params.workbench?.planMetadata ?? [])
     .filter((metadata) => !isBlockedPlanMetadata(metadata))
     .filter(hasCrossWorkDependencies)
-    .map((metadata) => {
+    .map((metadata) => ({
+      metadata,
+      unresolvedDependencies: metadata.dependencies.filter(
+        (dependency) => !isCompletedCrossWorkDependency(dependency, completedCrossWorkDependencyPaths),
+      ),
+    }))
+    .filter(({ unresolvedDependencies }) => unresolvedDependencies.length > 0)
+    .map(({ metadata, unresolvedDependencies }) => {
       const plan = params.workbench?.activePlans.find((file) => file.path === metadata.path);
       return {
         id: `cross-work-risk:${metadata.path}`,
@@ -191,7 +204,7 @@ export function buildDashboardWorkSystemSummary(
         target: '/workbench?view=plans',
         updatedAt: plan?.updatedAt,
         path: metadata.path,
-        detail: formatCrossWorkRiskDetail(metadata),
+        detail: formatCrossWorkRiskDetail(unresolvedDependencies),
         status: 'plan:cross-work-risk',
       };
     });
@@ -581,10 +594,12 @@ function hasCrossWorkDependencies(
   return Boolean(metadata.dependencies?.length);
 }
 
-function formatCrossWorkRiskDetail(
-  metadata: WorkbenchSnapshot['planMetadata'][number] & { dependencies: string[] },
-): string {
-  return `跨事项依赖 · ${metadata.dependencies.join(', ')}`;
+function isCompletedCrossWorkDependency(dependency: string, completedDependencyPaths: Set<string>): boolean {
+  return completedDependencyPaths.has(dependency) || /(^|\/)(work|plans)\/completed\//.test(dependency);
+}
+
+function formatCrossWorkRiskDetail(dependencies: string[]): string {
+  return `跨事项依赖 · ${dependencies.join(', ')}`;
 }
 
 function formatBlockedPlanDetail(metadata: WorkbenchSnapshot['planMetadata'][number]): string | undefined {

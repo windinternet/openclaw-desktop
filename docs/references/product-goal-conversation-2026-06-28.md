@@ -733,10 +733,24 @@ HTML 的独特优势：
 
 - Workbench 计划元数据解析开始读取显式依赖字段：`dependsOn`、`dependencies`、`dependency`、`requires`、`relatedWork`、`workDependencies`、`依赖`、`依赖事项`、`关联事项`、`前置事项`。
 - 依赖字段支持逗号、中文逗号、分号、中文分号分隔，也会把 Markdown 链接中的 href 作为依赖引用。
-- Dashboard work-system summary 会把未被 blocked 规则覆盖、但显式声明依赖的计划作为跨事项风险加入“卡住项”。
-- 这类卡住项状态是 `plan:cross-work-risk`，详情显示 `跨事项依赖 · <依赖列表>`，点击进入 `/workbench?view=plans`。
+- Dashboard work-system summary 会把未被 blocked 规则覆盖、但显式声明仍未完成依赖的计划作为跨事项风险加入“卡住项”。
+- 这类卡住项状态是 `plan:cross-work-risk`，详情显示 `跨事项依赖 · <未完成依赖列表>`，点击进入 `/workbench?view=plans`。
 - 该能力只读取显式元数据，不从计划正文做自然语言推断，不自动修改计划，也不自动解除风险。
 
 仍未完成的 P0 后续：
 
-- 后续仍需要更完整的跨事项风险处理，例如识别依赖事项是否已完成、是否长期停滞、是否缺少负责人，并提供可执行的收口动作。
+- 后续仍需要更完整的跨事项风险处理，例如识别依赖事项是否长期停滞、是否缺少负责人，并提供可执行的收口动作。
+
+### 10.28 2026-06-28 当前实施记录：跨事项依赖风险过滤已完成依赖
+
+围绕“Dashboard 卡住项应展示真实推进风险，而不是把已经收口的历史依赖继续报红”的 P0 内容，当前继续落地一段代码事实：
+
+- Dashboard work-system summary 会接收 Workbench Snapshot 中的 `completedWork` 和 `completedPlans`，用于判断显式计划依赖是否已经完成。
+- 当计划依赖路径已经出现在 `completedWork`、`completedPlans`，或路径本身位于 `work/completed/`、`plans/completed/` 时，Dashboard 会把该依赖从 `plan:cross-work-risk` 详情中过滤掉。
+- 如果一个计划的显式依赖全部已经完成，Dashboard 不再为它生成跨事项依赖卡住项。
+- 如果一个计划同时依赖已完成事项和未完成事项，Dashboard 只在详情里展示仍未完成的依赖。
+- 该能力仍然只读取显式元数据和已完成目录事实，不从计划正文做自然语言推断，不自动修改计划，也不自动解除风险。
+
+仍未完成的 P0 后续：
+
+- 后续仍需要更完整的跨事项风险处理，例如识别依赖事项是否长期停滞、是否缺少负责人，并提供可执行的收口动作。

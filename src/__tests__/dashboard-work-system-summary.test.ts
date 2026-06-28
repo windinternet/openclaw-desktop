@@ -599,12 +599,14 @@ describe('dashboard work system summary', () => {
       artifacts: [],
       workbench: {
         activeWork: [createMarkdownFile('work/active/release.md', '发布推进', 210)],
+        completedWork: [createMarkdownFile('work/completed/research.md', '资料调研', 200)],
         activePlans: [createMarkdownFile('plans/active/cross-work.md', '跨事项发布计划', 220)],
+        completedPlans: [createMarkdownFile('plans/completed/api.md', 'API 计划', 205)],
         planMetadata: [
           {
             path: 'plans/active/cross-work.md',
             status: 'active',
-            dependencies: ['work/active/design.md', 'plans/active/api.md'],
+            dependencies: ['work/active/design.md', 'plans/completed/api.md', 'work/completed/research.md'],
           },
         ],
         tailActions: [],
@@ -619,10 +621,35 @@ describe('dashboard work system summary', () => {
         title: '跨事项发布计划',
         target: '/workbench?view=plans',
         path: 'plans/active/cross-work.md',
-        detail: '跨事项依赖 · work/active/design.md, plans/active/api.md',
+        detail: '跨事项依赖 · work/active/design.md',
         status: 'plan:cross-work-risk',
       }),
     ]);
+  });
+
+  it('does not surface cross-work risks whose dependencies are already completed', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [],
+      workbench: {
+        activeWork: [],
+        completedWork: [createMarkdownFile('work/completed/research.md', '资料调研', 200)],
+        activePlans: [createMarkdownFile('plans/active/done-deps.md', '依赖已完成计划', 220)],
+        completedPlans: [createMarkdownFile('plans/completed/api.md', 'API 计划', 205)],
+        planMetadata: [
+          {
+            path: 'plans/active/done-deps.md',
+            status: 'active',
+            dependencies: ['work/completed/research.md', 'plans/completed/api.md'],
+          },
+        ],
+        tailActions: [],
+        reviews: [],
+      },
+    });
+
+    expect(summary.stuckItems).toEqual([]);
   });
 
   it('surfaces knowledge health issues as first-class dashboard knowledge updates', () => {

@@ -109,7 +109,10 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('blockerOwner');
     expect(skillContent).toContain('`dependsOn`, `dependencies`, `requires`, `relatedWork`');
     expect(skillContent).toContain('`依赖`, `依赖事项`, `关联事项`, or `前置事项`');
-    expect(skillContent).toContain('`plan:cross-work-risk` stuckItems');
+    expect(skillContent).toContain('unresolved dependencies as `plan:cross-work-risk` stuckItems');
+    expect(skillContent).toContain('Completed dependency paths from `completedWork`, `completedPlans`');
+    expect(skillContent).toContain('`work/completed/`, or `plans/completed/`');
+    expect(skillContent).toContain('only unresolved dependencies remain visible');
     expect(skillContent).toContain('does not infer cross-work risk from plan prose');
     expect(skillContent).toContain('/workbench?view=plans');
     expect(skillContent).toContain('Terminal work-item ActionRuns that are missing from `runs/action-runs/index.md`');
