@@ -912,6 +912,9 @@
     "aiCreatePreview": "预览结果",
     "aiCreateSave": "保存产物",
     "aiCreateRegen": "重新生成",
+    "aiCreateWorkItem": "关联事项",
+    "aiCreateWorkItemDesc": "先选择这次 AI 产物要服务的事项，生成后的运行记录会自动带上事项上下文。",
+    "aiCreateWorkItemPlaceholder": "选择关联事项",
     "openLink": "在浏览器打开",
     "copyCommand": "复制命令",
     "commandCopied": "命令已复制"

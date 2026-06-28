@@ -741,6 +741,25 @@ HTML 的独特优势：
 
 - 后续仍需要更完整的跨事项风险处理，例如提供可执行的收口动作，并把负责人解析扩展到工作事项等更多对象。
 
+### 10.43 2026-06-28 当前实施记录：Artifacts 发起前事项选择
+
+围绕“每次 AI 执行应归属事项”和“ActionRun / Workbench 的硬连接不能只靠事后补救”的 P0 验收，当前继续落地一段代码事实：
+
+- Artifacts 普通“AI 魔法创建”入口在没有外部来源事项时，会加载当前绑定 Repository 的 Workbench Snapshot。
+- 事项候选来自 `work/active`、`work/someday` 和 `work/completed`。
+- Desktop 会读取事项 Markdown frontmatter 中的 `id`，用于发起 `artifact_create` ActionRun 时写入 `workItemId`。
+- 用户可在发起前选择关联事项；创建 ActionRun 时会同时写入 `workItemPath` 和 `workItemId`。
+- Workbench 事项预览中的“生成成果”仍保留为来源事项已知的入口；普通 Artifacts 入口新增的是发起前选择已有事项能力。
+- 如果用户跳过选择，运行仍按 `workItemRequired: true` 和 `workItemUnassignedReason: pending_work_item_assignment` 进入未归属诊断。
+- 该入口不自动创建事项、不猜测归属、不替代 Repository Context，也不改变仓库 `AGENTS.md` 的优先级。
+
+仍未完成的 P0 后续：
+
+- 仍需要把事项选择提升为所有新 ActionRun 的全局能力。
+- 仍需要发起前直接创建新事项的产品流。
+- 仍需要把计划、执行、产物和复盘串成“开始一件事”专题金线。
+- 仍需要在 Knowledge、Teams、Repository 语义映射等其它非聊天式 AI 入口逐步统一事项选择或来源上下文。
+
 ### 10.55 2026-06-28 当前实施记录：ActionRun 补归属流程
 
 围绕“每次 AI 执行必须归属事项”和“已有无事项 ActionRun 不能只停留在 Dashboard 告警”的 P0 验收，当前继续落地一段代码事实：

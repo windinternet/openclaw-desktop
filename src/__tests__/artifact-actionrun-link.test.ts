@@ -34,6 +34,23 @@ describe('artifact ActionRun linkage', () => {
     expect(workbench).toContain('workItemPath={selectedWorkItemPath}');
   });
 
+  it('lets standalone artifact AI creation select a work item before starting ActionRun', () => {
+    const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
+    const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
+    const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
+
+    expect(drawer).toContain('loadRepositoryBinding');
+    expect(drawer).toContain('loadWorkbenchSnapshot');
+    expect(drawer).toContain('extractWorkbenchMatterId');
+    expect(drawer).toContain('selectedWorkItemPath');
+    expect(drawer).toContain('selectedWorkItemId');
+    expect(drawer).toContain("t('artifact.aiCreateWorkItemPlaceholder')");
+    expect(drawer).toContain('workItemId: resolvedWorkItemId');
+    expect(drawer).toContain('workItemPath: resolvedWorkItemPath');
+    expect(zh.artifact.aiCreateWorkItem).toBeTruthy();
+    expect(en.artifact.aiCreateWorkItem).toBeTruthy();
+  });
+
   it('prefills the artifact creation prompt when opened from a Dashboard output tail action', () => {
     const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
     const artifacts = readFileSync('src/pages/ArtifactsPage.tsx', 'utf8');
