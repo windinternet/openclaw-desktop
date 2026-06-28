@@ -47,6 +47,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain(
       'routes them to Workbench status handling, Artifacts, Knowledge, or Workbench review follow-up',
     );
+    expect(skillContent).toContain(
+      'Status tail actions can update the source matter `status` and check off only the matching status tail action',
+    );
     expect(skillContent).toContain('Review tail actions open Workbench reviews with a review tail action card');
     expect(skillContent).toContain('points to `reviews/weekly/`');
     expect(skillContent).toContain('exposes `desktop.artifacts.execution.review.write`');

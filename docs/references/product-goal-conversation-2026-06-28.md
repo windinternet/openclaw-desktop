@@ -878,6 +878,20 @@ HTML 的独特优势：
 
 - 仍需要更完整的结构化复盘表单、从事项执行记录和成果线索自动带入复盘上下文、Artifact 详情到 `desktop.artifacts.execution.review.write` 的 UI 入口、资产权限/审批面板、更完整的 Repository 资产目录协议、更细的状态/成果/知识尾动作处理流程，以及从手动仓库文件导入资产的流程。
 
+### 10.40 2026-06-28 当前实施记录：事项状态尾动作处理入口
+
+围绕“ActionRun 结束后必须触发是否更新事项状态”和“尾动作需要回到事项页闭环”的 P0 验收，当前继续落地一段代码事实：
+
+- Workbench 新增 `updateWorkbenchMatterStatusFromTailAction`，用于处理 Dashboard 带来的 `tail-action:status` 上下文。
+- Workbench tasks 视图在状态类尾动作进入时会显示“状态收尾动作”卡片，保留来源事项和 `tailActionId`。
+- 用户可显式选择新的事项状态：`active`、`blocked`、`done` 或 `paused`。
+- 确认后 Desktop 会读取来源事项 Markdown，把 frontmatter `status` 或正文 `状态：` 更新为所选值，并只把匹配的状态尾动作勾选为 `[x]`。
+- 该入口不会移动事项文件，不会自动判断事项是否完成，不会沉淀成果，不会更新知识库，不会写复盘，也不会执行资产或授予权限。
+
+仍未完成的 P0 后续：
+
+- 仍需要更完整的状态流转模型、完成后是否移动到 `work/completed/` 的显式确认流程、成果沉淀尾动作的更具体处理入口、知识更新尾动作的 ActionRun 发起入口，以及跨尾动作的结构化建议。
+
 ### 10.28 2026-06-28 当前实施记录：跨事项依赖风险过滤已完成依赖
 
 围绕“Dashboard 卡住项应展示真实推进风险，而不是把已经收口的历史依赖继续报红”的 P0 内容，当前继续落地一段代码事实：

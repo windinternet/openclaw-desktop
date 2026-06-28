@@ -1,6 +1,8 @@
 import type { RepositoryBinding, SemanticSlot } from './agentic-repository';
 import type { RepositoryMarkdownFile } from './repository-knowledge';
 
+const WORKBENCH_MATTER_STATUSES = new Set(['active', 'blocked', 'done', 'paused']);
+
 export interface WorkbenchSemanticSection {
   key: string;
   title: string;
@@ -73,6 +75,12 @@ export interface WorkbenchReviewConfirmInput {
   workItemPath: string;
   tailActionId: string;
   reviewedAt?: Date;
+}
+
+export interface WorkbenchMatterStatusUpdateInput {
+  workItemPath: string;
+  tailActionId: string;
+  status: string;
 }
 
 export interface WorkbenchSnapshot {
@@ -296,6 +304,32 @@ export async function completeWorkbenchTailAction(
   return true;
 }
 
+export async function updateWorkbenchMatterStatusFromTailAction(
+  binding: RepositoryBinding,
+  input: WorkbenchMatterStatusUpdateInput,
+): Promise<boolean> {
+  const workItemPath = normalizeWritableWorkbenchMarkdownPath(input.workItemPath);
+  const actionIndex = parseTailActionIndex(input.tailActionId);
+  const status = normalizeWorkbenchMatterStatus(input.status);
+  if (!workItemPath || !workItemPath.startsWith('work/') || actionIndex === null || !status) return false;
+
+  const repository = getWorkbenchWriteApi();
+  const markdown = await repository.readText(binding.repoPath, workItemPath);
+  const tailAction = parseWorkbenchTailActions(workItemPath, markdown).find(
+    (action) => action.id === input.tailActionId,
+  );
+  if (!tailAction || tailAction.completed) return false;
+
+  const statusUpdated = markWorkbenchMatterStatus(markdown, status);
+  if (!statusUpdated) return false;
+
+  const next = markWorkbenchTailActionCompleted(statusUpdated, actionIndex, tailAction.text);
+  if (!next || next === markdown) return false;
+
+  await repository.writeText(binding.repoPath, workItemPath, next);
+  return true;
+}
+
 export async function writeWorkbenchReviewDraft(
   binding: RepositoryBinding,
   input: WorkbenchReviewDraftInput,
@@ -496,10 +530,37 @@ function markWorkbenchTailActionCompleted(markdown: string, actionIndex: number,
   return null;
 }
 
+function markWorkbenchMatterStatus(markdown: string, status: string): string | null {
+  const lines = markdown.split(/\r?\n/);
+  if (lines[0]?.trim() === '---') {
+    const endIndex = lines.findIndex((line, index) => index > 0 && line.trim() === '---');
+    if (endIndex === -1) return null;
+    const statusIndex = lines.findIndex((line, index) => index > 0 && index < endIndex && /^status:\s*/.test(line));
+    if (statusIndex === -1) lines.splice(endIndex, 0, `status: ${status}`);
+    else lines[statusIndex] = `status: ${status}`;
+    return lines.join('\n');
+  }
+
+  const statusIndex = lines.findIndex((line) => /^状态[：:]\s*/.test(line.trim()));
+  if (statusIndex !== -1) {
+    const indent = lines[statusIndex].match(/^\s*/)?.[0] ?? '';
+    lines[statusIndex] = `${indent}状态：${status}`;
+    return lines.join('\n');
+  }
+
+  return ['---', `status: ${status}`, '---', '', markdown].join('\n');
+}
+
 function parseTailActionIndex(id: string): number | null {
   const match = /:tail-action:(\d+)$/.exec(id);
   if (!match) return null;
   return Number.parseInt(match[1], 10);
+}
+
+function normalizeWorkbenchMatterStatus(value: string): string | null {
+  const status = value.trim();
+  if (!WORKBENCH_MATTER_STATUSES.has(status)) return null;
+  return status;
 }
 
 function normalizeWritableWorkbenchMarkdownPath(value: string): string | null {

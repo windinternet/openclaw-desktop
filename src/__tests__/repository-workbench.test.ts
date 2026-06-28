@@ -8,6 +8,7 @@ import {
   loadWorkbenchSnapshot,
   parsePlanMetadata,
   readWorkbenchMarkdown,
+  updateWorkbenchMatterStatusFromTailAction,
   writeWorkbenchReviewDraft,
 } from '../lib/repository-workbench';
 
@@ -608,6 +609,98 @@ describe('repository workbench', () => {
         '\n',
       ),
     ]);
+  });
+
+  it('updates a work item status and completes the matching status tail action', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'work/active/release.md') {
+        return [
+          '---',
+          'id: release',
+          'status: active',
+          'source: desktop-onboarding',
+          '---',
+          '',
+          '# 发布推进',
+          '',
+          '## 收尾动作',
+          '',
+          '- [ ] 根据 ActionRun 更新事项状态。',
+          '- [ ] 判断是否需要写入复盘。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const updated = await updateWorkbenchMatterStatusFromTailAction(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'work/active/release.md:tail-action:0',
+        status: 'blocked',
+      },
+    );
+
+    expect(updated).toBe(true);
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(writeText.mock.calls[0]).toEqual([
+      '/repo',
+      'work/active/release.md',
+      [
+        '---',
+        'id: release',
+        'status: blocked',
+        'source: desktop-onboarding',
+        '---',
+        '',
+        '# 发布推进',
+        '',
+        '## 收尾动作',
+        '',
+        '- [x] 根据 ActionRun 更新事项状态。',
+        '- [ ] 判断是否需要写入复盘。',
+      ].join('\n'),
+    ]);
+  });
+
+  it('refuses unknown work item status values from status tail actions', async () => {
+    const readText = vi.fn(async () =>
+      [
+        '---',
+        'id: release',
+        'status: active',
+        '---',
+        '',
+        '## 收尾动作',
+        '',
+        '- [ ] 根据 ActionRun 更新事项状态。',
+      ].join('\n'),
+    );
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const updated = await updateWorkbenchMatterStatusFromTailAction(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'work/active/release.md:tail-action:0',
+        status: 'finished',
+      },
+    );
+
+    expect(updated).toBe(false);
+    expect(readText).not.toHaveBeenCalled();
+    expect(writeText).not.toHaveBeenCalled();
   });
 
   it('refuses to confirm a review draft that belongs to another tail action', async () => {

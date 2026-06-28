@@ -15,6 +15,7 @@ import {
   confirmWorkbenchReviewDraft,
   loadWorkbenchSnapshot,
   readWorkbenchMarkdown,
+  updateWorkbenchMatterStatusFromTailAction,
   writeWorkbenchReviewDraft,
 } from '../lib/repository-workbench';
 import type { AiActionRun, AiActionRunStatus } from '../lib/types';
@@ -26,6 +27,7 @@ const { Text, Title } = Typography;
 
 export type WorkbenchPanelView = 'dashboard' | 'projects' | 'tasks' | 'plans' | 'activity' | 'outputs' | 'reviews';
 type OutputGroupBy = 'none' | 'source' | 'type';
+const WORKBENCH_STATUS_OPTIONS = ['active', 'blocked', 'done', 'paused'] as const;
 
 interface ProjectDeliverable {
   id: string;
@@ -160,6 +162,9 @@ export default function WorkbenchRepositoryPanel({
   const [showMatterArtifactDrawer, setShowMatterArtifactDrawer] = useState(false);
   const [reviewDraftWriting, setReviewDraftWriting] = useState(false);
   const [reviewDraftConfirming, setReviewDraftConfirming] = useState(false);
+  const [statusTailActionValue, setStatusTailActionValue] =
+    useState<(typeof WORKBENCH_STATUS_OPTIONS)[number]>('active');
+  const [statusTailActionUpdating, setStatusTailActionUpdating] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -295,6 +300,34 @@ export default function WorkbenchRepositoryPanel({
       Toast.error(err instanceof Error ? err.message : t('workbench.reviewDraftConfirmFailed'));
     } finally {
       setReviewDraftConfirming(false);
+    }
+  };
+
+  const handleUpdateMatterStatus = async (context: DashboardTailActionRouteContext) => {
+    if (!context.workItemPath || !context.id) {
+      Toast.warning(t('workbench.statusTailActionUnavailable'));
+      return;
+    }
+
+    setStatusTailActionUpdating(true);
+    try {
+      const updated = await updateWorkbenchMatterStatusFromTailAction(binding, {
+        workItemPath: context.workItemPath,
+        tailActionId: context.id,
+        status: statusTailActionValue,
+      });
+      if (!updated) {
+        Toast.warning(t('workbench.statusTailActionUnavailable'));
+        return;
+      }
+      setSelectedPreviewPath(context.workItemPath);
+      setSelectedPreviewContent(await readWorkbenchMarkdown(binding, context.workItemPath));
+      setSnapshot(await loadWorkbenchSnapshot(binding));
+      Toast.success(t('workbench.matterStatusUpdated'));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('workbench.matterStatusUpdateFailed'));
+    } finally {
+      setStatusTailActionUpdating(false);
     }
   };
 
@@ -617,9 +650,18 @@ export default function WorkbenchRepositoryPanel({
       snapshot?.taskGroups.flatMap((group) =>
         group.items.map((item) => ({ ...item, groupTitle: group.title, groupId: group.id })),
       ) ?? [];
-    if (taskItems.length === 0) return renderWorkView();
+    const statusTailActionCard = renderStatusTailActionCard();
+    if (taskItems.length === 0) {
+      return (
+        <Space vertical align="start" style={{ width: '100%' }} spacing={12}>
+          {statusTailActionCard}
+          {renderWorkView()}
+        </Space>
+      );
+    }
     return (
       <Space vertical align="start" style={{ width: '100%' }}>
+        {statusTailActionCard}
         {taskItems.map((item) => (
           <button
             key={item.id}
@@ -650,6 +692,57 @@ export default function WorkbenchRepositoryPanel({
           </button>
         ))}
       </Space>
+    );
+  };
+
+  const renderStatusTailActionCard = () => {
+    const statusTailActionContext = tailActionContext?.kind === 'status' ? tailActionContext : null;
+    if (!statusTailActionContext) return null;
+    return (
+      <div
+        style={{
+          border: '1px solid var(--semi-color-border)',
+          borderRadius: 8,
+          padding: 12,
+          width: '100%',
+          background: 'var(--semi-color-fill-0)',
+        }}
+      >
+        <Space vertical align="start" style={{ width: '100%' }}>
+          <Space align="center" wrap>
+            <Tag color="orange">{t('workbench.statusTailActionTitle')}</Tag>
+            <Tag color="blue">work/</Tag>
+          </Space>
+          <Text size="small">{t('workbench.statusTailActionDesc')}</Text>
+          {statusTailActionContext.workItemPath ? (
+            <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }}>
+              {t('workbench.tailActionSource')}: {statusTailActionContext.workItemPath}
+            </Text>
+          ) : null}
+          <Space align="center" wrap>
+            <Select
+              size="small"
+              value={statusTailActionValue}
+              onChange={(value) => setStatusTailActionValue(value as (typeof WORKBENCH_STATUS_OPTIONS)[number])}
+              style={{ width: 160 }}
+            >
+              {WORKBENCH_STATUS_OPTIONS.map((status) => (
+                <Select.Option key={status} value={status}>
+                  {t(`workbench.matterStatus.${status}`)}
+                </Select.Option>
+              ))}
+            </Select>
+            <Button
+              size="small"
+              type="primary"
+              loading={statusTailActionUpdating}
+              onClick={() => void handleUpdateMatterStatus(statusTailActionContext)}
+            >
+              {t('workbench.updateMatterStatus')}
+            </Button>
+          </Space>
+        </Space>
+      </div>
     );
   };
 
