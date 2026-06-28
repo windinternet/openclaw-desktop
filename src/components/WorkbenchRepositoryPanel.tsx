@@ -11,7 +11,12 @@ import type { ArtifactMeta } from '../lib/artifact-types';
 import type { DashboardTailActionRouteContext } from '../lib/dashboard-tail-action-routing';
 import type { RepositoryMarkdownFile } from '../lib/repository-knowledge';
 import type { WorkbenchSnapshot } from '../lib/repository-workbench';
-import { loadWorkbenchSnapshot, readWorkbenchMarkdown, writeWorkbenchReviewDraft } from '../lib/repository-workbench';
+import {
+  confirmWorkbenchReviewDraft,
+  loadWorkbenchSnapshot,
+  readWorkbenchMarkdown,
+  writeWorkbenchReviewDraft,
+} from '../lib/repository-workbench';
 import type { AiActionRun, AiActionRunStatus } from '../lib/types';
 import { extractWorkbenchMatterId, isWorkbenchMatterPath } from '../lib/workbench-matter';
 import { ArtifactAICreateDrawer } from './ArtifactAICreateDrawer';
@@ -154,6 +159,7 @@ export default function WorkbenchRepositoryPanel({
   const [outputGroupBy, setOutputGroupBy] = useState<OutputGroupBy>('none');
   const [showMatterArtifactDrawer, setShowMatterArtifactDrawer] = useState(false);
   const [reviewDraftWriting, setReviewDraftWriting] = useState(false);
+  const [reviewDraftConfirming, setReviewDraftConfirming] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -262,6 +268,33 @@ export default function WorkbenchRepositoryPanel({
       Toast.error(err instanceof Error ? err.message : t('workbench.reviewDraftCreateFailed'));
     } finally {
       setReviewDraftWriting(false);
+    }
+  };
+
+  const handleConfirmReviewDraft = async (context: DashboardTailActionRouteContext) => {
+    if (!context.workItemPath || !context.id || !selectedPreviewPath) {
+      Toast.warning(t('workbench.reviewDraftConfirmUnavailable'));
+      return;
+    }
+
+    setReviewDraftConfirming(true);
+    try {
+      const confirmed = await confirmWorkbenchReviewDraft(binding, {
+        reviewPath: selectedPreviewPath,
+        workItemPath: context.workItemPath,
+        tailActionId: context.id,
+      });
+      if (!confirmed) {
+        Toast.warning(t('workbench.reviewDraftConfirmUnavailable'));
+        return;
+      }
+      setSelectedPreviewContent(await readWorkbenchMarkdown(binding, selectedPreviewPath));
+      setSnapshot(await loadWorkbenchSnapshot(binding));
+      Toast.success(t('workbench.reviewDraftConfirmed'));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('workbench.reviewDraftConfirmFailed'));
+    } finally {
+      setReviewDraftConfirming(false);
     }
   };
 
@@ -1013,6 +1046,10 @@ export default function WorkbenchRepositoryPanel({
   const renderReviewTailActionCard = () => {
     const reviewTailActionContext = tailActionContext?.kind === 'review' ? tailActionContext : null;
     if (!reviewTailActionContext) return null;
+    const canConfirmReviewDraft =
+      selectedPreviewPath.startsWith('reviews/') &&
+      /^status:\s*draft\s*$/m.test(selectedPreviewContent) &&
+      Boolean(reviewTailActionContext.workItemPath && reviewTailActionContext.id);
     return (
       <div
         style={{
@@ -1049,6 +1086,16 @@ export default function WorkbenchRepositoryPanel({
             <Button size="small" type="tertiary" onClick={() => openRepositoryFile('reviews/weekly/')}>
               {t('workbench.openReviewFolder')}
             </Button>
+            {canConfirmReviewDraft ? (
+              <Button
+                size="small"
+                type="secondary"
+                loading={reviewDraftConfirming}
+                onClick={() => void handleConfirmReviewDraft(reviewTailActionContext)}
+              >
+                {t('workbench.confirmReviewDraft')}
+              </Button>
+            ) : null}
           </Space>
         </Space>
       </div>

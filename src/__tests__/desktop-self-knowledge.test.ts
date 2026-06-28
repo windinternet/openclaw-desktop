@@ -53,6 +53,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('can create a draft work-item review in `reviews/weekly/`');
     expect(skillContent).toContain('does not check off the tail action by itself');
     expect(skillContent).toContain(
+      'can confirm that draft, mark it as `status: confirmed`, add `reviewedAt`, and check off only the matching source tail action',
+    );
+    expect(skillContent).toContain(
       'Dashboard tail action targets carry `tailAction`, `tailActionId`, and `workItemPath`',
     );
     expect(skillContent).toContain('Artifacts opens the AI Artifact creation flow with the source work item attached');

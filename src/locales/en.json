@@ -175,6 +175,10 @@
     "reviewDraftCreated": "Review draft written",
     "reviewDraftCreateFailed": "Failed to create review draft",
     "reviewDraftMissingSource": "Source matter is missing, so a review draft cannot be created",
+    "confirmReviewDraft": "Confirm Review and Complete Tail Action",
+    "reviewDraftConfirmed": "Review confirmed and tail action completed",
+    "reviewDraftConfirmFailed": "Failed to confirm review",
+    "reviewDraftConfirmUnavailable": "This review draft cannot be confirmed now",
     "openReviewFolder": "Open Review Folder",
     "viewMarkdown": "View Markdown"
   },

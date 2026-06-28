@@ -175,6 +175,10 @@
     "reviewDraftCreated": "复盘草稿已写入",
     "reviewDraftCreateFailed": "创建复盘草稿失败",
     "reviewDraftMissingSource": "缺少来源事项，无法创建复盘草稿",
+    "confirmReviewDraft": "确认复盘并完成尾动作",
+    "reviewDraftConfirmed": "复盘已确认，尾动作已完成",
+    "reviewDraftConfirmFailed": "确认复盘失败",
+    "reviewDraftConfirmUnavailable": "当前复盘草稿无法确认",
     "openReviewFolder": "打开复盘目录",
     "viewMarkdown": "查看 Markdown"
   },

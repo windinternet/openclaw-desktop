@@ -864,6 +864,20 @@ HTML 的独特优势：
 
 - 后续仍需要把草稿升级为确认表单或结构化编辑流程、从事项尾动作或 Artifact 详情带入 `artifactId` 并调用 `desktop.artifacts.execution.review.write`、写入成功后的尾动作勾选联动、资产权限/审批面板、更完整的 Repository 资产目录协议、更细的处理入口，以及从手动仓库文件导入资产的流程。
 
+### 10.39 2026-06-28 当前实施记录：事项尾动作复盘确认联动
+
+围绕“ActionRun 结束后必须触发是否写入复盘”和“执行结束后的尾动作需要回到事项页闭环”的 P0 验收，当前继续落地一段代码事实：
+
+- Workbench 新增 `confirmWorkbenchReviewDraft`，用于确认由 Dashboard 复盘尾动作创建的事项复盘草稿。
+- Workbench 复盘尾动作卡片新增“确认复盘并完成尾动作”按钮；按钮只在当前预览是 `reviews/` 下的 `status: draft` 草稿，且页面携带来源 `workItemPath` 与 `tailActionId` 时出现。
+- 确认时 Desktop 会读取复盘草稿和来源事项 Markdown，要求复盘草稿仍是 `status: draft`，来源事项里存在同一个未完成尾动作。
+- 确认成功后，Desktop 会把复盘草稿改为 `status: confirmed`，写入 `reviewedAt`，并只把来源事项中匹配的那条 `## 收尾动作` 勾选为 `[x]`。
+- 该入口不会自动更新事项状态、沉淀成果、更新知识库、执行资产、授予权限，也不会替代 `desktop.artifacts.execution.review.write` 的 Artifact 执行复盘写入。
+
+仍未完成的 P0 后续：
+
+- 仍需要更完整的结构化复盘表单、从事项执行记录和成果线索自动带入复盘上下文、Artifact 详情到 `desktop.artifacts.execution.review.write` 的 UI 入口、资产权限/审批面板、更完整的 Repository 资产目录协议、更细的状态/成果/知识尾动作处理流程，以及从手动仓库文件导入资产的流程。
+
 ### 10.28 2026-06-28 当前实施记录：跨事项依赖风险过滤已完成依赖
 
 围绕“Dashboard 卡住项应展示真实推进风险，而不是把已经收口的历史依赖继续报红”的 P0 内容，当前继续落地一段代码事实：

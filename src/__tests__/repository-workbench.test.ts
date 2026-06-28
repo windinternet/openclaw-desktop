@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
 import {
+  confirmWorkbenchReviewDraft,
   completeWorkbenchTailAction,
   groupReviewsByFolder,
   loadWorkbenchSnapshot,
@@ -540,6 +541,121 @@ describe('repository workbench', () => {
     expect(draft.content).toContain('- [ ] 判断是否需要把该尾动作标记完成。');
     expect(writeText).toHaveBeenCalledTimes(1);
     expect(writeText).toHaveBeenCalledWith('/repo', draft.path, draft.content);
+  });
+
+  it('confirms a review draft and completes the matching source tail action', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'reviews/weekly/2026-06-28-work-release-tail-action-1-review.md') {
+        return [
+          '---',
+          'source: desktop-workbench-review-tail-action',
+          'workItemPath: work/active/release.md',
+          'tailActionId: work/active/release.md:tail-action:1',
+          'createdAt: 2026-06-28T10:00:00.000Z',
+          'status: draft',
+          '---',
+          '',
+          '# release 复盘草稿',
+          '',
+          '## 复盘正文',
+          '',
+          '- 本次推进：已经完成验证。',
+        ].join('\n');
+      }
+      if (relativePath === 'work/active/release.md') {
+        return [
+          '# 发布推进',
+          '',
+          '## 收尾动作',
+          '',
+          '- [ ] 根据 ActionRun 更新事项状态。',
+          '- [ ] 判断是否需要写入复盘。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const confirmed = await confirmWorkbenchReviewDraft(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        reviewPath: 'reviews/weekly/2026-06-28-work-release-tail-action-1-review.md',
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'work/active/release.md:tail-action:1',
+        reviewedAt: new Date('2026-06-28T11:00:00.000Z'),
+      },
+    );
+
+    expect(confirmed).toBe(true);
+    expect(writeText).toHaveBeenCalledTimes(2);
+    const reviewWrite = writeText.mock.calls[0] as unknown as [string, string, string];
+    expect(reviewWrite).toEqual([
+      '/repo',
+      'reviews/weekly/2026-06-28-work-release-tail-action-1-review.md',
+      expect.stringContaining('status: confirmed'),
+    ]);
+    expect(reviewWrite[2]).toContain('reviewedAt: 2026-06-28T11:00:00.000Z');
+    expect(reviewWrite[2]).not.toContain('status: draft');
+    expect(writeText.mock.calls[1]).toEqual([
+      '/repo',
+      'work/active/release.md',
+      ['# 发布推进', '', '## 收尾动作', '', '- [ ] 根据 ActionRun 更新事项状态。', '- [x] 判断是否需要写入复盘。'].join(
+        '\n',
+      ),
+    ]);
+  });
+
+  it('refuses to confirm a review draft that belongs to another tail action', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'reviews/weekly/2026-06-28-work-release-tail-action-1-review.md') {
+        return [
+          '---',
+          'source: desktop-workbench-review-tail-action',
+          'workItemPath: work/active/other.md',
+          'tailActionId: work/active/other.md:tail-action:1',
+          'createdAt: 2026-06-28T10:00:00.000Z',
+          'status: draft',
+          '---',
+          '',
+          '# other 复盘草稿',
+        ].join('\n');
+      }
+      if (relativePath === 'work/active/release.md') {
+        return [
+          '# 发布推进',
+          '',
+          '## 收尾动作',
+          '',
+          '- [ ] 根据 ActionRun 更新事项状态。',
+          '- [ ] 判断是否需要写入复盘。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const confirmed = await confirmWorkbenchReviewDraft(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        reviewPath: 'reviews/weekly/2026-06-28-work-release-tail-action-1-review.md',
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'work/active/release.md:tail-action:1',
+        reviewedAt: new Date('2026-06-28T11:00:00.000Z'),
+      },
+    );
+
+    expect(confirmed).toBe(false);
+    expect(writeText).not.toHaveBeenCalled();
   });
 
   it('reads selected workbench markdown for inline preview', async () => {

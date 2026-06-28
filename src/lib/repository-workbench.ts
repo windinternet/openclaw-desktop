@@ -68,6 +68,13 @@ export interface WorkbenchReviewDraftResult {
   content: string;
 }
 
+export interface WorkbenchReviewConfirmInput {
+  reviewPath: string;
+  workItemPath: string;
+  tailActionId: string;
+  reviewedAt?: Date;
+}
+
 export interface WorkbenchSnapshot {
   inboxMarkdown: string;
   activeWork: RepositoryMarkdownFile[];
@@ -314,6 +321,42 @@ export async function writeWorkbenchReviewDraft(
   return { path, content };
 }
 
+export async function confirmWorkbenchReviewDraft(
+  binding: RepositoryBinding,
+  input: WorkbenchReviewConfirmInput,
+): Promise<boolean> {
+  const reviewPath = normalizeWritableWorkbenchMarkdownPath(input.reviewPath);
+  const workItemPath = normalizeWritableWorkbenchMarkdownPath(input.workItemPath);
+  const tailActionIndex = parseTailActionIndex(input.tailActionId);
+  if (!reviewPath || !reviewPath.startsWith('reviews/') || !workItemPath || !workItemPath.startsWith('work/')) {
+    return false;
+  }
+  if (tailActionIndex === null) return false;
+
+  const repository = getWorkbenchWriteApi();
+  const [reviewMarkdown, workMarkdown] = await Promise.all([
+    repository.readText(binding.repoPath, reviewPath),
+    repository.readText(binding.repoPath, workItemPath),
+  ]);
+  if (!/^status:\s*draft\s*$/m.test(reviewMarkdown)) return false;
+  if (readWorkbenchFrontmatterValue(reviewMarkdown, 'source') !== 'desktop-workbench-review-tail-action') return false;
+  if (readWorkbenchFrontmatterValue(reviewMarkdown, 'workItemPath') !== workItemPath) return false;
+  if (readWorkbenchFrontmatterValue(reviewMarkdown, 'tailActionId') !== input.tailActionId) return false;
+
+  const tailAction = parseWorkbenchTailActions(workItemPath, workMarkdown).find(
+    (action) => action.id === input.tailActionId,
+  );
+  if (!tailAction || tailAction.completed) return false;
+
+  const nextReview = markWorkbenchReviewDraftConfirmed(reviewMarkdown, input.reviewedAt ?? new Date());
+  const nextWork = markWorkbenchTailActionCompleted(workMarkdown, tailActionIndex, tailAction.text);
+  if (!nextReview || !nextWork || nextWork === workMarkdown) return false;
+
+  await repository.writeText(binding.repoPath, reviewPath, nextReview);
+  await repository.writeText(binding.repoPath, workItemPath, nextWork);
+  return true;
+}
+
 export function parsePlanMetadata(path: string, markdown: string): RepositoryPlanMetadata {
   const metadata: RepositoryPlanMetadata = { path };
   for (const line of markdown.split('\n').slice(0, 24)) {
@@ -515,6 +558,44 @@ function buildWorkbenchReviewDraftMarkdown(input: {
   ]
     .filter((line): line is string => line !== undefined)
     .join('\n');
+}
+
+function markWorkbenchReviewDraftConfirmed(markdown: string, reviewedAt: Date): string | null {
+  if (!/^---\n/.test(markdown)) return null;
+  const lines = markdown.split(/\r?\n/);
+  const endIndex = lines.findIndex((line, index) => index > 0 && line.trim() === '---');
+  if (endIndex === -1) return null;
+
+  let statusUpdated = false;
+  let reviewedAtIndex = -1;
+  for (let index = 1; index < endIndex; index += 1) {
+    if (/^status:\s*/.test(lines[index])) {
+      if (!/^status:\s*draft\s*$/.test(lines[index])) return null;
+      lines[index] = 'status: confirmed';
+      statusUpdated = true;
+    }
+    if (/^reviewedAt:\s*/.test(lines[index])) reviewedAtIndex = index;
+  }
+  if (!statusUpdated) return null;
+
+  const reviewedAtLine = `reviewedAt: ${reviewedAt.toISOString()}`;
+  if (reviewedAtIndex === -1) lines.splice(endIndex, 0, reviewedAtLine);
+  else lines[reviewedAtIndex] = reviewedAtLine;
+  return lines.join('\n');
+}
+
+function readWorkbenchFrontmatterValue(markdown: string, key: string): string | null {
+  if (!/^---\n/.test(markdown)) return null;
+  const lines = markdown.split(/\r?\n/);
+  const endIndex = lines.findIndex((line, index) => index > 0 && line.trim() === '---');
+  if (endIndex === -1) return null;
+
+  const prefix = `${key}:`;
+  const line = lines.slice(1, endIndex).find((item) => item.startsWith(prefix));
+  if (!line) return null;
+
+  const value = line.slice(prefix.length).trim();
+  return value.replace(/^["'](.+)["']$/, '$1');
 }
 
 export function deriveProjects(section?: WorkbenchSemanticSection): WorkbenchProject[] {

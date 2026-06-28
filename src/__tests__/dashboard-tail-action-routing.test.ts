@@ -18,8 +18,11 @@ describe('dashboard tail action routing', () => {
     expect(workbenchPanel).toContain("t('workbench.reviewTailActionTitle')");
     expect(workbenchPanel).toContain("t('workbench.reviewTailActionWriteCommand')");
     expect(workbenchPanel).toContain('writeWorkbenchReviewDraft');
+    expect(workbenchPanel).toContain('confirmWorkbenchReviewDraft');
     expect(workbenchPanel).toContain("t('workbench.createReviewDraft')");
     expect(workbenchPanel).toContain("t('workbench.reviewDraftCreated')");
+    expect(workbenchPanel).toContain("t('workbench.confirmReviewDraft')");
+    expect(workbenchPanel).toContain("t('workbench.reviewDraftConfirmed')");
     expect(workbenchPanel).toContain('desktop.artifacts.execution.review.write');
     expect(workbenchPanel).toContain('reviews/weekly/');
 

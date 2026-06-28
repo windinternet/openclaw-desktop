@@ -290,15 +290,15 @@ HTML 产物是特色能力：
 - Workbench 快照会解析工作事项里的 `## 收尾动作`，Dashboard “待确认”会显示未勾选收尾动作，让 ActionRun 结束后的后续判断进入每日推进面板。
 - Dashboard 会把未完成收尾动作分类为 `tail-action:status`、`tail-action:output`、`tail-action:knowledge` 或 `tail-action:review`，分别导向 Workbench 状态处理、Artifacts、Knowledge 或 Workbench 复盘后续。
 - 这些目标 URL 会携带 `tailAction`、`tailActionId` 和 `workItemPath`；Artifacts 会据此打开 AI 产物创建入口并带上来源事项，成果类尾动作会预填基于来源事项和最近执行记录沉淀成果的提示；Knowledge 会进入维护上下文，Workbench 会切到状态或复盘相关 tab 并显示来源事项。
-- Workbench 复盘视图已接收 `tailAction=review` 上下文，并显示“复盘收尾动作”卡片；卡片保留来源事项 `workItemPath`、建议目标 `reviews/weekly/` 和复盘写入命令线索 `desktop.artifacts.execution.review.write`，可打开复盘目录，也可创建 `reviews/weekly/YYYY-MM-DD-work-*-tail-action-*-review.md` 事项复盘草稿。草稿记录来源事项、尾动作 ID、创建时间和核对清单，但不会自动确认复盘或勾选尾动作。
+- Workbench 复盘视图已接收 `tailAction=review` 上下文，并显示“复盘收尾动作”卡片；卡片保留来源事项 `workItemPath`、建议目标 `reviews/weekly/` 和复盘写入命令线索 `desktop.artifacts.execution.review.write`，可打开复盘目录，也可创建 `reviews/weekly/YYYY-MM-DD-work-*-tail-action-*-review.md` 事项复盘草稿。草稿记录来源事项、尾动作 ID、创建时间和核对清单，创建时不会自动确认复盘或勾选尾动作；用户显式确认该草稿后，Desktop 会把草稿改为 `status: confirmed`、写入 `reviewedAt`，并只勾选匹配来源尾动作。
 - Dashboard 会读取 Workbench Snapshot 中的 `runs/action-runs/index.md`；已归属事项的终态 ActionRun 如果没有被索引，会作为 `action-run:unarchived` 待确认展示，并跳转到 `/workbench?view=actions` 让用户回到执行记录视图检查。
 - Dashboard 会把没有 `workItemPath` 的终态 ActionRun 作为 `action-run:unassigned` 待确认展示，并跳转到 `/workbench?view=actions`；这是对“每次 AI 执行应归属事项”的只读诊断，不自动创建事项或改写运行记录。
 - Dashboard 会把已完成、有 `workItemPath`、有 `resultSummary` 但没有 `artifactIds` 的 ActionRun 作为 `action-run:output-unpreserved` 待确认展示；如果同事项已有未完成成果尾动作则不重复提示，如果运行索引可用则要求该 run 已经归档。点击会进入 Artifacts 的 `tailAction=output` 成果沉淀入口，并携带 `tailActionId=action-run-output:<runId>` 和 `workItemPath`；这只是沉淀提示，不自动创建 Artifact 或 Repository output。
 - Dashboard 会把计划元数据中显式声明的 `dependsOn` / `dependencies` / `requires` / `relatedWork` / `依赖事项` / `关联事项` / `前置事项` 解析为跨事项依赖，并把仍未完成的依赖作为 `plan:cross-work-risk` 卡住项展示；已在 `completedWork`、`completedPlans`、`work/completed/` 或 `plans/completed/` 中出现的依赖会从风险详情中过滤。未完成依赖如果 14 天没有更新会标记“停滞 N 天”，未完成的活跃计划依赖如果没有显式负责人元数据会标记“负责人未知”。这只是显式元数据诊断，不从计划正文推断风险，也不自动改写计划。
-- 用户可在 Dashboard 将单条收尾动作标记完成；Desktop 会读取来源事项 Markdown，只把对应 `## 收尾动作` 行写回为 `[x]`，不自动执行更新状态、沉淀成果、更新知识库或写入复盘。
+- 用户可在 Dashboard 将单条收尾动作标记完成；Desktop 会读取来源事项 Markdown，只把对应 `## 收尾动作` 行写回为 `[x]`，不自动执行更新状态、沉淀成果、更新知识库或写入复盘。复盘类尾动作也可在 Workbench 明确确认复盘草稿后勾选匹配行，但这同样不触发其他尾动作。
 - 回写只允许发生在当前绑定仓库的 `work/` 下 Markdown，且同一个 run 路径已存在时不会重复追加。
 - Workbench 预览 `work/active/`、`work/completed/`、`work/someday/` 下的事项 Markdown 时，已提供“生成成果”入口；该入口复用 Artifact AI 创建抽屉，创建 `artifact_create` ActionRun 时写入 `sourcePage: workbench`、当前 `workItemPath`，并在事项 frontmatter 有 `id` 时写入 `workItemId`。
-- 这只是硬连接早期切片：全局 UI 侧强制归属、事项选择器、事项计划、尾动作的具体处理流程和复盘沉淀仍未完成。
+- 这只是硬连接早期切片：全局 UI 侧强制归属、事项选择器、事项计划，以及状态、成果、知识等尾动作的具体处理流程仍未完成。
 
 验收：
 
@@ -344,9 +344,9 @@ HTML 产物是特色能力：
 - `desktop.artifacts.search` 和 `desktop.artifacts.describe` 会返回 `assetExecutionSummary`，把执行型资产的审批要求、最近执行状态/结果/输出线索、终态执行后的 `reviewSummary` 复盘建议，以及 Desktop 只记录、不执行、不授予权限的边界直接暴露给 Gateway。
 - Repository `outputs/assets/index.md` 会为 `succeeded / failed / cancelled` 的最近执行写入 `review: pending, write reviews/weekly/ entry` 和结果摘要线索，用于提醒后续复盘，但不会自动写复盘。
 - `desktop.artifacts.execution.review.write` 已提供用户确认后的复盘写入入口，可把最近终态执行、输出 Artifact、Repository output、关联事项、复用判断和后续动作写入 `reviews/weekly/YYYY-MM-DD-artifact-*-review.md`；该入口不执行资产、不授予权限、不自动更新事项或勾选尾动作。
-- Workbench 复盘视图会在 Dashboard `tail-action:review` 路由进入时展示复盘收尾动作卡片，把 `reviews/weekly/` 和 `desktop.artifacts.execution.review.write` 作为 UI 侧线索暴露给用户；该卡片也能创建事项复盘草稿，让运行后复盘先进入仓库事实源，但不会直接执行资产、写已确认的 Artifact 执行复盘、勾选尾动作或授予权限。
+- Workbench 复盘视图会在 Dashboard `tail-action:review` 路由进入时展示复盘收尾动作卡片，把 `reviews/weekly/` 和 `desktop.artifacts.execution.review.write` 作为 UI 侧线索暴露给用户；该卡片也能创建事项复盘草稿，让运行后复盘先进入仓库事实源。用户显式确认事项复盘草稿后，Desktop 可把草稿标记为 `confirmed` 并勾选匹配的事项复盘尾动作，但不会直接执行资产、写已确认的 Artifact 执行复盘、更新事项状态、沉淀成果、更新知识库或授予权限。
 - Dashboard 最近产物和本周新增成果会把带 `reuseKind` 的 Artifact 与 Repository output 标为“可复用资产”，并在详情中展示复用分类、最近执行状态或待审批边界。
-- 这仍是第一片可观测入口；更完整的 Repository 资产目录协议、资产权限面板、UI 侧复盘入口、事项尾动作联动和更细的处理工作流仍需继续补齐。
+- 这仍是第一片可观测入口；更完整的 Repository 资产目录协议、资产权限面板、Artifact 执行复盘 UI 入口，以及状态/成果/知识等更细的处理工作流仍需继续补齐。
 
 验收：
 
