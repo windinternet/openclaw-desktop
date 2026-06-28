@@ -65,7 +65,9 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('计划执行成果沉淀入口');
     expect(source).toContain('计划执行成果候选提取');
     expect(source).toContain('计划执行成果候选来源扩展');
+    expect(source).toContain('ActionRun 成果保存后状态刷新');
     expect(source).toContain('ActionRun 成果沉淀后的 Dashboard 去重');
+    expect(source).toContain('notifyActionRunsChanged');
     expect(source).toContain('shouldOfferPlanExecutionOutputPreservation');
     expect(source).toContain('extractActionRunOutputCandidates');
     expect(source).toContain('buildArtifactOutputPreservationPrompt');
@@ -123,6 +125,7 @@ describe('product goal P0 traceability', () => {
     expect(plans).toContain('计划执行状态观测');
     expect(plans).toContain('findLatestPlanExecutionRun');
     expect(plans).toContain('计划执行成果沉淀入口');
+    expect(plans).toContain('保存后会触发 `notifyActionRunsChanged`');
     expect(plans).toContain('计划执行成果候选提取');
     expect(plans).toContain('shouldOfferPlanExecutionOutputPreservation');
     expect(plans).toContain('extractActionRunOutputCandidates');
@@ -172,6 +175,7 @@ describe('product goal P0 traceability', () => {
     expect(roadmap).toContain('计划执行状态观测');
     expect(roadmap).toContain('findLatestPlanExecutionRun');
     expect(roadmap).toContain('计划执行成果沉淀入口');
+    expect(roadmap).toContain('保存后会触发 `notifyActionRunsChanged`');
     expect(roadmap).toContain('计划执行成果候选提取');
     expect(roadmap).toContain('shouldOfferPlanExecutionOutputPreservation');
     expect(roadmap).toContain('extractActionRunOutputCandidates');
@@ -225,6 +229,8 @@ describe('product goal P0 traceability', () => {
     expect(skillContent).toContain('shouldOfferPlanExecutionOutputPreservation');
     expect(skillContent).toContain('`action-run-output:<runId>`');
     expect(skillContent).toContain('Preserve Output');
+    expect(skillContent).toContain('notifyActionRunsChanged');
+    expect(skillContent).toContain('Dashboard and Workbench reload local ActionRun observers');
     expect(skillContent).toContain('extractActionRunOutputCandidates');
     expect(skillContent).toContain('buildArtifactOutputPreservationPrompt');
     expect(skillContent).toContain('lastAssistantResponse');

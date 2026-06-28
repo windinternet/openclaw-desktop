@@ -157,6 +157,7 @@ interface StoreState {
   connectionRetry: GatewayRetryInfo | null;
   activeClient: GatewayClient | null;
   actionRunsVersion: number;
+  notifyActionRunsChanged: () => void;
 
   // ── Gateway Data (for current instance) ──
   sessions: SessionInfo[];
@@ -381,6 +382,7 @@ export const useStore = create<StoreState>((set, get) => ({
   connectionRetry: null,
   activeClient: null,
   actionRunsVersion: 0,
+  notifyActionRunsChanged: () => set((state) => ({ actionRunsVersion: state.actionRunsVersion + 1 })),
 
   sessions: [],
   agents: [],

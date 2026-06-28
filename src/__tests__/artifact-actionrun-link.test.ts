@@ -14,6 +14,16 @@ describe('artifact ActionRun linkage', () => {
     expect(store).toContain('artifactIds');
   });
 
+  it('notifies ActionRun observers after saving an AI-created artifact output', () => {
+    const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
+    const store = readFileSync('src/lib/store.ts', 'utf8');
+
+    expect(store).toContain('notifyActionRunsChanged: () => void');
+    expect(store).toContain('actionRunsVersion: state.actionRunsVersion + 1');
+    expect(drawer).toContain('const notifyActionRunsChanged = useStore((s) => s.notifyActionRunsChanged)');
+    expect(drawer).toContain('notifyActionRunsChanged();');
+  });
+
   it('carries the selected work item into workbench-created artifact ActionRuns', () => {
     const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
     const workbench = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');

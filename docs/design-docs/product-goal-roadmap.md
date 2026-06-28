@@ -297,7 +297,7 @@ HTML 产物是特色能力：
 - Workbench 复盘视图已接收 `tailAction=review` 上下文，并显示“复盘收尾动作”卡片；卡片保留来源事项 `workItemPath`、建议目标 `reviews/weekly/` 和复盘写入命令线索 `desktop.artifacts.execution.review.write`，可打开复盘目录，也可创建 `reviews/weekly/YYYY-MM-DD-work-*-tail-action-*-review.md` 事项复盘草稿。草稿记录来源事项、尾动作 ID、创建时间和核对清单，创建时不会自动确认复盘或勾选尾动作；用户显式确认该草稿后，Desktop 会把草稿改为 `status: confirmed`、写入 `reviewedAt`，并只勾选匹配来源尾动作。
 - Dashboard 会读取 Workbench Snapshot 中的 `runs/action-runs/index.md`；已归属事项的终态 ActionRun 如果没有被索引，会作为 `action-run:unarchived` 待确认展示，并跳转到 `/workbench?view=actions` 让用户回到执行记录视图检查。
 - Dashboard 会把没有 `workItemPath` 的终态 ActionRun 作为 `action-run:unassigned` 待确认展示，并把 `workItemUnassignedReason` 展示在详情里，跳转到 `/workbench?view=actions`；这是对“每次 AI 执行应归属事项”的协议化诊断，不自动创建事项或猜测归属。进入 ActionCenter 后，用户可显式选择已有事项完成补归属。
-- Dashboard 会把已完成、有 `workItemPath`、有 `resultSummary` 但没有 `artifactIds` 的 ActionRun 作为 `action-run:output-unpreserved` 待确认展示；如果同事项已有未完成成果尾动作则不重复提示，如果运行索引可用则要求该 run 已经归档，如果已有 Artifact 的 `source.type=action_run` 且 `source.id=<runId>` 则视为该 run 已有产物承接并不再重复提示。点击会进入 Artifacts 的 `tailAction=output` 成果沉淀入口，并携带 `tailActionId=action-run-output:<runId>` 和 `workItemPath`；这只是沉淀提示，不自动创建 Artifact 或 Repository output，但用户显式保存产物后会把成果关联回来源事项。
+- Dashboard 会把已完成、有 `workItemPath`、有 `resultSummary` 但没有 `artifactIds` 的 ActionRun 作为 `action-run:output-unpreserved` 待确认展示；如果同事项已有未完成成果尾动作则不重复提示，如果运行索引可用则要求该 run 已经归档，如果已有 Artifact 的 `source.type=action_run` 且 `source.id=<runId>` 则视为该 run 已有产物承接并不再重复提示。点击会进入 Artifacts 的 `tailAction=output` 成果沉淀入口，并携带 `tailActionId=action-run-output:<runId>` 和 `workItemPath`；这只是沉淀提示，不自动创建 Artifact 或 Repository output，但用户显式保存产物后会把成果关联回来源事项，保存后会触发 `notifyActionRunsChanged` 让 Dashboard 和 Workbench 重新加载本地 ActionRun 观察状态。
 - Dashboard 会把计划元数据中显式声明的 `dependsOn` / `dependencies` / `requires` / `relatedWork` / `依赖事项` / `关联事项` / `前置事项` 解析为跨事项依赖，并把仍未完成的依赖作为 `plan:cross-work-risk` 卡住项展示；已在 `completedWork`、`completedPlans`、`work/completed/` 或 `plans/completed/` 中出现的依赖会从风险详情中过滤。未完成依赖如果 14 天没有更新会标记“停滞 N 天”，未完成的活跃计划依赖如果没有显式负责人元数据会标记“负责人未知”。这只是显式元数据诊断，不从计划正文推断风险，也不自动改写计划。
 - 用户可在 Dashboard 将单条收尾动作标记完成；Desktop 会读取来源事项 Markdown，只把对应 `## 收尾动作` 行写回为 `[x]`，不自动执行更新状态、沉淀成果、更新知识库或写入复盘。成果类尾动作可在 Artifacts 显式保存产物后写入 `## 关联成果` 并勾选匹配行；知识类尾动作可在 Knowledge 完成知识更新或确认无需写入后显式勾选匹配行；状态类尾动作可在 Workbench 显式更新 `status` 后勾选匹配行；复盘类尾动作也可在 Workbench 明确确认复盘草稿后勾选匹配行，但这些都不触发其他尾动作。
 - 回写只允许发生在当前绑定仓库的 `work/` 下 Markdown，且同一个 run 路径已存在时不会重复追加。
@@ -351,7 +351,7 @@ HTML 产物是特色能力：
 - 计划执行成果沉淀入口已接入 Workbench：`shouldOfferPlanExecutionOutputPreservation` 会在最近一次 `plan_execute` 已完成、有 `resultSummary`、有安全 `workItemPath` 且没有 `artifactIds` 时，在计划预览头部显示“沉淀成果 / Preserve Output”。
 - “沉淀成果 / Preserve Output”会打开 Artifacts 的 `tailAction=output` 上下文，携带 `tailActionId=action-run-output:<runId>` 和来源 `workItemPath`；Artifacts 的 AI 创建提示会保留来源事项和来源执行记录。
 - 计划执行成果候选提取已接入：Artifacts 从 `action-run-output:<runId>` 进入成果沉淀时，会加载来源 ActionRun，并通过 `buildArtifactOutputPreservationPrompt` / `extractActionRunOutputCandidates` 把 `resultSummary`、`lastAssistantResponse`、`parseArtifactsFromText` 解析出的 `<artifact>` 块，以及显式输出段落中的文件、链接、HTML、文档、表格、演示等候选成果带入 AI 创建初始提示；这只是提示上下文，不自动创建 Artifact 或 Repository output，不读取任意本地文件、不执行文件、不授予权限。
-- Dashboard 会把 `source.type=action_run` 且 `source.id=<runId>` 的 Artifact 视为该 run 已有产物承接；即使 run 本身还没有回填 `artifactIds`，也不会继续把它显示为 `action-run:output-unpreserved`。
+- Dashboard 会把 `source.type=action_run` 且 `source.id=<runId>` 的 Artifact 视为该 run 已有产物承接；即使 run 本身还没有回填 `artifactIds`，也不会继续把它显示为 `action-run:output-unpreserved`；如果保存流程回填了 `artifactIds`，`notifyActionRunsChanged` 会让 Dashboard 和 Workbench 重新加载本地 ActionRun 观察状态。
 - 计划执行知识更新入口已接入 Workbench：`shouldOfferPlanExecutionKnowledgeUpdate` 会在最近一次 `plan_execute` 已完成、有 `resultSummary` 且有安全 `workItemPath` 时，在计划预览头部显示“更新知识 / Update Knowledge”。
 - “更新知识 / Update Knowledge”会打开 Knowledge 的 `tailAction=knowledge` 上下文，携带 `tailActionId=action-run-knowledge:<runId>` 和来源 `workItemPath`；Knowledge 的 prompt 会保留来源事项和来源执行记录 `action-run-knowledge:<runId>`。
 - `action-run-knowledge:<runId>` 是来源执行记录，不是事项 `## 收尾动作` checklist ID；Knowledge 可基于它发起 `knowledge_rewrite`，但不会显示或执行“确认已处理并完成尾动作”。
@@ -369,7 +369,7 @@ HTML 产物是特色能力：
 
 仍未完成：
 
-- 执行后的成果、知识更新和复盘已有发起入口；成果保存后的 Dashboard 重复提醒、知识更新发起后的 Workbench 重复入口、复盘草稿存在后的 Workbench 重复入口已按仓库事实消除；计划执行复盘草稿也会带入同源知识更新 ActionRun 供复盘核对，计划预览会把这类后续显示为“复盘知识更新”，并能把同源知识更新显示为待审批、已更新、知识无需写入等状态，把同源复盘文档显示为复盘草稿或已复盘；成果候选提取已能从显式 `resultSummary`、`lastAssistantResponse` 和 `<artifact>` 结构块进入 Artifacts 初始提示。但真正 Wiki 写入后的复盘建议、复盘确认后的后续联动、更自然的端到端体验和更完整的保存表单仍需继续接上。
+- 执行后的成果、知识更新和复盘已有发起入口；成果保存后的 Dashboard 重复提醒、知识更新发起后的 Workbench 重复入口、复盘草稿存在后的 Workbench 重复入口已按仓库事实消除；计划执行复盘草稿也会带入同源知识更新 ActionRun 供复盘核对，计划预览会把这类后续显示为“复盘知识更新”，并能把同源知识更新显示为待审批、已更新、知识无需写入等状态，把同源复盘文档显示为复盘草稿或已复盘；成果候选提取已能从显式 `resultSummary`、`lastAssistantResponse` 和 `<artifact>` 结构块进入 Artifacts 初始提示，保存后也会通过 `notifyActionRunsChanged` 刷新 Dashboard/Workbench 的本地 ActionRun 观察状态。但真正 Wiki 写入后的复盘建议、复盘确认后的后续联动、更自然的端到端体验和更完整的保存表单仍需继续接上。
 - 新用户从开箱第一事项自然进入计划、执行和产物沉淀的端到端体验仍未完整闭环。
 
 ### P0-7 可复用资产一等对象

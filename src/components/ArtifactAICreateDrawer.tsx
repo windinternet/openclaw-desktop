@@ -46,6 +46,7 @@ export function ArtifactAICreateDrawer({
   const generateArtifact = useStore((s) => s.generateArtifact);
   const activeClient = useStore((s) => s.activeClient);
   const currentInstanceId = useStore((s) => s.currentInstanceId);
+  const notifyActionRunsChanged = useStore((s) => s.notifyActionRunsChanged);
   const agents = useStore((s) => s.agents);
   const [input, setInput] = useState(initialInput ?? '');
   const {
@@ -211,6 +212,7 @@ export function ArtifactAICreateDrawer({
           artifactIds: Array.from(new Set([...(previewRun.artifactIds ?? []), artifact.id])),
           updatedAt: Date.now(),
         });
+        notifyActionRunsChanged();
       }
       await onSaved?.(artifact);
       Toast.success('产物已创建');
@@ -221,7 +223,7 @@ export function ArtifactAICreateDrawer({
     } catch (e) {
       Toast.error(String(e));
     }
-  }, [currentInstanceId, preview, previewRun, generateArtifact, onClose, onSaved]);
+  }, [currentInstanceId, preview, previewRun, generateArtifact, notifyActionRunsChanged, onClose, onSaved]);
 
   const handleClose = () => {
     if (!generating) {
