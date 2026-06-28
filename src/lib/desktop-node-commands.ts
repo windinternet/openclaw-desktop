@@ -126,6 +126,14 @@ function numberValue(value: unknown): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function dateValue(value: unknown): Date | undefined {
+  const number = numberValue(value);
+  if (number !== undefined) return new Date(number);
+  if (typeof value !== 'string' || !value.trim()) return undefined;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date : undefined;
+}
+
 function tagsValue(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined;
   return value.filter((item): item is string => typeof item === 'string');
@@ -242,6 +250,76 @@ function buildSessionSummaryMarkdown(params: {
     for (const artifact of params.artifacts) lines.push(`- ${artifact}`);
     lines.push('');
   }
+
+  return lines.join('\n');
+}
+
+function formatReviewDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function buildArtifactExecutionReviewMarkdown(params: {
+  artifact: ArtifactMeta;
+  reviewedAt: Date;
+  reviewer?: string;
+  reviewSummary: string;
+  reuseDecision?: string;
+  workItemPath?: string;
+  nextActions: string[];
+}): string {
+  const lastExecutionEvent = params.artifact.executionEvents?.[params.artifact.executionEvents.length - 1];
+  const date = formatReviewDate(params.reviewedAt);
+  const lines = [
+    '---',
+    `title: ${JSON.stringify(`可复用资产执行复盘 ${date} - ${params.artifact.title}`)}`,
+    'source: desktop-artifact-execution-review',
+    `artifactId: ${params.artifact.id}`,
+    `artifactUri: artifact://${params.artifact.id}`,
+    params.artifact.reuseKind ? `artifactReuseKind: ${params.artifact.reuseKind}` : undefined,
+    lastExecutionEvent ? `executionStatus: ${lastExecutionEvent.status}` : undefined,
+    `reviewedAt: ${params.reviewedAt.toISOString()}`,
+    params.reviewer ? `reviewer: ${params.reviewer}` : undefined,
+    params.workItemPath ? `workItemPath: ${params.workItemPath}` : undefined,
+    lastExecutionEvent?.outputArtifactId ? `outputArtifactId: ${lastExecutionEvent.outputArtifactId}` : undefined,
+    lastExecutionEvent?.repositoryOutputPath
+      ? `repositoryOutputPath: ${lastExecutionEvent.repositoryOutputPath}`
+      : undefined,
+    '---',
+    '',
+    `# 可复用资产执行复盘：${params.artifact.title}`,
+    '',
+    '## 摘要',
+    '',
+    `- Artifact: artifact://${params.artifact.id}`,
+    params.artifact.reuseKind ? `- 复用分类：${params.artifact.reuseKind}` : undefined,
+    lastExecutionEvent ? `- 最近执行：${lastExecutionEvent.status}` : undefined,
+    lastExecutionEvent?.runner ? `- 运行器：${lastExecutionEvent.runner}` : undefined,
+    lastExecutionEvent?.command ? `- 命令：\`${lastExecutionEvent.command}\`` : undefined,
+    lastExecutionEvent?.resultSummary ? `- 执行结果：${lastExecutionEvent.resultSummary}` : undefined,
+    lastExecutionEvent?.outputArtifactId ? `- 输出产物：artifact://${lastExecutionEvent.outputArtifactId}` : undefined,
+    lastExecutionEvent?.repositoryOutputPath ? `- 仓库输出：${lastExecutionEvent.repositoryOutputPath}` : undefined,
+    params.workItemPath ? `- 关联事项：${params.workItemPath}` : undefined,
+    '',
+    '## 复盘记录',
+    '',
+    params.reviewSummary,
+    '',
+    '## 复用判断',
+    '',
+    params.reuseDecision || '待补充。',
+    '',
+    '## 后续动作',
+    '',
+    ...(params.nextActions.length > 0
+      ? params.nextActions.map((action) => `- [ ] ${action}`)
+      : ['- [ ] 记录复用判断。']),
+    '',
+    '## 边界',
+    '',
+    '- Desktop 只写入复盘记录，不执行工具、脚本或工作流。',
+    '- Desktop 不授予执行权限，不替代用户审批。',
+    '',
+  ].filter((line): line is string => line !== undefined);
 
   return lines.join('\n');
 }
@@ -1307,6 +1385,62 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
             },
           }
         : {}),
+    };
+  }
+
+  if (command === 'desktop.artifacts.execution.review.write') {
+    const repoPath = stringValue(params.repoPath);
+    const artifactId = stringValue(params.artifactId);
+    if (!repoPath) return invalidParams('repoPath is required');
+    if (!artifactId) return invalidParams('artifactId is required');
+    const artifact = await artifactPersistence.loadMeta(artifactId);
+    if (!artifact) return { ok: false, error: 'not-found', artifactId };
+    if (!artifact.reuseKind || !ARTIFACT_EXECUTABLE_REUSE_KINDS.has(artifact.reuseKind)) {
+      return {
+        ok: false,
+        error: 'not-executable-artifact',
+        artifactId,
+        reuseKind: artifact.reuseKind,
+      };
+    }
+
+    const executionReviewSummary = buildArtifactExecutionReviewSummary(artifact);
+    if (!executionReviewSummary) return { ok: false, error: 'review-not-ready', artifactId };
+    const repository = repositoryApi();
+    if (!repository?.writeText) return { ok: false, error: 'repository-api-unavailable' };
+
+    const reviewedAt = dateValue(params.reviewedAt) ?? new Date();
+    const binding = createDefaultRepositoryBinding({
+      gatewayInstanceId: stringValue(params.gatewayInstanceId) ?? 'desktop-node',
+      repoPath,
+    });
+    const relativePath = `${binding.paths.reviews}/weekly/${formatReviewDate(reviewedAt)}-artifact-${slugPathSegment(
+      artifactId,
+    )}-review.md`;
+    const markdown = buildArtifactExecutionReviewMarkdown({
+      artifact,
+      reviewedAt,
+      reviewer: stringValue(params.reviewer),
+      reviewSummary:
+        stringValue(params.reviewSummary) ??
+        stringValue(params.summary) ??
+        executionReviewSummary.latestResultSummary ??
+        `最近一次执行状态为 ${executionReviewSummary.latestStatus}。`,
+      reuseDecision: stringValue(params.reuseDecision),
+      workItemPath: stringValue(params.workItemPath),
+      nextActions: stringArrayValue(params.nextActions),
+    });
+
+    await repository.writeText(repoPath, relativePath, markdown);
+    return {
+      ok: true,
+      artifactId,
+      path: relativePath,
+      boundary: {
+        recordOnly: true,
+        desktopExecutes: false,
+        grantsPermission: false,
+      },
     };
   }
 

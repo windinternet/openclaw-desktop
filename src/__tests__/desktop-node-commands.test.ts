@@ -1698,6 +1698,92 @@ describe('desktop node commands', () => {
     );
   });
 
+  it('writes a weekly review for a terminal executable artifact run without executing it', async () => {
+    const writeText = vi.fn(async (_repoPath: string, _relativePath: string, _content: string) => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: {
+          writeText,
+        },
+      },
+    });
+    mockedArtifactPersistence.loadMeta.mockResolvedValue({
+      id: 'art_script',
+      title: '部署脚本',
+      icon: '📎',
+      type: 'file',
+      source: { type: 'action_run', id: 'run_create' },
+      tags: ['deploy'],
+      currentVersion: 3,
+      status: 'draft',
+      createdAt: 1,
+      updatedAt: 2,
+      reuseKind: 'script',
+      command: 'npm run deploy',
+      contentSummary: 'Script · deploy.sh',
+      repositoryOutputPath: 'outputs/files/art_script.md',
+      executionEvents: [
+        {
+          id: 'exec_done',
+          status: 'succeeded',
+          artifactVersion: 3,
+          sourceId: 'run_exec',
+          sourceName: '部署生产',
+          runner: 'Gateway Agent',
+          command: 'npm run deploy -- --dry-run',
+          requestedAt: 10,
+          startedAt: 12,
+          endedAt: 30,
+          resultSummary: '生成 3 个发布命令',
+          outputArtifactId: 'art_output',
+          repositoryOutputPath: 'outputs/runs/exec_1.md',
+        },
+      ],
+    });
+
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.execution.review.write', {
+        repoPath: '/repo',
+        artifactId: 'art_script',
+        reviewedAt: Date.parse('2026-06-28T10:00:00.000Z'),
+        reviewer: '产品负责人',
+        reviewSummary: 'dry run 可复用，后续应参数化环境。',
+        reuseDecision: '继续保留为发布前检查脚本。',
+        workItemPath: 'work/active/release.md',
+        nextActions: ['关联到发布事项', '补充失败回滚说明'],
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      artifactId: 'art_script',
+      path: 'reviews/weekly/2026-06-28-artifact-art-script-review.md',
+      boundary: {
+        recordOnly: true,
+        desktopExecutes: false,
+        grantsPermission: false,
+      },
+    });
+
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'reviews/weekly/2026-06-28-artifact-art-script-review.md',
+      expect.any(String),
+    );
+    const markdown = writeText.mock.calls[0][2] as string;
+    expect(markdown).toContain('source: desktop-artifact-execution-review');
+    expect(markdown).toContain('artifactUri: artifact://art_script');
+    expect(markdown).toContain('executionStatus: succeeded');
+    expect(markdown).toContain('repositoryOutputPath: outputs/runs/exec_1.md');
+    expect(markdown).toContain('# 可复用资产执行复盘：部署脚本');
+    expect(markdown).toContain('- 执行结果：生成 3 个发布命令');
+    expect(markdown).toContain('- 关联事项：work/active/release.md');
+    expect(markdown).toContain('dry run 可复用，后续应参数化环境。');
+    expect(markdown).toContain('继续保留为发布前检查脚本。');
+    expect(markdown).toContain('- [ ] 关联到发布事项');
+    expect(markdown).toContain('- [ ] 补充失败回滚说明');
+    expect(markdown).toContain('- Desktop 只写入复盘记录，不执行工具、脚本或工作流。');
+    expect(markdown).toContain('- Desktop 不授予执行权限，不替代用户审批。');
+  });
+
   it('prepares an executable artifact approval request before any runner executes it', async () => {
     mockedArtifactPersistence.loadMeta.mockResolvedValue({
       id: 'art_script',

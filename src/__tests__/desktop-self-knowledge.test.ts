@@ -200,6 +200,11 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('records executable Artifact run and review-needed facts only');
     expect(skillContent).toContain('post-run review clues');
     expect(skillContent).toContain('reviewSummary');
+    expect(skillContent).toContain('desktop.artifacts.execution.review.write');
+    expect(skillContent).toContain('writes a `reviews/weekly/` Markdown review');
+    expect(skillContent).toContain(
+      'does not execute the Artifact, grant execution permission, or update the work item',
+    );
     expect(skillContent).toContain(
       'does not execute commands, grant execution permission, or write the review automatically',
     );

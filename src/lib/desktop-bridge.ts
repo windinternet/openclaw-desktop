@@ -26,6 +26,7 @@ export const DESKTOP_NODE_COMMANDS = [
   'desktop.artifacts.reuse.record',
   'desktop.artifacts.execution.prepare',
   'desktop.artifacts.execution.record',
+  'desktop.artifacts.execution.review.write',
   'desktop.artifacts.open',
   'desktop.artifacts.update',
   'desktop.artifacts.append',
