@@ -42,6 +42,7 @@
 - HTML 类型必须提供完整、自包含的 HTML 正文，放在 JSON header 后、`</artifact>` 前。
 - HTML 正文应该可直接预览，不依赖外部脚本、外部样式或远程图片。
 - 文件/图片/音频/视频可只提供 JSON header，并包含 `filePath`、`fileName`、`mimeType`、`externalFormat`、`contentSummary`、`importFile` 等已知字段。
+- 如果一次生成多个有价值产物，请连续输出多个 `<artifact>` 块，每个块只描述一个可单独保存的产物。
 - `reuseKind` 仅在确实可复用时填写，可选值：asset、template、tool、script、workflow。
 - tags 必须是字符串数组。
 

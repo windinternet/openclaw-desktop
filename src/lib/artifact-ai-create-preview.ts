@@ -35,12 +35,15 @@ const HTML_ARTIFACT_TYPES: ArtifactType[] = [
 const ARTIFACT_TYPES: ArtifactType[] = [...HTML_ARTIFACT_TYPES, 'link', 'app', 'file', 'audio', 'image', 'video'];
 
 export function parseArtifactAICreatePreview(response: string | undefined): ArtifactAICreatePreview | null {
-  if (!response?.trim()) return null;
+  return parseArtifactAICreatePreviews(response).at(-1) ?? null;
+}
+
+export function parseArtifactAICreatePreviews(response: string | undefined): ArtifactAICreatePreview[] {
+  if (!response?.trim()) return [];
 
   const parsedArtifacts = parseArtifactsFromText(response);
-  const artifact = parsedArtifacts[parsedArtifacts.length - 1];
-  if (artifact) {
-    return {
+  if (parsedArtifacts.length > 0) {
+    return parsedArtifacts.map((artifact) => ({
       title: artifact.title,
       type: artifact.type,
       description: artifact.description,
@@ -56,10 +59,10 @@ export function parseArtifactAICreatePreview(response: string | undefined): Arti
       contentSummary: artifact.contentSummary,
       reuseKind: artifact.reuseKind,
       importFile: artifact.importFile,
-    };
+    }));
   }
 
-  return parseLegacyAiActionPreview(response);
+  return parseLegacyAiActionPreviews(response);
 }
 
 export function buildArtifactAICreateGenerateParams(
@@ -86,15 +89,16 @@ export function buildArtifactAICreateGenerateParams(
   };
 }
 
-function parseLegacyAiActionPreview(response: string): ArtifactAICreatePreview | null {
+function parseLegacyAiActionPreviews(response: string): ArtifactAICreatePreview[] {
+  const previews: ArtifactAICreatePreview[] = [];
   const blocks = Array.from(response.matchAll(/```ai-action\s*([\s\S]*?)```/gi));
-  for (let idx = blocks.length - 1; idx >= 0; idx--) {
+  for (const block of blocks) {
     try {
-      const obj = JSON.parse(blocks[idx][1].trim());
+      const obj = JSON.parse(block[1].trim());
       const result = obj.result;
       if (!result || typeof result.title !== 'string' || !isValidArtifactType(result.type)) continue;
       if (HTML_ARTIFACT_TYPES.includes(result.type) && typeof result.html !== 'string') continue;
-      return {
+      previews.push({
         title: result.title,
         type: result.type,
         description: stringValue(result.description),
@@ -110,12 +114,12 @@ function parseLegacyAiActionPreview(response: string): ArtifactAICreatePreview |
         contentSummary: stringValue(result.contentSummary),
         reuseKind: isValidReuseKind(result.reuseKind) ? result.reuseKind : undefined,
         importFile: result.importFile === true,
-      };
+      });
     } catch {
       /* skip invalid ai-action blocks */
     }
   }
-  return null;
+  return previews;
 }
 
 function isValidArtifactType(type: unknown): type is ArtifactType {

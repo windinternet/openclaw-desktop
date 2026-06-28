@@ -53,6 +53,8 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('Dashboard and Workbench reload local ActionRun observers');
     expect(skillContent).toContain('artifact-ai-create-preview');
     expect(skillContent).toContain('rich `<artifact>` blocks');
+    expect(skillContent).toContain('multiple Artifact candidates');
+    expect(skillContent).toContain('selected candidate');
     expect(skillContent).toContain('extractActionRunOutputCandidates');
     expect(skillContent).toContain('buildArtifactOutputPreservationPrompt');
     expect(skillContent).toContain('lastAssistantResponse');

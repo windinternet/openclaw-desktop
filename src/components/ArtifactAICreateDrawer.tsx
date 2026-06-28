@@ -8,7 +8,7 @@ import { buildArtifactCreatePrompt } from '../lib/ai-action-prompts';
 import { upsertAiActionRun } from '../lib/ai-action-run-store';
 import {
   buildArtifactAICreateGenerateParams,
-  parseArtifactAICreatePreview,
+  parseArtifactAICreatePreviews,
   type ArtifactAICreatePreview,
 } from '../lib/artifact-ai-create-preview';
 import { useWorkbenchWorkItemOptions } from '../lib/workbench-work-items';
@@ -57,10 +57,12 @@ export function ArtifactAICreateDrawer({
     enabled: visible && !workItemPath,
   });
   const [generating, setGenerating] = useState(false);
-  const [preview, setPreview] = useState<ArtifactAICreatePreview | null>(null);
+  const [previews, setPreviews] = useState<ArtifactAICreatePreview[]>([]);
+  const [selectedPreviewIndex, setSelectedPreviewIndex] = useState(0);
   const [previewRun, setPreviewRun] = useState<AiActionRun | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isGeneratingRef = useRef(false);
+  const preview = previews[selectedPreviewIndex] ?? null;
 
   useEffect(() => {
     if (visible && initialInput !== undefined) setInput(initialInput);
@@ -74,7 +76,8 @@ export function ArtifactAICreateDrawer({
     }
     isGeneratingRef.current = true;
     setGenerating(true);
-    setPreview(null);
+    setPreviews([]);
+    setSelectedPreviewIndex(0);
     setPreviewRun(null);
     setError(null);
 
@@ -117,9 +120,10 @@ export function ArtifactAICreateDrawer({
       }
 
       if (latestRun.status === 'done' && latestRun.lastAssistantResponse) {
-        const parsed = parseArtifactAICreatePreview(latestRun.lastAssistantResponse);
-        if (parsed) {
-          setPreview(parsed);
+        const parsed = parseArtifactAICreatePreviews(latestRun.lastAssistantResponse);
+        if (parsed.length > 0) {
+          setPreviews(parsed);
+          setSelectedPreviewIndex(parsed.length - 1);
           setPreviewRun(latestRun);
         } else {
           setError('AI 未能生成有效的产物结构，请尝试更具体的描述');
@@ -162,7 +166,8 @@ export function ArtifactAICreateDrawer({
       await onSaved?.(artifact);
       Toast.success('产物已创建');
       setInput('');
-      setPreview(null);
+      setPreviews([]);
+      setSelectedPreviewIndex(0);
       setPreviewRun(null);
       onClose();
     } catch (e) {
@@ -173,7 +178,8 @@ export function ArtifactAICreateDrawer({
   const handleClose = () => {
     if (!generating) {
       setInput('');
-      setPreview(null);
+      setPreviews([]);
+      setSelectedPreviewIndex(0);
       setPreviewRun(null);
       setError(null);
       if (!workItemPath) setSelectedWorkItemPath('');
@@ -247,6 +253,37 @@ export function ArtifactAICreateDrawer({
             <Text strong style={{ fontSize: 14 }}>
               预览结果
             </Text>
+            {previews.length > 1 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <Text type="tertiary" size="small">
+                  已识别 {previews.length} 个候选产物，选择一个保存
+                </Text>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
+                  {previews.map((candidate, index) => (
+                    <Button
+                      key={`${candidate.title}-${index}`}
+                      theme={index === selectedPreviewIndex ? 'solid' : 'light'}
+                      type={index === selectedPreviewIndex ? 'primary' : 'tertiary'}
+                      onClick={() => setSelectedPreviewIndex(index)}
+                      style={{ minWidth: 0, justifyContent: 'flex-start' }}
+                    >
+                      <span
+                        style={{
+                          display: 'block',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          width: '100%',
+                          textAlign: 'left',
+                        }}
+                      >
+                        候选 {index + 1} · {candidate.title}
+                      </span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div
               style={{
                 padding: 16,

@@ -24,6 +24,19 @@ describe('artifact ActionRun linkage', () => {
     expect(prompt).toContain('contentSummary');
     expect(prompt).toContain('reuseKind');
     expect(prompt).toContain('HTML 类型必须提供完整、自包含的 HTML 正文');
+    expect(prompt).toContain('如果一次生成多个有价值产物');
+  });
+
+  it('keeps multiple AI-created artifact candidates selectable before saving', () => {
+    const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
+    const preview = readFileSync('src/lib/artifact-ai-create-preview.ts', 'utf8');
+
+    expect(preview).toContain('parseArtifactAICreatePreviews');
+    expect(drawer).toContain('const [previews, setPreviews]');
+    expect(drawer).toContain('selectedPreviewIndex');
+    expect(drawer).toContain('previews.map((candidate, index)');
+    expect(drawer).toContain('setSelectedPreviewIndex(index)');
+    expect(drawer).toContain('候选');
   });
 
   it('notifies ActionRun observers after saving an AI-created artifact output', () => {

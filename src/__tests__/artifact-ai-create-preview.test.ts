@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildArtifactAICreateGenerateParams, parseArtifactAICreatePreview } from '../lib/artifact-ai-create-preview';
+import {
+  buildArtifactAICreateGenerateParams,
+  parseArtifactAICreatePreview,
+  parseArtifactAICreatePreviews,
+} from '../lib/artifact-ai-create-preview';
 
 describe('artifact AI create preview', () => {
   it('builds a rich save preview from an artifact block', () => {
@@ -45,6 +49,43 @@ describe('artifact AI create preview', () => {
         source: { type: 'action_run', id: 'run-1', name: 'AI 魔法创建' },
       }),
     );
+  });
+
+  it('keeps every rich artifact block as an explicit save candidate', () => {
+    const previews = parseArtifactAICreatePreviews(
+      [
+        '<artifact>',
+        JSON.stringify({
+          title: '发布验收仪表盘',
+          type: 'dashboard',
+          externalFormat: 'html',
+          contentSummary: 'HTML · 发布验收交互仪表盘',
+        }),
+        '<!doctype html><html><body>dashboard</body></html>',
+        '</artifact>',
+        '<artifact>',
+        JSON.stringify({
+          title: '发布复盘文档',
+          type: 'document',
+          tags: ['复盘'],
+          externalFormat: 'html',
+          contentSummary: 'HTML · 发布复盘文档',
+        }),
+        '<!doctype html><html><body>review</body></html>',
+        '</artifact>',
+      ].join('\n'),
+    );
+
+    expect(previews).toHaveLength(2);
+    expect(previews.map((preview) => preview.title)).toEqual(['发布验收仪表盘', '发布复盘文档']);
+    expect(previews[0]).toEqual(
+      expect.objectContaining({
+        type: 'dashboard',
+        html: '<!doctype html><html><body>dashboard</body></html>',
+        contentSummary: 'HTML · 发布验收交互仪表盘',
+      }),
+    );
+    expect(parseArtifactAICreatePreview('')).toBeNull();
   });
 
   it('keeps legacy ai-action result parsing for simple artifacts', () => {
