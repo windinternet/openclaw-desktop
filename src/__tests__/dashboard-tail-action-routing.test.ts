@@ -32,6 +32,11 @@ describe('dashboard tail action routing', () => {
     expect(workbenchPanel).toContain("t('workbench.reviewDraftConfirmed')");
     expect(workbenchPanel).toContain('desktop.artifacts.execution.review.write');
     expect(workbenchPanel).toContain('reviews/weekly/');
+    expect(workbenchPanel).toContain('reviewTailActionCanConfirm');
+    expect(workbenchPanel).toContain("reviewTailActionContext.id.includes(':tail-action:')");
+    expect(workbenchPanel).toContain('reviewTailActionRunId');
+    expect(workbenchPanel).toContain('action-run-review:');
+    expect(workbenchPanel).toContain("t('workbench.reviewTailActionRunSource')");
 
     expect(artifacts).toContain('parseDashboardTailActionRoute(location.search)');
     expect(artifacts).toContain("tailActionContext?.kind === 'output'");

@@ -68,6 +68,9 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('计划执行知识更新入口');
     expect(source).toContain('shouldOfferPlanExecutionKnowledgeUpdate');
     expect(source).toContain('action-run-knowledge:<runId>');
+    expect(source).toContain('计划执行复盘草稿入口');
+    expect(source).toContain('shouldOfferPlanExecutionReview');
+    expect(source).toContain('action-run-review:<runId>');
     expect(source).toContain('repositoryWrite');
     expect(source).toContain('Knowledge 发起前事项选择');
     expect(source).toContain('Teams 发起前事项选择');
@@ -103,6 +106,9 @@ describe('product goal P0 traceability', () => {
     expect(plans).toContain('计划执行知识更新入口');
     expect(plans).toContain('shouldOfferPlanExecutionKnowledgeUpdate');
     expect(plans).toContain('action-run-knowledge:<runId>');
+    expect(plans).toContain('计划执行复盘草稿入口');
+    expect(plans).toContain('shouldOfferPlanExecutionReview');
+    expect(plans).toContain('action-run-review:<runId>');
     expect(plans).toContain('repositoryWrite.path/content/workItemPath');
     expect(plans).toContain('Knowledge 普通自动改写发起前事项选择');
     expect(plans).toContain('Teams 自然语言编排发起前事项选择');
@@ -131,6 +137,9 @@ describe('product goal P0 traceability', () => {
     expect(roadmap).toContain('计划执行知识更新入口');
     expect(roadmap).toContain('shouldOfferPlanExecutionKnowledgeUpdate');
     expect(roadmap).toContain('action-run-knowledge:<runId>');
+    expect(roadmap).toContain('计划执行复盘草稿入口');
+    expect(roadmap).toContain('shouldOfferPlanExecutionReview');
+    expect(roadmap).toContain('action-run-review:<runId>');
     expect(roadmap).toContain('applyWorkbenchMatterPlanApproval');
     expect(roadmap).toContain('repositoryWrite.path/content/workItemPath');
     expect(skillContent).toContain('Screenshot-confirmed P0 baseline');
@@ -162,6 +171,9 @@ describe('product goal P0 traceability', () => {
     expect(skillContent).toContain('shouldOfferPlanExecutionKnowledgeUpdate');
     expect(skillContent).toContain('`action-run-knowledge:<runId>`');
     expect(skillContent).toContain('Update Knowledge');
+    expect(skillContent).toContain('shouldOfferPlanExecutionReview');
+    expect(skillContent).toContain('`action-run-review:<runId>`');
+    expect(skillContent).toContain('Write Review');
     expect(skillContent).toContain('applyWorkbenchMatterPlanApproval');
     expect(skillContent).toContain('repositoryWrite.path/content/workItemPath');
     expect(skillContent).toContain('Artifacts UI also exposes a reuse-kind filter');

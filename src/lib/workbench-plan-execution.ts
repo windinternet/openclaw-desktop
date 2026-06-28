@@ -43,3 +43,16 @@ export function shouldOfferPlanExecutionKnowledgeUpdate(
     isWorkbenchMatterPath(run.workItemPath),
   );
 }
+
+export function shouldOfferPlanExecutionReview(
+  run: AiActionRun | undefined,
+): run is AiActionRun & { workItemPath: string } {
+  return Boolean(
+    run &&
+    run.type === 'plan_execute' &&
+    run.status === 'done' &&
+    run.resultSummary?.trim() &&
+    run.workItemPath &&
+    isWorkbenchMatterPath(run.workItemPath),
+  );
+}

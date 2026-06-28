@@ -4,6 +4,7 @@ import {
   getPlanExecutionPlanPath,
   shouldOfferPlanExecutionKnowledgeUpdate,
   shouldOfferPlanExecutionOutputPreservation,
+  shouldOfferPlanExecutionReview,
 } from '../lib/workbench-plan-execution';
 import type { AiActionRun } from '../lib/types';
 
@@ -159,6 +160,56 @@ describe('workbench plan execution observability', () => {
     ).toBe(false);
     expect(
       shouldOfferPlanExecutionKnowledgeUpdate(
+        createRun({
+          status: 'done',
+          resultSummary: '完成打包验证',
+          workItemPath: 'outputs/release.md',
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it('offers review draft creation for completed work-bound plan execution with a result summary', () => {
+    expect(
+      shouldOfferPlanExecutionReview(
+        createRun({
+          status: 'done',
+          resultSummary: '完成打包验证，需要复盘遗留风险',
+          workItemPath: 'work/active/release.md',
+          artifactIds: ['artifact-1'],
+        }),
+      ),
+    ).toBe(true);
+
+    expect(
+      shouldOfferPlanExecutionReview(
+        createRun({
+          type: 'artifact_create',
+          status: 'done',
+          resultSummary: '完成打包验证',
+          workItemPath: 'work/active/release.md',
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      shouldOfferPlanExecutionReview(
+        createRun({
+          status: 'running',
+          resultSummary: '正在执行',
+          workItemPath: 'work/active/release.md',
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      shouldOfferPlanExecutionReview(
+        createRun({
+          status: 'done',
+          workItemPath: 'work/active/release.md',
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      shouldOfferPlanExecutionReview(
         createRun({
           status: 'done',
           resultSummary: '完成打包验证',

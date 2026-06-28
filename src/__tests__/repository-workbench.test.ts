@@ -550,6 +550,33 @@ describe('repository workbench', () => {
     expect(writeText).toHaveBeenCalledWith('/repo', draft.path, draft.content);
   });
 
+  it('writes a review draft for a plan execution source record without pretending it is a checklist tail action', async () => {
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { writeText },
+      },
+    });
+
+    const draft = await writeWorkbenchReviewDraft(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'action-run-review:run-1',
+        createdAt: new Date('2026-06-28T10:00:00.000Z'),
+      },
+    );
+
+    expect(draft.path).toBe('reviews/weekly/2026-06-28-work-release-action-run-review-run-1-review.md');
+    expect(draft.content).toContain('source: desktop-workbench-review-source-execution');
+    expect(draft.content).toContain('workItemPath: work/active/release.md');
+    expect(draft.content).toContain('tailActionId: action-run-review:run-1');
+    expect(draft.content).toContain('sourceExecutionId: action-run-review:run-1');
+    expect(draft.content).toContain('来源执行记录: `action-run-review:run-1`');
+    expect(draft.content).not.toContain('来源尾动作: `action-run-review:run-1`');
+    expect(writeText).toHaveBeenCalledWith('/repo', draft.path, draft.content);
+  });
+
   it('confirms a review draft and completes the matching source tail action', async () => {
     const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
       if (relativePath === 'reviews/weekly/2026-06-28-work-release-tail-action-1-review.md') {
@@ -1229,6 +1256,21 @@ describe('repository workbench', () => {
     expect(source).toContain("t('workbench.updatePlanExecutionKnowledge')");
     expect(zh).toContain('"updatePlanExecutionKnowledge": "更新知识"');
     expect(en).toContain('"updatePlanExecutionKnowledge": "Update Knowledge"');
+  });
+
+  it('lets completed plan execution start a review draft through the existing Workbench review route', () => {
+    const source = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
+    const zh = readFileSync('src/locales/zh.json', 'utf8');
+    const en = readFileSync('src/locales/en.json', 'utf8');
+
+    expect(source).toContain('shouldOfferPlanExecutionReview');
+    expect(source).toContain('buildDashboardTailActionTarget');
+    expect(source).toContain("kind: 'review'");
+    expect(source).toContain('`action-run-review:${selectedPlanLatestRun.id}`');
+    expect(source).toContain('workItemPath: selectedPlanLatestRun.workItemPath');
+    expect(source).toContain("t('workbench.writePlanExecutionReview')");
+    expect(zh).toContain('"writePlanExecutionReview": "写复盘"');
+    expect(en).toContain('"writePlanExecutionReview": "Write Review"');
   });
 
   it('wires ActionCenter unassigned ActionRun backfill to repository work items', () => {

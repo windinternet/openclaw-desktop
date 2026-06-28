@@ -1231,3 +1231,19 @@ HTML 的独特优势：
 仍未完成的 P0 后续：
 
 - 仍需要知识写入后的状态刷新体验、与复盘尾动作的自然衔接、更完整的执行结果候选提取，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
+
+### 10.56 2026-06-29 当前实施记录：计划执行复盘草稿入口
+
+围绕“开始一件事闭环”中“执行 -> 复盘”的 P0 缺口，当前继续把计划执行结果接到已有 Workbench reviews 复盘流程：
+
+- 新增 `shouldOfferPlanExecutionReview`，只在最近一次 `plan_execute` 已完成、有 `resultSummary` 且有安全 `workItemPath` 时，认为该计划执行结果值得提示用户写复盘。
+- Workbench 选中 `plans/active/` 活跃计划时，如果最近一次执行满足上述条件，会在计划预览头部显示“写复盘 / Write Review”。
+- 点击后 Desktop 复用现有 Dashboard tail-action 路由，打开 Workbench reviews 并携带 `tailAction=review`、`tailActionId=action-run-review:<runId>` 和来源 `workItemPath`。
+- Workbench reviews 的复盘卡片会显示来源事项和来源执行记录 `action-run-review:<runId>`，并可创建 `reviews/weekly/YYYY-MM-DD-work-*-action-run-review-*-review.md` 复盘草稿。
+- 复盘草稿 frontmatter 会标记 `source: desktop-workbench-review-source-execution`、`workItemPath`、`tailActionId` 和 `sourceExecutionId`，正文会写明“来源执行记录”而不是“来源尾动作”。
+- `action-run-review:<runId>` 是来源执行记录，不是事项 `## 收尾动作` checklist ID；Workbench 不会显示或执行“确认复盘并完成尾动作”，不会假装勾选一条不存在的 checklist。
+- 该入口不会自动确认复盘，不会自动更新事项状态，不会沉淀成果，不会更新知识库，不会移动事项文件，也不会执行资产或授予权限。
+
+仍未完成的 P0 后续：
+
+- 仍需要复盘草稿创建后的 Dashboard/Workbench 状态刷新体验、复盘与知识写入后的自然联动、更完整的执行结果候选提取，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。

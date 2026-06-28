@@ -52,6 +52,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('shouldOfferPlanExecutionKnowledgeUpdate');
     expect(skillContent).toContain('`action-run-knowledge:<runId>`');
     expect(skillContent).toContain('Update Knowledge');
+    expect(skillContent).toContain('shouldOfferPlanExecutionReview');
+    expect(skillContent).toContain('`action-run-review:<runId>`');
+    expect(skillContent).toContain('Write Review');
     expect(skillContent).toContain('adds a `## 收尾动作` checklist');
     expect(skillContent).toContain('missing from the repository run index');
     expect(skillContent).toContain('`action-run:unarchived` pending confirmation');

@@ -500,9 +500,8 @@ export async function writeWorkbenchReviewDraft(
 
   const createdAt = input.createdAt ?? new Date();
   const date = createdAt.toISOString().slice(0, 10);
-  const tailActionIndex = input.tailActionId ? parseTailActionIndex(input.tailActionId) : null;
   const workSlug = slugifyPathSegment(workItemPath.replace(/\.md$/i, '').split('/').pop() ?? 'work-item');
-  const tailSlug = tailActionIndex === null ? 'tail-action' : `tail-action-${tailActionIndex}`;
+  const tailSlug = buildWorkbenchReviewDraftSourceSlug(input.tailActionId);
   const path = `reviews/weekly/${date}-work-${workSlug}-${tailSlug}-review.md`;
   const content = buildWorkbenchReviewDraftMarkdown({
     workItemPath,
@@ -877,16 +876,31 @@ function slugifyPathSegment(value: string): string {
   return slug || 'work-item';
 }
 
+function isActionRunReviewTailActionId(value?: string): value is string {
+  return Boolean(value?.startsWith('action-run-review:'));
+}
+
+function buildWorkbenchReviewDraftSourceSlug(tailActionId?: string): string {
+  if (!tailActionId) return 'tail-action';
+  if (isActionRunReviewTailActionId(tailActionId)) return slugifyPathSegment(tailActionId);
+  const tailActionIndex = parseTailActionIndex(tailActionId);
+  return tailActionIndex === null ? 'tail-action' : `tail-action-${tailActionIndex}`;
+}
+
 function buildWorkbenchReviewDraftMarkdown(input: {
   workItemPath: string;
   tailActionId?: string;
   createdAt: Date;
 }): string {
+  const sourceExecutionId = isActionRunReviewTailActionId(input.tailActionId) ? input.tailActionId : undefined;
   return [
     '---',
-    'source: desktop-workbench-review-tail-action',
+    sourceExecutionId
+      ? 'source: desktop-workbench-review-source-execution'
+      : 'source: desktop-workbench-review-tail-action',
     `workItemPath: ${input.workItemPath}`,
     input.tailActionId ? `tailActionId: ${input.tailActionId}` : undefined,
+    sourceExecutionId ? `sourceExecutionId: ${sourceExecutionId}` : undefined,
     `createdAt: ${input.createdAt.toISOString()}`,
     'status: draft',
     '---',
@@ -894,7 +908,11 @@ function buildWorkbenchReviewDraftMarkdown(input: {
     `# ${input.workItemPath.split('/').pop()?.replace(/\.md$/i, '') ?? '工作事项'} 复盘草稿`,
     '',
     `来源事项: \`${input.workItemPath}\``,
-    input.tailActionId ? `来源尾动作: \`${input.tailActionId}\`` : undefined,
+    sourceExecutionId
+      ? `来源执行记录: \`${sourceExecutionId}\``
+      : input.tailActionId
+        ? `来源尾动作: \`${input.tailActionId}\``
+        : undefined,
     '',
     '## 核对清单',
     '',

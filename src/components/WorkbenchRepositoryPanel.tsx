@@ -29,6 +29,7 @@ import {
   findLatestPlanExecutionRun,
   shouldOfferPlanExecutionKnowledgeUpdate,
   shouldOfferPlanExecutionOutputPreservation,
+  shouldOfferPlanExecutionReview,
 } from '../lib/workbench-plan-execution';
 import { ArtifactAICreateDrawer } from './ArtifactAICreateDrawer';
 import MarkdownView from './MarkdownView';
@@ -1387,9 +1388,16 @@ export default function WorkbenchRepositoryPanel({
   const renderReviewTailActionCard = () => {
     const reviewTailActionContext = tailActionContext?.kind === 'review' ? tailActionContext : null;
     if (!reviewTailActionContext) return null;
+    const reviewTailActionCanConfirm = Boolean(
+      reviewTailActionContext.id && reviewTailActionContext.id.includes(':tail-action:'),
+    );
+    const reviewTailActionRunId = reviewTailActionContext.id?.startsWith('action-run-review:')
+      ? reviewTailActionContext.id
+      : undefined;
     const canConfirmReviewDraft =
       selectedPreviewPath.startsWith('reviews/') &&
       /^status:\s*draft\s*$/m.test(selectedPreviewContent) &&
+      reviewTailActionCanConfirm &&
       Boolean(reviewTailActionContext.workItemPath && reviewTailActionContext.id);
     return (
       <div
@@ -1410,6 +1418,11 @@ export default function WorkbenchRepositoryPanel({
           {reviewTailActionContext.workItemPath ? (
             <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }}>
               {t('workbench.tailActionSource')}: {reviewTailActionContext.workItemPath}
+            </Text>
+          ) : null}
+          {reviewTailActionRunId ? (
+            <Text type="tertiary" size="small">
+              {t('workbench.reviewTailActionRunSource')}: {reviewTailActionRunId}
             </Text>
           ) : null}
           <Text type="tertiary" size="small" style={{ fontFamily: 'var(--semi-font-family-monospace)' }}>
@@ -1515,6 +1528,7 @@ export default function WorkbenchRepositoryPanel({
     : undefined;
   const selectedPlanCanPreserveOutput = shouldOfferPlanExecutionOutputPreservation(selectedPlanLatestRun);
   const selectedPlanCanUpdateKnowledge = shouldOfferPlanExecutionKnowledgeUpdate(selectedPlanLatestRun);
+  const selectedPlanCanWriteReview = shouldOfferPlanExecutionReview(selectedPlanLatestRun);
   const previewTitle =
     panelView === 'projects' ? t('workbench.projectPreview') : selectedPreviewPath || t('workbench.preview');
   const standaloneView = panelView === 'dashboard' || panelView === 'outputs';
@@ -1723,6 +1737,24 @@ export default function WorkbenchRepositoryPanel({
                               }
                             >
                               {t('workbench.updatePlanExecutionKnowledge')}
+                            </Button>
+                          )}
+                          {selectedPlanCanWriteReview && (
+                            <Button
+                              size="small"
+                              type="tertiary"
+                              icon={<IconCheckList />}
+                              onClick={() =>
+                                navigate(
+                                  buildDashboardTailActionTarget('/workbench', {
+                                    kind: 'review',
+                                    id: `action-run-review:${selectedPlanLatestRun.id}`,
+                                    workItemPath: selectedPlanLatestRun.workItemPath,
+                                  }),
+                                )
+                              }
+                            >
+                              {t('workbench.writePlanExecutionReview')}
                             </Button>
                           )}
                         </>
