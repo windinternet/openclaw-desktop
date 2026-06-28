@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, Button, Input, Select, Tag, Card, Spin, Empty, Toast, Popconfirm } from '@douyinfe/semi-ui';
 import { IconArrowLeft, IconPlay, IconDeleteStroked, IconRefresh } from '@douyinfe/semi-icons';
@@ -9,6 +9,12 @@ import { buildArtifactReuseReference } from '../lib/artifact-reference';
 import { buildArtifactVersionHistory } from '../lib/artifact-version-history';
 import { buildArtifactPreviewCard } from '../lib/artifact-display';
 import { buildArtifactValueHealth, type ArtifactValueHealthStatus } from '../lib/artifact-value-health';
+import {
+  ARTIFACT_EXECUTION_REVIEW_WRITE_COMMAND,
+  buildArtifactExecutionReviewWriteCommand,
+  formatArtifactExecutionReviewWriteCommand,
+} from '../lib/artifact-execution-review-command';
+import { loadRepositoryBinding } from '../lib/agentic-repository-store';
 
 const { Text, Title } = Typography;
 
@@ -20,9 +26,11 @@ export default function ArtifactDetailPage() {
   const openArtifactWindow = useStore((s) => s.openArtifactWindow);
   const deleteArtifact = useStore((s) => s.deleteArtifact);
   const updateArtifact = useStore((s) => s.updateArtifact);
+  const currentInstanceId = useStore((s) => s.currentInstanceId);
   const [editingMeta, setEditingMeta] = useState(false);
   const [metaForm, setMetaForm] = useState<Partial<ArtifactMeta>>({});
   const [metaFormArtifactId, setMetaFormArtifactId] = useState<string | null>(null);
+  const [reviewCommandRepoPath, setReviewCommandRepoPath] = useState<string | null>(null);
 
   const meta = artifacts.find((a) => a.id === artifactId);
 
@@ -36,6 +44,29 @@ export default function ArtifactDetailPage() {
     });
     setMetaFormArtifactId(meta.id);
   }
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!currentInstanceId) {
+      setReviewCommandRepoPath(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    loadRepositoryBinding(currentInstanceId)
+      .then((binding) => {
+        if (cancelled) return;
+        setReviewCommandRepoPath(binding?.status === 'repo_ready' ? binding.repoPath : null);
+      })
+      .catch(() => {
+        if (!cancelled) setReviewCommandRepoPath(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentInstanceId]);
 
   if (!meta) {
     return (
@@ -74,6 +105,16 @@ export default function ArtifactDetailPage() {
   const valueHealth = buildArtifactValueHealth(meta);
   const enrichmentEvents = meta.enrichmentEvents ?? [];
   const lastEnrichmentEvent = enrichmentEvents[enrichmentEvents.length - 1];
+  const executionReviewCommand = buildArtifactExecutionReviewWriteCommand(meta, { repoPath: reviewCommandRepoPath });
+  const executionReviewCommandText = executionReviewCommand
+    ? formatArtifactExecutionReviewWriteCommand(executionReviewCommand)
+    : null;
+
+  const handleCopyExecutionReviewCommand = async () => {
+    if (!executionReviewCommandText) return;
+    await navigator.clipboard.writeText(executionReviewCommandText);
+    Toast.success(t('artifact.executionReviewCommandCopied'));
+  };
 
   return (
     <div style={{ padding: 24, height: '100%', overflow: 'auto' }}>
@@ -644,6 +685,39 @@ export default function ArtifactDetailPage() {
                           {event.repositoryOutputPath ? ` · ${event.repositoryOutputPath}` : ''}
                         </Text>
                       ))}
+                    {executionReviewCommandText && (
+                      <div
+                        style={{
+                          marginTop: 8,
+                          padding: 10,
+                          borderRadius: 6,
+                          border: '1px solid var(--semi-color-border)',
+                          background: 'var(--semi-color-fill-0)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 8,
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <Text strong>{t('artifact.executionReviewWrite')}</Text>
+                            <div>
+                              <Text type="secondary" size="small">
+                                {reviewCommandRepoPath
+                                  ? t('artifact.executionReviewWriteHint')
+                                  : t('artifact.executionReviewWriteMissingRepoHint')}
+                              </Text>
+                            </div>
+                          </div>
+                          <Button size="small" onClick={handleCopyExecutionReviewCommand}>
+                            {t('artifact.executionReviewCopyCommand')}
+                          </Button>
+                        </div>
+                        <Text code copyable style={{ wordBreak: 'break-all' }}>
+                          {ARTIFACT_EXECUTION_REVIEW_WRITE_COMMAND}
+                        </Text>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

@@ -298,8 +298,10 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('reviewSummary');
     expect(skillContent).toContain('desktop.artifacts.execution.review.write');
     expect(skillContent).toContain('writes a `reviews/weekly/` Markdown review');
+    expect(skillContent).toContain('Artifact detail can show a Write execution review entry');
+    expect(skillContent).toContain('copy the same JSON command');
     expect(skillContent).toContain(
-      'does not execute the Artifact, grant execution permission, or update the work item',
+      'does not execute the Artifact, grant execution permission, write the review automatically, or update the work item',
     );
     expect(skillContent).toContain(
       'does not execute commands, grant execution permission, or write the review automatically',

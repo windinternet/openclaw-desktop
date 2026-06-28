@@ -400,9 +400,10 @@ HTML 产物是特色能力：
 - `desktop.artifacts.search` 和 `desktop.artifacts.describe` 会返回 `assetExecutionSummary`，把执行型资产的审批要求、最近执行状态/结果/输出线索、终态执行后的 `reviewSummary` 复盘建议，以及 Desktop 只记录、不执行、不授予权限的边界直接暴露给 Gateway。
 - Repository `outputs/assets/index.md` 会为 `succeeded / failed / cancelled` 的最近执行写入 `review: pending, write reviews/weekly/ entry` 和结果摘要线索，用于提醒后续复盘，但不会自动写复盘。
 - `desktop.artifacts.execution.review.write` 已提供用户确认后的复盘写入入口，可把最近终态执行、输出 Artifact、Repository output、关联事项、复用判断和后续动作写入 `reviews/weekly/YYYY-MM-DD-artifact-*-review.md`；该入口不执行资产、不授予权限、不自动更新事项或勾选尾动作。
+- Artifact 详情页已在执行记录下暴露“写执行复盘”入口；当 `tool / script / workflow` 的最近执行为 `succeeded / failed / cancelled` 时，页面会读取当前实例就绪 Repository 的 `repoPath`，复制 `desktop.artifacts.execution.review.write` JSON 命令和只记录/不执行/不授权边界；如果未读取到就绪仓库，则命令保留 `repoPath` 占位，仍不自动写复盘、不执行资产、不授予权限。
 - Workbench 复盘视图会在 Dashboard `tail-action:review` 路由进入时展示复盘收尾动作卡片，把 `reviews/weekly/` 和 `desktop.artifacts.execution.review.write` 作为 UI 侧线索暴露给用户；该卡片也能创建事项复盘草稿，让运行后复盘先进入仓库事实源。用户显式确认事项复盘草稿后，Desktop 可把草稿标记为 `confirmed` 并勾选匹配的事项复盘尾动作，但不会直接执行资产、写已确认的 Artifact 执行复盘、更新事项状态、沉淀成果、更新知识库或授予权限。
 - Dashboard 最近产物和本周新增成果会把带 `reuseKind` 的 Artifact 与 Repository output 标为“可复用资产”，并在详情中展示复用分类、最近执行状态或待审批边界。
-- 这仍是第一片可观测入口；更完整的 Repository 资产目录协议、资产权限面板、Artifact 执行复盘 UI 入口，以及状态/成果/知识等更细的处理工作流仍需继续补齐。
+- 这仍是第一片可观测入口；更完整的 Repository 资产目录协议、资产权限面板，以及状态/成果/知识等更细的处理工作流仍需继续补齐。
 
 验收：
 
