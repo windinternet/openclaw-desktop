@@ -350,6 +350,51 @@ describe('dashboard work system summary', () => {
     ]);
   });
 
+  it('surfaces terminal ActionRuns without a work item as pending assignment confirmations', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [
+        createActionRun({
+          id: 'run_unassigned',
+          type: 'knowledge_digest',
+          status: 'done',
+          input: '整理剪藏资料',
+          resultSummary: '资料摘要已生成',
+          updatedAt: 230,
+        }),
+        createActionRun({
+          id: 'run_assigned',
+          type: 'artifact_create',
+          status: 'done',
+          input: '生成发布报告',
+          resultSummary: '发布报告已生成',
+          workItemPath: 'work/active/release.md',
+          updatedAt: 220,
+        }),
+      ],
+      artifacts: [],
+      workbench: {
+        activeWork: [],
+        activePlans: [],
+        planMetadata: [],
+        tailActions: [],
+        reviews: [],
+      },
+      limit: 8,
+    });
+
+    expect(summary.pendingConfirmations).toEqual([
+      expect.objectContaining({
+        id: 'unassigned-action-run:run_unassigned',
+        kind: 'action_run',
+        title: '整理剪藏资料',
+        target: '/workbench?view=actions',
+        detail: '未关联事项',
+        status: 'action-run:unassigned',
+      }),
+    ]);
+  });
+
   it('surfaces explicit output clues from review deliverable sections', () => {
     const now = Date.parse('2026-06-28T12:00:00.000Z');
     const summary = buildDashboardWorkSystemSummary({

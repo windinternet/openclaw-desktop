@@ -33,6 +33,8 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('adds a `## 收尾动作` checklist');
     expect(skillContent).toContain('missing from the repository run index');
     expect(skillContent).toContain('`action-run:unarchived` pending confirmation');
+    expect(skillContent).toContain('has no `workItemPath`');
+    expect(skillContent).toContain('`action-run:unassigned` pending confirmation');
     expect(skillContent).toContain(
       'unfinished `## 收尾动作` checklist items surface as Dashboard pending confirmations',
     );
@@ -103,6 +105,8 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('/workbench?view=plans');
     expect(skillContent).toContain('Terminal work-item ActionRuns that are missing from `runs/action-runs/index.md`');
     expect(skillContent).toContain('not an automatic repository repair');
+    expect(skillContent).toContain('Terminal ActionRuns without `workItemPath`');
+    expect(skillContent).toContain('not an automatic assignment');
     expect(skillContent).toContain('Knowledge health issues');
     expect(skillContent).toContain('orphan sources, stale index entries, broken knowledge links');
     expect(skillContent).toContain('undigested sources queue');

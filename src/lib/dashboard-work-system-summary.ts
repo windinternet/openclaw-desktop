@@ -148,6 +148,20 @@ export function buildDashboardWorkSystemSummary(
             detail: `运行记录未归档 · ${run.workItemPath}`,
             status: 'action-run:unarchived',
           }));
+  const unassignedActionRunItems = params.workbench
+    ? params.actionRuns
+        .filter(isTerminalActionRun)
+        .filter((run) => !run.workItemPath)
+        .map((run) => ({
+          id: `unassigned-action-run:${run.id}`,
+          kind: 'action_run' as const,
+          title: run.input || run.type,
+          target: '/workbench?view=actions',
+          updatedAt: run.updatedAt,
+          detail: '未关联事项',
+          status: 'action-run:unassigned',
+        }))
+    : [];
 
   const failedRunItems = params.actionRuns
     .filter((run) => run.status === 'failed' || run.status === 'cancelled')
@@ -266,6 +280,7 @@ export function buildDashboardWorkSystemSummary(
     ...pendingRunItems,
     ...pendingPlanItems,
     ...pendingTailActionItems,
+    ...unassignedActionRunItems,
     ...unarchivedActionRunItems,
   ]).slice(0, limit);
   const stuckItems = sortItems([...failedRunItems, ...blockedPlanItems]).slice(0, limit);
