@@ -33,6 +33,8 @@ describe('repository workbench', () => {
     const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
       if (relativePath === 'work/inbox.md') return '# Inbox';
       if (relativePath === 'runs/index.md') return '# Runs';
+      if (relativePath === 'runs/action-runs/index.md')
+        return '# Action Runs\n\n- [artifact_create](runs/action-runs/action-42.md) - done';
       if (relativePath === 'outputs/index.md') return '# Outputs';
       if (relativePath === 'reviews/weekly/2026-W26.md')
         return [
@@ -102,7 +104,9 @@ describe('repository workbench', () => {
         files: [{ path: 'reviews/weekly/2026-W26.md', name: '2026-W26.md', size: 30, updatedAt: 3 }],
       },
     ]);
-    expect(snapshot.runsMarkdown).toBe('# Runs');
+    expect(snapshot.runsMarkdown).toBe(
+      '# Runs\n\n# Action Runs\n\n- [artifact_create](runs/action-runs/action-42.md) - done',
+    );
     expect(snapshot.outputsMarkdown).toBe('# Outputs');
     expect(snapshot.reviews).toHaveLength(1);
     expect(snapshot.reviewDocuments).toEqual([

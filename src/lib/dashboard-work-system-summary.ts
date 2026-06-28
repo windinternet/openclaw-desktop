@@ -50,6 +50,7 @@ export interface BuildDashboardWorkSystemSummaryParams {
         WorkbenchSnapshot,
         'activeWork' | 'activePlans' | 'planMetadata' | 'reviews' | 'reviewDocuments' | 'tailActions'
       > & {
+        runsMarkdown?: string;
         outputsMarkdown?: string;
       })
     | null;
@@ -130,6 +131,23 @@ export function buildDashboardWorkSystemSummary(
         status: `tail-action:${tailAction.kind}`,
       };
     });
+  const unarchivedActionRunItems =
+    params.workbench?.runsMarkdown === undefined
+      ? []
+      : params.actionRuns
+          .filter(isTerminalActionRun)
+          .filter((run) => Boolean(run.workItemPath))
+          .filter((run) => !isActionRunArchivedInRepository(run, params.workbench?.runsMarkdown ?? ''))
+          .map((run) => ({
+            id: `unarchived-action-run:${run.id}`,
+            kind: 'action_run' as const,
+            title: run.input || run.type,
+            target: '/workbench?view=actions',
+            updatedAt: run.updatedAt,
+            path: run.workItemPath,
+            detail: `运行记录未归档 · ${run.workItemPath}`,
+            status: 'action-run:unarchived',
+          }));
 
   const failedRunItems = params.actionRuns
     .filter((run) => run.status === 'failed' || run.status === 'cancelled')
@@ -244,10 +262,12 @@ export function buildDashboardWorkSystemSummary(
   );
 
   const todayContinue = sortItems([...activeWorkItems, ...activeSessionItems, ...runningActionItems]).slice(0, limit);
-  const pendingConfirmations = sortItems([...pendingRunItems, ...pendingPlanItems, ...pendingTailActionItems]).slice(
-    0,
-    limit,
-  );
+  const pendingConfirmations = sortItems([
+    ...pendingRunItems,
+    ...pendingPlanItems,
+    ...pendingTailActionItems,
+    ...unarchivedActionRunItems,
+  ]).slice(0, limit);
   const stuckItems = sortItems([...failedRunItems, ...blockedPlanItems]).slice(0, limit);
   const recentOutputs = sortItems(recentOutputItems).slice(0, limit);
   const weeklyOutputs = sortItems(weeklyOutputItems).slice(0, limit);
@@ -466,6 +486,16 @@ function markdownTitle(file: RepositoryMarkdownFile): string {
 
 function sortItems(items: DashboardWorkSystemSummaryItem[]): DashboardWorkSystemSummaryItem[] {
   return [...items].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+}
+
+function isTerminalActionRun(run: AiActionRun): boolean {
+  return run.status === 'done' || run.status === 'failed' || run.status === 'cancelled';
+}
+
+function isActionRunArchivedInRepository(run: AiActionRun, runsMarkdown: string): boolean {
+  if (!runsMarkdown.trim()) return false;
+  const runPath = `runs/action-runs/${run.id}.md`;
+  return runsMarkdown.includes(runPath) || runsMarkdown.includes(`runId: ${run.id}`);
 }
 
 function isBlockedStatus(status?: string): boolean {

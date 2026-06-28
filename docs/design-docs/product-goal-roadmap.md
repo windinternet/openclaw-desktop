@@ -76,6 +76,14 @@ OpenClaw Desktop
 
 判定规则：只要开箱体验、Dashboard 真实推进状态、Repository 初始化、Knowledge 导入/消化/健康检查、事务推进闭环、开始一件事闭环、可复用资产一等对象中的任一项还没有形成可用闭环，就不得判定 P0 已整体完成。某个切片可以标记为“第一片落地”或“核心金线已落地”，但不能因此把该 P0 项降级为 P1/P2。
 
+截图里的细化内容必须按原意保留为验收口径：
+
+- 开箱金线不是“连接成功”就结束，而是“打开应用 -> 选择语言/主题 -> 自动发现或安装 Gateway -> 创建本地工作仓库 -> 输入第一件事 -> 进入工作台”。
+- Dashboard 不是展示统计数量，而是优先展示今天可继续的工作、待确认计划或尾动作、卡住事项、最近成果、本周新增成果和知识动态。
+- Knowledge 必须包含导入中心、消化队列和健康检查三层能力；导入中心覆盖拖文件、粘贴文本、剪藏 URL 和选择文件夹。
+- 事务推进必须把 ActionRun 和 Workbench 硬连接：每个事项有唯一 ID，每次 AI 执行应归属事项，执行结束后进入 `runs/action-runs/`，回写事项页执行记录，并触发更新状态、沉淀成果、更新知识库和写入复盘等尾动作。
+- 可复用资产不只包括工具和脚本，也包括模板、工作流、提示词、检查清单等；它们必须有来源、版本、权限、审批边界、运行记录、输入输出和复盘线索。
+
 1. **自由边界是 P0；外部生态入口不是当前实施阻塞**
    - 保持自由、不被第三方商业生态绑定，是产品北极星里的 P0 约束，不能从验收口径中移走。
    - SkillHub / ClawHub / GitHub release 等入口当前不作为本阶段具体代码实施阻塞。
@@ -99,7 +107,7 @@ OpenClaw Desktop
    - Dashboard 首屏应从 Gateway 状态优先，改成用户工作优先。
    - 第一屏应展示今日继续、待确认、最近成果、知识动态、卡住事项和本周新增成果。
    - Gateway 健康状态应退到顶部小状态条，而不是主叙事。
-   - 当前代码第一片已落地：Dashboard 首屏新增“我的工作系统”摘要，从 Sessions、Workbench、Knowledge、ActionRun、Artifacts、Repository `outputs/index.md` 和 `reviews/` 复盘文档聚合今日继续、待确认、卡住事项、最近成果、本周新增成果和知识动态；本周新增成果会读取 Artifact `createdAt`、仓库 output index 的 `createdAt`（旧索引回退 `updatedAt`）、终态 ActionRun `updatedAt` 和复盘文档 `updatedAt`。仓库 output 条目会跳转到 `/workbench?view=outputs`，ActionRun 摘要条目会跳转到 `/workbench?view=actions`，复盘成果线索会跳转到 `/workbench?view=reviews`。Dashboard 只解析复盘中明确的 `成果` / `产物` / `输出` / deliverable 小节列表，不从全文做语义推断；卡住项会读取计划 `status: blocked/stuck/卡住` 以及显式 `blockedReason` / `blocker` / `阻塞原因`，并展示阻塞原因和负责人；事项 `## 收尾动作` 的未勾选项已进入“待确认”，并可在 Dashboard 标记完成、写回事项 Markdown。知识健康检查结果已进入知识动态；跨事项风险、未归档运行记录和成果沉淀缺口等更完整诊断仍待继续接入。
+   - 当前代码第一片已落地：Dashboard 首屏新增“我的工作系统”摘要，从 Sessions、Workbench、Knowledge、ActionRun、Artifacts、Repository `outputs/index.md`、`runs/action-runs/index.md` 和 `reviews/` 复盘文档聚合今日继续、待确认、卡住事项、最近成果、本周新增成果和知识动态；本周新增成果会读取 Artifact `createdAt`、仓库 output index 的 `createdAt`（旧索引回退 `updatedAt`）、终态 ActionRun `updatedAt` 和复盘文档 `updatedAt`。仓库 output 条目会跳转到 `/workbench?view=outputs`，ActionRun 摘要条目会跳转到 `/workbench?view=actions`，复盘成果线索会跳转到 `/workbench?view=reviews`。Dashboard 只解析复盘中明确的 `成果` / `产物` / `输出` / deliverable 小节列表，不从全文做语义推断；卡住项会读取计划 `status: blocked/stuck/卡住` 以及显式 `blockedReason` / `blocker` / `阻塞原因`，并展示阻塞原因和负责人；事项 `## 收尾动作` 的未勾选项已进入“待确认”，并可在 Dashboard 标记完成、写回事项 Markdown；已归属事项的终态 ActionRun 如果缺少 `runs/action-runs/index.md` 索引记录，会作为 `action-run:unarchived` 待确认展示并跳转 `/workbench?view=actions`。知识健康检查结果已进入知识动态；跨事项风险和成果沉淀缺口等更完整诊断仍待继续接入。
 
 4. **Repository 初始化前置是 P0**
    - 仓库绑定不能只藏在 Workbench / Knowledge 里等用户发现。
@@ -282,6 +290,7 @@ HTML 产物是特色能力：
 - Workbench 快照会解析工作事项里的 `## 收尾动作`，Dashboard “待确认”会显示未勾选收尾动作，让 ActionRun 结束后的后续判断进入每日推进面板。
 - Dashboard 会把未完成收尾动作分类为 `tail-action:status`、`tail-action:output`、`tail-action:knowledge` 或 `tail-action:review`，分别导向 Workbench 状态处理、Artifacts、Knowledge 或 Workbench 复盘后续。
 - 这些目标 URL 会携带 `tailAction`、`tailActionId` 和 `workItemPath`；Artifacts 会据此打开 AI 产物创建入口并带上来源事项，成果类尾动作会预填基于来源事项和最近执行记录沉淀成果的提示；Knowledge 会进入维护上下文，Workbench 会切到状态或复盘相关 tab 并显示来源事项。
+- Dashboard 会读取 Workbench Snapshot 中的 `runs/action-runs/index.md`；已归属事项的终态 ActionRun 如果没有被索引，会作为 `action-run:unarchived` 待确认展示，并跳转到 `/workbench?view=actions` 让用户回到执行记录视图检查。
 - 用户可在 Dashboard 将单条收尾动作标记完成；Desktop 会读取来源事项 Markdown，只把对应 `## 收尾动作` 行写回为 `[x]`，不自动执行更新状态、沉淀成果、更新知识库或写入复盘。
 - 回写只允许发生在当前绑定仓库的 `work/` 下 Markdown，且同一个 run 路径已存在时不会重复追加。
 - Workbench 预览 `work/active/`、`work/completed/`、`work/someday/` 下的事项 Markdown 时，已提供“生成成果”入口；该入口复用 Artifact AI 创建抽屉，创建 `artifact_create` ActionRun 时写入 `sourcePage: workbench`、当前 `workItemPath`，并在事项 frontmatter 有 `id` 时写入 `workItemId`。

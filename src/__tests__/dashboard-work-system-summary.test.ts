@@ -302,6 +302,54 @@ describe('dashboard work system summary', () => {
     expect(summary.recentOutputs.some((item) => item.id === 'action-run-output:run_artifact')).toBe(false);
   });
 
+  it('surfaces terminal work item ActionRuns missing from the repository run index as pending confirmations', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [
+        createActionRun({
+          id: 'run_unarchived',
+          type: 'artifact_create',
+          status: 'done',
+          input: '生成发布报告',
+          resultSummary: '发布报告已生成',
+          workItemPath: 'work/active/release.md',
+          updatedAt: 220,
+        }),
+        createActionRun({
+          id: 'run_archived',
+          type: 'knowledge_digest',
+          status: 'done',
+          input: '消化发布资料',
+          resultSummary: '发布知识已更新',
+          workItemPath: 'work/active/release.md',
+          updatedAt: 210,
+        }),
+      ],
+      artifacts: [],
+      workbench: {
+        activeWork: [],
+        activePlans: [],
+        planMetadata: [],
+        tailActions: [],
+        reviews: [],
+        runsMarkdown: ['# Action Runs', '', '- [knowledge_digest](runs/action-runs/run_archived.md) - done'].join('\n'),
+      },
+      limit: 8,
+    });
+
+    expect(summary.pendingConfirmations).toEqual([
+      expect.objectContaining({
+        id: 'unarchived-action-run:run_unarchived',
+        kind: 'action_run',
+        title: '生成发布报告',
+        target: '/workbench?view=actions',
+        path: 'work/active/release.md',
+        detail: '运行记录未归档 · work/active/release.md',
+        status: 'action-run:unarchived',
+      }),
+    ]);
+  });
+
   it('surfaces explicit output clues from review deliverable sections', () => {
     const now = Date.parse('2026-06-28T12:00:00.000Z');
     const summary = buildDashboardWorkSystemSummary({

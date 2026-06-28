@@ -22,12 +22,17 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('不被任何第三方商业生态所绑定');
     expect(skillContent).toContain('AI驱动长期可成长的知识库');
     expect(skillContent).toContain('这是我的终极目标');
+    expect(skillContent).toContain(
+      'open app -> choose language/theme -> discover or install Gateway -> create local work repository -> enter the first matter -> open Workbench',
+    );
     expect(skillContent).toContain('Repository Context 和仓库 `AGENTS.md`');
     expect(skillContent).toContain('ActionRun 是 OpenClaw Desktop 在普通聊天之外调用大模型的通用操作单元');
     expect(skillContent).toContain('An ActionRun can carry `workItemId` and `workItemPath`');
     expect(skillContent).toContain("appends an execution record back to that matter's `## 执行记录` section");
     expect(skillContent).toContain('Workbench matter preview can prefill both values');
     expect(skillContent).toContain('adds a `## 收尾动作` checklist');
+    expect(skillContent).toContain('missing from the repository run index');
+    expect(skillContent).toContain('`action-run:unarchived` pending confirmation');
     expect(skillContent).toContain(
       'unfinished `## 收尾动作` checklist items surface as Dashboard pending confirmations',
     );
@@ -79,6 +84,7 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain(
       'todayContinue, pendingConfirmations, stuckItems, recentOutputs, weeklyOutputs, and knowledgeUpdates',
     );
+    expect(skillContent).toContain('Repository runs');
     expect(skillContent).toContain('Artifact outputs created during the current UTC week');
     expect(skillContent).toContain('Repository `outputs/index.md` entries whose `createdAt`');
     expect(skillContent).toContain('/workbench?view=outputs');
@@ -95,6 +101,8 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('blockedReason');
     expect(skillContent).toContain('blockerOwner');
     expect(skillContent).toContain('/workbench?view=plans');
+    expect(skillContent).toContain('Terminal work-item ActionRuns that are missing from `runs/action-runs/index.md`');
+    expect(skillContent).toContain('not an automatic repository repair');
     expect(skillContent).toContain('Knowledge health issues');
     expect(skillContent).toContain('orphan sources, stale index entries, broken knowledge links');
     expect(skillContent).toContain('undigested sources queue');
