@@ -62,6 +62,9 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('buildPlanExecutePrompt');
     expect(source).toContain('计划执行状态观测');
     expect(source).toContain('findLatestPlanExecutionRun');
+    expect(source).toContain('计划执行成果沉淀入口');
+    expect(source).toContain('shouldOfferPlanExecutionOutputPreservation');
+    expect(source).toContain('action-run-output:<runId>');
     expect(source).toContain('repositoryWrite');
     expect(source).toContain('Knowledge 发起前事项选择');
     expect(source).toContain('Teams 发起前事项选择');
@@ -91,6 +94,9 @@ describe('product goal P0 traceability', () => {
     expect(plans).toContain('buildPlanExecutePrompt');
     expect(plans).toContain('计划执行状态观测');
     expect(plans).toContain('findLatestPlanExecutionRun');
+    expect(plans).toContain('计划执行成果沉淀入口');
+    expect(plans).toContain('shouldOfferPlanExecutionOutputPreservation');
+    expect(plans).toContain('action-run-output:<runId>');
     expect(plans).toContain('repositoryWrite.path/content/workItemPath');
     expect(plans).toContain('Knowledge 普通自动改写发起前事项选择');
     expect(plans).toContain('Teams 自然语言编排发起前事项选择');
@@ -113,6 +119,9 @@ describe('product goal P0 traceability', () => {
     expect(roadmap).toContain('buildPlanExecutePrompt');
     expect(roadmap).toContain('计划执行状态观测');
     expect(roadmap).toContain('findLatestPlanExecutionRun');
+    expect(roadmap).toContain('计划执行成果沉淀入口');
+    expect(roadmap).toContain('shouldOfferPlanExecutionOutputPreservation');
+    expect(roadmap).toContain('action-run-output:<runId>');
     expect(roadmap).toContain('applyWorkbenchMatterPlanApproval');
     expect(roadmap).toContain('repositoryWrite.path/content/workItemPath');
     expect(skillContent).toContain('Screenshot-confirmed P0 baseline');
@@ -138,6 +147,9 @@ describe('product goal P0 traceability', () => {
     expect(skillContent).toContain('buildPlanExecutePrompt');
     expect(skillContent).toContain('findLatestPlanExecutionRun');
     expect(skillContent).toContain('latest plan execution status');
+    expect(skillContent).toContain('shouldOfferPlanExecutionOutputPreservation');
+    expect(skillContent).toContain('`action-run-output:<runId>`');
+    expect(skillContent).toContain('Preserve Output');
     expect(skillContent).toContain('applyWorkbenchMatterPlanApproval');
     expect(skillContent).toContain('repositoryWrite.path/content/workItemPath');
     expect(skillContent).toContain('Artifacts UI also exposes a reuse-kind filter');

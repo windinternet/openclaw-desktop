@@ -9,7 +9,10 @@ import { loadAiActionRuns, upsertAiActionRun } from '../lib/ai-action-run-store'
 import { buildPlanExecutePrompt, buildWorkMatterPlanPrompt } from '../lib/ai-action-prompts';
 import { buildArtifactOutputDescription } from '../lib/artifact-display';
 import type { ArtifactMeta } from '../lib/artifact-types';
-import type { DashboardTailActionRouteContext } from '../lib/dashboard-tail-action-routing';
+import {
+  buildDashboardTailActionTarget,
+  type DashboardTailActionRouteContext,
+} from '../lib/dashboard-tail-action-routing';
 import type { RepositoryMarkdownFile } from '../lib/repository-knowledge';
 import type { WorkbenchSnapshot } from '../lib/repository-workbench';
 import {
@@ -22,7 +25,10 @@ import {
 } from '../lib/repository-workbench';
 import type { AiActionRun, AiActionRunStatus } from '../lib/types';
 import { extractWorkbenchMatterId, isWorkbenchMatterPath } from '../lib/workbench-matter';
-import { findLatestPlanExecutionRun } from '../lib/workbench-plan-execution';
+import {
+  findLatestPlanExecutionRun,
+  shouldOfferPlanExecutionOutputPreservation,
+} from '../lib/workbench-plan-execution';
 import { ArtifactAICreateDrawer } from './ArtifactAICreateDrawer';
 import MarkdownView from './MarkdownView';
 
@@ -1506,6 +1512,7 @@ export default function WorkbenchRepositoryPanel({
   const selectedPlanLatestRun = selectedPlanPath
     ? findLatestPlanExecutionRun(selectedPlanPath, activityRuns)
     : undefined;
+  const selectedPlanCanPreserveOutput = shouldOfferPlanExecutionOutputPreservation(selectedPlanLatestRun);
   const previewTitle =
     panelView === 'projects' ? t('workbench.projectPreview') : selectedPreviewPath || t('workbench.preview');
   const standaloneView = panelView === 'dashboard' || panelView === 'outputs';
@@ -1680,6 +1687,24 @@ export default function WorkbenchRepositoryPanel({
                           <Button size="small" type="tertiary" onClick={() => navigate('/actions')}>
                             {t('workbench.openPlanExecutionRuns')}
                           </Button>
+                          {selectedPlanCanPreserveOutput && (
+                            <Button
+                              size="small"
+                              type="tertiary"
+                              icon={<IconBox />}
+                              onClick={() =>
+                                navigate(
+                                  buildDashboardTailActionTarget('/artifacts', {
+                                    kind: 'output',
+                                    id: `action-run-output:${selectedPlanLatestRun.id}`,
+                                    workItemPath: selectedPlanLatestRun.workItemPath,
+                                  }),
+                                )
+                              }
+                            >
+                              {t('workbench.preservePlanExecutionOutput')}
+                            </Button>
+                          )}
                         </>
                       )}
                       <Button

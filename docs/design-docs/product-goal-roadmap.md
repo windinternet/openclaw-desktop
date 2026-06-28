@@ -348,11 +348,13 @@ HTML 产物是特色能力：
 - 该入口创建 `plan_execute` ActionRun，`sourcePage: workbench`，并使用 `buildPlanExecutePrompt` / `plan-execute.md` 带入 `planPath`、计划内容，以及计划元数据中通过 `work/(active|completed|someday)/*.md` 边界校验的 `workItemPath` 和来源事项内容。
 - 如果计划有关联且安全的来源事项，`plan_execute` 会写入 `workItemPath` / `workItemId`，终态后复用现有 ActionRun 仓库镜像、事项 `## 执行记录` 和 `## 收尾动作` 机制；没有来源事项或来源事项路径不在工作事项边界内时仍进入未归属诊断，不猜测事项。
 - 计划执行状态观测已接入 Workbench：`findLatestPlanExecutionRun` 会从 `plan_execute` ActionRun 输入中的独立 `planPath` 行关联活跃计划，并在活跃计划列表和选中计划预览头部展示最近执行状态、摘要和进入 Action Center 的入口。
-- 该入口只启动执行 ActionRun，不自动沉淀成果、不更新知识库、不写复盘、不移动事项文件。
+- 计划执行成果沉淀入口已接入 Workbench：`shouldOfferPlanExecutionOutputPreservation` 会在最近一次 `plan_execute` 已完成、有 `resultSummary`、有安全 `workItemPath` 且没有 `artifactIds` 时，在计划预览头部显示“沉淀成果 / Preserve Output”。
+- “沉淀成果 / Preserve Output”会打开 Artifacts 的 `tailAction=output` 上下文，携带 `tailActionId=action-run-output:<runId>` 和来源 `workItemPath`；Artifacts 的 AI 创建提示会保留来源事项和来源执行记录。
+- 该入口只提示用户显式判断并保存成果，不自动创建 Artifact 或 Repository output、不更新知识库、不写复盘、不移动事项文件。
 
 仍未完成：
 
-- 执行后的成果/知识/复盘金线仍需继续接上。
+- 执行后的知识更新和复盘金线仍需继续接上；成果沉淀已有入口，但更完整的候选提取、保存表单和保存后状态刷新仍需继续打磨。
 - 新用户从开箱第一事项自然进入计划、执行和产物沉淀的端到端体验仍未完整闭环。
 
 ### P0-7 可复用资产一等对象

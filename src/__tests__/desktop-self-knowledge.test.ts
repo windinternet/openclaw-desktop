@@ -46,6 +46,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('Terminal `plan_execute` runs reuse the existing ActionRun repository summary');
     expect(skillContent).toContain('findLatestPlanExecutionRun');
     expect(skillContent).toContain('latest plan execution status');
+    expect(skillContent).toContain('shouldOfferPlanExecutionOutputPreservation');
+    expect(skillContent).toContain('`action-run-output:<runId>`');
+    expect(skillContent).toContain('Preserve Output');
     expect(skillContent).toContain('adds a `## 收尾动作` checklist');
     expect(skillContent).toContain('missing from the repository run index');
     expect(skillContent).toContain('`action-run:unarchived` pending confirmation');

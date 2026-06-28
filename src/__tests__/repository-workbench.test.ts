@@ -1201,6 +1201,21 @@ describe('repository workbench', () => {
     expect(en).toContain('"latestPlanExecution": "Latest execution"');
   });
 
+  it('lets completed plan execution preserve output through the existing Artifacts tail-action route', () => {
+    const source = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
+    const zh = readFileSync('src/locales/zh.json', 'utf8');
+    const en = readFileSync('src/locales/en.json', 'utf8');
+
+    expect(source).toContain('shouldOfferPlanExecutionOutputPreservation');
+    expect(source).toContain('buildDashboardTailActionTarget');
+    expect(source).toContain("kind: 'output'");
+    expect(source).toContain('`action-run-output:${selectedPlanLatestRun.id}`');
+    expect(source).toContain('workItemPath: selectedPlanLatestRun.workItemPath');
+    expect(source).toContain("t('workbench.preservePlanExecutionOutput')");
+    expect(zh).toContain('"preservePlanExecutionOutput": "沉淀成果"');
+    expect(en).toContain('"preservePlanExecutionOutput": "Preserve Output"');
+  });
+
   it('wires ActionCenter unassigned ActionRun backfill to repository work items', () => {
     const page = readFileSync('src/pages/ActionCenterPage.tsx', 'utf8');
     const zh = readFileSync('src/locales/zh.json', 'utf8');

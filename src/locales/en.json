@@ -179,6 +179,7 @@
     "latestPlanExecution": "Latest execution",
     "planExecutionNoSummary": "No execution summary yet",
     "openPlanExecutionRuns": "View Runs",
+    "preservePlanExecutionOutput": "Preserve Output",
     "createArtifactForMatter": "Create Output",
     "tailActionContextTitle": "Pending Tail Action",
     "tailActionContextDesc": "A Dashboard tail action for a matter. Check the source matter before continuing.",

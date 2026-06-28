@@ -31,14 +31,20 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
   const location = useLocation();
   const tailActionContext = useMemo(() => parseDashboardTailActionRoute(location.search), [location.search]);
   const artifactTailActionContext = tailActionContext?.kind === 'output' ? tailActionContext : null;
+  const artifactTailActionRunId = artifactTailActionContext?.id?.startsWith('action-run-output:')
+    ? artifactTailActionContext.id.slice('action-run-output:'.length)
+    : undefined;
   const artifactTailActionInitialInput = useMemo(() => {
     if (!artifactTailActionContext?.workItemPath) return undefined;
     return [
       `请根据来源事项 ${artifactTailActionContext.workItemPath} 和最近执行记录，判断本次执行中值得沉淀的成果。`,
+      artifactTailActionRunId ? `来源执行记录 action-run-output:${artifactTailActionRunId}。` : undefined,
       '如果适合沉淀，请生成一个可保存、可复用、可追踪的产物；优先考虑 HTML 报告/仪表盘、文档、链接或文件型成果。',
       '请在产物说明中保留来源事项和价值摘要。',
-    ].join('\n');
-  }, [artifactTailActionContext?.workItemPath]);
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }, [artifactTailActionContext?.workItemPath, artifactTailActionRunId]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [reuseKindFilter, setReuseKindFilter] = useState<ArtifactReuseKindFilter>('all');

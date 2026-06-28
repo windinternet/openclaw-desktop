@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { findLatestPlanExecutionRun, getPlanExecutionPlanPath } from '../lib/workbench-plan-execution';
+import {
+  findLatestPlanExecutionRun,
+  getPlanExecutionPlanPath,
+  shouldOfferPlanExecutionOutputPreservation,
+} from '../lib/workbench-plan-execution';
 import type { AiActionRun } from '../lib/types';
 
 function createRun(overrides: Partial<AiActionRun>): AiActionRun {
@@ -54,5 +58,62 @@ describe('workbench plan execution observability', () => {
 
     expect(findLatestPlanExecutionRun('plans/active/release.md', [older, otherPlan, latest, otherType])).toBe(latest);
     expect(findLatestPlanExecutionRun('plans/active/missing.md', [older, latest])).toBeUndefined();
+  });
+
+  it('offers output preservation only for completed work-bound plan execution without artifacts', () => {
+    expect(
+      shouldOfferPlanExecutionOutputPreservation(
+        createRun({
+          status: 'done',
+          resultSummary: '完成打包验证',
+          workItemPath: 'work/active/release.md',
+        }),
+      ),
+    ).toBe(true);
+
+    expect(
+      shouldOfferPlanExecutionOutputPreservation(
+        createRun({
+          status: 'running',
+          resultSummary: '正在执行',
+          workItemPath: 'work/active/release.md',
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      shouldOfferPlanExecutionOutputPreservation(
+        createRun({
+          status: 'done',
+          workItemPath: 'work/active/release.md',
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      shouldOfferPlanExecutionOutputPreservation(
+        createRun({
+          status: 'done',
+          resultSummary: '完成打包验证',
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      shouldOfferPlanExecutionOutputPreservation(
+        createRun({
+          status: 'done',
+          resultSummary: '完成打包验证',
+          workItemPath: 'work/active/release.md',
+          artifactIds: ['artifact-1'],
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      shouldOfferPlanExecutionOutputPreservation(
+        createRun({
+          status: 'done',
+          resultSummary: '完成打包验证',
+          workItemPath: 'outputs/release.md',
+        }),
+      ),
+    ).toBe(false);
   });
 });

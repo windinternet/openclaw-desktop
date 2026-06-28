@@ -1201,3 +1201,18 @@ HTML 的独特优势：
 仍未完成的 P0 后续：
 
 - 仍需要执行后的产物沉淀、知识更新和复盘金线。
+
+### 10.54 2026-06-29 当前实施记录：计划执行成果沉淀入口
+
+围绕“开始一件事闭环”中“执行 -> 产物”的 P0 缺口，当前继续把计划执行结果接到已有 Artifacts 成果沉淀流程：
+
+- 新增 `shouldOfferPlanExecutionOutputPreservation`，只在最近一次 `plan_execute` 已完成、有 `resultSummary`、有安全 `workItemPath` 且没有 `artifactIds` 时，认为该计划执行结果值得提示用户沉淀。
+- Workbench 选中 `plans/active/` 活跃计划时，如果最近一次执行满足上述条件，会在计划预览头部显示“沉淀成果 / Preserve Output”。
+- 点击后 Desktop 复用现有 Dashboard tail-action 路由，打开 Artifacts 并携带 `tailAction=output`、`tailActionId=action-run-output:<runId>` 和来源 `workItemPath`。
+- Artifacts 的 AI 创建提示会保留来源事项和来源执行记录 `action-run-output:<runId>`，避免用户进入空白输入框，也方便 Gateway/Agent 知道要基于哪次执行判断成果价值。
+- 用户显式保存产物后，现有 `preserveWorkbenchOutputFromTailAction` 会把 Artifact 或 Repository output 链接写回来源事项 `## 关联成果`；如果 `tailActionId` 不是事项 checklist ID，例如 `action-run-output:<runId>`，则只写回成果关联，不假装勾选一条不存在的 checklist。
+- 该入口不会自动创建 Artifact 或 Repository output，不会自动更新知识库，不会写复盘，不会更新事项状态，不会移动事项文件，也不会执行资产或授予权限。
+
+仍未完成的 P0 后续：
+
+- 仍需要更完整的成果候选提取、保存后 Dashboard 待确认刷新体验、执行后的知识更新金线、复盘金线，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。

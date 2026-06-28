@@ -58,6 +58,8 @@ describe('artifact ActionRun linkage', () => {
     expect(drawer).toContain('if (visible && initialInput !== undefined) setInput(initialInput)');
     expect(artifacts).toContain('artifactTailActionInitialInput');
     expect(artifacts).toContain('请根据来源事项');
+    expect(artifacts).toContain('artifactTailActionRunId');
+    expect(artifacts).toContain('来源执行记录 action-run-output');
     expect(artifacts).toContain('initialInput={artifactTailActionInitialInput}');
   });
 
