@@ -76,6 +76,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('verify whether Wiki/index/log was updated or no write was needed');
     expect(skillContent).toContain('Review Knowledge Update');
     expect(skillContent).toContain('writePlanExecutionReviewWithKnowledge');
+    expect(skillContent).toContain('Review Knowledge Write');
+    expect(skillContent).toContain('Review No-Write Decision');
+    expect(skillContent).toContain('getPlanExecutionKnowledgeReviewSuggestion');
     expect(skillContent).toContain('findPlanExecutionKnowledgeUpdateState');
     expect(skillContent).toContain('Knowledge No Write');
     expect(skillContent).toContain('findPlanExecutionReviewState');

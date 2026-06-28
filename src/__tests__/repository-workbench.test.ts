@@ -1337,12 +1337,15 @@ describe('repository workbench', () => {
 
   it('lets completed plan execution start a review draft through the existing Workbench review route', () => {
     const source = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
+    const planExecution = readFileSync('src/lib/workbench-plan-execution.ts', 'utf8');
     const zh = readFileSync('src/locales/zh.json', 'utf8');
     const en = readFileSync('src/locales/en.json', 'utf8');
 
     expect(source).toContain('shouldOfferPlanExecutionReview');
     expect(source).toContain('findPlanExecutionKnowledgeUpdateState');
+    expect(source).toContain('getPlanExecutionKnowledgeReviewSuggestion');
     expect(source).toContain('selectedPlanKnowledgeUpdateState');
+    expect(source).toContain('selectedPlanReviewSuggestion');
     expect(source).toContain('findPlanExecutionReviewState');
     expect(source).toContain('selectedPlanReviewState');
     expect(source).toContain('workbench.planExecutionKnowledgeNoWrite');
@@ -1352,16 +1355,20 @@ describe('repository workbench', () => {
     expect(source).toContain('reviewDocuments: snapshot?.reviewDocuments');
     expect(source).toContain('relatedKnowledgeRunIds');
     expect(source).toContain('selectedPlanRelatedKnowledgeRunIds');
-    expect(source).toContain('workbench.writePlanExecutionReviewWithKnowledge');
-    expect(source).toContain('workbench.writePlanExecutionReviewWithKnowledgeHint');
+    expect(planExecution).toContain('workbench.writePlanExecutionReviewWithKnowledge');
+    expect(planExecution).toContain('workbench.writePlanExecutionReviewWithKnowledgeHint');
+    expect(planExecution).toContain('workbench.writePlanExecutionReviewAfterKnowledgeWrite');
+    expect(planExecution).toContain('workbench.writePlanExecutionReviewAfterKnowledgeNoWrite');
     expect(source).toContain('buildDashboardTailActionTarget');
     expect(source).toContain("kind: 'review'");
     expect(source).toContain('`action-run-review:${selectedPlanLatestRun.id}`');
     expect(source).toContain('workItemPath: selectedPlanLatestRun.workItemPath');
-    expect(source).toContain("'workbench.writePlanExecutionReview'");
+    expect(planExecution).toContain("'workbench.writePlanExecutionReview'");
     expect(zh).toContain('"writePlanExecutionReview": "写复盘"');
     expect(zh).toContain('"writePlanExecutionReviewWithKnowledge": "复盘知识更新"');
     expect(zh).toContain('"writePlanExecutionReviewWithKnowledgeHint": "复盘草稿会带入同源知识更新记录"');
+    expect(zh).toContain('"writePlanExecutionReviewAfterKnowledgeWrite": "复盘知识写入"');
+    expect(zh).toContain('"writePlanExecutionReviewAfterKnowledgeNoWrite": "复盘无需写入"');
     expect(zh).toContain('"planExecutionKnowledgeNoWrite": "知识无需写入"');
     expect(zh).toContain('"planExecutionKnowledgeAwaitingApproval": "知识待审批"');
     expect(zh).toContain('"planExecutionReviewDraft": "复盘草稿"');
@@ -1371,6 +1378,8 @@ describe('repository workbench', () => {
     expect(en).toContain(
       '"writePlanExecutionReviewWithKnowledgeHint": "The review draft will include source-bound knowledge updates"',
     );
+    expect(en).toContain('"writePlanExecutionReviewAfterKnowledgeWrite": "Review Knowledge Write"');
+    expect(en).toContain('"writePlanExecutionReviewAfterKnowledgeNoWrite": "Review No-Write Decision"');
     expect(en).toContain('"planExecutionKnowledgeNoWrite": "Knowledge No Write"');
     expect(en).toContain('"planExecutionKnowledgeAwaitingApproval": "Knowledge Approval"');
     expect(en).toContain('"planExecutionReviewDraft": "Review Draft"');

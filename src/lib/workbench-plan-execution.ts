@@ -16,6 +16,11 @@ export interface PlanExecutionKnowledgeUpdateState {
   updatedAt: number;
 }
 
+export interface PlanExecutionKnowledgeReviewSuggestion {
+  labelKey: string;
+  hintKey?: string;
+}
+
 export interface PlanExecutionFollowUpContext {
   actionRuns?: readonly AiActionRun[];
   reviewDocuments?: readonly PlanExecutionReviewDocument[];
@@ -111,6 +116,28 @@ export function findPlanExecutionReviewState(
 ): PlanExecutionReviewState | undefined {
   const states = findPlanExecutionReviewStates(run, context);
   return states.find((state) => state.status === 'confirmed') ?? states[0];
+}
+
+export function getPlanExecutionKnowledgeReviewSuggestion(
+  state: PlanExecutionKnowledgeUpdateState | undefined,
+): PlanExecutionKnowledgeReviewSuggestion {
+  if (!state) return { labelKey: 'workbench.writePlanExecutionReview' };
+  if (state.status === 'done') {
+    return {
+      labelKey: 'workbench.writePlanExecutionReviewAfterKnowledgeWrite',
+      hintKey: 'workbench.writePlanExecutionReviewAfterKnowledgeWriteHint',
+    };
+  }
+  if (state.status === 'no_write_needed') {
+    return {
+      labelKey: 'workbench.writePlanExecutionReviewAfterKnowledgeNoWrite',
+      hintKey: 'workbench.writePlanExecutionReviewAfterKnowledgeNoWriteHint',
+    };
+  }
+  return {
+    labelKey: 'workbench.writePlanExecutionReviewWithKnowledge',
+    hintKey: 'workbench.writePlanExecutionReviewWithKnowledgeHint',
+  };
 }
 
 function hasPlanExecutionKnowledgeFollowUp(run: AiActionRun, context: PlanExecutionFollowUpContext): boolean {

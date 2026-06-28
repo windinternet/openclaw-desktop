@@ -30,6 +30,7 @@ import {
   findPlanExecutionKnowledgeUpdateState,
   findLatestPlanExecutionRun,
   findPlanExecutionReviewState,
+  getPlanExecutionKnowledgeReviewSuggestion,
   shouldOfferPlanExecutionKnowledgeUpdate,
   shouldOfferPlanExecutionOutputPreservation,
   shouldOfferPlanExecutionReview,
@@ -1573,6 +1574,9 @@ export default function WorkbenchRepositoryPanel({
     reviewDocuments: snapshot?.reviewDocuments,
   });
   const selectedPlanReviewHasKnowledgeContext = selectedPlanRelatedKnowledgeRunIds.length > 0;
+  const selectedPlanReviewSuggestion = getPlanExecutionKnowledgeReviewSuggestion(
+    selectedPlanReviewHasKnowledgeContext ? selectedPlanKnowledgeUpdateState : undefined,
+  );
   const previewTitle =
     panelView === 'projects' ? t('workbench.projectPreview') : selectedPreviewPath || t('workbench.preview');
   const standaloneView = panelView === 'dashboard' || panelView === 'outputs';
@@ -1803,8 +1807,8 @@ export default function WorkbenchRepositoryPanel({
                               type="tertiary"
                               icon={<IconCheckList />}
                               title={
-                                selectedPlanReviewHasKnowledgeContext
-                                  ? t('workbench.writePlanExecutionReviewWithKnowledgeHint')
+                                selectedPlanReviewSuggestion.hintKey
+                                  ? t(selectedPlanReviewSuggestion.hintKey)
                                   : undefined
                               }
                               onClick={() =>
@@ -1817,11 +1821,7 @@ export default function WorkbenchRepositoryPanel({
                                 )
                               }
                             >
-                              {t(
-                                selectedPlanReviewHasKnowledgeContext
-                                  ? 'workbench.writePlanExecutionReviewWithKnowledge'
-                                  : 'workbench.writePlanExecutionReview',
-                              )}
+                              {t(selectedPlanReviewSuggestion.labelKey)}
                             </Button>
                           )}
                         </>

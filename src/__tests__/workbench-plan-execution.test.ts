@@ -4,6 +4,7 @@ import {
   findPlanExecutionKnowledgeUpdateState,
   findLatestPlanExecutionRun,
   findPlanExecutionReviewState,
+  getPlanExecutionKnowledgeReviewSuggestion,
   getPlanExecutionPlanPath,
   shouldOfferPlanExecutionKnowledgeUpdate,
   shouldOfferPlanExecutionOutputPreservation,
@@ -295,6 +296,47 @@ describe('workbench plan execution observability', () => {
       runId: 'run-knowledge-no-write',
       summary: '索引和日志已经同步，本次无需写入。',
       updatedAt: 30,
+    });
+  });
+
+  it('suggests precise review copy after source-bound knowledge updates', () => {
+    expect(
+      getPlanExecutionKnowledgeReviewSuggestion({
+        status: 'done',
+        runId: 'run-knowledge',
+        summary: '已写入 wiki/release.md 并更新索引',
+        updatedAt: 20,
+      }),
+    ).toEqual({
+      labelKey: 'workbench.writePlanExecutionReviewAfterKnowledgeWrite',
+      hintKey: 'workbench.writePlanExecutionReviewAfterKnowledgeWriteHint',
+    });
+
+    expect(
+      getPlanExecutionKnowledgeReviewSuggestion({
+        status: 'no_write_needed',
+        runId: 'run-knowledge',
+        summary: '本次无需写入 Wiki/index/log',
+        updatedAt: 21,
+      }),
+    ).toEqual({
+      labelKey: 'workbench.writePlanExecutionReviewAfterKnowledgeNoWrite',
+      hintKey: 'workbench.writePlanExecutionReviewAfterKnowledgeNoWriteHint',
+    });
+
+    expect(
+      getPlanExecutionKnowledgeReviewSuggestion({
+        status: 'running',
+        runId: 'run-knowledge',
+        updatedAt: 22,
+      }),
+    ).toEqual({
+      labelKey: 'workbench.writePlanExecutionReviewWithKnowledge',
+      hintKey: 'workbench.writePlanExecutionReviewWithKnowledgeHint',
+    });
+
+    expect(getPlanExecutionKnowledgeReviewSuggestion(undefined)).toEqual({
+      labelKey: 'workbench.writePlanExecutionReview',
     });
   });
 
