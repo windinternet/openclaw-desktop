@@ -19,6 +19,13 @@ export interface WorkbenchSemanticDocument {
   file: RepositoryMarkdownFile;
 }
 
+export interface WorkbenchReviewDocument {
+  path: string;
+  title: string;
+  content: string;
+  file: RepositoryMarkdownFile;
+}
+
 export interface WorkbenchProject {
   id: string;
   name: string;
@@ -60,6 +67,7 @@ export interface WorkbenchSnapshot {
   runsMarkdown: string;
   outputsMarkdown: string;
   reviews: RepositoryMarkdownFile[];
+  reviewDocuments?: WorkbenchReviewDocument[];
   planMetadata: RepositoryPlanMetadata[];
   reviewGroups: RepositoryReviewGroup[];
   semanticSections: WorkbenchSemanticSection[];
@@ -107,13 +115,14 @@ export async function loadWorkbenchSnapshot(binding: RepositoryBinding): Promise
     repository.listMarkdown(binding.repoPath, binding.paths.reviews),
   ]);
 
-  const [planMetadata, tailActions] = await Promise.all([
+  const [planMetadata, tailActions, reviewDocuments] = await Promise.all([
     Promise.all(
       [...activePlans, ...completedPlans].map(async (file) =>
         parsePlanMetadata(file.path, await repository.readText(binding.repoPath, file.path)),
       ),
     ),
     loadWorkbenchTailActions(binding, [...activeWork, ...completedWork, ...somedayWork]),
+    loadWorkbenchReviewDocuments(binding, reviews),
   ]);
 
   return {
@@ -126,6 +135,7 @@ export async function loadWorkbenchSnapshot(binding: RepositoryBinding): Promise
     runsMarkdown,
     outputsMarkdown,
     reviews,
+    reviewDocuments,
     planMetadata: planMetadata.filter((item) => item.status || item.approval),
     reviewGroups: groupReviewsByFolder(reviews),
     semanticSections: [],
@@ -138,7 +148,9 @@ export async function loadWorkbenchSnapshot(binding: RepositoryBinding): Promise
 async function loadSemanticWorkbenchSnapshot(binding: RepositoryBinding): Promise<WorkbenchSnapshot> {
   const semanticSections = await loadSemanticSections(binding);
   const sectionByKey = new Map(semanticSections.map((section) => [section.key, section]));
-  const reviews = semanticSections.find((section) => section.key === 'reviews')?.files ?? [];
+  const reviewSection = semanticSections.find((section) => section.key === 'reviews');
+  const reviews = reviewSection?.files ?? [];
+  const reviewDocuments = reviewSection?.documents ?? [];
   const tailActions = semanticSections.flatMap((section) =>
     section.documents.flatMap((document) =>
       parseWorkbenchTailActions(document.path, document.content, document.file.updatedAt),
@@ -154,6 +166,7 @@ async function loadSemanticWorkbenchSnapshot(binding: RepositoryBinding): Promis
     runsMarkdown: sectionByKey.get('runs')?.markdown ?? '',
     outputsMarkdown: sectionByKey.get('outputs')?.markdown ?? '',
     reviews,
+    reviewDocuments,
     planMetadata: [],
     reviewGroups: groupReviewsByFolder(reviews),
     semanticSections,
@@ -305,6 +318,24 @@ export function parseWorkbenchTailActions(sourcePath: string, markdown: string, 
     });
   }
   return actions;
+}
+
+async function loadWorkbenchReviewDocuments(
+  binding: RepositoryBinding,
+  reviews: RepositoryMarkdownFile[],
+): Promise<WorkbenchReviewDocument[]> {
+  const repository = getWorkbenchReadApi();
+  return Promise.all(
+    reviews.map(async (file) => {
+      const content = await repository.readText(binding.repoPath, file.path);
+      return {
+        path: file.path,
+        title: extractTitle(content) || file.name,
+        content,
+        file,
+      };
+    }),
+  );
 }
 
 function markWorkbenchTailActionCompleted(markdown: string, actionIndex: number, expectedText: string): string | null {

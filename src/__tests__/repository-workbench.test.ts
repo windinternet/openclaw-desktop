@@ -34,6 +34,14 @@ describe('repository workbench', () => {
       if (relativePath === 'work/inbox.md') return '# Inbox';
       if (relativePath === 'runs/index.md') return '# Runs';
       if (relativePath === 'outputs/index.md') return '# Outputs';
+      if (relativePath === 'reviews/weekly/2026-W26.md')
+        return [
+          '# 第 26 周复盘',
+          '',
+          '## 成果',
+          '',
+          '- [交互报告](../../outputs/reports/report.md)：让进展可视化',
+        ].join('\n');
       if (relativePath === 'work/active/project.md')
         return [
           '# 发布推进',
@@ -97,6 +105,14 @@ describe('repository workbench', () => {
     expect(snapshot.runsMarkdown).toBe('# Runs');
     expect(snapshot.outputsMarkdown).toBe('# Outputs');
     expect(snapshot.reviews).toHaveLength(1);
+    expect(snapshot.reviewDocuments).toEqual([
+      {
+        path: 'reviews/weekly/2026-W26.md',
+        title: '第 26 周复盘',
+        content: '# 第 26 周复盘\n\n## 成果\n\n- [交互报告](../../outputs/reports/report.md)：让进展可视化',
+        file: { path: 'reviews/weekly/2026-W26.md', name: '2026-W26.md', size: 30, updatedAt: 3 },
+      },
+    ]);
   });
 
   it('loads semantic workbench slots when binding has a workbench mapping', async () => {
@@ -182,7 +198,7 @@ describe('repository workbench', () => {
     const listMarkdown = vi.fn(async (_repoPath: string, directory: string) =>
       directory === 'reviews' ? [reviewFile] : [],
     );
-    const readText = vi.fn(async () => '');
+    const readText = vi.fn(async () => '# 第 26 周复盘\n\n## 成果\n\n- [发布报告](../outputs/report.md)');
     vi.stubGlobal('window', {
       electronAPI: {
         repository: { listMarkdown, readText },
@@ -211,6 +227,14 @@ describe('repository workbench', () => {
       {
         group: 'weekly',
         files: [reviewFile],
+      },
+    ]);
+    expect(snapshot.reviewDocuments).toEqual([
+      {
+        path: 'reviews/weekly/2026-W26.md',
+        title: '第 26 周复盘',
+        content: '# 第 26 周复盘\n\n## 成果\n\n- [发布报告](../outputs/report.md)',
+        file: reviewFile,
       },
     ]);
   });

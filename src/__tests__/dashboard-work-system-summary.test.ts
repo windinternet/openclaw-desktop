@@ -302,6 +302,71 @@ describe('dashboard work system summary', () => {
     expect(summary.recentOutputs.some((item) => item.id === 'action-run-output:run_artifact')).toBe(false);
   });
 
+  it('surfaces explicit output clues from review deliverable sections', () => {
+    const now = Date.parse('2026-06-28T12:00:00.000Z');
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [],
+      workbench: {
+        activeWork: [],
+        activePlans: [],
+        planMetadata: [],
+        tailActions: [],
+        reviews: [
+          createMarkdownFile('reviews/weekly/2026-W26.md', '2026-W26.md', Date.parse('2026-06-27T09:00:00.000Z')),
+        ],
+        reviewDocuments: [
+          {
+            path: 'reviews/weekly/2026-W26.md',
+            title: '第 26 周复盘',
+            content: [
+              '# 第 26 周复盘',
+              '',
+              '## 事项观察',
+              '',
+              '- 普通事项，不应进入成果。',
+              '',
+              '## 成果',
+              '',
+              '- [交互式进展报告](../../outputs/reports/progress.html)：让项目进展可视化、可操作。',
+              '- 可复用发布检查清单：沉淀为下次发布模板。',
+            ].join('\n'),
+            file: createMarkdownFile(
+              'reviews/weekly/2026-W26.md',
+              '2026-W26.md',
+              Date.parse('2026-06-27T09:00:00.000Z'),
+            ),
+          },
+        ],
+      },
+      now,
+    });
+
+    expect(summary.recentOutputs.map((item) => item.id)).toEqual([
+      'review-output:reviews/weekly/2026-W26.md:0',
+      'review-output:reviews/weekly/2026-W26.md:1',
+    ]);
+    expect(summary.weeklyOutputs.map((item) => item.id)).toEqual([
+      'review-output:reviews/weekly/2026-W26.md:0',
+      'review-output:reviews/weekly/2026-W26.md:1',
+    ]);
+    expect(summary.recentOutputs[0]).toMatchObject({
+      kind: 'output',
+      title: '交互式进展报告',
+      target: '/workbench?view=reviews',
+      path: 'outputs/reports/progress.html',
+      detail: '复盘成果 · 第 26 周复盘 · 让项目进展可视化、可操作。',
+    });
+    expect(summary.recentOutputs[1]).toMatchObject({
+      kind: 'output',
+      title: '可复用发布检查清单',
+      path: 'reviews/weekly/2026-W26.md',
+      detail: '复盘成果 · 第 26 周复盘 · 沉淀为下次发布模板。',
+    });
+    expect(summary.recentOutputs.some((item) => item.title === '普通事项，不应进入成果。')).toBe(false);
+  });
+
   it('surfaces knowledge health issues as first-class dashboard knowledge updates', () => {
     const summary = buildDashboardWorkSystemSummary({
       sessions: [],

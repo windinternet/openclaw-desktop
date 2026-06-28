@@ -85,6 +85,12 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('terminal ActionRuns with `resultSummary` updated during the current UTC week');
     expect(skillContent).toContain('/workbench?view=actions');
     expect(skillContent).toContain('does not duplicate the ActionRun summary as another output');
+    expect(skillContent).toContain(
+      'explicit output clues from `reviews/` documents updated during the current UTC week',
+    );
+    expect(skillContent).toContain('/workbench?view=reviews');
+    expect(skillContent).toContain('Review output clues are read only from explicit `成果`, `产物`, `输出`');
+    expect(skillContent).toContain('does not infer value outputs from arbitrary review prose');
     expect(skillContent).toContain('Knowledge health issues');
     expect(skillContent).toContain('orphan sources, stale index entries, broken knowledge links');
     expect(skillContent).toContain('undigested sources queue');

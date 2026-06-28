@@ -46,7 +46,10 @@ export interface BuildDashboardWorkSystemSummaryParams {
   actionRuns: AiActionRun[];
   artifacts: ArtifactMeta[];
   workbench?:
-    | (Pick<WorkbenchSnapshot, 'activeWork' | 'activePlans' | 'planMetadata' | 'reviews' | 'tailActions'> & {
+    | (Pick<
+        WorkbenchSnapshot,
+        'activeWork' | 'activePlans' | 'planMetadata' | 'reviews' | 'reviewDocuments' | 'tailActions'
+      > & {
         outputsMarkdown?: string;
       })
     | null;
@@ -179,6 +182,21 @@ export function buildDashboardWorkSystemSummary(
         detail: output.summary ?? output.format ?? output.path,
       },
     }));
+  const knownOutputPaths = new Set([...artifactOutputPaths, ...repositoryOutputItems.map(({ output }) => output.path)]);
+  const reviewOutputItems = parseReviewOutputClues(params.workbench?.reviewDocuments ?? [])
+    .filter((output) => !knownOutputPaths.has(output.path))
+    .map((output) => ({
+      output,
+      item: {
+        id: `review-output:${output.sourcePath}:${output.index}`,
+        kind: 'output' as const,
+        title: output.title,
+        target: '/workbench?view=reviews',
+        updatedAt: output.updatedAt,
+        path: output.path,
+        detail: ['复盘成果', output.sourceTitle, output.summary].filter(Boolean).join(' · '),
+      },
+    }));
   const knownOutputArtifactIds = new Set([
     ...artifactIds,
     ...repositoryOutputItems.map(({ output }) => output.artifactId).filter((id): id is string => Boolean(id)),
@@ -202,6 +220,7 @@ export function buildDashboardWorkSystemSummary(
   const recentOutputItems = [
     ...artifactOutputItems.map(({ item }) => item),
     ...repositoryOutputItems.map(({ item }) => item),
+    ...reviewOutputItems.map(({ item }) => item),
     ...actionRunOutputItems.map(({ item }) => item),
   ];
   const weeklyOutputItems = [
@@ -209,6 +228,7 @@ export function buildDashboardWorkSystemSummary(
     ...repositoryOutputItems
       .filter(({ output }) => (output.createdAt ?? output.updatedAt ?? 0) >= weekStart)
       .map(({ item }) => item),
+    ...reviewOutputItems.filter(({ output }) => output.updatedAt >= weekStart).map(({ item }) => item),
     ...actionRunOutputItems.filter(({ run }) => run.updatedAt >= weekStart).map(({ item }) => item),
   ];
   const knowledgeHealthItems = (params.knowledge?.health?.issues ?? []).map((issue) => ({
@@ -263,6 +283,16 @@ interface RepositoryOutputIndexItem {
   summary?: string;
 }
 
+interface ReviewOutputClue {
+  index: number;
+  title: string;
+  path: string;
+  sourcePath: string;
+  sourceTitle: string;
+  updatedAt: number;
+  summary?: string;
+}
+
 function parseRepositoryOutputIndex(markdown: string): RepositoryOutputIndexItem[] {
   const items: RepositoryOutputIndexItem[] = [];
   let current: (RepositoryOutputIndexItem & { metadata: Record<string, string> }) | null = null;
@@ -310,6 +340,85 @@ function parseTimestamp(value?: string): number | undefined {
   if (!value) return undefined;
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? undefined : parsed;
+}
+
+function parseReviewOutputClues(
+  documents: NonNullable<BuildDashboardWorkSystemSummaryParams['workbench']>['reviewDocuments'],
+): ReviewOutputClue[] {
+  const outputs: ReviewOutputClue[] = [];
+  for (const document of documents ?? []) {
+    let inOutputSection = false;
+    for (const rawLine of document.content.split('\n')) {
+      const line = rawLine.trim();
+      if (/^#{1,6}\s+/.test(line)) {
+        inOutputSection = isReviewOutputHeading(line);
+        continue;
+      }
+      if (!inOutputSection) continue;
+
+      const bullet = parseReviewOutputBullet(document.path, line);
+      if (!bullet) continue;
+      outputs.push({
+        index: outputs.filter((item) => item.sourcePath === document.path).length,
+        sourcePath: document.path,
+        sourceTitle: document.title || markdownTitle(document.file),
+        updatedAt: document.file.updatedAt,
+        ...bullet,
+      });
+    }
+  }
+  return outputs;
+}
+
+function isReviewOutputHeading(line: string): boolean {
+  return /^#{1,6}\s+/.test(line) && /(成果|产物|输出|交付|deliverable|artifact|output)/i.test(line);
+}
+
+function parseReviewOutputBullet(
+  reviewPath: string,
+  line: string,
+): Pick<ReviewOutputClue, 'title' | 'path' | 'summary'> | null {
+  const bulletMatch = /^-\s+(?:\[[ xX]\]\s+)?(.+)$/.exec(line);
+  if (!bulletMatch) return null;
+  const text = bulletMatch[1]?.trim();
+  if (!text || text.startsWith('暂无')) return null;
+
+  const linkMatch = /\[([^\]]+)]\(([^)]+)\)/.exec(text);
+  if (linkMatch) {
+    const summary = text
+      .slice((linkMatch.index ?? 0) + linkMatch[0].length)
+      .replace(/^[\s:：\-—]+/, '')
+      .trim();
+    return {
+      title: linkMatch[1].trim(),
+      path: resolveReviewOutputPath(reviewPath, linkMatch[2].trim()),
+      summary: summary || undefined,
+    };
+  }
+
+  const [title, ...summaryParts] = text.split(/[：:]/);
+  const normalizedTitle = title.trim();
+  if (!normalizedTitle) return null;
+  return {
+    title: normalizedTitle,
+    path: reviewPath,
+    summary: summaryParts.join('：').trim() || undefined,
+  };
+}
+
+function resolveReviewOutputPath(reviewPath: string, href: string): string {
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(href)) return href;
+  if (href.startsWith('#')) return `${reviewPath}${href}`;
+  if (href.startsWith('/')) return href.replace(/^\/+/, '');
+
+  const parts = [...reviewPath.split('/').slice(0, -1), ...href.split('/')];
+  const resolved: string[] = [];
+  for (const part of parts) {
+    if (!part || part === '.') continue;
+    if (part === '..') resolved.pop();
+    else resolved.push(part);
+  }
+  return resolved.join('/');
 }
 
 function startOfUtcWeek(timestamp: number): number {
