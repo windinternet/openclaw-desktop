@@ -181,6 +181,8 @@ describe('product goal P0 traceability', () => {
     expect(plans).toContain('`asset-run:review-pending` 待确认');
     expect(plans).toContain('`desktop.repository.assets.execution.review.write`');
     expect(plans).toContain('资产运行复盘');
+    expect(plans).toContain('status: confirmed');
+    expect(plans).toContain('Dashboard 会用 confirmed 复盘文档过滤同一资产运行的待确认提醒');
     expect(plans).toContain('PDF / Word / Excel / PowerPoint best-effort 文本抽取导入');
     expect(plans).toContain('计划执行成果候选提取');
     expect(plans).toContain('shouldOfferPlanExecutionOutputPreservation');
@@ -255,6 +257,7 @@ describe('product goal P0 traceability', () => {
     expect(roadmap).toContain('`asset-run:review-pending` 待确认');
     expect(roadmap).toContain('`desktop.repository.assets.execution.review.write`');
     expect(roadmap).toContain('资产运行复盘卡片');
+    expect(roadmap).toContain('Dashboard 也会用 confirmed 复盘文档过滤同一 `assetRunPath`');
     expect(roadmap).toContain('PDF / Word / Excel / PowerPoint best-effort 文本抽取导入');
     expect(roadmap).toContain('计划执行成果候选提取');
     expect(roadmap).toContain('shouldOfferPlanExecutionOutputPreservation');
@@ -378,6 +381,7 @@ describe('product goal P0 traceability', () => {
     expect(skillContent).toContain('asset-run:review-pending');
     expect(skillContent).toContain('Asset Run Review card');
     expect(skillContent).toContain('desktop.repository.assets.execution.review.write');
+    expect(skillContent).toContain('Dashboard stops showing the same asset run as `asset-run:review-pending`');
     expect(skillContent).toContain('post-run review clues');
     expect(skillContent).toContain('desktop.artifacts.execution.review.write');
   });

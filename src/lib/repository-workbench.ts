@@ -98,6 +98,12 @@ export interface WorkbenchReviewConfirmInput {
   reviewedAt?: Date;
 }
 
+export interface WorkbenchAssetRunReviewConfirmInput {
+  reviewPath: string;
+  assetRunPath: string;
+  reviewedAt?: Date;
+}
+
 export interface WorkbenchMatterStatusUpdateInput {
   workItemPath: string;
   tailActionId: string;
@@ -649,6 +655,31 @@ export async function confirmWorkbenchReviewDraft(
 
   await repository.writeText(binding.repoPath, reviewPath, nextReview);
   await repository.writeText(binding.repoPath, workItemPath, nextWork);
+  return true;
+}
+
+export async function confirmWorkbenchAssetRunReviewDraft(
+  binding: RepositoryBinding,
+  input: WorkbenchAssetRunReviewConfirmInput,
+): Promise<boolean> {
+  const reviewPath = normalizeWritableWorkbenchMarkdownPath(input.reviewPath);
+  const assetRunPath = normalizeWritableWorkbenchMarkdownPath(input.assetRunPath);
+  if (!reviewPath || !reviewPath.startsWith('reviews/') || !assetRunPath || !assetRunPath.startsWith('runs/assets/')) {
+    return false;
+  }
+
+  const repository = getWorkbenchWriteApi();
+  const reviewMarkdown = await repository.readText(binding.repoPath, reviewPath);
+  if (!/^status:\s*draft\s*$/m.test(reviewMarkdown)) return false;
+  if (readWorkbenchFrontmatterValue(reviewMarkdown, 'source') !== 'desktop-repository-asset-execution-review') {
+    return false;
+  }
+  if (readWorkbenchFrontmatterValue(reviewMarkdown, 'assetRunPath') !== assetRunPath) return false;
+
+  const nextReview = markWorkbenchReviewDraftConfirmed(reviewMarkdown, input.reviewedAt ?? new Date());
+  if (!nextReview || nextReview === reviewMarkdown) return false;
+
+  await repository.writeText(binding.repoPath, reviewPath, nextReview);
   return true;
 }
 

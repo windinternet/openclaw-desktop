@@ -241,6 +241,8 @@
     "assetRunReviewDesc": "Create a review draft from this repository asset run, then check outputs, reuse decisions, and follow-up actions.",
     "assetRunReviewSource": "Source asset run",
     "assetRunReviewMissingSource": "Asset run record is missing, so a review draft cannot be created",
+    "confirmAssetRunReviewDraft": "Confirm Asset Run Review",
+    "assetRunReviewDraftConfirmed": "Asset run review confirmed",
     "openAssetRunRecord": "Open Run Record",
     "viewMarkdown": "View Markdown"
   },

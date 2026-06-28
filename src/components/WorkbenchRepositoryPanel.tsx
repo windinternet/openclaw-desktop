@@ -17,6 +17,7 @@ import type { RepositoryMarkdownFile } from '../lib/repository-knowledge';
 import type { WorkbenchSnapshot } from '../lib/repository-workbench';
 import {
   archiveCompletedWorkbenchMatter,
+  confirmWorkbenchAssetRunReviewDraft,
   confirmWorkbenchReviewDraft,
   loadWorkbenchSnapshot,
   readWorkbenchMarkdown,
@@ -350,6 +351,32 @@ export default function WorkbenchRepositoryPanel({
       Toast.error(err instanceof Error ? err.message : t('workbench.reviewDraftCreateFailed'));
     } finally {
       setReviewDraftWriting(false);
+    }
+  };
+
+  const handleConfirmAssetRunReviewDraft = async () => {
+    if (!assetRunPath || !selectedPreviewPath) {
+      Toast.warning(t('workbench.reviewDraftConfirmUnavailable'));
+      return;
+    }
+
+    setReviewDraftConfirming(true);
+    try {
+      const confirmed = await confirmWorkbenchAssetRunReviewDraft(binding, {
+        reviewPath: selectedPreviewPath,
+        assetRunPath,
+      });
+      if (!confirmed) {
+        Toast.warning(t('workbench.reviewDraftConfirmUnavailable'));
+        return;
+      }
+      setSelectedPreviewContent(await readWorkbenchMarkdown(binding, selectedPreviewPath));
+      setSnapshot(await loadWorkbenchSnapshot(binding));
+      Toast.success(t('workbench.assetRunReviewDraftConfirmed'));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('workbench.reviewDraftConfirmFailed'));
+    } finally {
+      setReviewDraftConfirming(false);
     }
   };
 
@@ -1454,6 +1481,13 @@ export default function WorkbenchRepositoryPanel({
 
   const renderAssetRunReviewCard = () => {
     if (!assetRunPath) return null;
+    const canConfirmAssetRunReviewDraft =
+      selectedPreviewPath.startsWith('reviews/') &&
+      /^status:\s*draft\s*$/m.test(selectedPreviewContent) &&
+      /^source:\s*desktop-repository-asset-execution-review\s*$/m.test(selectedPreviewContent) &&
+      new RegExp(`^assetRunPath:\\s*${assetRunPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'm').test(
+        selectedPreviewContent,
+      );
     return (
       <div
         style={{
@@ -1491,6 +1525,16 @@ export default function WorkbenchRepositoryPanel({
             <Button size="small" type="tertiary" onClick={() => openRepositoryFile('reviews/weekly/')}>
               {t('workbench.openReviewFolder')}
             </Button>
+            {canConfirmAssetRunReviewDraft ? (
+              <Button
+                size="small"
+                type="secondary"
+                loading={reviewDraftConfirming}
+                onClick={() => void handleConfirmAssetRunReviewDraft()}
+              >
+                {t('workbench.confirmAssetRunReviewDraft')}
+              </Button>
+            ) : null}
           </Space>
         </Space>
       </div>

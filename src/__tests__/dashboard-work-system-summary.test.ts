@@ -382,6 +382,57 @@ describe('dashboard work system summary', () => {
     ]);
   });
 
+  it('does not keep a repository asset run review pending after a confirmed review document exists', () => {
+    const runPath = 'runs/assets/20260629-010203-tools-release-check-sh.md';
+    const now = Date.parse('2026-06-29T12:00:00.000Z');
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [],
+      workbench: {
+        activeWork: [],
+        activePlans: [],
+        planMetadata: [],
+        tailActions: [],
+        reviews: [],
+        reviewDocuments: [
+          {
+            path: 'reviews/weekly/2026-06-29-asset-run-tools-release-check-sh-review.md',
+            title: '资产运行复盘',
+            file: createMarkdownFile(
+              'reviews/weekly/2026-06-29-asset-run-tools-release-check-sh-review.md',
+              '资产运行复盘',
+              now,
+            ),
+            content: [
+              '---',
+              'source: desktop-repository-asset-execution-review',
+              `assetRunPath: ${runPath}`,
+              'status: confirmed',
+              'reviewedAt: 2026-06-29T09:00:00.000Z',
+              '---',
+              '',
+              '# 仓库资产执行复盘：发布检查脚本',
+            ].join('\n'),
+          },
+        ],
+        runsMarkdown: [
+          '# Asset Runs',
+          '',
+          '- [发布检查脚本](assets/20260629-010203-tools-release-check-sh.md) (`tools-release-check-sh`, script, succeeded)',
+          '  - runPath: runs/assets/20260629-010203-tools-release-check-sh.md',
+          '  - executedAt: 2026-06-29T01:02:03.000Z',
+          '  - result: 发布检查通过',
+          '  - review: pending, write reviews/weekly/ entry',
+        ].join('\n'),
+      },
+      now,
+      limit: 8,
+    });
+
+    expect(summary.pendingConfirmations.map((item) => item.id)).not.toContain(`asset-run-review:${runPath}`);
+  });
+
   it('surfaces terminal ActionRun summaries as output clues without duplicating known artifacts', () => {
     const now = Date.parse('2026-06-28T12:00:00.000Z');
     const summary = buildDashboardWorkSystemSummary({

@@ -44,8 +44,10 @@ describe('dashboard tail action routing', () => {
     expect(workbenchPanel).toContain('action-run-review:');
     expect(workbenchPanel).toContain("t('workbench.reviewTailActionRunSource')");
     expect(workbenchPanel).toContain('writeWorkbenchAssetRunReviewDraft');
+    expect(workbenchPanel).toContain('confirmWorkbenchAssetRunReviewDraft');
     expect(workbenchPanel).toContain("t('workbench.assetRunReviewTitle')");
     expect(workbenchPanel).toContain('desktop.repository.assets.execution.review.write');
+    expect(workbenchPanel).toContain("t('workbench.confirmAssetRunReviewDraft')");
 
     expect(artifacts).toContain('parseDashboardTailActionRoute(location.search)');
     expect(artifacts).toContain("tailActionContext?.kind === 'output'");

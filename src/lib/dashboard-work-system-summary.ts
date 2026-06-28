@@ -282,6 +282,7 @@ export function buildDashboardWorkSystemSummary(
       },
     }));
   const repositoryAssetRunItems = parseRepositoryAssetRunIndex(params.workbench?.runsMarkdown ?? '');
+  const confirmedAssetRunReviewPaths = collectConfirmedAssetRunReviewPaths(params.workbench?.reviewDocuments ?? []);
   const repositoryAssetRunOutputItems = repositoryAssetRunItems
     .filter((run) => run.result || run.outputPath || run.outputArtifactId)
     .filter((run) => !run.outputPath || !knownOutputPaths.has(run.outputPath))
@@ -303,6 +304,7 @@ export function buildDashboardWorkSystemSummary(
     }));
   const pendingAssetRunReviewItems = repositoryAssetRunItems
     .filter((run) => run.reviewPending)
+    .filter((run) => !confirmedAssetRunReviewPaths.has(run.runPath))
     .map((run) => ({
       id: `asset-run-review:${run.runPath}`,
       kind: 'output' as const,
@@ -651,6 +653,38 @@ function parseReviewOutputClues(
     }
   }
   return outputs;
+}
+
+function collectConfirmedAssetRunReviewPaths(
+  documents: NonNullable<BuildDashboardWorkSystemSummaryParams['workbench']>['reviewDocuments'],
+): Set<string> {
+  const paths = new Set<string>();
+  for (const document of documents ?? []) {
+    if (readReviewFrontmatterValue(document.content, 'source') !== 'desktop-repository-asset-execution-review') {
+      continue;
+    }
+    if (readReviewFrontmatterValue(document.content, 'status') !== 'confirmed') continue;
+    const assetRunPath = readReviewFrontmatterValue(document.content, 'assetRunPath');
+    if (assetRunPath?.startsWith('runs/assets/') && assetRunPath.endsWith('.md')) {
+      paths.add(assetRunPath);
+    }
+  }
+  return paths;
+}
+
+function readReviewFrontmatterValue(markdown: string, key: string): string | undefined {
+  if (!/^---\n/.test(markdown)) return undefined;
+  const lines = markdown.split(/\r?\n/);
+  const endIndex = lines.findIndex((line, index) => index > 0 && line.trim() === '---');
+  if (endIndex === -1) return undefined;
+
+  const prefix = `${key}:`;
+  const line = lines.slice(1, endIndex).find((item) => item.startsWith(prefix));
+  if (!line) return undefined;
+  return line
+    .slice(prefix.length)
+    .trim()
+    .replace(/^["'](.+)["']$/, '$1');
 }
 
 function isReviewOutputHeading(line: string): boolean {

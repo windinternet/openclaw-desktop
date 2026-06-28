@@ -4,6 +4,7 @@ import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
 import {
   applyWorkbenchMatterPlanApproval,
   archiveCompletedWorkbenchMatter,
+  confirmWorkbenchAssetRunReviewDraft,
   confirmWorkbenchKnowledgeTailAction,
   confirmWorkbenchReviewDraft,
   completeWorkbenchTailAction,
@@ -784,6 +785,60 @@ describe('repository workbench', () => {
         `- [2026-06-29 资产运行复盘草稿](../../${reviewPath}) - 来源资产运行: \`${runPath}\``,
       ].join('\n'),
     );
+  });
+
+  it('confirms a repository asset execution review draft without completing a source tail action', async () => {
+    const runPath = 'runs/assets/20260629-010203-tools-release-check-sh.md';
+    const reviewPath = 'reviews/weekly/2026-06-29-asset-run-tools-release-check-sh-review.md';
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === reviewPath) {
+        return [
+          '---',
+          'source: desktop-repository-asset-execution-review',
+          `assetRunPath: ${runPath}`,
+          'assetId: tools-release-check-sh',
+          'assetReuseKind: script',
+          'executionStatus: succeeded',
+          'workItemPath: work/active/release.md',
+          'createdAt: 2026-06-29T08:00:00.000Z',
+          'status: draft',
+          'recordOnly: true',
+          'desktopExecutes: false',
+          'grantsPermission: false',
+          '---',
+          '',
+          '# 仓库资产执行复盘：发布检查脚本',
+          '',
+          '## 复盘正文',
+          '',
+          '- 本次推进：发布检查通过。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const confirmed = await confirmWorkbenchAssetRunReviewDraft(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        reviewPath,
+        assetRunPath: runPath,
+        reviewedAt: new Date('2026-06-29T09:00:00.000Z'),
+      },
+    );
+
+    expect(confirmed).toBe(true);
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(writeText).toHaveBeenCalledWith('/repo', reviewPath, expect.stringContaining('status: confirmed'));
+    const reviewWrite = (writeText.mock.calls[0] as unknown as [string, string, string])[2];
+    expect(reviewWrite).toContain('reviewedAt: 2026-06-29T09:00:00.000Z');
+    expect(reviewWrite).toContain(`assetRunPath: ${runPath}`);
+    expect(reviewWrite).not.toContain('status: draft');
   });
 
   it('confirms a review draft and completes the matching source tail action', async () => {

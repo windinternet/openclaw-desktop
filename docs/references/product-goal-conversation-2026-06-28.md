@@ -1660,7 +1660,9 @@ HTML 的独特优势：
 - 用户可从卡片创建 `reviews/weekly/YYYY-MM-DD-asset-run-*-review.md` 草稿；草稿 frontmatter 记录 `source: desktop-repository-asset-execution-review`、`assetRunPath`、资产 id、复用分类、执行状态、输出线索、可选事项和只记录/不执行/不授权边界。
 - 如果运行记录或入口携带当前仓库 `work/` 下安全的 `workItemPath`，Desktop 会把草稿链接写回来源事项 `## 复盘`。
 - Desktop node 新增 `desktop.repository.assets.execution.review.write`，Gateway 可传入 `repoPath`、`assetRunPath`，以及可选 `reviewSummary`、`reuseDecision`、`nextActions`、`workItemPath`、`reviewer` 和 `reviewedAt`，在聊天中完成同类复盘草稿写入。
-- 该能力以当前代码事实为准：只观察、路由和写入复盘草稿，不执行资产、不授予权限、不自动更新事项状态、不自动沉淀成果、不更新知识库、不勾选事项尾动作。
+- 用户可显式确认资产运行复盘草稿；Desktop 会把草稿从 `status: draft` 改为 `status: confirmed`，写入 `reviewedAt`，但不会勾选事项尾动作。
+- Dashboard 读取 `reviews/weekly/` 中 `source: desktop-repository-asset-execution-review` 且 `status: confirmed` 的文档；如果其 `assetRunPath` 指向同一条资产运行，就不再显示对应 `asset-run:review-pending`。
+- 该能力以当前代码事实为准：只观察、路由和写入/确认复盘记录，不执行资产、不授予权限、不自动更新事项状态、不自动沉淀成果、不更新知识库、不勾选事项尾动作。
 
 仍未完成的 P0 后续：
 
