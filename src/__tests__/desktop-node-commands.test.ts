@@ -2223,6 +2223,7 @@ describe('desktop node commands', () => {
     mockedRecordRepositoryAssetExecution.mockResolvedValue({
       indexPath: 'outputs/assets/index.md',
       runPath: 'runs/assets/20260629-010203-tools-release-check-sh.md',
+      runIndexPath: 'runs/assets/index.md',
       assetId: 'tools-release-check-sh',
       assetPath: 'tools/release-check.sh',
       title: '发布检查脚本',
@@ -2253,6 +2254,7 @@ describe('desktop node commands', () => {
       execution: {
         indexPath: 'outputs/assets/index.md',
         runPath: 'runs/assets/20260629-010203-tools-release-check-sh.md',
+        runIndexPath: 'runs/assets/index.md',
         assetId: 'tools-release-check-sh',
         assetPath: 'tools/release-check.sh',
         title: '发布检查脚本',

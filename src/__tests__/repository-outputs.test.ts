@@ -673,6 +673,7 @@ describe('repository outputs', () => {
           '',
         ].join('\n');
       }
+      if (relativePath === 'runs/assets/index.md') return '# Asset Runs\n';
       return '';
     });
     vi.stubGlobal('window', {
@@ -779,6 +780,7 @@ describe('repository outputs', () => {
     expect(result).toEqual({
       indexPath: 'outputs/assets/index.md',
       runPath: 'runs/assets/20260629-010203-tools-release-check-sh.md',
+      runIndexPath: 'runs/assets/index.md',
       assetId: 'tools-release-check-sh',
       assetPath: 'tools/release-check.sh',
       title: '发布检查脚本',
@@ -810,6 +812,21 @@ describe('repository outputs', () => {
     expect(indexWrite).toContain('  - review: pending, write reviews/weekly/ entry');
     expect(indexWrite).toContain('  - reviewResult: 发布检查通过');
     expect(indexWrite).toContain('  - boundary: recordOnly, desktopExecutes=false, grantsPermission=false');
+
+    const runIndexWrite = writeText.mock.calls.find((call) => call[1] === 'runs/assets/index.md')?.[2] as string;
+    expect(runIndexWrite).toContain(
+      '- [发布检查脚本](20260629-010203-tools-release-check-sh.md) (`tools-release-check-sh`, script, succeeded)',
+    );
+    expect(runIndexWrite).toContain('  - assetPath: tools/release-check.sh');
+    expect(runIndexWrite).toContain('  - runPath: runs/assets/20260629-010203-tools-release-check-sh.md');
+    expect(runIndexWrite).toContain('  - executedAt: 2026-06-29T01:02:03.000Z');
+    expect(runIndexWrite).toContain('  - runner: Gateway Agent');
+    expect(runIndexWrite).toContain('  - command: bash tools/release-check.sh');
+    expect(runIndexWrite).toContain('  - result: 发布检查通过');
+    expect(runIndexWrite).toContain('  - output: outputs/reports/release-check.md');
+    expect(runIndexWrite).toContain('  - workItem: work/active/release.md');
+    expect(runIndexWrite).toContain('  - review: pending, write reviews/weekly/ entry');
+    expect(runIndexWrite).toContain('  - boundary: recordOnly, desktopExecutes=false, grantsPermission=false');
   });
 
   it('writes file artifacts into the repository files output bucket', async () => {

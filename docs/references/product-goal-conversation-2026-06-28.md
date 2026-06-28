@@ -1577,6 +1577,20 @@ HTML 的独特优势：
 
 - 仍需要更完整的 Repository 资产目录协议、资产权限面板、资产运行记录 UI、运行后成果/知识/复盘联动，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
 
+### 10.77 2026-06-29 当前实施记录：Repository 资产搜索入口
+
+围绕“仓库中已有资产不仅要能登记，还要能被 Gateway 和 Agent 结构化找到”的 P0 缺口，当前继续补齐资产目录查询入口：
+
+- 新增 `searchRepositoryAssetIndex`，读取当前绑定仓库的 `outputs/assets/index.md`，解析 Artifact 镜像资产和仓库本地资产条目。
+- 新增 Desktop node command `desktop.repository.assets.search`，Gateway 可传入 `repoPath`、可选 `query`、可选 `reuseKind` 和可选 `limit`。
+- 查询结果返回结构化资产线索：标题、链接、资产 id、复用分类、来源、仓库路径、Artifact URI、Repository output、版本、摘要、价值健康、执行/复盘线索、标签和硬边界。
+- 搜索文本包含普通中文复用分类别名，例如“可复用的脚本 / 可复用的模板 / 可复用的工具 / 可复用的工作流”，使仓库本地资产不必先变成 Artifact 也能被找到。
+- 该能力以当前代码事实为准：只读取资产索引，不打开文件、不执行资产、不写复盘、不授予权限、不自动生成运行记录、不更新事项状态、不写知识库。
+
+仍未完成的 P0 后续：
+
+- 仍需要更完整的 Repository 资产目录协议、资产权限面板、资产运行记录 UI、运行后成果/知识/复盘联动，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
+
 ### 10.78 2026-06-29 当前实施记录：Repository 资产执行记录入口
 
 围绕“可复用资产一等对象需要运行记录、产出关联和复盘线索”的 P0 缺口，当前继续补齐仓库本地资产的执行事实归档：
@@ -1592,16 +1606,16 @@ HTML 的独特优势：
 
 - 仍需要资产权限面板、资产运行记录 UI、运行后成果/知识/复盘联动，以及把仓库本地资产执行记录纳入更自然的“开始一件事”闭环。
 
-### 10.77 2026-06-29 当前实施记录：Repository 资产搜索入口
+### 10.79 2026-06-29 当前实施记录：Repository 资产运行索引入口
 
-围绕“仓库中已有资产不仅要能登记，还要能被 Gateway 和 Agent 结构化找到”的 P0 缺口，当前继续补齐资产目录查询入口：
+围绕“运行记录必须可追踪、可检索、可被后续 UI/Gateway 读取”的 P0 缺口，当前继续把仓库本地资产执行记录从散落文件推进为索引化事实：
 
-- 新增 `searchRepositoryAssetIndex`，读取当前绑定仓库的 `outputs/assets/index.md`，解析 Artifact 镜像资产和仓库本地资产条目。
-- 新增 Desktop node command `desktop.repository.assets.search`，Gateway 可传入 `repoPath`、可选 `query`、可选 `reuseKind` 和可选 `limit`。
-- 查询结果返回结构化资产线索：标题、链接、资产 id、复用分类、来源、仓库路径、Artifact URI、Repository output、版本、摘要、价值健康、执行/复盘线索、标签和硬边界。
-- 搜索文本包含普通中文复用分类别名，例如“可复用的脚本 / 可复用的模板 / 可复用的工具 / 可复用的工作流”，使仓库本地资产不必先变成 Artifact 也能被找到。
-- 该能力以当前代码事实为准：只读取资产索引，不打开文件、不执行资产、不写复盘、不授予权限、不自动生成运行记录、不更新事项状态、不写知识库。
+- `recordRepositoryAssetExecution` 现在除了写入 `runs/assets/YYYYMMDD-HHmmss-<assetId>.md` 单条执行记录，也会维护 `runs/assets/index.md`。
+- `desktop.repository.assets.execution.record` 的返回值新增 `runIndexPath: runs/assets/index.md`，让 Gateway 明确知道运行索引入口。
+- `runs/assets/index.md` 条目会记录资产标题、资产 id、复用分类、执行状态、资产路径、runPath、执行时间、runner、命令、结果摘要、输出 Artifact、Repository output、关联事项、复盘线索和只记录/不执行/不授权边界。
+- 已存在同一 `runPath` 的索引条目会被替换，不会重复追加。
+- 该能力以当前代码事实为准：这只是仓库运行记录索引，不执行资产、不授予权限、不自动写复盘、不更新事项、不沉淀成果、不更新知识库。
 
 仍未完成的 P0 后续：
 
-- 仍需要更完整的 Repository 资产目录协议、资产权限面板、资产运行记录 UI、运行后成果/知识/复盘联动，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
+- 仍需要资产权限面板、资产运行记录 UI、运行后成果/知识/复盘联动，以及把 `runs/assets/index.md` 纳入 Dashboard/Workbench 的更自然观测入口。

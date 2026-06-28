@@ -99,6 +99,7 @@ export interface RecordRepositoryAssetExecutionParams {
 export interface RepositoryAssetExecutionRecordResult {
   indexPath: string;
   runPath: string;
+  runIndexPath: string;
   assetId: string;
   assetPath: string;
   title: string;
@@ -409,13 +410,31 @@ export async function recordRepositoryAssetExecution(
 
   const executedAt = normalizeRepositoryAssetExecutionDate(params.executedAt);
   const runPath = buildRepositoryAssetExecutionRunPath(params.binding, asset.id, executedAt);
+  const runIndexPath = getRepositoryAssetRunIndexPath(params.binding);
   const reviewSuggested = TERMINAL_ASSET_EXECUTION_STATUSES.has(params.status);
   const assetExecutionPath = asset.path ?? asset.output ?? asset.link;
+  const existingRunIndex = await readRepositoryTextOrEmpty(repository, params.binding.repoPath, runIndexPath);
 
   await repository.writeText(
     params.binding.repoPath,
     runPath,
     buildRepositoryAssetExecutionMarkdown({ asset, params, runPath, executedAt, reviewSuggested }),
+  );
+  await repository.writeText(
+    params.binding.repoPath,
+    runIndexPath,
+    upsertRepositoryAssetExecutionIndexEntry(
+      existingRunIndex,
+      runPath,
+      buildRepositoryAssetExecutionIndexEntry({
+        asset,
+        params,
+        runPath,
+        runIndexPath,
+        executedAt,
+        reviewSuggested,
+      }),
+    ),
   );
   await repository.writeText(
     params.binding.repoPath,
@@ -431,6 +450,7 @@ export async function recordRepositoryAssetExecution(
   return {
     indexPath,
     runPath,
+    runIndexPath,
     assetId: asset.id,
     assetPath: assetExecutionPath,
     title: asset.title,
@@ -737,6 +757,51 @@ function updateRepositoryAssetIndexExecution(
   return [...lines.slice(0, start + 1), ...nextMetadataLines, ...lines.slice(end)].join('\n').trimEnd() + '\n';
 }
 
+function buildRepositoryAssetExecutionIndexEntry(params: {
+  asset: RepositoryAssetSearchResult;
+  params: RecordRepositoryAssetExecutionParams;
+  runPath: string;
+  runIndexPath: string;
+  executedAt: Date;
+  reviewSuggested: boolean;
+}): string {
+  const assetPath = params.asset.path ?? params.asset.output ?? params.asset.link;
+  const lines = [
+    `- [${params.asset.title}](${buildRepositoryAssetIndexLink(params.runPath, params.runIndexPath)}) (` +
+      `\`${params.asset.id}\`, ${params.asset.reuseKind}, ${params.params.status})`,
+    `  - assetPath: ${assetPath}`,
+    `  - runPath: ${params.runPath}`,
+    `  - executedAt: ${params.executedAt.toISOString()}`,
+    params.params.runner ? `  - runner: ${formatInlineText(params.params.runner)}` : undefined,
+    params.params.command ? `  - command: ${formatInlineText(params.params.command)}` : undefined,
+    params.params.resultSummary ? `  - result: ${formatInlineText(params.params.resultSummary)}` : undefined,
+    params.params.outputArtifactId ? `  - outputArtifact: artifact://${params.params.outputArtifactId}` : undefined,
+    params.params.repositoryOutputPath ? `  - output: ${params.params.repositoryOutputPath}` : undefined,
+    params.params.workItemPath ? `  - workItem: ${params.params.workItemPath}` : undefined,
+    params.reviewSuggested ? '  - review: pending, write reviews/weekly/ entry' : undefined,
+    '  - boundary: recordOnly, desktopExecutes=false, grantsPermission=false',
+  ];
+  return lines.filter((line): line is string => typeof line === 'string').join('\n');
+}
+
+function upsertRepositoryAssetExecutionIndexEntry(existingIndex: string, runPath: string, indexEntry: string): string {
+  const base = ensureIndexTitle(existingIndex, '# Asset Runs').trimEnd();
+  if (!base.includes(runPath)) return `${base}\n${indexEntry}\n`;
+
+  const lines = base.split('\n');
+  const start = lines.findIndex((line) => line.includes(runPath));
+  if (start === -1) return `${base}\n${indexEntry}\n`;
+
+  let entryStart = start;
+  while (entryStart > 0 && lines[entryStart].startsWith('  - ')) entryStart -= 1;
+  let entryEnd = entryStart + 1;
+  while (entryEnd < lines.length && lines[entryEnd].startsWith('  - ')) entryEnd += 1;
+
+  return (
+    [...lines.slice(0, entryStart), ...indexEntry.split('\n'), ...lines.slice(entryEnd)].join('\n').trimEnd() + '\n'
+  );
+}
+
 function parseRepositoryAssetExecutionCount(value: string | undefined): number {
   if (!value) return 0;
   const match = /execution:\s*(\d+)\s+events/.exec(value);
@@ -767,6 +832,22 @@ function upsertOutputIndexEntry(existingIndex: string, outputPath: string, index
 
 function getRepositoryAssetIndexPath(binding: RepositoryBinding): string {
   return binding.paths.outputs ? `${binding.paths.outputs}/assets/index.md` : DEFAULT_REPOSITORY_ASSET_INDEX_PATH;
+}
+
+function getRepositoryAssetRunIndexPath(binding: RepositoryBinding): string {
+  return `${binding.paths.runs || 'runs'}/assets/index.md`;
+}
+
+async function readRepositoryTextOrEmpty(
+  repository: { readText: (repoPath: string, relativePath: string) => Promise<string> },
+  repoPath: string,
+  relativePath: string,
+): Promise<string> {
+  try {
+    return await repository.readText(repoPath, relativePath);
+  } catch {
+    return '';
+  }
 }
 
 function normalizeRepositoryAssetPath(value: string, assetIndexPath: string): string {

@@ -285,6 +285,7 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('desktop.repository.assets.search');
     expect(skillContent).toContain('desktop.repository.assets.execution.record');
     expect(skillContent).toContain('runs/assets/');
+    expect(skillContent).toContain('runs/assets/index.md');
     expect(skillContent).toContain('lastRun');
     expect(skillContent).toContain('Repository-relative `path`');
     expect(skillContent).toContain('post-run review clue when available');
