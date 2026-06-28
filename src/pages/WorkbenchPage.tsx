@@ -50,6 +50,14 @@ function getWorkbenchSearchWorkItemPath(search: string): string | null {
   return isWorkbenchMatterPath(workItemPath) ? workItemPath : null;
 }
 
+function getWorkbenchSearchPlanPath(search: string): string | null {
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  const planPath = params.get('planPath') ?? '';
+  if (!planPath.startsWith('plans/active/') || !planPath.endsWith('.md')) return null;
+  if (planPath.includes('..') || planPath.includes('//')) return null;
+  return planPath;
+}
+
 function getWorkbenchInitialTab(context: DashboardTailActionRouteContext | null, search: string): WorkbenchTabKey {
   const tailActionTab = getWorkbenchTailActionTab(context);
   if (isWorkbenchTabKey(tailActionTab)) return tailActionTab;
@@ -62,6 +70,7 @@ export default function WorkbenchPage() {
   const tailActionContext = useMemo(() => parseDashboardTailActionRoute(location.search), [location.search]);
   const assetRunPath = useMemo(() => getWorkbenchAssetRunPath(location.search), [location.search]);
   const searchWorkItemPath = useMemo(() => getWorkbenchSearchWorkItemPath(location.search), [location.search]);
+  const searchPlanPath = useMemo(() => getWorkbenchSearchPlanPath(location.search), [location.search]);
   const searchTab = getWorkbenchSearchTab(location.search);
   const [activeTab, setActiveTab] = useState<WorkbenchTabKey>(() =>
     getWorkbenchInitialTab(tailActionContext, location.search),
@@ -151,6 +160,7 @@ export default function WorkbenchPage() {
           tailActionContext={tailActionContext}
           assetRunPath={assetRunPath}
           initialWorkItemPath={searchWorkItemPath}
+          initialPlanPath={searchPlanPath}
         />
       )}
     </RepositoryGate>

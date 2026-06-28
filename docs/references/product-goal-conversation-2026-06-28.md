@@ -1166,6 +1166,7 @@ HTML 的独特优势：
 - `applyWorkbenchMatterPlanApproval` 只允许写入当前绑定仓库 `plans/active/` 下的 Markdown，来源事项必须位于 `work/` 下，并且 `repositoryWrite.workItemPath` 必须与 ActionRun 来源事项一致。
 - 写入计划时，Desktop 会补充 `source: work_matter_plan`、`workItemPath`、`actionRunId`、`approval: approved`、`approvedAt` 等前置元数据。
 - 写入计划后，Desktop 会把计划相对链接追加到来源事项 `## 关联计划`，并移除该小节里的 `- 暂无` 占位。
+- Action Center 写入成功后会打开 `/workbench?view=plans&planPath=<plan>`；Workbench 只接受 `plans/active/*.md` 且不含越界片段的计划路径，并在 plans 视图自动打开一次该计划预览，让用户直接看到“执行计划”入口。
 - 该步骤只做审批后的计划落盘和互链；不会自动执行计划、写运行记录、沉淀成果、更新知识库、写复盘或移动事项文件。
 
 仍未完成的 P0 后续：

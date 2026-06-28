@@ -1504,6 +1504,11 @@ describe('repository workbench', () => {
     expect(source).toContain("sourcePage: 'workbench'");
     expect(actionCenterPage).toContain('applyWorkbenchMatterPlanApproval');
     expect(actionCenterPage).toContain('approval.repositoryWrite');
+    expect(actionCenterPage).toContain('encodeURIComponent(writeResult.planPath)');
+    expect(actionCenterPage).toContain('`/workbench?view=plans&planPath=${encodeURIComponent(writeResult.planPath)}`');
+    expect(source).toContain('initialPlanPath');
+    expect(source).toContain('openedInitialPlanPath');
+    expect(source).toContain('setSelectedPreviewPath(initialPlanPath)');
     expect(source).toContain('workItemId: selectedWorkItemId');
     expect(source).toContain('workItemPath: selectedWorkItemPath');
     expect(source).toContain("t('workbench.generatePlanForMatter')");

@@ -179,12 +179,14 @@ export default function WorkbenchRepositoryPanel({
   tailActionContext,
   assetRunPath,
   initialWorkItemPath,
+  initialPlanPath,
 }: {
   binding: RepositoryBinding;
   panelView?: WorkbenchPanelView;
   tailActionContext?: DashboardTailActionRouteContext | null;
   assetRunPath?: string | null;
   initialWorkItemPath?: string | null;
+  initialPlanPath?: string | null;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -200,6 +202,7 @@ export default function WorkbenchRepositoryPanel({
   const [selectedPreviewPath, setSelectedPreviewPath] = useState('');
   const [selectedPreviewContent, setSelectedPreviewContent] = useState('');
   const [openedInitialWorkItemPath, setOpenedInitialWorkItemPath] = useState('');
+  const [openedInitialPlanPath, setOpenedInitialPlanPath] = useState('');
   const [selectedProjectDocumentPath, setSelectedProjectDocumentPath] = useState('');
   const [outputSourceFilters, setOutputSourceFilters] = useState<string[]>([]);
   const [outputTypeFilters, setOutputTypeFilters] = useState<string[]>([]);
@@ -292,6 +295,23 @@ export default function WorkbenchRepositoryPanel({
       cancelled = true;
     };
   }, [binding, initialWorkItemPath, openedInitialWorkItemPath, panelView, selectedPreviewPath, snapshot]);
+
+  useEffect(() => {
+    if (panelView !== 'plans' || !initialPlanPath || !snapshot) return;
+    if (openedInitialPlanPath === initialPlanPath) return;
+    if (selectedPreviewPath === initialPlanPath) return;
+    if (!snapshot.activePlans.some((plan) => plan.path === initialPlanPath)) return;
+
+    let cancelled = false;
+    setSelectedPreviewPath(initialPlanPath);
+    setOpenedInitialPlanPath(initialPlanPath);
+    readWorkbenchMarkdown(binding, initialPlanPath).then((content) => {
+      if (!cancelled) setSelectedPreviewContent(content);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [binding, initialPlanPath, openedInitialPlanPath, panelView, selectedPreviewPath, snapshot]);
 
   const openPreview = async (file: RepositoryMarkdownFile) => {
     setSelectedPreviewPath(file.path);

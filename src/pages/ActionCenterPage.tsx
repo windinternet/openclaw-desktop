@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import {
   Button,
   Card,
@@ -100,6 +101,7 @@ interface EmbeddedPageProps {
 
 export default function ActionCenterPage({ embedded = false, onHeaderActionsChange }: EmbeddedPageProps = {}) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
 
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const activeClient = useStore((s) => s.activeClient);
@@ -234,6 +236,7 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
           };
           await upsertAiActionRun(currentInstanceId, updated);
           setRuns((current) => current.map((run) => (run.id === updated.id ? updated : run)));
+          navigate(`/workbench?view=plans&planPath=${encodeURIComponent(writeResult.planPath)}`);
         }
 
         if (decision === 'approved' && selectedRun.type === 'knowledge_rewrite' && approval.repositoryWrite) {
@@ -264,7 +267,7 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
         setDecisionLoadingId(null);
       }
     },
-    [activeClient, connectionStatus, currentInstanceId, selectedRun, t],
+    [activeClient, connectionStatus, currentInstanceId, navigate, selectedRun, t],
   );
 
   const handleResync = useCallback(

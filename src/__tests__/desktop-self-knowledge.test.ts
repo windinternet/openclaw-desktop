@@ -41,6 +41,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('repositoryWrite.path/content/workItemPath');
     expect(skillContent).toContain('applyWorkbenchMatterPlanApproval');
     expect(skillContent).toContain('link it back to the source matter `## 关联计划`');
+    expect(skillContent).toContain('/workbench?view=plans&planPath=<plan>');
+    expect(skillContent).toContain('only accepts `plans/active/*.md` plan paths');
+    expect(skillContent).toContain('explicitly choose Execute Plan');
     expect(skillContent).toContain('plan_execute');
     expect(skillContent).toContain('buildPlanExecutePrompt');
     expect(skillContent).toContain('Terminal `plan_execute` runs reuse the existing ActionRun repository summary');

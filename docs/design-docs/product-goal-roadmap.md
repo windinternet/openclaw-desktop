@@ -345,6 +345,7 @@ HTML 产物是特色能力：
 - 计划草案应包含验收标准、关联资料、关联成果、关键步骤、风险、待确认问题和建议写入的 `plans/active/<slug>.md` 路径。
 - 写入或更新 `plans/active/` 必须通过 `approval_required` 请求 Action Center 审批；审批块必须携带结构化 `repositoryWrite.path/content/workItemPath`。
 - Action Center 批准 `work_matter_plan` 后，Desktop 调用 `applyWorkbenchMatterPlanApproval`，校验目标只能位于 `plans/active/`、来源事项必须位于 `work/`，写入计划 Markdown，并把计划相对链接回写到来源事项 `## 关联计划`。
+- 审批写入成功后，Action Center 会打开 `/workbench?view=plans&planPath=<plan>`；Workbench 只接受 `plans/active/*.md` 且不含越界片段的计划路径，并在 plans 视图自动打开一次该计划预览，让用户直接看到“执行计划”入口。
 - 该审批写入只处理计划落盘和事项互链，不自动执行计划、不沉淀成果、不更新知识库、不写复盘、不移动事项文件。
 - Workbench 预览 `plans/active/` 下的活跃计划时，已提供“执行计划”入口。
 - 该入口创建 `plan_execute` ActionRun，`sourcePage: workbench`，并使用 `buildPlanExecutePrompt` / `plan-execute.md` 带入 `planPath`、计划内容，以及计划元数据中通过 `work/(active|completed|someday)/*.md` 边界校验的 `workItemPath` 和来源事项内容。
