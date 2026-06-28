@@ -27,6 +27,7 @@ import type { AiActionRun, AiActionRunStatus } from '../lib/types';
 import { extractWorkbenchMatterId, isWorkbenchMatterPath } from '../lib/workbench-matter';
 import {
   findLatestPlanExecutionRun,
+  shouldOfferPlanExecutionKnowledgeUpdate,
   shouldOfferPlanExecutionOutputPreservation,
 } from '../lib/workbench-plan-execution';
 import { ArtifactAICreateDrawer } from './ArtifactAICreateDrawer';
@@ -1513,6 +1514,7 @@ export default function WorkbenchRepositoryPanel({
     ? findLatestPlanExecutionRun(selectedPlanPath, activityRuns)
     : undefined;
   const selectedPlanCanPreserveOutput = shouldOfferPlanExecutionOutputPreservation(selectedPlanLatestRun);
+  const selectedPlanCanUpdateKnowledge = shouldOfferPlanExecutionKnowledgeUpdate(selectedPlanLatestRun);
   const previewTitle =
     panelView === 'projects' ? t('workbench.projectPreview') : selectedPreviewPath || t('workbench.preview');
   const standaloneView = panelView === 'dashboard' || panelView === 'outputs';
@@ -1703,6 +1705,24 @@ export default function WorkbenchRepositoryPanel({
                               }
                             >
                               {t('workbench.preservePlanExecutionOutput')}
+                            </Button>
+                          )}
+                          {selectedPlanCanUpdateKnowledge && (
+                            <Button
+                              size="small"
+                              type="tertiary"
+                              icon={<IconFile />}
+                              onClick={() =>
+                                navigate(
+                                  buildDashboardTailActionTarget('/knowledge', {
+                                    kind: 'knowledge',
+                                    id: `action-run-knowledge:${selectedPlanLatestRun.id}`,
+                                    workItemPath: selectedPlanLatestRun.workItemPath,
+                                  }),
+                                )
+                              }
+                            >
+                              {t('workbench.updatePlanExecutionKnowledge')}
                             </Button>
                           )}
                         </>

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   findLatestPlanExecutionRun,
   getPlanExecutionPlanPath,
+  shouldOfferPlanExecutionKnowledgeUpdate,
   shouldOfferPlanExecutionOutputPreservation,
 } from '../lib/workbench-plan-execution';
 import type { AiActionRun } from '../lib/types';
@@ -108,6 +109,56 @@ describe('workbench plan execution observability', () => {
     ).toBe(false);
     expect(
       shouldOfferPlanExecutionOutputPreservation(
+        createRun({
+          type: 'artifact_create',
+          status: 'done',
+          resultSummary: '完成打包验证',
+          workItemPath: 'work/active/release.md',
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      shouldOfferPlanExecutionOutputPreservation(
+        createRun({
+          status: 'done',
+          resultSummary: '完成打包验证',
+          workItemPath: 'outputs/release.md',
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it('offers knowledge update for completed work-bound plan execution with a result summary', () => {
+    expect(
+      shouldOfferPlanExecutionKnowledgeUpdate(
+        createRun({
+          status: 'done',
+          resultSummary: '完成打包验证，发现发布文档需要补充',
+          workItemPath: 'work/active/release.md',
+          artifactIds: ['artifact-1'],
+        }),
+      ),
+    ).toBe(true);
+
+    expect(
+      shouldOfferPlanExecutionKnowledgeUpdate(
+        createRun({
+          status: 'running',
+          resultSummary: '正在执行',
+          workItemPath: 'work/active/release.md',
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      shouldOfferPlanExecutionKnowledgeUpdate(
+        createRun({
+          status: 'done',
+          workItemPath: 'work/active/release.md',
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      shouldOfferPlanExecutionKnowledgeUpdate(
         createRun({
           status: 'done',
           resultSummary: '完成打包验证',

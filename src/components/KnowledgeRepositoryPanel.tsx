@@ -108,6 +108,12 @@ export default function KnowledgeRepositoryPanel({
   const [importUrlNote, setImportUrlNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   const knowledgeTailActionContext = tailActionContext?.kind === 'knowledge' ? tailActionContext : null;
+  const knowledgeTailActionCanConfirm = Boolean(
+    knowledgeTailActionContext?.id && knowledgeTailActionContext.id.includes(':tail-action:'),
+  );
+  const knowledgeTailActionRunId = knowledgeTailActionContext?.id?.startsWith('action-run-knowledge:')
+    ? knowledgeTailActionContext.id
+    : undefined;
   const {
     createWorkItem: createKnowledgeWorkItem,
     creating: creatingKnowledgeWorkItem,
@@ -988,6 +994,11 @@ export default function KnowledgeRepositoryPanel({
                     {t('knowledge.tailActionSource')}: {knowledgeTailActionContext.workItemPath}
                   </Text>
                 ) : null}
+                {knowledgeTailActionRunId ? (
+                  <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>
+                    {t('knowledge.tailActionRunSource')}: {knowledgeTailActionRunId}
+                  </Text>
+                ) : null}
               </div>
               <Space wrap>
                 <Button
@@ -999,17 +1010,19 @@ export default function KnowledgeRepositoryPanel({
                 >
                   {t('knowledge.startTailActionRewrite')}
                 </Button>
-                <Button
-                  type="secondary"
-                  icon={<IconTickCircle />}
-                  loading={tailActionConfirming}
-                  disabled={
-                    !knowledgeTailActionContext.workItemPath || !knowledgeTailActionContext.id || tailActionConfirmed
-                  }
-                  onClick={() => void handleConfirmKnowledgeTailAction()}
-                >
-                  {tailActionConfirmed ? t('knowledge.tailActionConfirmed') : t('knowledge.confirmTailAction')}
-                </Button>
+                {knowledgeTailActionCanConfirm ? (
+                  <Button
+                    type="secondary"
+                    icon={<IconTickCircle />}
+                    loading={tailActionConfirming}
+                    disabled={
+                      !knowledgeTailActionContext.workItemPath || !knowledgeTailActionContext.id || tailActionConfirmed
+                    }
+                    onClick={() => void handleConfirmKnowledgeTailAction()}
+                  >
+                    {tailActionConfirmed ? t('knowledge.tailActionConfirmed') : t('knowledge.confirmTailAction')}
+                  </Button>
+                ) : null}
               </Space>
             </Space>
           </div>

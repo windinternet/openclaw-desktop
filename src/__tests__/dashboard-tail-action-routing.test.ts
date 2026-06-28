@@ -50,5 +50,9 @@ describe('dashboard tail action routing', () => {
     expect(knowledgePanel).toContain("t('knowledge.confirmTailAction')");
     expect(knowledgePanel).toContain('workItemPath: knowledgeTailActionContext.workItemPath');
     expect(knowledgePanel).toContain('tailActionId: knowledgeTailActionContext.id');
+    expect(knowledgePanel).toContain('knowledgeTailActionCanConfirm');
+    expect(knowledgePanel).toContain("knowledgeTailActionContext.id.includes(':tail-action:')");
+    expect(knowledgePanel).toContain('knowledgeTailActionRunId');
+    expect(knowledgePanel).toContain('action-run-knowledge:');
   });
 });

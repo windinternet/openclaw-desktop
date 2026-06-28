@@ -1216,6 +1216,21 @@ describe('repository workbench', () => {
     expect(en).toContain('"preservePlanExecutionOutput": "Preserve Output"');
   });
 
+  it('lets completed plan execution start knowledge update through the existing Knowledge tail-action route', () => {
+    const source = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
+    const zh = readFileSync('src/locales/zh.json', 'utf8');
+    const en = readFileSync('src/locales/en.json', 'utf8');
+
+    expect(source).toContain('shouldOfferPlanExecutionKnowledgeUpdate');
+    expect(source).toContain('buildDashboardTailActionTarget');
+    expect(source).toContain("kind: 'knowledge'");
+    expect(source).toContain('`action-run-knowledge:${selectedPlanLatestRun.id}`');
+    expect(source).toContain('workItemPath: selectedPlanLatestRun.workItemPath');
+    expect(source).toContain("t('workbench.updatePlanExecutionKnowledge')");
+    expect(zh).toContain('"updatePlanExecutionKnowledge": "更新知识"');
+    expect(en).toContain('"updatePlanExecutionKnowledge": "Update Knowledge"');
+  });
+
   it('wires ActionCenter unassigned ActionRun backfill to repository work items', () => {
     const page = readFileSync('src/pages/ActionCenterPage.tsx', 'utf8');
     const zh = readFileSync('src/locales/zh.json', 'utf8');

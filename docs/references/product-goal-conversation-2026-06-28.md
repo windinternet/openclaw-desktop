@@ -1216,3 +1216,18 @@ HTML 的独特优势：
 仍未完成的 P0 后续：
 
 - 仍需要更完整的成果候选提取、保存后 Dashboard 待确认刷新体验、执行后的知识更新金线、复盘金线，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
+
+### 10.55 2026-06-29 当前实施记录：计划执行知识更新入口
+
+围绕“开始一件事闭环”中“执行 -> 知识更新”的 P0 缺口，当前继续把计划执行结果接到已有 Knowledge 更新流程：
+
+- 新增 `shouldOfferPlanExecutionKnowledgeUpdate`，只在最近一次 `plan_execute` 已完成、有 `resultSummary` 且有安全 `workItemPath` 时，认为该计划执行结果值得提示用户检查知识库更新。
+- Workbench 选中 `plans/active/` 活跃计划时，如果最近一次执行满足上述条件，会在计划预览头部显示“更新知识 / Update Knowledge”。
+- 点击后 Desktop 复用现有 Dashboard tail-action 路由，打开 Knowledge 并携带 `tailAction=knowledge`、`tailActionId=action-run-knowledge:<runId>` 和来源 `workItemPath`。
+- Knowledge 的提示词会保留来源事项和来源执行记录 `action-run-knowledge:<runId>`，要求先读取来源事项、关联执行记录、关联成果和现有知识库，再提出写入 Wiki、更新 `wiki/index.md` / `wiki/log.md` 的审批计划；没有必要写入时输出 `no_write_needed`。
+- `action-run-knowledge:<runId>` 是来源执行记录，不是事项 `## 收尾动作` checklist ID；Knowledge 可以基于它发起 `knowledge_rewrite`，但不会显示或执行“确认已处理并完成尾动作”，不会假装勾选一条不存在的 checklist。
+- 该入口不会自动写 Wiki，不会自动更新 `wiki/index.md` / `wiki/log.md`，不会自动勾选事项尾动作，不会更新事项状态，不会沉淀成果，不会写复盘，不会移动事项文件，也不会执行资产或授予权限。
+
+仍未完成的 P0 后续：
+
+- 仍需要知识写入后的状态刷新体验、与复盘尾动作的自然衔接、更完整的执行结果候选提取，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。

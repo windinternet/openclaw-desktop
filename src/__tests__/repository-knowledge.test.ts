@@ -765,6 +765,17 @@ describe('repository knowledge', () => {
     expect(prompt).toContain('approval_required');
   });
 
+  it('builds a source execution instruction for plan execution knowledge updates', () => {
+    const instruction = buildKnowledgeTailActionRewriteInstruction({
+      workItemPath: 'work/active/release.md',
+      tailActionId: 'action-run-knowledge:run-1',
+    });
+
+    expect(instruction).toContain('来源事项 work/active/release.md');
+    expect(instruction).toContain('来源执行记录 action-run-knowledge:run-1');
+    expect(instruction).toContain('no_write_needed');
+  });
+
   it('builds a binding-time semantic mapping prompt for LLM Wiki repositories', () => {
     const template = readFileSync('src/prompts/repository/knowledge-semantic-mapping.md', 'utf8');
     const source = readFileSync('src/lib/repository-knowledge.ts', 'utf8');
