@@ -1305,3 +1305,17 @@ HTML 的独特优势：
 仍未完成的 P0 后续：
 
 - 仍需要真正 Wiki 写入后的复盘建议/确认状态、复盘确认后的更完整状态表达、更完整的执行结果候选提取，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
+
+### 10.61 2026-06-29 当前实施记录：计划执行知识更新后的复盘入口强化
+
+围绕“开始一件事闭环”中“执行 -> 知识更新 -> 复盘”的入口自然性，当前继续把同源知识更新事实提前显示到计划预览复盘按钮上：
+
+- Workbench 计划预览会计算 `selectedPlanRelatedKnowledgeRunIds`，复用与复盘草稿相同的同源知识更新识别逻辑。
+- 当同一个 `plan_execute` 已经存在未失败/未取消、输入包含 `action-run-knowledge:<runId>` 的 `knowledge_rewrite` ActionRun，且该计划执行仍可写复盘时，复盘按钮不再只显示“写复盘 / Write Review”。
+- 这时按钮显示为“复盘知识更新 / Review Knowledge Update”，对应文案 key 为 `writePlanExecutionReviewWithKnowledge`。
+- 按钮仍然打开 Workbench reviews 的 `action-run-review:<runId>` 路由；后续创建草稿时仍由 `relatedKnowledgeRunIds` 写入相关知识更新运行。
+- 该能力只是把“知识更新后要复盘”的下一步更清楚地露出来，不自动写 Wiki/index/log、不自动确认复盘、不勾选事项尾动作、不更新状态、不沉淀成果、不移动事项文件。
+
+仍未完成的 P0 后续：
+
+- 仍需要真正 Wiki 写入后的复盘确认状态、复盘确认后的更完整状态表达、更完整的执行结果候选提取，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。

@@ -182,6 +182,8 @@
     "preservePlanExecutionOutput": "Preserve Output",
     "updatePlanExecutionKnowledge": "Update Knowledge",
     "writePlanExecutionReview": "Write Review",
+    "writePlanExecutionReviewWithKnowledge": "Review Knowledge Update",
+    "writePlanExecutionReviewWithKnowledgeHint": "The review draft will include source-bound knowledge updates",
     "createArtifactForMatter": "Create Output",
     "tailActionContextTitle": "Pending Tail Action",
     "tailActionContextDesc": "A Dashboard tail action for a matter. Check the source matter before continuing.",

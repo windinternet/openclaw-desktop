@@ -1343,13 +1343,22 @@ describe('repository workbench', () => {
     expect(source).toContain('shouldOfferPlanExecutionReview');
     expect(source).toContain('reviewDocuments: snapshot?.reviewDocuments');
     expect(source).toContain('relatedKnowledgeRunIds');
+    expect(source).toContain('selectedPlanRelatedKnowledgeRunIds');
+    expect(source).toContain('workbench.writePlanExecutionReviewWithKnowledge');
+    expect(source).toContain('workbench.writePlanExecutionReviewWithKnowledgeHint');
     expect(source).toContain('buildDashboardTailActionTarget');
     expect(source).toContain("kind: 'review'");
     expect(source).toContain('`action-run-review:${selectedPlanLatestRun.id}`');
     expect(source).toContain('workItemPath: selectedPlanLatestRun.workItemPath');
-    expect(source).toContain("t('workbench.writePlanExecutionReview')");
+    expect(source).toContain("'workbench.writePlanExecutionReview'");
     expect(zh).toContain('"writePlanExecutionReview": "写复盘"');
+    expect(zh).toContain('"writePlanExecutionReviewWithKnowledge": "复盘知识更新"');
+    expect(zh).toContain('"writePlanExecutionReviewWithKnowledgeHint": "复盘草稿会带入同源知识更新记录"');
     expect(en).toContain('"writePlanExecutionReview": "Write Review"');
+    expect(en).toContain('"writePlanExecutionReviewWithKnowledge": "Review Knowledge Update"');
+    expect(en).toContain(
+      '"writePlanExecutionReviewWithKnowledgeHint": "The review draft will include source-bound knowledge updates"',
+    );
   });
 
   it('wires ActionCenter unassigned ActionRun backfill to repository work items', () => {

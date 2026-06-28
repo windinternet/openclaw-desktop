@@ -60,6 +60,8 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('sourceExecutionId` or `tailActionId` equal to `action-run-review:<runId>`');
     expect(skillContent).toContain('relatedKnowledgeRunIds');
     expect(skillContent).toContain('verify whether Wiki/index/log was updated or no write was needed');
+    expect(skillContent).toContain('Review Knowledge Update');
+    expect(skillContent).toContain('writePlanExecutionReviewWithKnowledge');
     expect(skillContent).toContain('adds a `## 收尾动作` checklist');
     expect(skillContent).toContain('missing from the repository run index');
     expect(skillContent).toContain('`action-run:unarchived` pending confirmation');

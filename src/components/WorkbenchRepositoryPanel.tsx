@@ -1534,6 +1534,9 @@ export default function WorkbenchRepositoryPanel({
   const selectedPlanLatestRun = selectedPlanPath
     ? findLatestPlanExecutionRun(selectedPlanPath, activityRuns)
     : undefined;
+  const selectedPlanRelatedKnowledgeRunIds = findPlanExecutionKnowledgeFollowUpRuns(selectedPlanLatestRun, {
+    actionRuns: activityRuns,
+  }).map((run) => run.id);
   const selectedPlanCanPreserveOutput = shouldOfferPlanExecutionOutputPreservation(selectedPlanLatestRun);
   const selectedPlanCanUpdateKnowledge = shouldOfferPlanExecutionKnowledgeUpdate(selectedPlanLatestRun, {
     actionRuns: activityRuns,
@@ -1541,6 +1544,7 @@ export default function WorkbenchRepositoryPanel({
   const selectedPlanCanWriteReview = shouldOfferPlanExecutionReview(selectedPlanLatestRun, {
     reviewDocuments: snapshot?.reviewDocuments,
   });
+  const selectedPlanReviewHasKnowledgeContext = selectedPlanRelatedKnowledgeRunIds.length > 0;
   const previewTitle =
     panelView === 'projects' ? t('workbench.projectPreview') : selectedPreviewPath || t('workbench.preview');
   const standaloneView = panelView === 'dashboard' || panelView === 'outputs';
@@ -1756,6 +1760,11 @@ export default function WorkbenchRepositoryPanel({
                               size="small"
                               type="tertiary"
                               icon={<IconCheckList />}
+                              title={
+                                selectedPlanReviewHasKnowledgeContext
+                                  ? t('workbench.writePlanExecutionReviewWithKnowledgeHint')
+                                  : undefined
+                              }
                               onClick={() =>
                                 navigate(
                                   buildDashboardTailActionTarget('/workbench', {
@@ -1766,7 +1775,11 @@ export default function WorkbenchRepositoryPanel({
                                 )
                               }
                             >
-                              {t('workbench.writePlanExecutionReview')}
+                              {t(
+                                selectedPlanReviewHasKnowledgeContext
+                                  ? 'workbench.writePlanExecutionReviewWithKnowledge'
+                                  : 'workbench.writePlanExecutionReview',
+                              )}
                             </Button>
                           )}
                         </>
