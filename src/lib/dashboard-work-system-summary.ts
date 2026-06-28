@@ -245,6 +245,11 @@ export function buildDashboardWorkSystemSummary(
     params.artifacts.map((artifact) => artifact.repositoryOutputPath).filter(Boolean),
   );
   const artifactIds = new Set(params.artifacts.map((artifact) => artifact.id));
+  const preservedActionRunOutputIds = new Set(
+    params.artifacts
+      .filter((artifact) => artifact.source.type === 'action_run' && Boolean(artifact.source.id))
+      .map((artifact) => artifact.source.id as string),
+  );
   const repositoryOutputItems = parseRepositoryOutputIndex(params.workbench?.outputsMarkdown ?? '')
     .filter(
       (output) => !artifactOutputPaths.has(output.path) && (!output.artifactId || !artifactIds.has(output.artifactId)),
@@ -306,6 +311,7 @@ export function buildDashboardWorkSystemSummary(
         .filter((run) => run.status === 'done' && Boolean(run.resultSummary))
         .filter(hasWorkItemPath)
         .filter((run) => (run.artifactIds ?? []).length === 0)
+        .filter((run) => !preservedActionRunOutputIds.has(run.id))
         .filter((run) => !pendingOutputTailActionWorkItemPaths.has(run.workItemPath))
         .filter((run) =>
           params.workbench?.runsMarkdown === undefined

@@ -521,6 +521,41 @@ describe('dashboard work system summary', () => {
     ]);
   });
 
+  it('does not ask to preserve an ActionRun output again when an Artifact already points to that run', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [
+        createActionRun({
+          id: 'run_preserved_by_source',
+          type: 'plan_execute',
+          status: 'done',
+          input: '执行发布计划',
+          resultSummary: '生成了发布计划执行摘要',
+          workItemPath: 'work/active/release.md',
+          updatedAt: 230,
+        }),
+      ],
+      artifacts: [
+        createArtifact({
+          id: 'art_from_run',
+          title: '发布计划执行摘要',
+          source: { type: 'action_run', id: 'run_preserved_by_source' },
+          updatedAt: 240,
+        }),
+      ],
+      workbench: {
+        activeWork: [],
+        activePlans: [],
+        planMetadata: [],
+        tailActions: [],
+        reviews: [],
+      },
+      limit: 8,
+    });
+
+    expect(summary.pendingConfirmations).toEqual([]);
+  });
+
   it('does not duplicate output preservation confirmations covered by pending output tail actions', () => {
     const summary = buildDashboardWorkSystemSummary({
       sessions: [],

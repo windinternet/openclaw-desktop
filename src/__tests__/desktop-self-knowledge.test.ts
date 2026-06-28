@@ -62,6 +62,7 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('has no `workItemPath`');
     expect(skillContent).toContain('`action-run:unassigned` pending confirmation');
     expect(skillContent).toContain('`action-run:output-unpreserved` pending confirmation');
+    expect(skillContent).toContain('no existing Artifact with `source.type=action_run` and `source.id=<runId>`');
     expect(skillContent).toContain('opens Artifacts with `tailAction=output`');
     expect(skillContent).toContain('does not auto-create an Artifact or Repository output');
     expect(skillContent).toContain(

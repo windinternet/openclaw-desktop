@@ -63,8 +63,10 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('计划执行状态观测');
     expect(source).toContain('findLatestPlanExecutionRun');
     expect(source).toContain('计划执行成果沉淀入口');
+    expect(source).toContain('ActionRun 成果沉淀后的 Dashboard 去重');
     expect(source).toContain('shouldOfferPlanExecutionOutputPreservation');
     expect(source).toContain('action-run-output:<runId>');
+    expect(source).toContain('artifact.source.type === "action_run"');
     expect(source).toContain('计划执行知识更新入口');
     expect(source).toContain('shouldOfferPlanExecutionKnowledgeUpdate');
     expect(source).toContain('action-run-knowledge:<runId>');
@@ -105,6 +107,7 @@ describe('product goal P0 traceability', () => {
     expect(plans).toContain('计划执行成果沉淀入口');
     expect(plans).toContain('shouldOfferPlanExecutionOutputPreservation');
     expect(plans).toContain('action-run-output:<runId>');
+    expect(plans).toContain('source.type=action_run');
     expect(plans).toContain('计划执行知识更新入口');
     expect(plans).toContain('shouldOfferPlanExecutionKnowledgeUpdate');
     expect(plans).toContain('action-run-knowledge:<runId>');
@@ -137,6 +140,7 @@ describe('product goal P0 traceability', () => {
     expect(roadmap).toContain('计划执行成果沉淀入口');
     expect(roadmap).toContain('shouldOfferPlanExecutionOutputPreservation');
     expect(roadmap).toContain('action-run-output:<runId>');
+    expect(roadmap).toContain('source.type=action_run');
     expect(roadmap).toContain('计划执行知识更新入口');
     expect(roadmap).toContain('shouldOfferPlanExecutionKnowledgeUpdate');
     expect(roadmap).toContain('action-run-knowledge:<runId>');
@@ -172,6 +176,7 @@ describe('product goal P0 traceability', () => {
     expect(skillContent).toContain('shouldOfferPlanExecutionOutputPreservation');
     expect(skillContent).toContain('`action-run-output:<runId>`');
     expect(skillContent).toContain('Preserve Output');
+    expect(skillContent).toContain('source.type=action_run');
     expect(skillContent).toContain('shouldOfferPlanExecutionKnowledgeUpdate');
     expect(skillContent).toContain('`action-run-knowledge:<runId>`');
     expect(skillContent).toContain('Update Knowledge');
