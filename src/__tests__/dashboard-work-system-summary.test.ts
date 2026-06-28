@@ -592,6 +592,39 @@ describe('dashboard work system summary', () => {
     ]);
   });
 
+  it('surfaces explicit cross-work plan dependencies as stuck risks', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [],
+      workbench: {
+        activeWork: [createMarkdownFile('work/active/release.md', '发布推进', 210)],
+        activePlans: [createMarkdownFile('plans/active/cross-work.md', '跨事项发布计划', 220)],
+        planMetadata: [
+          {
+            path: 'plans/active/cross-work.md',
+            status: 'active',
+            dependencies: ['work/active/design.md', 'plans/active/api.md'],
+          },
+        ],
+        tailActions: [],
+        reviews: [],
+      },
+    });
+
+    expect(summary.stuckItems).toEqual([
+      expect.objectContaining({
+        id: 'cross-work-risk:plans/active/cross-work.md',
+        kind: 'plan',
+        title: '跨事项发布计划',
+        target: '/workbench?view=plans',
+        path: 'plans/active/cross-work.md',
+        detail: '跨事项依赖 · work/active/design.md, plans/active/api.md',
+        status: 'plan:cross-work-risk',
+      }),
+    ]);
+  });
+
   it('surfaces knowledge health issues as first-class dashboard knowledge updates', () => {
     const summary = buildDashboardWorkSystemSummary({
       sessions: [],

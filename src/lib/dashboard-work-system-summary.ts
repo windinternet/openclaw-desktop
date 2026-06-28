@@ -179,6 +179,22 @@ export function buildDashboardWorkSystemSummary(
       status: metadata.status ?? 'blocked',
     };
   });
+  const crossWorkRiskPlanItems = (params.workbench?.planMetadata ?? [])
+    .filter((metadata) => !isBlockedPlanMetadata(metadata))
+    .filter(hasCrossWorkDependencies)
+    .map((metadata) => {
+      const plan = params.workbench?.activePlans.find((file) => file.path === metadata.path);
+      return {
+        id: `cross-work-risk:${metadata.path}`,
+        kind: 'plan' as const,
+        title: plan ? markdownTitle(plan) : metadata.path,
+        target: '/workbench?view=plans',
+        updatedAt: plan?.updatedAt,
+        path: metadata.path,
+        detail: formatCrossWorkRiskDetail(metadata),
+        status: 'plan:cross-work-risk',
+      };
+    });
 
   const artifactOutputItems = params.artifacts.map((artifact) => ({
     artifact,
@@ -315,7 +331,7 @@ export function buildDashboardWorkSystemSummary(
     ...unarchivedActionRunItems,
     ...unpreservedActionRunOutputItems,
   ]).slice(0, limit);
-  const stuckItems = sortItems([...failedRunItems, ...blockedPlanItems]).slice(0, limit);
+  const stuckItems = sortItems([...failedRunItems, ...blockedPlanItems, ...crossWorkRiskPlanItems]).slice(0, limit);
   const recentOutputs = sortItems(recentOutputItems).slice(0, limit);
   const weeklyOutputs = sortItems(weeklyOutputItems).slice(0, limit);
   const knowledgeUpdates = sortItems([...knowledgeHealthItems, ...knowledgeItems]).slice(0, limit);
@@ -557,6 +573,18 @@ function isBlockedStatus(status?: string): boolean {
 
 function isBlockedPlanMetadata(metadata: WorkbenchSnapshot['planMetadata'][number]): boolean {
   return isBlockedStatus(metadata.status) || Boolean(metadata.blockedReason);
+}
+
+function hasCrossWorkDependencies(
+  metadata: WorkbenchSnapshot['planMetadata'][number],
+): metadata is WorkbenchSnapshot['planMetadata'][number] & { dependencies: string[] } {
+  return Boolean(metadata.dependencies?.length);
+}
+
+function formatCrossWorkRiskDetail(
+  metadata: WorkbenchSnapshot['planMetadata'][number] & { dependencies: string[] },
+): string {
+  return `跨事项依赖 · ${metadata.dependencies.join(', ')}`;
 }
 
 function formatBlockedPlanDetail(metadata: WorkbenchSnapshot['planMetadata'][number]): string | undefined {

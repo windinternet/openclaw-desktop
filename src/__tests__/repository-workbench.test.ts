@@ -428,6 +428,21 @@ describe('repository workbench', () => {
       status: '卡住',
       blockedReason: '依赖 Gateway 协议确认',
     });
+    expect(
+      parsePlanMetadata(
+        'plans/active/cross-work.md',
+        [
+          'status: active',
+          'dependsOn: work/active/design.md, [API 计划](plans/active/api.md)',
+          '关联事项: work/active/release.md；work/someday/legal.md',
+          '# 跨事项计划',
+        ].join('\n'),
+      ),
+    ).toEqual({
+      path: 'plans/active/cross-work.md',
+      status: 'active',
+      dependencies: ['work/active/design.md', 'plans/active/api.md', 'work/active/release.md', 'work/someday/legal.md'],
+    });
 
     expect(
       groupReviewsByFolder([

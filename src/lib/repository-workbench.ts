@@ -82,6 +82,7 @@ export interface RepositoryPlanMetadata {
   approval?: string;
   blockedReason?: string;
   blockerOwner?: string;
+  dependencies?: string[];
 }
 
 export interface RepositoryReviewGroup {
@@ -141,7 +142,7 @@ export async function loadWorkbenchSnapshot(binding: RepositoryBinding): Promise
     outputsMarkdown,
     reviews,
     reviewDocuments,
-    planMetadata: planMetadata.filter((item) => item.status || item.approval),
+    planMetadata: planMetadata.filter((item) => item.status || item.approval || item.dependencies?.length),
     reviewGroups: groupReviewsByFolder(reviews),
     semanticSections: [],
     projects: [],
@@ -286,6 +287,9 @@ export function parsePlanMetadata(path: string, markdown: string): RepositoryPla
     if (key === 'approval') metadata.approval = value;
     if (key === 'blockedreason') metadata.blockedReason = value;
     if (key === 'blockerowner') metadata.blockerOwner = value;
+    if (key === 'dependencies') {
+      metadata.dependencies = [...(metadata.dependencies ?? []), ...parseDependencyReferences(value)];
+    }
   }
   return metadata;
 }
@@ -302,7 +306,35 @@ function normalizePlanMetadataKey(value: string): string {
     return 'blockedreason';
   }
   if (['blockerowner', 'owner', '负责人', '责任人'].includes(key)) return 'blockerowner';
+  if (
+    [
+      'dependson',
+      'dependencies',
+      'dependency',
+      'requires',
+      'relatedwork',
+      'workdependencies',
+      '依赖',
+      '依赖事项',
+      '关联事项',
+      '前置事项',
+    ].includes(key)
+  ) {
+    return 'dependencies';
+  }
   return key;
+}
+
+function parseDependencyReferences(value: string): string[] {
+  return value
+    .split(/[,，;；]/)
+    .map((part) => extractMarkdownLinkHref(part) ?? part)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function extractMarkdownLinkHref(value: string): string | undefined {
+  return /\[[^\]]+]\(([^)]+)\)/.exec(value)?.[1]?.trim();
 }
 
 async function loadWorkbenchTailActions(

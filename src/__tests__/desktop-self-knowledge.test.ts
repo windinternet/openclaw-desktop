@@ -102,9 +102,15 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('/workbench?view=reviews');
     expect(skillContent).toContain('Review output clues are read only from explicit `成果`, `产物`, `输出`');
     expect(skillContent).toContain('does not infer value outputs from arbitrary review prose');
-    expect(skillContent).toContain('Dashboard stuckItems include failed or cancelled ActionRuns and blocked plans');
+    expect(skillContent).toContain(
+      'Dashboard stuckItems include failed or cancelled ActionRuns, blocked plans, and explicit cross-work plan dependencies',
+    );
     expect(skillContent).toContain('blockedReason');
     expect(skillContent).toContain('blockerOwner');
+    expect(skillContent).toContain('`dependsOn`, `dependencies`, `requires`, `relatedWork`');
+    expect(skillContent).toContain('`依赖`, `依赖事项`, `关联事项`, or `前置事项`');
+    expect(skillContent).toContain('`plan:cross-work-risk` stuckItems');
+    expect(skillContent).toContain('does not infer cross-work risk from plan prose');
     expect(skillContent).toContain('/workbench?view=plans');
     expect(skillContent).toContain('Terminal work-item ActionRuns that are missing from `runs/action-runs/index.md`');
     expect(skillContent).toContain('not an automatic repository repair');
