@@ -13,7 +13,7 @@ import {
   Toast,
   Typography,
 } from '@douyinfe/semi-ui';
-import { IconBolt, IconFile, IconPlus, IconSearch } from '@douyinfe/semi-icons';
+import { IconBolt, IconFile, IconLink, IconPlus, IconSearch } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway, useStore } from '../lib';
@@ -29,6 +29,7 @@ import type {
 import {
   buildKnowledgeRewritePrompt,
   importKnowledgeTextSource,
+  importKnowledgeUrlSource,
   loadKnowledgeDocumentHistory,
   loadKnowledgeSnapshot,
   readKnowledgeDocument,
@@ -75,8 +76,12 @@ export default function KnowledgeRepositoryPanel({
   const [documentHistory, setDocumentHistory] = useState<RepositoryGitLogEntry[]>([]);
   const [activeSection, setActiveSection] = useState<KnowledgeSection>(section ?? 'wiki');
   const [showImportText, setShowImportText] = useState(false);
+  const [showImportUrl, setShowImportUrl] = useState(false);
   const [importTitle, setImportTitle] = useState('');
   const [importBody, setImportBody] = useState('');
+  const [importUrl, setImportUrl] = useState('');
+  const [importUrlTitle, setImportUrlTitle] = useState('');
+  const [importUrlNote, setImportUrlNote] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -160,6 +165,35 @@ export default function KnowledgeRepositoryPanel({
       Toast.success(t('knowledge.importTextDone'));
     } catch (err) {
       Toast.error(err instanceof Error ? err.message : t('knowledge.importTextFailed'));
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const handleImportUrlSource = async () => {
+    if (!importUrl.trim()) {
+      Toast.warning(t('knowledge.importUrlRequired'));
+      return;
+    }
+    setImportLoading(true);
+    setError(null);
+    try {
+      const imported = await importKnowledgeUrlSource(binding, {
+        title: importUrlTitle,
+        url: importUrl,
+        note: importUrlNote,
+      });
+      const nextSnapshot = await loadKnowledgeSnapshot(binding);
+      setSnapshot(nextSnapshot);
+      setImportUrl('');
+      setImportUrlTitle('');
+      setImportUrlNote('');
+      setShowImportUrl(false);
+      setActiveSection('digest');
+      await openDocument(imported.path);
+      Toast.success(t('knowledge.importUrlDone'));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('knowledge.importUrlFailed'));
     } finally {
       setImportLoading(false);
     }
@@ -725,6 +759,9 @@ export default function KnowledgeRepositoryPanel({
           <Button icon={<IconPlus />} onClick={() => setShowImportText(true)}>
             {t('knowledge.importTextSource')}
           </Button>
+          <Button icon={<IconLink />} onClick={() => setShowImportUrl(true)}>
+            {t('knowledge.importUrlSource')}
+          </Button>
           <Button
             icon={<IconBolt />}
             loading={rewriteLoading}
@@ -914,6 +951,47 @@ export default function KnowledgeRepositoryPanel({
           />
           <Text type="tertiary" size="small">
             {t('knowledge.importTextDesc')}
+          </Text>
+        </Space>
+      </Modal>
+      <Modal
+        title={t('knowledge.importUrlSource')}
+        visible={showImportUrl}
+        onCancel={() => {
+          if (!importLoading) setShowImportUrl(false);
+        }}
+        footer={
+          <Space>
+            <Button disabled={importLoading} onClick={() => setShowImportUrl(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              type="primary"
+              theme="solid"
+              loading={importLoading}
+              disabled={!importUrl.trim()}
+              onClick={() => void handleImportUrlSource()}
+            >
+              {t('knowledge.importUrlConfirm')}
+            </Button>
+          </Space>
+        }
+      >
+        <Space vertical align="start" style={{ width: '100%' }}>
+          <Input value={importUrl} onChange={setImportUrl} placeholder={t('knowledge.importUrlPlaceholder')} />
+          <Input
+            value={importUrlTitle}
+            onChange={setImportUrlTitle}
+            placeholder={t('knowledge.importUrlTitlePlaceholder')}
+          />
+          <TextArea
+            value={importUrlNote}
+            onChange={setImportUrlNote}
+            autosize={{ minRows: 5, maxRows: 12 }}
+            placeholder={t('knowledge.importUrlNotePlaceholder')}
+          />
+          <Text type="tertiary" size="small">
+            {t('knowledge.importUrlDesc')}
           </Text>
         </Space>
       </Modal>

@@ -3,12 +3,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
 import {
   buildKnowledgeTextSourceImport,
+  buildKnowledgeUrlSourceImport,
   buildKnowledgeRepositoryMappingPrompt,
   buildKnowledgeRewritePrompt,
   classifyKnowledgeSearchResult,
   extractMarkdownLinks,
   findBacklinks,
   importKnowledgeTextSource,
+  importKnowledgeUrlSource,
   loadKnowledgeSnapshot,
   parseKnowledgeRepositoryMappingResponse,
   parseKnowledgeIndexEntries,
@@ -67,6 +69,64 @@ describe('repository knowledge', () => {
     );
 
     expect(written.path).toBe('sources/imported/2026-06-28-040506-my-raw-idea.md');
+    expect(writeText).toHaveBeenCalledWith('/repo', written.path, written.markdown);
+  });
+
+  it('builds and writes clipped URLs as source markdown files', async () => {
+    const now = new Date('2026-06-28T05:06:07.000Z');
+    const imported = buildKnowledgeUrlSourceImport({
+      title: '  Useful Article  ',
+      url: 'https://example.com/articles/ai-workflows?utm=1',
+      note: 'Important excerpt',
+      now,
+      sourceRoot: 'sources',
+    });
+
+    expect(imported).toEqual({
+      title: 'Useful Article',
+      path: 'sources/imported/2026-06-28-050607-useful-article.md',
+      markdown: [
+        '---',
+        'title: "Useful Article"',
+        'source: desktop-url',
+        'url: "https://example.com/articles/ai-workflows?utm=1"',
+        'importedAt: 2026-06-28T05:06:07.000Z',
+        '---',
+        '',
+        '# Useful Article',
+        '',
+        '## 来源链接',
+        '',
+        '- https://example.com/articles/ai-workflows?utm=1',
+        '',
+        '## 摘录与备注',
+        '',
+        'Important excerpt',
+        '',
+      ].join('\n'),
+    });
+
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { writeText },
+      },
+    });
+
+    const written = await importKnowledgeUrlSource(
+      {
+        ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+        status: 'repo_ready',
+      },
+      {
+        title: 'Useful Article',
+        url: 'https://example.com/articles/ai-workflows?utm=1',
+        note: 'Important excerpt',
+        now,
+      },
+    );
+
+    expect(written.path).toBe('sources/imported/2026-06-28-050607-useful-article.md');
     expect(writeText).toHaveBeenCalledWith('/repo', written.path, written.markdown);
   });
 

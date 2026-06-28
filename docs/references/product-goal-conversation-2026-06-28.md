@@ -479,3 +479,20 @@ HTML 的独特优势：
 - 文件拖拽导入、URL 剪藏和文件夹导入仍待补齐。
 - “AI 先提出消化计划，批准后写入 `wiki/`、更新 `wiki/index.md` 和 `wiki/log.md`”仍需更完整的 UI 承接。
 - 健康检查结果写入 `reviews/weekly/`、长期未复盘项目和相互矛盾记录仍待继续推进。
+
+### 10.12 2026-06-28 当前实施记录：Knowledge 剪藏 URL 入口
+
+围绕“Knowledge 导入/消化/健康检查是 P0”中的 URL 剪藏能力，当前继续落地一段代码事实：
+
+- Knowledge 页面新增“剪藏 URL”入口。
+- 用户可以粘贴网页 URL、可选标题、可选摘录或备注。
+- Desktop 会把内容写入当前绑定仓库的 `sources/imported/YYYY-MM-DD-HHmmss-*.md`。
+- 生成的 Markdown frontmatter 会标记 `source: desktop-url`、`url` 和 `importedAt`。
+- 导入成功后，Knowledge 会刷新 Snapshot、切到“未消化资料”视图，并打开刚剪藏的资料源。
+- 当前剪藏不后台抓取网页正文，也不绕过网络审批；它只保存用户提供的链接和摘录。
+
+仍未完成的 P0 后续：
+
+- 文件拖拽导入和文件夹导入仍待补齐。
+- 如果后续要自动抓取网页正文，应单独设计网络权限、来源元数据、失败回退和内容清洗边界。
+- “AI 先提出消化计划，批准后写入 `wiki/`、更新 `wiki/index.md` 和 `wiki/log.md`”仍需更完整的 UI 承接。

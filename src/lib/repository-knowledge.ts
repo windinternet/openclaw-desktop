@@ -228,6 +228,14 @@ export interface KnowledgeTextSourceImport {
   markdown: string;
 }
 
+export interface KnowledgeUrlSourceImportInput {
+  title?: string;
+  url: string;
+  note?: string;
+  now?: Date;
+  sourceRoot?: string;
+}
+
 export function buildKnowledgeTextSourceImport(input: KnowledgeTextSourceImportInput): KnowledgeTextSourceImport {
   const body = normalizeSourceBody(input.body);
   const title = normalizeSourceTitle(input.title, body);
@@ -254,11 +262,56 @@ export function buildKnowledgeTextSourceImport(input: KnowledgeTextSourceImportI
   return { title, path, markdown };
 }
 
+export function buildKnowledgeUrlSourceImport(input: KnowledgeUrlSourceImportInput): KnowledgeTextSourceImport {
+  const url = normalizeSourceUrl(input.url);
+  const note = input.note?.replace(/\r\n/g, '\n').trim();
+  const title = normalizeSourceTitle(input.title, `${url.hostname}${url.pathname}`);
+  const now = input.now ?? new Date();
+  const date = now.toISOString().slice(0, 10);
+  const time = now.toISOString().slice(11, 19).replace(/:/g, '');
+  const sourceRoot = normalizeSourceRoot(input.sourceRoot ?? 'sources');
+  const href = url.toString();
+  const path = `${sourceRoot}/imported/${date}-${time}-${slugifyKnowledgeTitle(title)}.md`;
+  const markdown = [
+    '---',
+    `title: ${JSON.stringify(title)}`,
+    'source: desktop-url',
+    `url: ${JSON.stringify(href)}`,
+    `importedAt: ${now.toISOString()}`,
+    '---',
+    '',
+    `# ${title}`,
+    '',
+    '## 来源链接',
+    '',
+    `- ${href}`,
+    '',
+    '## 摘录与备注',
+    '',
+    note || '暂无',
+    '',
+  ].join('\n');
+
+  return { title, path, markdown };
+}
+
 export async function importKnowledgeTextSource(
   binding: RepositoryBinding,
   input: Omit<KnowledgeTextSourceImportInput, 'sourceRoot'>,
 ): Promise<KnowledgeTextSourceImport> {
   const imported = buildKnowledgeTextSourceImport({
+    ...input,
+    sourceRoot: binding.knowledge.sourceRoot,
+  });
+  await getKnowledgeWriteApi().writeText(binding.repoPath, imported.path, imported.markdown);
+  return imported;
+}
+
+export async function importKnowledgeUrlSource(
+  binding: RepositoryBinding,
+  input: Omit<KnowledgeUrlSourceImportInput, 'sourceRoot'>,
+): Promise<KnowledgeTextSourceImport> {
+  const imported = buildKnowledgeUrlSourceImport({
     ...input,
     sourceRoot: binding.knowledge.sourceRoot,
   });
@@ -653,6 +706,19 @@ function slugifyKnowledgeTitle(value: string): string {
     .slice(0, 64)
     .replace(/-+$/g, '');
   return slug || 'pasted-source';
+}
+
+function normalizeSourceUrl(value: string): URL {
+  let url: URL;
+  try {
+    url = new URL(value.trim());
+  } catch {
+    throw new Error('Knowledge source URL is invalid');
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error('Knowledge source URL must use http or https');
+  }
+  return url;
 }
 
 function normalizeSourceRoot(value: string): string {
