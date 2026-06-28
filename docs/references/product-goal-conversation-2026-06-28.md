@@ -603,7 +603,7 @@ HTML 的独特优势：
 仍未完成的 P0 后续：
 
 - 更完整的工作状态诊断仍需继续补齐，例如跨事项风险、计划阻塞原因、未归档运行记录和成果沉淀缺口。
-- ActionRun 摘要和事项复盘中的价值成果线索仍待继续并入 Dashboard 成果观察。
+- 事项复盘中的价值成果线索仍待继续并入 Dashboard 成果观察。
 
 ### 10.20 2026-06-28 当前实施记录：Repository outputs 纳入 Dashboard 成果观察
 
@@ -618,5 +618,19 @@ HTML 的独特优势：
 
 仍未完成的 P0 后续：
 
-- ActionRun 摘要和事项复盘中的价值成果线索仍需继续并入 Dashboard 成果观察。
+- 事项复盘中的价值成果线索仍需继续并入 Dashboard 成果观察。
+- 更完整的工作状态诊断仍需继续补齐，例如跨事项风险、计划阻塞原因、未归档运行记录和成果沉淀缺口。
+
+### 10.21 2026-06-28 当前实施记录：ActionRun 摘要纳入 Dashboard 成果观察
+
+围绕“ActionRun 是 Desktop 非聊天式 AI 操作通道”和“Dashboard 显示真实推进状态”的 P0 内容，当前继续落地一段代码事实：
+
+- Dashboard work-system summary 会把终态 `done` 且有 `resultSummary` 的 ActionRun 作为成果线索补进“最近成果”和“本周新增成果”。
+- ActionRun 摘要条目的本周判断使用 run 的 `updatedAt`，因为现有数据结构没有独立 `completedAt` 字段。
+- 如果该 ActionRun 的 `artifactIds` 已经被本地 Artifact 或 Repository output artifact id 承接，Dashboard 不再重复显示这条 ActionRun 摘要。
+- ActionRun 摘要条目会跳转到 `/workbench?view=actions`，让用户回到执行记录视图查看上下文。
+
+仍未完成的 P0 后续：
+
+- 事项复盘中的价值成果线索仍需继续并入 Dashboard 成果观察。
 - 更完整的工作状态诊断仍需继续补齐，例如跨事项风险、计划阻塞原因、未归档运行记录和成果沉淀缺口。

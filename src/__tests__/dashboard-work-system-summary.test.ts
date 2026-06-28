@@ -256,6 +256,52 @@ describe('dashboard work system summary', () => {
     expect(summary.counts.weeklyOutputs).toBe(1);
   });
 
+  it('surfaces terminal ActionRun summaries as output clues without duplicating known artifacts', () => {
+    const now = Date.parse('2026-06-28T12:00:00.000Z');
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [
+        createActionRun({
+          id: 'run_summary',
+          type: 'knowledge_digest',
+          status: 'done',
+          input: '消化剪藏资料',
+          resultSummary: '提炼了 3 条可复用知识，并建议更新 wiki/index.md',
+          updatedAt: Date.parse('2026-06-27T10:00:00.000Z'),
+        }),
+        createActionRun({
+          id: 'run_artifact',
+          type: 'artifact_create',
+          status: 'done',
+          input: '生成交互报告',
+          resultSummary: '交互报告已生成',
+          artifactIds: ['art_known'],
+          updatedAt: Date.parse('2026-06-27T11:00:00.000Z'),
+        }),
+      ],
+      artifacts: [
+        createArtifact({
+          id: 'art_known',
+          title: '交互报告',
+          createdAt: Date.parse('2026-06-27T11:00:00.000Z'),
+          updatedAt: Date.parse('2026-06-27T11:00:00.000Z'),
+        }),
+      ],
+      now,
+    });
+
+    expect(summary.recentOutputs.map((item) => item.id)).toEqual(['art_known', 'action-run-output:run_summary']);
+    expect(summary.weeklyOutputs.map((item) => item.id)).toEqual(['art_known', 'action-run-output:run_summary']);
+    expect(summary.recentOutputs[1]).toMatchObject({
+      kind: 'action_run',
+      title: '消化剪藏资料',
+      target: '/workbench?view=actions',
+      detail: '提炼了 3 条可复用知识，并建议更新 wiki/index.md',
+      status: 'done',
+    });
+    expect(summary.recentOutputs.some((item) => item.id === 'action-run-output:run_artifact')).toBe(false);
+  });
+
   it('surfaces knowledge health issues as first-class dashboard knowledge updates', () => {
     const summary = buildDashboardWorkSystemSummary({
       sessions: [],

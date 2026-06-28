@@ -82,6 +82,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('Artifact outputs created during the current UTC week');
     expect(skillContent).toContain('Repository `outputs/index.md` entries whose `createdAt`');
     expect(skillContent).toContain('/workbench?view=outputs');
+    expect(skillContent).toContain('terminal ActionRuns with `resultSummary` updated during the current UTC week');
+    expect(skillContent).toContain('/workbench?view=actions');
+    expect(skillContent).toContain('does not duplicate the ActionRun summary as another output');
     expect(skillContent).toContain('Knowledge health issues');
     expect(skillContent).toContain('orphan sources, stale index entries, broken knowledge links');
     expect(skillContent).toContain('undigested sources queue');

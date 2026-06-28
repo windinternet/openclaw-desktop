@@ -179,15 +179,37 @@ export function buildDashboardWorkSystemSummary(
         detail: output.summary ?? output.format ?? output.path,
       },
     }));
+  const knownOutputArtifactIds = new Set([
+    ...artifactIds,
+    ...repositoryOutputItems.map(({ output }) => output.artifactId).filter((id): id is string => Boolean(id)),
+  ]);
+  const actionRunOutputItems = params.actionRuns
+    .filter((run) => run.status === 'done' && Boolean(run.resultSummary))
+    .filter((run) => !(run.artifactIds ?? []).some((artifactId) => knownOutputArtifactIds.has(artifactId)))
+    .map((run) => ({
+      run,
+      item: {
+        id: `action-run-output:${run.id}`,
+        kind: 'action_run' as const,
+        title: run.input || run.type,
+        target: '/workbench?view=actions',
+        updatedAt: run.updatedAt,
+        path: run.workItemPath,
+        detail: run.resultSummary,
+        status: run.status,
+      },
+    }));
   const recentOutputItems = [
     ...artifactOutputItems.map(({ item }) => item),
     ...repositoryOutputItems.map(({ item }) => item),
+    ...actionRunOutputItems.map(({ item }) => item),
   ];
   const weeklyOutputItems = [
     ...artifactOutputItems.filter(({ artifact }) => artifact.createdAt >= weekStart).map(({ item }) => item),
     ...repositoryOutputItems
       .filter(({ output }) => (output.createdAt ?? output.updatedAt ?? 0) >= weekStart)
       .map(({ item }) => item),
+    ...actionRunOutputItems.filter(({ run }) => run.updatedAt >= weekStart).map(({ item }) => item),
   ];
   const knowledgeHealthItems = (params.knowledge?.health?.issues ?? []).map((issue) => ({
     id: issue.id,
