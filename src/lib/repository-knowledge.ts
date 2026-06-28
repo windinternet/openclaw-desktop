@@ -236,6 +236,14 @@ export interface KnowledgeUrlSourceImportInput {
   sourceRoot?: string;
 }
 
+export interface KnowledgeFileSourceImportInput {
+  fileName: string;
+  mimeType?: string;
+  body: string;
+  now?: Date;
+  sourceRoot?: string;
+}
+
 export function buildKnowledgeTextSourceImport(input: KnowledgeTextSourceImportInput): KnowledgeTextSourceImport {
   const body = normalizeSourceBody(input.body);
   const title = normalizeSourceTitle(input.title, body);
@@ -295,6 +303,40 @@ export function buildKnowledgeUrlSourceImport(input: KnowledgeUrlSourceImportInp
   return { title, path, markdown };
 }
 
+export function buildKnowledgeFileSourceImport(input: KnowledgeFileSourceImportInput): KnowledgeTextSourceImport {
+  const body = normalizeSourceBody(input.body);
+  const title = normalizeSourceFileTitle(input.fileName, body);
+  const now = input.now ?? new Date();
+  const date = now.toISOString().slice(0, 10);
+  const time = now.toISOString().slice(11, 19).replace(/:/g, '');
+  const sourceRoot = normalizeSourceRoot(input.sourceRoot ?? 'sources');
+  const mimeType = input.mimeType?.trim();
+  const path = `${sourceRoot}/imported/${date}-${time}-${slugifyKnowledgeTitle(title)}.md`;
+  const markdown = [
+    '---',
+    `title: ${JSON.stringify(title)}`,
+    'source: desktop-file',
+    `fileName: ${JSON.stringify(input.fileName)}`,
+    ...(mimeType ? [`mimeType: ${JSON.stringify(mimeType)}`] : []),
+    `importedAt: ${now.toISOString()}`,
+    '---',
+    '',
+    `# ${title}`,
+    '',
+    '## 原始文件',
+    '',
+    `- ${input.fileName}`,
+    ...(mimeType ? [`- ${mimeType}`] : []),
+    '',
+    '## 原始内容',
+    '',
+    body,
+    '',
+  ].join('\n');
+
+  return { title, path, markdown };
+}
+
 export async function importKnowledgeTextSource(
   binding: RepositoryBinding,
   input: Omit<KnowledgeTextSourceImportInput, 'sourceRoot'>,
@@ -312,6 +354,18 @@ export async function importKnowledgeUrlSource(
   input: Omit<KnowledgeUrlSourceImportInput, 'sourceRoot'>,
 ): Promise<KnowledgeTextSourceImport> {
   const imported = buildKnowledgeUrlSourceImport({
+    ...input,
+    sourceRoot: binding.knowledge.sourceRoot,
+  });
+  await getKnowledgeWriteApi().writeText(binding.repoPath, imported.path, imported.markdown);
+  return imported;
+}
+
+export async function importKnowledgeFileSource(
+  binding: RepositoryBinding,
+  input: Omit<KnowledgeFileSourceImportInput, 'sourceRoot'>,
+): Promise<KnowledgeTextSourceImport> {
+  const imported = buildKnowledgeFileSourceImport({
     ...input,
     sourceRoot: binding.knowledge.sourceRoot,
   });
@@ -694,6 +748,15 @@ function normalizeSourceTitle(title: string | undefined, body: string): string {
     )
     .find(Boolean);
   return (explicit || firstLine || '粘贴资料').slice(0, 160);
+}
+
+function normalizeSourceFileTitle(fileName: string, body: string): string {
+  const baseName = fileName.split(/[\\/]/).pop()?.trim() || '';
+  const withoutExtension = baseName
+    .replace(/\.[^.]+$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return normalizeSourceTitle(withoutExtension || '导入文件', body);
 }
 
 function slugifyKnowledgeTitle(value: string): string {

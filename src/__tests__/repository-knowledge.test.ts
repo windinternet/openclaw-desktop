@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
 import {
+  buildKnowledgeFileSourceImport,
   buildKnowledgeTextSourceImport,
   buildKnowledgeUrlSourceImport,
   buildKnowledgeRepositoryMappingPrompt,
@@ -9,6 +10,7 @@ import {
   classifyKnowledgeSearchResult,
   extractMarkdownLinks,
   findBacklinks,
+  importKnowledgeFileSource,
   importKnowledgeTextSource,
   importKnowledgeUrlSource,
   loadKnowledgeSnapshot,
@@ -127,6 +129,68 @@ describe('repository knowledge', () => {
     );
 
     expect(written.path).toBe('sources/imported/2026-06-28-050607-useful-article.md');
+    expect(writeText).toHaveBeenCalledWith('/repo', written.path, written.markdown);
+  });
+
+  it('builds and writes imported text files as source markdown files', async () => {
+    const now = new Date('2026-06-28T06:07:08.000Z');
+    const imported = buildKnowledgeFileSourceImport({
+      fileName: 'Meeting Notes.md',
+      mimeType: 'text/markdown',
+      body: '# Notes\n\nAction item',
+      now,
+      sourceRoot: 'sources',
+    });
+
+    expect(imported).toEqual({
+      title: 'Meeting Notes',
+      path: 'sources/imported/2026-06-28-060708-meeting-notes.md',
+      markdown: [
+        '---',
+        'title: "Meeting Notes"',
+        'source: desktop-file',
+        'fileName: "Meeting Notes.md"',
+        'mimeType: "text/markdown"',
+        'importedAt: 2026-06-28T06:07:08.000Z',
+        '---',
+        '',
+        '# Meeting Notes',
+        '',
+        '## 原始文件',
+        '',
+        '- Meeting Notes.md',
+        '- text/markdown',
+        '',
+        '## 原始内容',
+        '',
+        '# Notes',
+        '',
+        'Action item',
+        '',
+      ].join('\n'),
+    });
+
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { writeText },
+      },
+    });
+
+    const written = await importKnowledgeFileSource(
+      {
+        ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+        status: 'repo_ready',
+      },
+      {
+        fileName: 'Meeting Notes.md',
+        mimeType: 'text/markdown',
+        body: '# Notes\n\nAction item',
+        now,
+      },
+    );
+
+    expect(written.path).toBe('sources/imported/2026-06-28-060708-meeting-notes.md');
     expect(writeText).toHaveBeenCalledWith('/repo', written.path, written.markdown);
   });
 

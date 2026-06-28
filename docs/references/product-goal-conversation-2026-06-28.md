@@ -496,3 +496,21 @@ HTML 的独特优势：
 - 文件拖拽导入和文件夹导入仍待补齐。
 - 如果后续要自动抓取网页正文，应单独设计网络权限、来源元数据、失败回退和内容清洗边界。
 - “AI 先提出消化计划，批准后写入 `wiki/`、更新 `wiki/index.md` 和 `wiki/log.md`”仍需更完整的 UI 承接。
+
+### 10.13 2026-06-28 当前实施记录：Knowledge 导入文件入口
+
+围绕“Knowledge 导入/消化/健康检查是 P0”中的本地文件导入能力，当前继续落地一段代码事实：
+
+- Knowledge 页面新增“导入文件”入口。
+- 用户可以通过系统文件选择器选择本地 Markdown / TXT 文本文件。
+- Desktop 会读取文件文本，并把内容写入当前绑定仓库的 `sources/imported/YYYY-MM-DD-HHmmss-*.md`。
+- 生成的 Markdown frontmatter 会标记 `source: desktop-file`、原始 `fileName`、可用的 `mimeType` 和 `importedAt`。
+- 导入成功后，Knowledge 会刷新 Snapshot、切到“未消化资料”视图，并打开最后一个导入的资料源。
+- 该入口只保存原始文件文本，不自动生成 Wiki、不更新 `wiki/index.md`、不写入 `wiki/log.md`；后续消化仍通过 `knowledge_rewrite` ActionRun 走计划与审批。
+
+仍未完成的 P0 后续：
+
+- 文件拖拽导入、选择文件夹导入仍待补齐。
+- Office / PDF / 图片 / 音视频 / 二进制文件内容导入仍待单独设计解析、安全、失败回退和来源元数据边界。
+- “AI 先提出消化计划，批准后写入 `wiki/`、更新 `wiki/index.md` 和 `wiki/log.md`”仍需更完整的 UI 承接。
+- 健康检查结果写入 `reviews/weekly/`、长期未复盘项目和相互矛盾记录仍待继续推进。

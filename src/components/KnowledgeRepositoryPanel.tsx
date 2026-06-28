@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Button,
   Card,
@@ -13,7 +13,7 @@ import {
   Toast,
   Typography,
 } from '@douyinfe/semi-ui';
-import { IconBolt, IconFile, IconLink, IconPlus, IconSearch } from '@douyinfe/semi-icons';
+import { IconBolt, IconFile, IconLink, IconPlus, IconSearch, IconUpload } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway, useStore } from '../lib';
@@ -28,6 +28,7 @@ import type {
 } from '../lib/repository-knowledge';
 import {
   buildKnowledgeRewritePrompt,
+  importKnowledgeFileSource,
   importKnowledgeTextSource,
   importKnowledgeUrlSource,
   loadKnowledgeDocumentHistory,
@@ -63,6 +64,7 @@ export default function KnowledgeRepositoryPanel({
   const activeClient = useStore((s) => s.activeClient);
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const agents = useStore((s) => s.agents);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [snapshot, setSnapshot] = useState<KnowledgeSnapshot | null>(null);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<RepositorySearchResult[]>([]);
@@ -196,6 +198,36 @@ export default function KnowledgeRepositoryPanel({
       Toast.error(err instanceof Error ? err.message : t('knowledge.importUrlFailed'));
     } finally {
       setImportLoading(false);
+    }
+  };
+
+  const handleImportFiles = async (files: FileList | null) => {
+    const selectedFiles = Array.from(files ?? []);
+    if (selectedFiles.length === 0) return;
+
+    setImportLoading(true);
+    setError(null);
+    try {
+      let lastImportedPath: string | undefined;
+      for (const file of selectedFiles) {
+        const body = await file.text();
+        const imported = await importKnowledgeFileSource(binding, {
+          fileName: file.name,
+          mimeType: file.type || undefined,
+          body,
+        });
+        lastImportedPath = imported.path;
+      }
+      const nextSnapshot = await loadKnowledgeSnapshot(binding);
+      setSnapshot(nextSnapshot);
+      setActiveSection('digest');
+      if (lastImportedPath) await openDocument(lastImportedPath);
+      Toast.success(t('knowledge.importFileDone', { count: selectedFiles.length }));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('knowledge.importFileFailed'));
+    } finally {
+      setImportLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -756,8 +788,19 @@ export default function KnowledgeRepositoryPanel({
           <Tag color="green">{t('knowledge.wikiCount', { count: snapshot?.wiki.length ?? 0 })}</Tag>
         </Space>
         <Space wrap>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".md,.markdown,.txt,text/markdown,text/plain"
+            multiple
+            style={{ display: 'none' }}
+            onChange={(event) => void handleImportFiles(event.currentTarget.files)}
+          />
           <Button icon={<IconPlus />} onClick={() => setShowImportText(true)}>
             {t('knowledge.importTextSource')}
+          </Button>
+          <Button icon={<IconUpload />} loading={importLoading} onClick={() => fileInputRef.current?.click()}>
+            {t('knowledge.importFileSource')}
           </Button>
           <Button icon={<IconLink />} onClick={() => setShowImportUrl(true)}>
             {t('knowledge.importUrlSource')}
