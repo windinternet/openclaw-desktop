@@ -12,6 +12,8 @@ import type { RepositoryMarkdownFile } from '../lib/repository-knowledge';
 import type { ArtifactMeta } from '../lib/artifact-types';
 import { buildArtifactOutputDescription } from '../lib/artifact-display';
 import type { AiActionRun, AiActionRunStatus } from '../lib/types';
+import { extractWorkbenchMatterId, isWorkbenchMatterPath } from '../lib/workbench-matter';
+import { ArtifactAICreateDrawer } from './ArtifactAICreateDrawer';
 import MarkdownView from './MarkdownView';
 
 const { Text, Title } = Typography;
@@ -147,6 +149,7 @@ export default function WorkbenchRepositoryPanel({
   const [outputSourceFilters, setOutputSourceFilters] = useState<string[]>([]);
   const [outputTypeFilters, setOutputTypeFilters] = useState<string[]>([]);
   const [outputGroupBy, setOutputGroupBy] = useState<OutputGroupBy>('none');
+  const [showMatterArtifactDrawer, setShowMatterArtifactDrawer] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -1034,6 +1037,8 @@ export default function WorkbenchRepositoryPanel({
   };
 
   const selectedProject = snapshot?.projects.find((project) => project.path === selectedPreviewPath);
+  const selectedWorkItemPath = isWorkbenchMatterPath(selectedPreviewPath) ? selectedPreviewPath : undefined;
+  const selectedWorkItemId = selectedWorkItemPath ? extractWorkbenchMatterId(selectedPreviewContent) : undefined;
   const previewTitle =
     panelView === 'projects' ? t('workbench.projectPreview') : selectedPreviewPath || t('workbench.preview');
   const standaloneView = panelView === 'dashboard' || panelView === 'outputs';
@@ -1192,13 +1197,32 @@ export default function WorkbenchRepositoryPanel({
               overflow: 'auto',
             }}
           >
-            <Title heading={5} style={{ marginTop: 0 }} ellipsis={{ showTooltip: true }}>
-              {previewTitle}
-            </Title>
+            <Space align="center" style={{ justifyContent: 'space-between', width: '100%', marginBottom: 12 }}>
+              <Title heading={5} style={{ margin: 0 }} ellipsis={{ showTooltip: true }}>
+                {previewTitle}
+              </Title>
+              {selectedWorkItemPath && (
+                <Button
+                  size="small"
+                  type="tertiary"
+                  icon={<IconBolt />}
+                  onClick={() => setShowMatterArtifactDrawer(true)}
+                >
+                  {t('workbench.createArtifactForMatter')}
+                </Button>
+              )}
+            </Space>
             {renderPreviewContent()}
           </Card>
         )}
       </div>
+      <ArtifactAICreateDrawer
+        visible={showMatterArtifactDrawer}
+        onClose={() => setShowMatterArtifactDrawer(false)}
+        sourcePage="workbench"
+        workItemId={selectedWorkItemId}
+        workItemPath={selectedWorkItemPath}
+      />
     </Space>
   );
 }

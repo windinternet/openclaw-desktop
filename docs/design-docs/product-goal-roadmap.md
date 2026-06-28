@@ -68,7 +68,87 @@ OpenClaw Desktop
 
 > Desktop Self-Knowledge Pack 只提供“如何使用 Desktop 能力”的通用说明；凡涉及当前仓库内容、路径、写入规则、项目目标和工作边界，必须以 Repository Context 和仓库 `AGENTS.md` 为准。
 
+### 2.3 2026-06-28 P0 校正
+
+以下校正来自 2026-06-28 对产品目标的复审和用户反馈，必须进入 P0 规划，而不能被后续 Artifact 单点收口稀释：
+
+其中开箱体验、知识库导入/消化/健康检查、事务推进闭环、Dashboard 真实推进状态和可复用资产一等对象，均来自用户截图追溯确认。它们不是普通建议备忘，而是 P0 验收来源。
+
+1. **外部生态入口不是当前 P0 风险**
+   - SkillHub / ClawHub / GitHub release 等入口可通过开源源码、协议开放和数据可迁移性保证自由边界。
+   - 当前不把这些外部入口列为 P0 实施阻塞。
+
+2. **开箱体验是 P0**
+   - 不隐藏 Gateway，但要把 Gateway 从“用户目标”降级为“基础设施”。
+   - 当前第一感受不应是“我要先连接一个 Gateway”，而应是“我想让小龙虾帮我管理知识、推进事情、留下成果；连接 Gateway 只是为了让 AI 能干活”。
+   - 推荐开箱金线：
+
+```text
+打开应用
+  -> 选择语言 / 主题
+  -> 自动发现或安装 Gateway
+  -> 创建本地工作仓库
+  -> 输入第一件事
+  -> 进入工作台
+```
+
+3. **Dashboard 真实推进状态是 P0**
+   - Dashboard 首屏应从 Gateway 状态优先，改成用户工作优先。
+   - 第一屏应展示今日继续、待确认、最近成果、知识动态、卡住事项和本周新增成果。
+   - Gateway 健康状态应退到顶部小状态条，而不是主叙事。
+   - 当前代码第一片已落地：Dashboard 首屏新增“我的工作系统”摘要，从 Sessions、Workbench、Knowledge、ActionRun 和 Artifacts 聚合今日继续、待确认、卡住事项、最近成果和知识动态；事项 `## 收尾动作` 的未勾选项已进入“待确认”，并可在 Dashboard 标记完成、写回事项 Markdown。本周新增成果、知识健康检查结果和更完整的工作状态诊断仍待继续接入。
+
+4. **Repository 初始化前置是 P0**
+   - 仓库绑定不能只藏在 Workbench / Knowledge 里等用户发现。
+   - 首次成功连接 Gateway 后，应立即引导用户“创建我的工作仓库”。
+   - UI 第一层用普通语言表达资料、知识、事项、计划、执行记录、成果、复盘；高级用户再看到目录和协议。
+
+5. **Knowledge 导入、消化、健康检查是 P0**
+   - 导入中心：支持拖文件、粘贴文本、剪藏 URL、选择文件夹；原始内容先进入 `sources/`，自动生成来源元数据。
+   - 消化队列：新增“未消化资料”视图；用户点击“消化为知识”后，AI 先提出计划，批准后写入 `wiki/`，更新 `wiki/index.md` 和 `wiki/log.md`。
+   - 健康检查：定期检查孤立资料、过期索引、断链、没有来源引用的 Wiki、长期未复盘项目、相互矛盾记录；结果进入 `reviews/weekly/`。
+
+6. **事务推进闭环是 P0**
+   - 每个工作事项必须有唯一 ID。
+   - `work/active/foo.md` 应明确目标、状态、验收标准、关联资料、关联计划、关联运行记录和关联成果。
+   - 每次 AI 执行都必须归属某个事项；ActionRun 完成后自动追加到 `runs/action-runs/`，并回写事项页的执行记录。
+   - 执行结束必须触发尾动作：是否更新事项状态、是否沉淀成果、是否更新知识库、是否写入复盘。
+
+7. **可复用资产一等对象是 P0**
+   - 工具、脚本、模板、工作流、提示词、检查清单等不是普通附件。
+   - 它们应有来源、版本、权限、审批边界、运行记录和产出关联。
+   - 它们可以作为 Artifact 的 `reuseKind` 被沉淀，也需要在 Repository 中形成可被 Agent 检索和复用的资产目录。
+
 ## 3. P0 推进方向
+
+### P0-0 开箱体验与工作系统金线
+
+目标：让普通用户第一天进入的是“我的 AI 工作系统”，而不是“Gateway 控制台”。
+
+范围：
+
+- 首屏叙事从连接控制台转向创建工作系统。
+- Gateway 自动发现、安装或连接作为基础设施步骤。
+- 首次连接成功后引导创建本地 Agentic Repository。
+- 输入第一件事后进入工作台，而不是停留在连接完成状态。
+- UI 第一层使用“资料 / 知识 / 事项 / 计划 / 执行记录 / 成果 / 复盘”的普通语言。
+
+当前代码事实：
+
+- Dashboard 已在连接 Gateway 但当前实例没有可用 Repository 时，前置显示“创建你的工作系统”引导。
+- 该引导把 Gateway 连接标为已完成，把“创建本地工作仓库”列为下一步，并直接复用 `RepositoryGate area="workbench"` 的本地仓库创建能力。
+- Setup / Welcome 连接成功后已显式导航到 `/?onboarding=work-system`，`HomeRoute` 会在该 query 存在时绕过用户默认首页偏好并进入 Dashboard。
+- Dashboard 识别 `onboarding=work-system` 后会优先显示工作系统开箱引导，并用稳定锚点 `work-system-onboarding` 定位。
+- 仓库就绪后，引导中的“输入第一件事”会调用 Desktop 仓库写入能力，生成 `work/active/YYYY-MM-DD-HHmmss-*.md`。
+- 生成的事项 Markdown 包含唯一 ID、`status: active`、`source: desktop-onboarding`、目标、验收标准、关联资料、关联计划、执行记录、关联成果和复盘占位。
+- 第一件事写入成功后会自动进入 `/workbench`，让用户看到刚创建的工作事项。
+- 这只是 P0-0 核心金线：后续仍需在“开始一件事”专题中补齐事项计划、ActionRun 执行、产物沉淀和复盘尾动作。
+
+验收：
+
+- 新用户能沿着开箱金线完成“打开应用 -> 连接或安装 Gateway -> 创建本地工作仓库 -> 输入第一件事 -> 进入工作台”。
+- 用户不需要先理解 Repository、runs、schemas、protocol 等目录术语。
+- Gateway 状态可见，但不抢占用户目标叙事。
 
 ### P0-1 Desktop Self-Knowledge Pack
 
@@ -119,7 +199,11 @@ HTML 产物是特色能力：
 - 产物能清楚标注来源：chat / workflow / agent_team / manual / mcp_tool / action_run。
 - HTML 产物可预览、可打开、可版本化、可沉淀到仓库。
 - 新产物和 `desktop.artifacts.inspect` 刷新的文件型产物会记录 `previewPlan`，把 Office/PDF/媒体等当前可用的安全预览策略、限制和下一步缺口沉淀到 Artifact 详情、Gateway 搜索和 Repository outputs。
-- 已导入文本、代码和 HTML 文件副本可自动安全抽取 `contentExtract`，并进入 Artifact 详情、Gateway 命令、搜索、复用引用和 Repository outputs；Office/PDF/媒体内容级解析仍作为后续能力推进。
+- Desktop 会基于 Artifact 事实计算只读 `valueHealth`，让用户和 Gateway 在搜索、描述、复用引用和 Repository outputs 中直接看到产物是 ready、usable_with_limits 还是 needs_attention，并看到 gaps 与 nextActions。
+- ActionRun 仓库摘要会解析已生成 Artifact meta，列出价值摘要、`valueHealth`、`previewPlan`、`reuseKind` 和 Repository output / preview 路径，让非聊天式 AI 操作的结果能被复盘和继续使用。
+- 已导入文本、代码、HTML、PDF 和 Word/Excel/PowerPoint OOXML 文件副本可自动安全抽取 `contentExtract`，其中 PDF 与 OOXML 是基于导入副本 PDF text streams 或 OOXML XML entries 的 best-effort 文本抽取；抽取事实会进入 Artifact 详情、Gateway 命令、搜索、复用引用和 Repository outputs；旧版二进制 Office/音视频内容级解析仍作为后续能力推进。
+- 已导入 Office、PDF、图片、音频、视频和普通文件副本可自动安全记录 `contentFacts`，把文件大小、sha256、文件头签名、可识别图片尺寸和 best-effort PDF 版本/页数沉淀到 Artifact 详情、Gateway 命令、搜索、复用引用和 Repository outputs；已导入图片副本可自动安全记录 `thumbnail` 并用于 Artifacts UI 真实缩略图，Repository outputs 只记录可用状态；旧版二进制 Office 正文解析和 Office/PDF/音视频原生缩略图仍作为后续能力推进。
+- 内容抽取、文件事实抽取和缩略图生成会写入 `enrichmentEvents`，记录成功、不可用或失败的 kind / format / reason / resultSummary / error，并进入 Artifact 详情、搜索文本、Repository output markdown 和 `outputs/index.md`，让产物增强过程本身可观测、可复盘。
 
 ### P0-3 ActionRun 定位统一
 
@@ -137,6 +221,7 @@ HTML 产物是特色能力：
 - ActionRun 文档明确不隶属于 Workbench。
 - 所有非聊天 UI AI 操作都能归类为 ActionRun。
 - ActionRun 能产生产物、知识库更新、仓库写入、团队草稿、复盘建议等结果。
+- ActionRun 仓库摘要能呈现产物价值摘要、`valueHealth`、`previewPlan`、`reuseKind` 和 Repository output / preview 路径。
 
 ### P0-4 Knowledge 导入、消化、健康检查
 
@@ -156,11 +241,42 @@ HTML 产物是特色能力：
 - 用户能从 UI 发起“消化为知识” ActionRun。
 - 健康检查结果能进入 `reviews/weekly/` 或 Dashboard。
 
-### P0-5 “开始一件事闭环”专题
+### P0-5 事务推进与 ActionRun / Workbench 硬连接
+
+目标：让每一次 AI 执行都有明确归属、结果和尾动作，避免 ActionRun 只成为孤立记录。
+
+范围：
+
+- 工作事项唯一 ID。
+- 事项页包含目标、状态、验收标准、关联资料、关联计划、关联运行记录和关联成果。
+- ActionRun 必须能关联或创建工作事项。
+- ActionRun 完成后写入 `runs/action-runs/`，并回写事项页执行记录。
+- 执行结束后提示或自动建议尾动作：更新事项状态、沉淀成果、更新知识库、写入复盘。
+
+当前代码事实：
+
+- `AiActionRun` 已支持可选 `workItemId` / `workItemPath`。
+- ActionRun 仓库摘要会写入 `workItemId` / `workItemPath`，让 `runs/action-runs/*.md` 保留归属线索。
+- 当终态 ActionRun 带有安全的 `workItemPath` 且仓库绑定就绪时，Desktop 会读取对应 `work/` 下的事项 Markdown，向 `## 执行记录` 追加包含时间、类型、状态、`runs/action-runs/<id>.md` 链接和结果摘要的一条记录，并向 `## 收尾动作` 追加更新事项状态、沉淀成果、更新知识库和写入复盘的检查清单。
+- Workbench 快照会解析工作事项里的 `## 收尾动作`，Dashboard “待确认”会显示未勾选收尾动作，让 ActionRun 结束后的后续判断进入每日推进面板。
+- Dashboard 会把未完成收尾动作分类为 `tail-action:status`、`tail-action:output`、`tail-action:knowledge` 或 `tail-action:review`，分别导向 Workbench 状态处理、Artifacts、Knowledge 或 Workbench 复盘后续。
+- 这些目标 URL 会携带 `tailAction`、`tailActionId` 和 `workItemPath`；Artifacts 会据此打开 AI 产物创建入口并带上来源事项，成果类尾动作会预填基于来源事项和最近执行记录沉淀成果的提示；Knowledge 会进入维护上下文，Workbench 会切到状态或复盘相关 tab 并显示来源事项。
+- 用户可在 Dashboard 将单条收尾动作标记完成；Desktop 会读取来源事项 Markdown，只把对应 `## 收尾动作` 行写回为 `[x]`，不自动执行更新状态、沉淀成果、更新知识库或写入复盘。
+- 回写只允许发生在当前绑定仓库的 `work/` 下 Markdown，且同一个 run 路径已存在时不会重复追加。
+- Workbench 预览 `work/active/`、`work/completed/`、`work/someday/` 下的事项 Markdown 时，已提供“生成成果”入口；该入口复用 Artifact AI 创建抽屉，创建 `artifact_create` ActionRun 时写入 `sourcePage: workbench`、当前 `workItemPath`，并在事项 frontmatter 有 `id` 时写入 `workItemId`。
+- 这只是硬连接早期切片：全局 UI 侧强制归属、事项选择器、事项计划、尾动作的具体处理流程和复盘沉淀仍未完成。
+
+验收：
+
+- 一个事项能串起 sources / wiki / plans / runs / outputs / reviews。
+- ActionRun 不再只是“做过一次 AI 操作”，而是进入工作系统的推进记录。
+- Dashboard 能展示卡住事项、待确认计划、今天可继续工作和本周新增成果。
+
+### P0-6 “开始一件事闭环”专题
 
 目标：把用户一句话转成可推进、可观测、可沉淀的工作闭环。
 
-当前只记录专题，不在本文展开。
+该专题仍需要单独深入设计，但优先级是 P0，不应降级为体验优化。
 
 专题范围：
 
@@ -173,6 +289,22 @@ HTML 产物是特色能力：
   -> 产生产物
   -> 更新知识库 / 复盘
 ```
+
+### P0-7 可复用资产一等对象
+
+目标：把工具、脚本、模板、工作流、提示词和检查清单作为可追踪、可审批、可复用的资产，而不是散落附件。
+
+范围：
+
+- 资产来源：由 Artifact 沉淀、从仓库导入、由 ActionRun 生成或由用户手动创建。
+- 资产元数据：类型、版本、权限、审批要求、运行方式、最近运行、关联输出。
+- 资产运行记录进入 `runs/`，产出进入 `outputs/`，复盘进入 `reviews/`。
+
+验收：
+
+- 用户和 Agent 能搜索“可复用的脚本 / 模板 / 工作流”。
+- 执行前能看到权限和审批边界。
+- 执行后能看到运行记录、产物和复盘线索。
 
 ## 4. P1 / P2 推进方向
 
@@ -187,17 +319,6 @@ HTML 产物是特色能力：
 - ActionRun 执行过程展示当前步骤和审批点。
 - MCP/tool 调用链可视化。
 
-### P1 可复用资产目录
-
-目标：把工具、脚本、模板、工作流、提示词、清单作为可复用资产管理。
-
-方向：
-
-- 扫描 `tools/` 或未来资产目录。
-- 显示类型、权限、版本、来源、最近运行。
-- 允许从产物保存为模板或工具。
-- 运行记录写入 `runs/tool-runs/`。
-
 ### P2 性能、发布和体验打磨
 
 目标：提升普通用户交付体验。
@@ -211,22 +332,28 @@ HTML 产物是特色能力：
 
 ## 5. 推荐执行顺序
 
-1. **Desktop Self-Knowledge Pack**
+1. **开箱体验与工作系统金线**
+   - 先把用户第一天的入口从 Gateway 控制台改成工作系统创建。
+
+2. **Desktop Self-Knowledge Pack**
    - 先让 Gateway 懂 Desktop。
    - 为聊天补位和后续 UI 能力打基础。
 
-2. **Artifact 产物系统收口**
+3. **Artifact 产物系统收口**
    - 明确产物是 P0 价值层。
    - 强化 HTML 特色能力。
 
-3. **ActionRun 定位统一**
+4. **ActionRun 定位统一**
    - 让所有非聊天式 AI 操作有一致协议和记录。
 
-4. **Knowledge 导入/消化/健康检查**
+5. **Knowledge 导入/消化/健康检查**
    - 让知识库形成长期成长机制。
 
-5. **“开始一件事闭环”专题设计**
-   - 在上述能力更清晰后，串成普通人第一天就能使用的主路径。
+6. **事务推进与 Dashboard 真实状态**
+   - 把 Workbench、ActionRun、Artifacts、Knowledge 的事实串到用户可观测的每日推进面板。
+
+7. **可复用资产一等对象**
+   - 让工具、脚本、模板、工作流具备来源、版本、权限和运行记录。
 
 ## 6. 设计约束
 

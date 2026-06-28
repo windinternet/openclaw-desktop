@@ -3,6 +3,8 @@ import type { RepositoryBinding } from './agentic-repository';
 import { loadRepositoryBinding } from './agentic-repository-store';
 import { buildArtifactVersionHistory } from './artifact-version-history';
 import { buildArtifactPreviewCard } from './artifact-display';
+import { formatArtifactPdfFacts } from './artifact-content-facts';
+import { buildArtifactValueHealth } from './artifact-value-health';
 
 export interface CreateRepositoryOutputParams {
   binding: RepositoryBinding;
@@ -45,9 +47,12 @@ export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string
   const lastReuseEvent = reuseEvents[reuseEvents.length - 1];
   const executionEvents = artifact.executionEvents ?? [];
   const lastExecutionEvent = executionEvents[executionEvents.length - 1];
+  const enrichmentEvents = artifact.enrichmentEvents ?? [];
+  const lastEnrichmentEvent = enrichmentEvents[enrichmentEvents.length - 1];
   const versions = buildArtifactVersionHistory(artifact);
   const latestVersion = versions[versions.length - 1];
   const previewCard = buildArtifactPreviewCard(artifact);
+  const valueHealth = buildArtifactValueHealth(artifact);
 
   return [
     `# ${artifact.title}`,
@@ -66,6 +71,7 @@ export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string
     artifact.source.name ? `sourceName: ${artifact.source.name}` : undefined,
     artifact.externalFormat ? `externalFormat: ${artifact.externalFormat}` : undefined,
     artifact.contentSummary ? `contentSummary: ${artifact.contentSummary}` : undefined,
+    artifact.thumbnail ? 'thumbnail: available' : undefined,
     artifact.fileInspection ? `fileInspectionFormat: ${artifact.fileInspection.format}` : undefined,
     artifact.fileInspection ? `fileInspectionSource: ${artifact.fileInspection.sourceKind}` : undefined,
     artifact.fileInspection ? `fileInspectionOpen: ${artifact.fileInspection.openBehavior}` : undefined,
@@ -90,12 +96,46 @@ export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string
     artifact.contentExtract
       ? `contentExtractAt: ${new Date(artifact.contentExtract.extractedAt).toISOString()}`
       : undefined,
+    artifact.contentFacts ? `contentFactsStatus: ${artifact.contentFacts.status}` : undefined,
+    artifact.contentFacts ? `contentFactsFormat: ${artifact.contentFacts.format}` : undefined,
+    artifact.contentFacts ? `contentFactsSource: ${artifact.contentFacts.sourceKind}` : undefined,
+    artifact.contentFacts ? `contentFactsSummary: ${artifact.contentFacts.summary}` : undefined,
+    artifact.contentFacts?.fileName ? `contentFactsFileName: ${artifact.contentFacts.fileName}` : undefined,
+    artifact.contentFacts?.mimeType ? `contentFactsMimeType: ${artifact.contentFacts.mimeType}` : undefined,
+    artifact.contentFacts?.fileSize !== undefined
+      ? `contentFactsFileSize: ${artifact.contentFacts.fileSize}`
+      : undefined,
+    artifact.contentFacts ? `contentFactsBytes: ${artifact.contentFacts.bytesRead}` : undefined,
+    artifact.contentFacts ? `contentFactsSha256: ${artifact.contentFacts.sha256}` : undefined,
+    artifact.contentFacts ? `contentFactsSignature: ${artifact.contentFacts.signatureHex}` : undefined,
+    artifact.contentFacts?.imageDimensions
+      ? `contentFactsImage: ${artifact.contentFacts.imageDimensions.width}x${artifact.contentFacts.imageDimensions.height} ${artifact.contentFacts.imageDimensions.kind}`
+      : undefined,
+    artifact.contentFacts?.pdfInfo
+      ? `contentFactsPdf: ${formatArtifactPdfFacts(artifact.contentFacts.pdfInfo)}`
+      : undefined,
+    artifact.contentFacts ? `contentFactsAt: ${new Date(artifact.contentFacts.extractedAt).toISOString()}` : undefined,
+    enrichmentEvents.length ? `enrichmentEventCount: ${enrichmentEvents.length}` : undefined,
+    lastEnrichmentEvent ? `lastEnrichmentKind: ${lastEnrichmentEvent.kind}` : undefined,
+    lastEnrichmentEvent ? `lastEnrichmentStatus: ${lastEnrichmentEvent.status}` : undefined,
+    lastEnrichmentEvent ? `lastEnrichmentFormat: ${lastEnrichmentEvent.format}` : undefined,
+    lastEnrichmentEvent?.reason ? `lastEnrichmentReason: ${lastEnrichmentEvent.reason}` : undefined,
+    lastEnrichmentEvent?.resultSummary
+      ? `lastEnrichmentSummary: ${formatInlineText(lastEnrichmentEvent.resultSummary)}`
+      : undefined,
+    lastEnrichmentEvent?.error ? `lastEnrichmentError: ${formatInlineText(lastEnrichmentEvent.error)}` : undefined,
+    lastEnrichmentEvent ? `lastEnrichmentAt: ${new Date(lastEnrichmentEvent.attemptedAt).toISOString()}` : undefined,
     `previewCardFormat: ${previewCard.formatLabel}`,
     `previewCardThumbnail: ${previewCard.thumbnailLabel}`,
     `previewCardSummary: ${previewCard.summary}`,
     previewCard.location ? `previewCardLocation: ${previewCard.location}` : undefined,
     `previewCardAction: ${previewCard.primaryAction}`,
     previewCard.safetyNote ? `previewCardSafety: ${previewCard.safetyNote}` : undefined,
+    `valueHealthStatus: ${valueHealth.status}`,
+    `valueHealthSummary: ${valueHealth.summary}`,
+    valueHealth.strengths.length ? `valueHealthStrengths: ${valueHealth.strengths.join(', ')}` : undefined,
+    valueHealth.gaps.length ? `valueHealthGaps: ${valueHealth.gaps.join(', ')}` : undefined,
+    valueHealth.nextActions.length ? `valueHealthNextActions: ${valueHealth.nextActions.join(', ')}` : undefined,
     artifact.previewPlan ? `previewPlanStrategy: ${artifact.previewPlan.strategy}` : undefined,
     artifact.previewPlan ? `previewPlanSurface: ${artifact.previewPlan.surface}` : undefined,
     artifact.previewPlan ? `previewPlanAction: ${artifact.previewPlan.primaryAction}` : undefined,
@@ -212,8 +252,11 @@ export async function mirrorArtifactToReadyRepositoryOutput(
 
 function buildOutputIndexEntry(artifact: ArtifactMeta, outputPath: string, previewPath?: string): string {
   const previewCard = buildArtifactPreviewCard(artifact);
+  const valueHealth = buildArtifactValueHealth(artifact);
   const executionCount = artifact.executionEvents?.length ?? 0;
   const lastExecutionEvent = artifact.executionEvents?.[executionCount - 1];
+  const enrichmentCount = artifact.enrichmentEvents?.length ?? 0;
+  const lastEnrichmentEvent = artifact.enrichmentEvents?.[enrichmentCount - 1];
   return [
     `- [${artifact.title}](${outputPath}) (\`${artifact.id}\`, ${artifact.type}, ${artifact.status})`,
     `  - artifact: artifact://${artifact.id}`,
@@ -222,11 +265,21 @@ function buildOutputIndexEntry(artifact: ArtifactMeta, outputPath: string, previ
     previewPath ? `  - preview: ${previewPath}` : undefined,
     artifact.externalFormat ? `  - format: ${artifact.externalFormat}` : undefined,
     artifact.contentSummary ? `  - summary: ${artifact.contentSummary}` : undefined,
+    artifact.thumbnail ? '  - thumbnail: available' : undefined,
     artifact.contentExtract
       ? `  - contentExtract: ${artifact.contentExtract.status}, ${artifact.contentExtract.textLength} chars${
           artifact.contentExtract.truncated ? ', truncated' : ''
         }`
       : undefined,
+    artifact.contentFacts
+      ? `  - contentFacts: ${artifact.contentFacts.status}, sha256 ${artifact.contentFacts.sha256.slice(0, 12)}`
+      : undefined,
+    artifact.contentFacts?.pdfInfo
+      ? `  - contentFactsPdf: ${formatArtifactPdfFacts(artifact.contentFacts.pdfInfo)}`
+      : undefined,
+    lastEnrichmentEvent ? `  - enrichment: ${lastEnrichmentEvent.kind}, ${lastEnrichmentEvent.status}` : undefined,
+    `  - valueHealth: ${valueHealth.status}`,
+    valueHealth.gaps.length ? `  - valueHealthGaps: ${valueHealth.gaps.join(', ')}` : undefined,
     artifact.fileInspection
       ? `  - inspection: ${artifact.fileInspection.sourceKind}, ${artifact.fileInspection.previewStatus}`
       : undefined,

@@ -1,4 +1,6 @@
 import type { ArtifactMeta } from './artifact-types';
+import { formatArtifactPdfFacts } from './artifact-content-facts';
+import { buildArtifactValueHealth } from './artifact-value-health';
 
 export interface ArtifactReuseReference {
   uri: string;
@@ -9,6 +11,7 @@ export function buildArtifactReuseReference(artifact: ArtifactMeta): ArtifactReu
   const uri = `artifact://${artifact.id}`;
   const lastReuseEvent = artifact.reuseEvents?.[artifact.reuseEvents.length - 1];
   const lastExecutionEvent = artifact.executionEvents?.[artifact.executionEvents.length - 1];
+  const valueHealth = buildArtifactValueHealth(artifact);
   const lines = [
     `- [${artifact.title}](${uri})`,
     `  - artifactId: ${artifact.id}`,
@@ -16,6 +19,10 @@ export function buildArtifactReuseReference(artifact: ArtifactMeta): ArtifactReu
     artifact.reuseKind ? `  - reuseKind: ${artifact.reuseKind}` : undefined,
     artifact.externalFormat ? `  - format: ${artifact.externalFormat}` : undefined,
     artifact.contentSummary ? `  - summary: ${artifact.contentSummary}` : undefined,
+    artifact.thumbnail ? '  - thumbnail: available' : undefined,
+    `  - valueHealth: ${valueHealth.status}`,
+    valueHealth.gaps.length ? `  - valueHealthGaps: ${valueHealth.gaps.join(', ')}` : undefined,
+    valueHealth.nextActions.length ? `  - valueHealthNextActions: ${valueHealth.nextActions.join(', ')}` : undefined,
     `  - source: ${formatSource(artifact)}`,
     artifact.repositoryOutputPath ? `  - repositoryOutput: ${artifact.repositoryOutputPath}` : undefined,
     artifact.repositoryPreviewPath ? `  - repositoryPreview: ${artifact.repositoryPreviewPath}` : undefined,
@@ -31,6 +38,11 @@ export function buildArtifactReuseReference(artifact: ArtifactMeta): ArtifactReu
       : undefined,
     artifact.contentExtract ? `  - contentExtract: ${artifact.contentExtract.status}` : undefined,
     artifact.contentExtract ? `  - contentExtractSummary: ${artifact.contentExtract.summary}` : undefined,
+    artifact.contentFacts ? `  - contentFacts: ${artifact.contentFacts.status}` : undefined,
+    artifact.contentFacts ? `  - contentFactsSummary: ${artifact.contentFacts.summary}` : undefined,
+    artifact.contentFacts?.pdfInfo
+      ? `  - contentFactsPdf: ${formatArtifactPdfFacts(artifact.contentFacts.pdfInfo)}`
+      : undefined,
     artifact.fileName ? `  - fileName: ${artifact.fileName}` : undefined,
     artifact.filePath ? `  - filePath: ${artifact.filePath}` : undefined,
     artifact.url ? `  - url: ${artifact.url}` : undefined,

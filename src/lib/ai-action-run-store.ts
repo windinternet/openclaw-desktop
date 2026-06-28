@@ -16,12 +16,12 @@ import { fetchGatewayAgents } from './gateway-agents';
 import { loadRepositoryBinding } from './agentic-repository-store';
 import { artifactPersistence } from './artifact-persistence';
 import { parseArtifactsFromText, saveArtifactFromChat } from './artifact-parser';
-import {
-  buildArtifactRepositoryOutputUpdates,
-  mirrorArtifactToReadyRepositoryOutput,
-} from './repository-outputs';
+import { buildArtifactRepositoryOutputUpdates, mirrorArtifactToReadyRepositoryOutput } from './repository-outputs';
+import { buildArtifactOutputDescription } from './artifact-display';
+import { buildArtifactValueHealth } from './artifact-value-health';
 import { loadInstanceData, saveInstanceDataAwaited } from './local-persistence';
 import type { ArtifactMeta } from './artifact-types';
+import type { RepositoryBinding } from './agentic-repository';
 import type { AgentTeamProfile, AiActionRun, AiActionRunStatus } from './types';
 
 export interface AiActionGatewayClient {
@@ -61,6 +61,8 @@ export function buildAiActionRunMarkdown(run: AiActionRun, artifacts: ArtifactMe
     `executionMode: ${run.executionMode}`,
     run.gatewaySessionKey ? `gatewaySessionKey: ${run.gatewaySessionKey}` : undefined,
     run.gatewayRunId ? `gatewayRunId: ${run.gatewayRunId}` : undefined,
+    run.workItemId ? `workItemId: ${run.workItemId}` : undefined,
+    run.workItemPath ? `workItemPath: ${run.workItemPath}` : undefined,
     `createdAt: ${new Date(run.createdAt).toISOString()}`,
     `updatedAt: ${new Date(run.updatedAt).toISOString()}`,
     '',
@@ -90,6 +92,7 @@ export function buildAiActionRunMarkdown(run: AiActionRun, artifacts: ArtifactMe
       lines.push(`- ${title} (\`${artifact.id}\`, ${artifact.type})`);
       if (artifact.repositoryPreviewPath) lines.push(`  - preview: ${artifact.repositoryPreviewPath}`);
       lines.push(`  - detail: artifact://${artifact.id}`);
+      lines.push(...buildAiActionRunArtifactValueLines(artifact));
     }
     lines.push('');
   }
@@ -107,6 +110,24 @@ export function buildAiActionRunMarkdown(run: AiActionRun, artifacts: ArtifactMe
   return lines.filter((line): line is string => typeof line === 'string').join('\n');
 }
 
+function buildAiActionRunArtifactValueLines(artifact: ArtifactMeta): string[] {
+  const valueSummary = buildArtifactOutputDescription(artifact);
+  const valueHealth = buildArtifactValueHealth(artifact);
+  const enrichmentCount = artifact.enrichmentEvents?.length ?? 0;
+  const lastEnrichmentEvent = artifact.enrichmentEvents?.[enrichmentCount - 1];
+  return [
+    valueSummary ? `  - summary: ${valueSummary}` : undefined,
+    `  - valueHealth: ${valueHealth.status}`,
+    valueHealth.gaps.length ? `  - valueHealthGaps: ${valueHealth.gaps.join(', ')}` : undefined,
+    valueHealth.nextActions.length ? `  - valueHealthNextActions: ${valueHealth.nextActions.join(', ')}` : undefined,
+    artifact.previewPlan
+      ? `  - previewPlan: ${artifact.previewPlan.strategy}, ${artifact.previewPlan.primaryAction}`
+      : undefined,
+    lastEnrichmentEvent ? `  - enrichment: ${lastEnrichmentEvent.kind}, ${lastEnrichmentEvent.status}` : undefined,
+    artifact.reuseKind ? `  - reuseKind: ${artifact.reuseKind}` : undefined,
+  ].filter((line): line is string => typeof line === 'string');
+}
+
 async function mirrorTerminalAiActionRunToRepository(instanceId: string, run: AiActionRun): Promise<void> {
   if (!['done', 'failed', 'cancelled'].includes(run.status)) return;
   const binding = await loadRepositoryBinding(instanceId);
@@ -114,16 +135,112 @@ async function mirrorTerminalAiActionRunToRepository(instanceId: string, run: Ai
 
   const repository = typeof window !== 'undefined' ? window.electronAPI?.repository : undefined;
   if (!repository?.writeText || !repository.readText) return;
+  const repositoryApi = {
+    readText: repository.readText,
+    writeText: repository.writeText,
+  };
 
   const runPath = `${binding.paths.runs}/action-runs/${run.id}.md`;
   const artifacts = await loadRunArtifacts(run.artifactIds);
-  await repository.writeText(binding.repoPath, runPath, buildAiActionRunMarkdown(run, artifacts));
+  await repositoryApi.writeText(binding.repoPath, runPath, buildAiActionRunMarkdown(run, artifacts));
 
   const indexPath = `${binding.paths.runs}/action-runs/index.md`;
-  const existingIndex = await repository.readText(binding.repoPath, indexPath);
+  const existingIndex = await repositoryApi.readText(binding.repoPath, indexPath);
   const indexEntry = `- [${run.type}](${runPath}) - ${run.status}`;
   const nextIndex = existingIndex.includes(runPath) ? existingIndex : `${existingIndex.trimEnd()}\n${indexEntry}\n`;
-  await repository.writeText(binding.repoPath, indexPath, nextIndex);
+  await repositoryApi.writeText(binding.repoPath, indexPath, nextIndex);
+  await appendActionRunExecutionRecordToWorkItem(repositoryApi, binding, run, runPath);
+}
+
+async function appendActionRunExecutionRecordToWorkItem(
+  repository: {
+    readText: (repoPath: string, relativePath: string) => Promise<string>;
+    writeText: (repoPath: string, relativePath: string, content: string) => Promise<void>;
+  },
+  binding: RepositoryBinding,
+  run: AiActionRun,
+  runPath: string,
+): Promise<void> {
+  const workItemPath = normalizeRunWorkItemPath(run.workItemPath, binding.paths.work);
+  if (!workItemPath) return;
+
+  const existing = await repository.readText(binding.repoPath, workItemPath);
+  if (!existing.trim() || existing.includes(runPath)) return;
+
+  const runLink = buildRunMarkdownLink(workItemPath, runPath);
+  let next = appendExecutionRecordMarkdown(existing, buildExecutionRecordLine(run, runLink));
+  next = appendTailActionMarkdown(next, buildTailActionLines(runLink));
+  if (next !== existing) await repository.writeText(binding.repoPath, workItemPath, next);
+}
+
+function normalizeRunWorkItemPath(value: string | undefined, workRoot: string): string | null {
+  if (!value) return null;
+  const path = value.trim().replace(/^\/+/, '');
+  const root = workRoot.trim().replace(/^\/+|\/+$/g, '');
+  if (!path || !root || !path.endsWith('.md') || path.includes('..') || root.includes('..')) return null;
+  return path.startsWith(`${root}/`) ? path : null;
+}
+
+function buildExecutionRecordLine(run: AiActionRun, runLink: string): string {
+  const summary = oneLine(run.resultSummary || run.error || run.input || run.type);
+  return `- ${new Date(run.updatedAt).toISOString()} · ${run.type} · ${run.status} · ${runLink} · ${summary}`;
+}
+
+function buildRunMarkdownLink(workItemPath: string, runPath: string): string {
+  return `[${runPath}](${relativeMarkdownLink(workItemPath, runPath)})`;
+}
+
+function appendExecutionRecordMarkdown(markdown: string, recordLine: string): string {
+  const lines = markdown.split('\n');
+  const headerIndex = lines.findIndex((line) => line.trim() === '## 执行记录');
+  if (headerIndex === -1) return `${markdown.trimEnd()}\n\n## 执行记录\n\n${recordLine}\n`;
+
+  let insertIndex = headerIndex + 1;
+  while (insertIndex < lines.length && lines[insertIndex].trim() === '') insertIndex += 1;
+  while (insertIndex < lines.length && lines[insertIndex].trim() === '- 暂无') {
+    lines.splice(insertIndex, 1);
+    while (insertIndex < lines.length && lines[insertIndex].trim() === '') lines.splice(insertIndex, 1);
+  }
+  lines.splice(insertIndex, 0, recordLine);
+  return `${lines.join('\n').trimEnd()}\n`;
+}
+
+function buildTailActionLines(runLink: string): string[] {
+  return [
+    `- [ ] 根据 ${runLink} 更新事项状态。`,
+    '- [ ] 判断是否需要把本次执行结果沉淀为成果，并关联到事项。',
+    '- [ ] 判断是否需要更新知识库。',
+    '- [ ] 判断是否需要写入复盘。',
+  ];
+}
+
+function appendTailActionMarkdown(markdown: string, tailActionLines: string[]): string {
+  const lines = markdown.split('\n');
+  const headerIndex = lines.findIndex((line) => line.trim() === '## 收尾动作');
+  if (headerIndex === -1) {
+    return `${markdown.trimEnd()}\n\n## 收尾动作\n\n${tailActionLines.join('\n')}\n`;
+  }
+
+  let insertIndex = headerIndex + 1;
+  while (insertIndex < lines.length && lines[insertIndex].trim() === '') insertIndex += 1;
+  while (insertIndex < lines.length && lines[insertIndex].trim() === '- 暂无') {
+    lines.splice(insertIndex, 1);
+    while (insertIndex < lines.length && lines[insertIndex].trim() === '') lines.splice(insertIndex, 1);
+  }
+  lines.splice(insertIndex, 0, ...tailActionLines);
+  return `${lines.join('\n').trimEnd()}\n`;
+}
+
+function relativeMarkdownLink(fromPath: string, toPath: string): string {
+  const from = fromPath.split('/').slice(0, -1);
+  const to = toPath.split('/');
+  let common = 0;
+  while (common < from.length && common < to.length && from[common] === to[common]) common += 1;
+  return [...Array(from.length - common).fill('..'), ...to.slice(common)].join('/');
+}
+
+function oneLine(value: string): string {
+  return value.replace(/\s+/g, ' ').trim() || '(empty)';
 }
 
 async function loadRunArtifacts(artifactIds: string[] | undefined): Promise<ArtifactMeta[]> {

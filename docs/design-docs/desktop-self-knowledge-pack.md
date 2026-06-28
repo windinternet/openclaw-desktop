@@ -98,14 +98,18 @@ Skill 应包含：
 - HTML 产物必须自包含、可视化、可交互，不依赖外部 CDN。
 - Desktop 会为保存后的 HTML 产物记录 `htmlAudit`，暴露非自包含资源和需审批能力。
 - HTML 产物运行时授权或拒绝会写回 Artifact `authEvents`，用于审计 Desktop Bridge 权限边界。
-- HTML 产物可通过 `artifactBridge.fetch(url, init)` 请求 HTTP(S) 网络数据；这会触发 `network.fetch` 授权，由主进程代理请求，并把状态、响应摘要和裁剪后的文本结果写入 `bridgeEvents`。普通直连 `fetch()` 仍被 CSP 阻止，`artifactBridge.exec()` 仍保持未实现；unsupported exec 尝试会同时写入 `bridgeEvents` 和 `executionEvents`，只做审计，不执行命令。
+- HTML 产物可通过 `artifactBridge.fetch(url, init)` 请求 HTTP(S) 网络数据；这会触发 `network.fetch` 授权，由主进程代理请求，并把状态、响应摘要和裁剪后的文本结果写入 `bridgeEvents`。普通直连 `fetch()` 仍被 CSP 阻止；`artifactBridge.exec(command, options?)` 只提出 prepare-only 命令执行审批意图，会写入 `bridgeEvents` 和 `executionEvents` 并返回 pending approval 载荷，不执行命令、不授予权限、不绕过外部 runner 审批流程。
 - HTML 产物可通过 `artifactBridge.exportAs(typeOrOptions, content, fileName)` 请求导出 HTML、文本、Markdown 或 JSON；这会触发 `export` 授权和系统保存对话框，并把结果写入 `bridgeEvents`，不能用于静默写文件。
 - Artifact 会记录版本历史；新建产物是 v1，HTML 追加会增加版本，`desktop.artifacts.describe` 和 Repository output markdown 会暴露版本数量与最新版本信息。
 - 普通聊天里已完成的 assistant 消息可以包含一个或多个 `<artifact>` 块；Desktop 会逐个保存为 `source: chat` 的 Artifact，仓库绑定就绪时镜像到 Repository `outputs/`。
 - 文件型产物可以通过 `filePath` 或 `url` 表示；本地文件可复制导入 Artifact storage，并交给系统文件处理器打开。
-- 非 HTML / Office / 文件 / 链接 / 应用入口产物会生成预览卡片，包含 format label、thumbnail label、summary、location、primary action 和 safety note；Artifacts UI、`desktop.artifacts.search`、`desktop.artifacts.describe` 和 Repository output markdown 会暴露同一份线索。
+- 非 HTML / Office / 文件 / 链接 / 应用入口产物会生成预览卡片，包含 format label、thumbnail label、summary、location、primary action 和 safety note；Artifacts UI、`desktop.artifacts.search`、`desktop.artifacts.describe` 和 Repository output markdown 会暴露同一份线索。Gateway-facing 的 `search/describe` 只暴露 `thumbnailAvailable`，不会返回图片 data URL。
 - 新产物会记录 `previewPlan`；文件型、Office、PDF、媒体、链接、应用入口和命令型产物可通过 `desktop.artifacts.inspect` 刷新 `fileInspection` 和 `previewPlan`，记录格式、来源类型、打开方式、安全预览策略、预览状态、摘要、路径、限制和下一步缺口；这是文件检查和预览计划事实，不读取内容、不渲染 Office、不执行命令、不授予权限。
-- 已导入文本、代码和 HTML 文件副本会在安全可读时自动写入 `contentExtract`，也可通过 `desktop.artifacts.content.extract` 刷新；该记录包含读取字节数、文本长度、截断状态和抽取片段。该能力只读取 Artifact storage 副本，不读取任意本地路径，不解析 Office/PDF/媒体文件，不执行命令、不授予权限。
+- 已导入文本、代码、HTML、PDF 和 Word/Excel/PowerPoint OOXML 文件副本会在安全可读时自动写入 `contentExtract`，也可通过 `desktop.artifacts.content.extract` 刷新；该记录包含读取字节数、文本长度、截断状态和抽取片段。PDF 与 OOXML 抽取是基于导入副本 PDF text streams 或 OOXML XML entries 的 best-effort 文本抽取，可能不完整；该能力只读取 Artifact storage 副本，不读取任意本地路径，不解析旧版二进制 Office/音视频文件，不生成原生预览，不执行命令、不授予权限。
+- 已导入 Office、PDF、图片、音频、视频、普通文件或未知格式副本会在安全可读时自动写入 `contentFacts`，也可通过 `desktop.artifacts.content.facts.extract` 刷新；该记录包含文件大小、已哈希字节数、sha256、文件头签名、可识别图片尺寸，以及 best-effort PDF 版本/页数。该能力只读取 Artifact storage 副本，不读取任意本地路径，不替代 `contentExtract`、不解析旧版二进制 Office 正文，不生成 Office/PDF/媒体原生缩略图，不执行命令、不授予权限。
+- 已导入图片文件副本会在安全可读且大小在限制内时自动写入 `thumbnail`，也可通过 `desktop.artifacts.thumbnail.extract` 刷新；Artifacts UI 会显示真实图片缩略图，Repository output、`artifact://` 引用和 Gateway-facing 搜索/描述结果只记录缩略图可用状态，不嵌入 data URL。该能力只读取 Artifact storage 副本，不读取任意本地路径，不为 Office/PDF/音视频生成原生缩略图，不执行命令、不授予权限。
+- 内容抽取、文件事实抽取和缩略图生成尝试会写入 `enrichmentEvents`，记录 `succeeded / unavailable / failed`、format、reason、resultSummary 或 error；Artifact 详情页、搜索文本、Repository output markdown 和 `outputs/index.md` 会暴露这些审计线索。该记录只做观测和复盘，不自动重试、不打开文件、不执行命令、不授予权限。
+- Desktop 会从这些事实计算只读 `valueHealth`，并在 Artifact UI、`desktop.artifacts.search`、`desktop.artifacts.describe`、`artifact://` 引用和 Repository outputs 中暴露 `ready` / `usable_with_limits` / `needs_attention`、strengths、gaps 和 nextActions。它用于帮助 Gateway 和用户判断补齐顺序，不执行动作、不打开文件、不授予权限。
 - ActionRun 文件型 `<artifact>` header 可以携带 `filePath / fileName / fileSize / mimeType / externalFormat / contentSummary / reuseKind / importFile`；`importFile: true` 表示允许导入本地文件，仓库绑定就绪时会镜像到 `outputs/files/`。
 - 可复用资产、模板、工具、脚本和工作流应通过 `reuseKind: asset / template / tool / script / workflow` 标记；该字段用于分类和追踪，不代表可以绕过审批直接执行。
 - 既有产物可用稳定引用 `artifact://<artifactId>` 继续复用；Gateway 可调用 `desktop.artifacts.describe` 获取标题、类型、摘要、预览卡片、预览计划、来源、仓库 output / preview 和文件或 URL 线索。
@@ -118,6 +122,7 @@ Skill 应包含：
 - Artifacts 列表搜索、Dashboard 最近产物和 Workbench outputs 会展示价值摘要、`externalFormat`、`reuseKind`、来源、更新时间、标签以及 Repository output / preview 线索，检查系统状态时应把这些作为关键成果入口。
 - 终态 ActionRun 的 `lastAssistantResponse` 如果包含 `<artifact>` 块，Desktop 会自动保存为 `source: action_run` 的 Artifact，并把 Artifact id 回写到 ActionRun。
 - ActionRun 产生产物后，仓库 run 摘要会尽量写入产物标题、类型、Artifact 引用和 Repository output / preview 路径。
+- ActionRun 关联事项后追加的 `## 收尾动作` 会进入 Dashboard 待确认；Dashboard 会把它们分类为 `tail-action:status / output / knowledge / review`，分别导向 Workbench 状态处理、Artifacts、Knowledge 或 Workbench 复盘后续。目标 URL 会携带 `tailAction / tailActionId / workItemPath`；Artifacts 会打开 AI 产物创建入口并带上来源事项，成果类尾动作会预填沉淀成果意图，Workbench/Knowledge 会显示来源上下文。标记完成只写回该条 checklist，不自动执行底层更新。
 
 Skill 不应包含：
 

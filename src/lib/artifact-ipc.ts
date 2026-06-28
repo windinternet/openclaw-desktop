@@ -16,6 +16,8 @@ export const ARTIFACT_IPC = {
   SAVE_HTML: 'artifact:saveHtml',
   IMPORT_FILE: 'artifact:importFile',
   READ_IMPORTED_TEXT: 'artifact:readImportedText',
+  READ_IMPORTED_FILE_FACTS: 'artifact:readImportedFileFacts',
+  READ_IMPORTED_IMAGE_THUMBNAIL: 'artifact:readImportedImageThumbnail',
   UPDATE_INDEX: 'artifact:updateIndex',
   WRITE_SKILL: 'artifact:writeSkill',
 } as const;

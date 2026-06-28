@@ -18,17 +18,25 @@ Artifacts 是 OpenClaw Desktop 的 P0 价值沉淀层。只要一个结果对用
 
 为了让非 HTML 产物不只是路径，Desktop 会为链接、应用入口、Office 文件、PDF、媒体和普通文件记录 `externalFormat` 与 `contentSummary`。这些字段会进入 Artifact UI 和 Repository output markdown，用于搜索、识别、复用和长期审计。
 
-Desktop 会为非 HTML、Office、文件、链接和应用入口产物生成一份最小预览卡片。预览卡片包含格式标签、缩略标签、摘要、位置、主动作和安全说明；Artifacts 列表、详情页、`desktop.artifacts.search`、`desktop.artifacts.describe` 和 Repository output markdown 会读取同一份线索。当前预览卡片不是 Office 原生渲染，也不会执行命令；文件仍通过系统默认应用打开，命令入口只复制给用户确认。
+Desktop 会为非 HTML、Office、文件、链接和应用入口产物生成一份最小预览卡片。预览卡片包含格式标签、缩略标签、摘要、位置、主动作和安全说明；Artifacts 列表、详情页、`desktop.artifacts.search`、`desktop.artifacts.describe` 和 Repository output markdown 会读取同一份线索。当前预览卡片不是 Office 原生渲染，也不会执行命令；文件仍通过系统默认应用打开，命令入口只复制给用户确认。Gateway-facing 的 `desktop.artifacts.search` / `desktop.artifacts.describe` 不会返回图片 data URL，只返回 `thumbnailAvailable` 这类可用状态。
 
 Desktop 还会为文件型、Office、PDF、媒体、链接、应用入口和命令型产物记录 `fileInspection`。该记录包含格式、来源类型、打开方式、预览状态、摘要、存储路径、原始路径和当前限制。Gateway 可以调用 `desktop.artifacts.inspect` 为既有产物补写检查记录，并在 `repoPath` 就绪时刷新 Repository output。该命令只记录文件检查事实，不读取文件内容、不渲染 Office、不执行命令，也不授予额外权限。
 
-Desktop 会为新产物记录 `previewPlan`，并在 `desktop.artifacts.inspect` 时刷新。`previewPlan` 用于说明当前安全预览策略、展示 surface、主动作、安全说明、限制和下一步预览缺口；Artifacts 详情页、`desktop.artifacts.search`、`desktop.artifacts.inspect`、Repository output markdown 和 `outputs/index.md` 会暴露这些线索。它不是 Office/PDF/媒体正文解析，不会生成真实缩略图，也不会执行命令。
+Desktop 会为新产物记录 `previewPlan`，并在 `desktop.artifacts.inspect` 时刷新。`previewPlan` 用于说明当前安全预览策略、展示 surface、主动作、安全说明、限制和下一步预览缺口；Artifacts 详情页、`desktop.artifacts.search`、`desktop.artifacts.inspect`、Repository output markdown 和 `outputs/index.md` 会暴露这些线索。它不是 Office/PDF/媒体正文解析，不会生成 Office/PDF/媒体原生预览，也不会执行命令。
 
-已导入的文本、代码和 HTML 文件副本可以进一步记录 `contentExtract`。新导入且安全可读的文本/代码/HTML 文件会自动写入读取字节数、文本长度、是否截断、抽取片段和抽取时间；Gateway 也可以调用 `desktop.artifacts.content.extract` 刷新既有产物，并在 `repoPath` 就绪时刷新 Repository output。该能力只读取 Artifact storage 中的导入副本，不读取任意本地路径、不解析 Office/PDF/媒体文件、不执行命令，也不授予额外权限。
+Desktop 会从 `previewPlan`、`contentExtract`、`contentFacts`、`thumbnail`、Repository output 和复用分类等已有事实计算 `valueHealth`。它把产物标记为 `ready`、`usable_with_limits` 或 `needs_attention`，并列出 strengths、gaps 和 nextActions；Artifacts UI、`desktop.artifacts.search`、`desktop.artifacts.describe`、`artifact://` 复用引用、Repository output markdown 和 `outputs/index.md` 都会暴露这个只读状态。`valueHealth` 只是产品就绪度摘要，不会自动执行 nextActions、不打开文件、不授予权限，也不会替代底层审计事实。
+
+已导入的文本、代码、HTML、PDF 和 Word/Excel/PowerPoint OOXML 文件副本可以进一步记录 `contentExtract`。新导入且安全可读的文本/代码/HTML/PDF/Office OOXML 文件会自动写入读取字节数、文本长度、是否截断、抽取片段和抽取时间；Gateway 也可以调用 `desktop.artifacts.content.extract` 刷新既有产物，并在 `repoPath` 就绪时刷新 Repository output。PDF 与 OOXML 抽取是基于导入副本中 PDF text streams 或 OOXML XML entries 的 best-effort 文本抽取，可能不完整；该能力只读取 Artifact storage 中的导入副本，不读取任意本地路径、不解析旧版二进制 Office/音频/视频文件、不生成原生预览、不执行命令，也不授予额外权限。
+
+已导入的非文本文件副本（Office、PDF、图片、音频、视频、普通文件或未知格式）可以记录 `contentFacts`。新导入且安全可读的非文本文件会自动写入文件大小、已哈希字节数、sha256、文件头签名、图片宽高（可识别时），以及 PDF 版本和页数（best-effort，可识别时）；Gateway 也可以调用 `desktop.artifacts.content.facts.extract` 刷新既有产物，并在 `repoPath` 就绪时刷新 Repository output。该能力只读取 Artifact storage 中的导入副本，不读取任意本地路径、不替代 `contentExtract`、不解析旧版二进制 Office 正文、不生成 Office/PDF/媒体原生缩略图、不执行命令，也不授予额外权限。
+
+已导入的图片文件副本可以记录 `thumbnail`。新导入且安全可读、大小在限制内的图片会自动写入 `data:image/...` 缩略图，Artifacts 列表和详情页会优先显示真实图片预览；Repository output、`artifact://` 复用引用和 Gateway-facing 搜索/描述结果只记录缩略图可用状态，不会嵌入 data URL。Gateway 也可以调用 `desktop.artifacts.thumbnail.extract` 刷新既有图片产物，并在 `repoPath` 就绪时刷新 Repository output。该能力只读取 Artifact storage 中的导入副本，不读取任意本地路径、不为 Office/PDF/音视频生成原生缩略图、不执行命令，也不授予额外权限。
+
+Desktop 会为内容抽取、文件事实抽取和缩略图生成记录 `enrichmentEvents`。无论结果是 `succeeded`、`unavailable` 还是 `failed`，事件都会保留 kind、format、reason、resultSummary 或 error，让用户和 Gateway 能看到产物为什么被补强，或为什么仍需后续动作；Artifact 详情页、搜索文本、Repository output markdown 和 `outputs/index.md` 会暴露这些审计线索。该记录不会自动重试抽取、不打开文件、不生成原生预览、不执行命令，也不授予权限。
 
 Artifact 会记录版本历史。新建产物会产生 v1，HTML 追加会产生新版本；详情页、Desktop node command `desktop.artifacts.describe` 和 Repository output markdown 会展示版本数量和最新版本信息。旧产物如果只有 `currentVersion`，Desktop 会生成兼容历史用于展示，不会丢失原有记录。
 
-每个 Artifact 都有稳定引用 `artifact://<artifactId>`。详情页可以复制一段可复用 Markdown 引用，包含标题、类型、价值摘要、来源、仓库 output / preview 路径以及文件或 URL 线索。Gateway 也可以通过 Desktop node command `desktop.artifacts.describe` 读取同一份引用和 `previewPlan`，用于在普通聊天或 ActionRun 中继续使用已有产物。
+每个 Artifact 都有稳定引用 `artifact://<artifactId>`。详情页可以复制一段可复用 Markdown 引用，包含标题、类型、价值摘要、来源、缩略图可用状态、仓库 output / preview 路径以及文件或 URL 线索。Gateway 也可以通过 Desktop node command `desktop.artifacts.describe` 读取同一份引用和 `previewPlan`，用于在普通聊天或 ActionRun 中继续使用已有产物。
 
 如果 Gateway 或 ActionRun 不知道具体 `artifactId`，应先调用 `desktop.artifacts.search`。该命令可以按 `query`、`type`、`externalFormat`、`reuseKind`、`sourceType`、`status` 和 `limit` 搜索已有产物，返回 `artifact://` URI、价值摘要、预览卡片、预览计划、来源、仓库 output / preview、文件或 URL 线索和可复用 Markdown 引用。搜索只读索引，不打开文件、不执行命令，也不授予额外权限。
 
@@ -67,7 +75,7 @@ Desktop 保存或追加 HTML 产物时会记录 `htmlAudit`：
 
 Desktop Bridge 的实际调用结果会写入 `bridgeEvents`。该记录包含 method、detail、status、resultSummary、error、startedAt 和 endedAt，用于把“已审批”继续连接到“执行了什么、成功还是失败、结果摘要是什么”。当前 HTML 预览窗口通过专用 preload 暴露受控 `window.artifactBridge`，主进程只接受来自 Artifact preview window 的调用。
 
-HTML 产物可以通过 `artifactBridge.fetch(url, init)` 请求 HTTP(S) 网络数据。Desktop 会先请求 `network.fetch` 授权，再由主进程代理请求，并把状态码、响应摘要和裁剪后的文本结果记录到 `bridgeEvents`。普通直连 `fetch()` 仍会被 CSP 阻止；`artifactBridge.exec()` 仍保持未实现，不能作为默认命令执行入口。若 HTML 产物尝试调用 `artifactBridge.exec()`，Desktop 会拒绝执行，并把这次 unsupported bridge 调用记录到 `bridgeEvents`，同时把被阻止的命令执行意图写入 `executionEvents`，用于后续审计和复盘。
+HTML 产物可以通过 `artifactBridge.fetch(url, init)` 请求 HTTP(S) 网络数据。Desktop 会先请求 `network.fetch` 授权，再由主进程代理请求，并把状态码、响应摘要和裁剪后的文本结果记录到 `bridgeEvents`。普通直连 `fetch()` 仍会被 CSP 阻止；`artifactBridge.exec(command, options?)` 只用于提出命令执行意图。Desktop 会把这次调用记录到 `bridgeEvents`，同时把 `approval_required` 执行意图写入 `executionEvents`，并向 HTML 返回 pending approval 载荷；Desktop 不执行命令、不授予权限，也不绕过外部 runner 的审批、执行和归档流程。
 
 HTML 产物可以通过 `artifactBridge.exportAs(typeOrOptions, content, fileName)` 请求导出 HTML、文本、Markdown 或 JSON。Desktop 会先请求 `export` 授权，再打开系统保存对话框；用户确认路径后才写入文件，并把成功、取消或失败记录到 `bridgeEvents`。该能力用于交付和保存副本，不允许 HTML 产物静默写入任意文件。
 
@@ -99,6 +107,6 @@ HTML 产物可以通过 `artifactBridge.exportAs(typeOrOptions, content, fileNam
 
 仓库绑定就绪时，Desktop 可以把产物镜像到 `outputs/`。Markdown 元数据适合审计和 Agent 阅读；HTML 文件适合用户预览和交付。
 
-`outputs/index.md` 是可扫读的产物目录。Desktop 会为每个镜像产物写入 Artifact 链接、`artifact://` 引用、来源、更新时间、预览路径、外部格式、价值摘要、内容抽取状态、复用分类和标签等线索；同一路径再次镜像时会刷新旧条目，避免目录停留在过期状态。详细审计仍以单个产物 markdown 为准。
+`outputs/index.md` 是可扫读的产物目录。Desktop 会为每个镜像产物写入 Artifact 链接、`artifact://` 引用、来源、更新时间、预览路径、外部格式、价值摘要、价值健康状态、内容抽取状态、内容事实状态、PDF 版本/页数、复用分类和标签等线索；同一路径再次镜像时会刷新旧条目，避免目录停留在过期状态。详细审计仍以单个产物 markdown 为准。
 
-普通聊天和 ActionRun 自动保存的产物都会优先进入 Artifact storage；仓库绑定就绪时，Desktop 会把它们镜像为 Repository outputs。若产物来自 ActionRun，ActionRun 的仓库摘要会尽量反向列出这些产物的标题、类型、Artifact 引用、Repository output 路径和 HTML preview 路径，让“非聊天式 AI 操作 -> 结果 -> 产物 -> 仓库沉淀”形成可追踪链路。文件型产物会镜像为 `outputs/files/<artifactId>.md`，其中包含来源、格式、摘要、版本历史摘要、可复用资产分类、复用记录摘要、文件路径审计信息和安全内容抽取事实。
+普通聊天和 ActionRun 自动保存的产物都会优先进入 Artifact storage；仓库绑定就绪时，Desktop 会把它们镜像为 Repository outputs。若产物来自 ActionRun，ActionRun 的仓库摘要会尽量反向列出这些产物的标题、类型、Artifact 引用、Repository output 路径和 HTML preview 路径，让“非聊天式 AI 操作 -> 结果 -> 产物 -> 仓库沉淀”形成可追踪链路。文件型产物会镜像为 `outputs/files/<artifactId>.md`，其中包含来源、格式、摘要、版本历史摘要、可复用资产分类、复用记录摘要、文件路径审计信息、安全内容抽取事实，以及 PDF/Office OOXML best-effort 抽取和 PDF 版本/页数事实。

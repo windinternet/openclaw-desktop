@@ -24,7 +24,29 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('这是我的终极目标');
     expect(skillContent).toContain('Repository Context 和仓库 `AGENTS.md`');
     expect(skillContent).toContain('ActionRun 是 OpenClaw Desktop 在普通聊天之外调用大模型的通用操作单元');
+    expect(skillContent).toContain('An ActionRun can carry `workItemId` and `workItemPath`');
+    expect(skillContent).toContain("appends an execution record back to that matter's `## 执行记录` section");
+    expect(skillContent).toContain('Workbench matter preview can prefill both values');
+    expect(skillContent).toContain('adds a `## 收尾动作` checklist');
+    expect(skillContent).toContain(
+      'unfinished `## 收尾动作` checklist items surface as Dashboard pending confirmations',
+    );
+    expect(skillContent).toContain(
+      'Dashboard classifies tail actions as `tail-action:status`, `tail-action:output`, `tail-action:knowledge`, or `tail-action:review`',
+    );
+    expect(skillContent).toContain(
+      'routes them to Workbench status handling, Artifacts, Knowledge, or Workbench review follow-up',
+    );
+    expect(skillContent).toContain(
+      'Dashboard tail action targets carry `tailAction`, `tailActionId`, and `workItemPath`',
+    );
+    expect(skillContent).toContain('Artifacts opens the AI Artifact creation flow with the source work item attached');
+    expect(skillContent).toContain('output-preservation tail actions prefill the Artifact creation prompt');
+    expect(skillContent).toContain('Dashboard can mark a pending tail action complete and write it back');
     expect(skillContent).toContain('completed ActionRun response contains `<artifact>` blocks');
+    expect(skillContent).toContain('valueHealth status/gaps/next actions');
+    expect(skillContent).toContain('previewPlan clues');
+    expect(skillContent).toContain('enrichment status');
     expect(skillContent).toContain('Ordinary completed chat assistant messages with `<artifact>` blocks');
     expect(skillContent).toContain('Desktop saves every parsed Artifact');
     expect(skillContent).toContain('Repository output / preview paths');
@@ -37,10 +59,8 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('artifactBridge.fetch');
     expect(skillContent).toContain('requires `network.fetch` approval');
     expect(skillContent).toContain('Direct browser `fetch()` remains blocked by CSP');
-    expect(skillContent).toContain('artifactBridge.exec()` remains unsupported');
-    expect(skillContent).toContain(
-      'unsupported exec attempts are recorded in both `bridgeEvents` and `executionEvents`',
-    );
+    expect(skillContent).toContain('artifactBridge.exec(command, options?)` is prepare-only');
+    expect(skillContent).toContain('Desktop records an `approval_required` execution intent in `executionEvents`');
     expect(skillContent).toContain('artifactBridge.exportAs');
     expect(skillContent).toContain('requires `export` approval');
     expect(skillContent).toContain('must not be used for silent file writes');
@@ -53,20 +73,53 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('desktop.artifacts.search');
     expect(skillContent).toContain('Search existing Artifacts before asking the user for an artifact id');
     expect(skillContent).toContain('desktop.artifacts.inspect');
+    expect(skillContent).toContain(
+      'Dashboard first surfaces a work-system summary before Gateway infrastructure details',
+    );
+    expect(skillContent).toContain(
+      'todayContinue, pendingConfirmations, stuckItems, recentOutputs, and knowledgeUpdates',
+    );
+    expect(skillContent).toContain('not the primary answer to "what is my system state?"');
+    expect(skillContent).toContain('Dashboard surfaces a "create your work system" onboarding path');
+    expect(skillContent).toContain('writes the first user-entered matter into `work/active/YYYY-MM-DD-HHmmss-*.md`');
     expect(skillContent).toContain('records file inspection facts only');
     expect(skillContent).toContain('previewPlan');
     expect(skillContent).toContain('safe preview strategy');
+    expect(skillContent).toContain('valueHealth');
+    expect(skillContent).toContain('ready`, `usable_with_limits`, or `needs_attention`');
     expect(skillContent).toContain('does not parse Office/PDF/media contents');
+    expect(skillContent).toContain('render Office/PDF/media native previews');
     expect(skillContent).toContain('desktop.artifacts.content.extract');
-    expect(skillContent).toContain('reads only imported text/code Artifact copies');
     expect(skillContent).toContain(
-      'Newly imported text/code/HTML file Artifacts automatically record `contentExtract`',
+      'text/code/HTML/PDF and Word/Excel/PowerPoint OOXML file Artifacts automatically record `contentExtract`',
+    );
+    expect(skillContent).toContain(
+      'reads only imported text/code/HTML/PDF and Word/Excel/PowerPoint OOXML Artifact copies',
+    );
+    expect(skillContent).toContain(
+      'PDF and OOXML extraction are best-effort text extraction from PDF text streams or OOXML XML entries',
+    );
+    expect(skillContent).toContain(
+      'does not read arbitrary local paths, parse legacy binary Office/audio/video files, render native previews',
+    );
+    expect(skillContent).toContain('desktop.artifacts.content.facts.extract');
+    expect(skillContent).toContain('Newly imported non-text file Artifacts');
+    expect(skillContent).toContain('sha256, signature hex, image dimensions, and best-effort PDF version/page count');
+    expect(skillContent).toContain('does not replace `contentExtract`, parse legacy binary Office document bodies');
+    expect(skillContent).toContain('desktop.artifacts.thumbnail.extract');
+    expect(skillContent).toContain('Newly imported image file Artifacts can record `thumbnail`');
+    expect(skillContent).toContain('record only thumbnail availability');
+    expect(skillContent).toContain('must not embed the data URL');
+    expect(skillContent).toContain('Desktop records `enrichmentEvents`');
+    expect(skillContent).toContain('status (`succeeded`, `unavailable`, or `failed`)');
+    expect(skillContent).toContain(
+      'Artifact detail, search text, Repository output markdown, and `outputs/index.md` expose these audit clues',
     );
     expect(skillContent).toContain('desktop.artifacts.describe');
     expect(skillContent).toContain('desktop.outputs.create');
     expect(skillContent).toContain('Repository `outputs/index.md`');
     expect(skillContent).toContain(
-      'artifact URI, source, updated time, preview, format, summary, preview plan, content extraction status, preview card, reuse kind, and tags',
+      'artifact URI, source, updated time, preview, format, summary, thumbnail availability, value health, preview plan, content extraction status, content facts status, PDF facts, preview card, reuse kind, and tags',
     );
     expect(skillContent).toContain('externalFormat');
     expect(skillContent).toContain('reuseKind');
@@ -89,6 +142,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('imported into Artifact storage');
     expect(skillContent).toContain('Artifact preview card');
     expect(skillContent).toContain('format label, thumbnail label, summary, location, primary action, and safety note');
+    expect(skillContent).toContain('Gateway-facing search/describe preview cards expose `thumbnailAvailable`');
+    expect(skillContent).toContain('must not return image data URLs');
+    expect(skillContent).toContain('return thumbnail data URLs');
     expect(skillContent).toContain('preview cards');
     expect(skillContent).toContain('Repository output markdown expose this preview card');
     expect(skillContent).toContain('contentSummary');

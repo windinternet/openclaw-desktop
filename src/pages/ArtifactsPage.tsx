@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, type ReactNode } from 'react';
 import { Typography, Button, Input, Tag, Select, Empty, Card, Spin, Toast } from '@douyinfe/semi-ui';
 import { IconPlus, IconSearch, IconAppCenter, IconAIFilledLevel1 } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from '../lib';
 import type { ArtifactMeta } from '../lib/artifact-types';
 import {
@@ -11,8 +11,10 @@ import {
   buildArtifactSearchText,
   formatArtifactSource,
 } from '../lib/artifact-display';
+import { buildArtifactValueHealth, type ArtifactValueHealthStatus } from '../lib/artifact-value-health';
 import { ArtifactCreateDialog } from '../components/ArtifactCreateDialog';
 import { ArtifactAICreateDrawer } from '../components/ArtifactAICreateDrawer';
+import { parseDashboardTailActionRoute } from '../lib/dashboard-tail-action-routing';
 
 const { Text } = Typography;
 
@@ -27,6 +29,17 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
   const fetchArtifacts = useStore((s) => s.fetchArtifacts);
   const openArtifactWindow = useStore((s) => s.openArtifactWindow);
   const navigate = useNavigate();
+  const location = useLocation();
+  const tailActionContext = useMemo(() => parseDashboardTailActionRoute(location.search), [location.search]);
+  const artifactTailActionContext = tailActionContext?.kind === 'output' ? tailActionContext : null;
+  const artifactTailActionInitialInput = useMemo(() => {
+    if (!artifactTailActionContext?.workItemPath) return undefined;
+    return [
+      `请根据来源事项 ${artifactTailActionContext.workItemPath} 和最近执行记录，判断本次执行中值得沉淀的成果。`,
+      '如果适合沉淀，请生成一个可保存、可复用、可追踪的产物；优先考虑 HTML 报告/仪表盘、文档、链接或文件型成果。',
+      '请在产物说明中保留来源事项和价值摘要。',
+    ].join('\n');
+  }, [artifactTailActionContext?.workItemPath]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [showCreate, setShowCreate] = useState(false);
@@ -42,6 +55,10 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!embedded && artifactTailActionContext) setShowAICreate(true);
+  }, [artifactTailActionContext, embedded]);
 
   const typeOptions = useMemo(
     () => [
@@ -161,6 +178,30 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
         </div>
       )}
 
+      {!embedded && artifactTailActionContext?.workItemPath ? (
+        <div
+          style={{
+            border: '1px solid var(--semi-color-border)',
+            borderRadius: 8,
+            padding: 12,
+            marginBottom: 16,
+            background: 'var(--semi-color-fill-0)',
+          }}
+        >
+          <Tag color="green" size="small">
+            {t('artifact.tailActionContextTitle')}
+          </Tag>
+          <Text
+            type="tertiary"
+            size="small"
+            ellipsis={{ showTooltip: true }}
+            style={{ display: 'block', marginTop: 6 }}
+          >
+            {t('artifact.tailActionSource')}: {artifactTailActionContext.workItemPath}
+          </Text>
+        </div>
+      ) : null}
+
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
           <Spin />
@@ -171,6 +212,7 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
           {filteredArtifacts.map((a: ArtifactMeta) => {
             const previewCard = buildArtifactPreviewCard(a);
+            const valueHealth = buildArtifactValueHealth(a);
             return (
               <div key={a.id} onClick={() => handleOpenArtifact(a)} style={{ cursor: 'pointer' }}>
                 <Card
@@ -267,6 +309,7 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
                         borderRadius: 6,
                         background: 'var(--semi-color-fill-0)',
                         border: '1px solid var(--semi-color-border)',
+                        overflow: 'hidden',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -275,7 +318,15 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
                         color: 'var(--semi-color-text-1)',
                       }}
                     >
-                      {previewCard.thumbnailLabel}
+                      {previewCard.thumbnailUrl ? (
+                        <img
+                          src={previewCard.thumbnailUrl}
+                          alt=""
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        />
+                      ) : (
+                        previewCard.thumbnailLabel
+                      )}
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <div
@@ -317,6 +368,9 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
                     {buildArtifactDisplayLine(a)}
                   </div>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+                    <Tag size="small" color={valueHealthColor(valueHealth.status)} type="light">
+                      {valueHealth.status}
+                    </Tag>
                     <Tag size="small" color="grey" type="light">
                       {formatArtifactSource(a)}
                     </Tag>
@@ -346,6 +400,7 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {filteredArtifacts.map((a: ArtifactMeta) => {
             const previewCard = buildArtifactPreviewCard(a);
+            const valueHealth = buildArtifactValueHealth(a);
             return (
               <div
                 key={a.id}
@@ -364,14 +419,29 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
                 <span
                   style={{
                     width: 42,
+                    height: 34,
                     flex: '0 0 42px',
+                    borderRadius: 6,
+                    border: '1px solid var(--semi-color-border)',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     textAlign: 'center',
                     fontSize: 11,
                     fontWeight: 700,
                     color: 'var(--semi-color-text-1)',
                   }}
                 >
-                  {previewCard.thumbnailLabel}
+                  {previewCard.thumbnailUrl ? (
+                    <img
+                      src={previewCard.thumbnailUrl}
+                      alt=""
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    />
+                  ) : (
+                    previewCard.thumbnailLabel
+                  )}
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }} title={a.contentSummary ?? buildArtifactDisplayLine(a)}>
                   <div style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -400,6 +470,9 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
                     {a.reuseKind}
                   </Tag>
                 )}
+                <Tag size="small" color={valueHealthColor(valueHealth.status)} type="light">
+                  {valueHealth.status}
+                </Tag>
                 <Tag size="small" color="grey" type="light">
                   {formatArtifactSource(a)}
                 </Tag>
@@ -438,9 +511,21 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
       )}
 
       <ArtifactCreateDialog visible={showCreate} onClose={() => setShowCreate(false)} />
-      <ArtifactAICreateDrawer visible={showAICreate} onClose={() => setShowAICreate(false)} />
+      <ArtifactAICreateDrawer
+        visible={showAICreate}
+        onClose={() => setShowAICreate(false)}
+        sourcePage={artifactTailActionContext ? 'workbench' : 'artifacts'}
+        workItemPath={artifactTailActionContext?.workItemPath}
+        initialInput={artifactTailActionInitialInput}
+      />
     </div>
   );
+}
+
+function valueHealthColor(status: ArtifactValueHealthStatus): 'green' | 'orange' | 'red' {
+  if (status === 'ready') return 'green';
+  if (status === 'usable_with_limits') return 'orange';
+  return 'red';
 }
 
 export { ArtifactsPage };

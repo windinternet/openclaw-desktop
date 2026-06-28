@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Modal, Button, TextArea, Spin, Tag, Toast, Typography, Space } from '@douyinfe/semi-ui';
 import { IconAIFilledLevel1, IconRefresh } from '@douyinfe/semi-icons';
 import { useStore } from '../lib';
@@ -23,19 +23,34 @@ interface ParsedArtifactResult {
 interface Props {
   visible: boolean;
   onClose: () => void;
+  sourcePage?: string;
+  workItemId?: string;
+  workItemPath?: string;
+  initialInput?: string;
 }
 
-export function ArtifactAICreateDrawer({ visible, onClose }: Props) {
+export function ArtifactAICreateDrawer({
+  visible,
+  onClose,
+  sourcePage = 'artifacts',
+  workItemId,
+  workItemPath,
+  initialInput,
+}: Props) {
   const generateArtifact = useStore((s) => s.generateArtifact);
   const activeClient = useStore((s) => s.activeClient);
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const agents = useStore((s) => s.agents);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(initialInput ?? '');
   const [generating, setGenerating] = useState(false);
   const [preview, setPreview] = useState<ParsedArtifactResult | null>(null);
   const [previewRun, setPreviewRun] = useState<AiActionRun | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isGeneratingRef = useRef(false);
+
+  useEffect(() => {
+    if (visible && initialInput !== undefined) setInput(initialInput);
+  }, [initialInput, visible]);
 
   const isValidType = (t: string): boolean =>
     [
@@ -78,11 +93,13 @@ export function ArtifactAICreateDrawer({ visible, onClose }: Props) {
 
     const actionRun = createAiActionRun({
       type: 'artifact_create',
-      sourcePage: 'artifacts',
+      sourcePage,
       instanceId: currentInstanceId,
       agentId: defaultAgent.id,
       executionMode: 'isolated-session',
       input: input.trim(),
+      workItemId,
+      workItemPath,
     });
 
     try {
@@ -140,7 +157,7 @@ export function ArtifactAICreateDrawer({ visible, onClose }: Props) {
       setGenerating(false);
       isGeneratingRef.current = false;
     }
-  }, [input, activeClient, currentInstanceId, agents]);
+  }, [input, activeClient, currentInstanceId, agents, sourcePage, workItemId, workItemPath]);
 
   const handleSave = useCallback(async () => {
     if (!preview) return;
@@ -195,6 +212,12 @@ export function ArtifactAICreateDrawer({ visible, onClose }: Props) {
           maxCount={2000}
           disabled={generating}
         />
+
+        {workItemPath && (
+          <Tag color="blue" type="light" size="small">
+            关联事项：{workItemPath}
+          </Tag>
+        )}
 
         <Button
           colorful

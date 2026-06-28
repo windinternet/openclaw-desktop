@@ -72,6 +72,13 @@ describe('repository outputs', () => {
     expect(markdown).toContain(
       'previewPlanNextSteps: open-with-system-app, add-native-preview, add-thumbnail, add-content-extraction',
     );
+    expect(markdown).toContain('valueHealthStatus: usable_with_limits');
+    expect(markdown).toContain(
+      'valueHealthGaps: native-preview-missing, thumbnail-missing, content-extraction-missing',
+    );
+    expect(markdown).toContain(
+      'valueHealthNextActions: open-with-system-app, add-native-preview, add-thumbnail, add-content-extraction',
+    );
   });
 
   it('includes extracted artifact text snippets in repository output markdown', () => {
@@ -93,6 +100,17 @@ describe('repository outputs', () => {
         snippet: '# 推进计划\n\nShip the content extraction slice.',
         summary: 'Text extract · plan.md · 42 chars',
       },
+      enrichmentEvents: [
+        {
+          id: 'enrich_20_1',
+          kind: 'content_extract',
+          status: 'succeeded',
+          artifactVersion: 1,
+          format: 'text',
+          attemptedAt: 20,
+          resultSummary: 'Text extract · plan.md · 42 chars',
+        },
+      ],
     });
 
     expect(markdown).toContain('contentExtractStatus: extracted');
@@ -102,6 +120,128 @@ describe('repository outputs', () => {
     expect(markdown).toContain('contentExtractTruncated: false');
     expect(markdown).toContain('contentExtractSnippet: # 推进计划\\n\\nShip the content extraction slice.');
     expect(markdown).toContain('contentExtractAt: 1970-01-01T00:00:00.020Z');
+    expect(markdown).toContain('enrichmentEventCount: 1');
+    expect(markdown).toContain('lastEnrichmentKind: content_extract');
+    expect(markdown).toContain('lastEnrichmentStatus: succeeded');
+    expect(markdown).toContain('lastEnrichmentSummary: Text extract · plan.md · 42 chars');
+  });
+
+  it('includes imported binary file facts in repository output markdown', () => {
+    const markdown = buildOutputMarkdown({
+      ...createArtifact(),
+      type: 'file',
+      externalFormat: 'pdf',
+      contentSummary: 'PDF · brief.pdf · 4 KB',
+      contentFacts: {
+        extractedAt: 30,
+        status: 'recorded',
+        format: 'pdf',
+        sourceKind: 'imported_file',
+        summary: 'PDF facts · brief.pdf · PDF 1.7 · 12 pages · 4 KB · sha256 cccccccccccc',
+        fileName: 'brief.pdf',
+        mimeType: 'application/pdf',
+        fileSize: 4096,
+        bytesRead: 4096,
+        sha256: 'c'.repeat(64),
+        signatureHex: '255044462d312e37',
+        pdfInfo: { version: '1.7', pageCount: 12 },
+      },
+    });
+
+    expect(markdown).toContain('contentFactsStatus: recorded');
+    expect(markdown).toContain('contentFactsFormat: pdf');
+    expect(markdown).toContain('contentFactsSource: imported_file');
+    expect(markdown).toContain(
+      'contentFactsSummary: PDF facts · brief.pdf · PDF 1.7 · 12 pages · 4 KB · sha256 cccccccccccc',
+    );
+    expect(markdown).toContain('contentFactsPdf: PDF 1.7, 12 pages');
+    expect(markdown).toContain('contentFactsFileName: brief.pdf');
+    expect(markdown).toContain('contentFactsMimeType: application/pdf');
+    expect(markdown).toContain('contentFactsFileSize: 4096');
+    expect(markdown).toContain('contentFactsBytes: 4096');
+    expect(markdown).toContain(`contentFactsSha256: ${'c'.repeat(64)}`);
+    expect(markdown).toContain('contentFactsSignature: 255044462d312e37');
+    expect(markdown).toContain('contentFactsAt: 1970-01-01T00:00:00.030Z');
+  });
+
+  it('includes media dimensions from file facts in repository output markdown', () => {
+    const markdown = buildOutputMarkdown({
+      ...createArtifact(),
+      type: 'image',
+      externalFormat: 'image',
+      contentSummary: 'Image · cover.png · 8 KB',
+      contentFacts: {
+        extractedAt: 40,
+        status: 'recorded',
+        format: 'image',
+        sourceKind: 'imported_file',
+        summary: 'Image facts · cover.png · 1280x720 · 8 KB · sha256 dddddddddddd',
+        fileName: 'cover.png',
+        mimeType: 'image/png',
+        fileSize: 8192,
+        bytesRead: 8192,
+        sha256: 'd'.repeat(64),
+        signatureHex: '89504e470d0a1a0a',
+        imageDimensions: { width: 1280, height: 720, kind: 'png' },
+      },
+    });
+
+    expect(markdown).toContain('contentFactsImage: 1280x720 png');
+  });
+
+  it('includes PDF facts in repository output index entries', async () => {
+    const writeText = vi.fn();
+    const readText = vi.fn(async () => '# Outputs\n');
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: {
+          writeText,
+          readText,
+        },
+      },
+    });
+
+    await createRepositoryOutput({
+      binding: createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      artifact: createArtifact({
+        id: 'art_pdf',
+        title: 'Project Brief',
+        type: 'file',
+        externalFormat: 'pdf',
+        contentSummary: 'PDF · brief.pdf · 4 KB',
+        contentFacts: {
+          extractedAt: 30,
+          status: 'recorded',
+          format: 'pdf',
+          sourceKind: 'imported_file',
+          summary: 'PDF facts · brief.pdf · PDF 1.7 · 12 pages · 4 KB · sha256 cccccccccccc',
+          fileName: 'brief.pdf',
+          fileSize: 4096,
+          bytesRead: 4096,
+          sha256: 'c'.repeat(64),
+          signatureHex: '255044462d312e37',
+          pdfInfo: { version: '1.7', pageCount: 12 },
+        },
+      }),
+    });
+
+    const indexWrite = writeText.mock.calls.find((call) => call[1] === 'outputs/index.md')?.[2] as string;
+    expect(indexWrite).toContain('  - contentFacts: recorded, sha256 cccccccccccc');
+    expect(indexWrite).toContain('  - contentFactsPdf: PDF 1.7, 12 pages');
+  });
+
+  it('records thumbnail availability without embedding data urls in repository output markdown', () => {
+    const markdown = buildOutputMarkdown({
+      ...createArtifact(),
+      type: 'image',
+      externalFormat: 'image',
+      contentSummary: 'Image · cover.png · 2 KB',
+      thumbnail: 'data:image/png;base64,iVBORw0KGgo=',
+    });
+
+    expect(markdown).toContain('thumbnail: available');
+    expect(markdown).toContain('previewCardThumbnail: IMG');
+    expect(markdown).not.toContain('data:image/png;base64');
   });
 
   it('includes Desktop Bridge call summaries in repository output markdown', () => {
@@ -275,6 +415,29 @@ describe('repository outputs', () => {
         source: { type: 'chat', id: 'agent:main:demo', name: 'msg-1' },
         externalFormat: 'powerpoint',
         contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+        contentFacts: {
+          extractedAt: 30,
+          status: 'recorded',
+          format: 'powerpoint',
+          sourceKind: 'imported_file',
+          summary: 'PowerPoint facts · roadmap.pptx · 4 KB · sha256 aaaaaaaaaaaa',
+          fileName: 'roadmap.pptx',
+          fileSize: 4096,
+          bytesRead: 4096,
+          sha256: 'a'.repeat(64),
+          signatureHex: '504b0304140000000800',
+        },
+        enrichmentEvents: [
+          {
+            id: 'enrich_20_1',
+            kind: 'content_facts',
+            status: 'succeeded',
+            artifactVersion: 1,
+            format: 'powerpoint',
+            attemptedAt: 30,
+            resultSummary: 'PowerPoint facts · roadmap.pptx · 4 KB · sha256 aaaaaaaaaaaa',
+          },
+        ],
         reuseKind: 'template',
         previewPlan: {
           plannedAt: 20,
@@ -297,6 +460,9 @@ describe('repository outputs', () => {
     expect(indexWrite).toContain('  - source: chat / agent:main:demo / msg-1');
     expect(indexWrite).toContain('  - format: powerpoint');
     expect(indexWrite).toContain('  - summary: PowerPoint · roadmap.pptx · 4 KB');
+    expect(indexWrite).toContain('  - contentFacts: recorded, sha256 aaaaaaaaaaaa');
+    expect(indexWrite).toContain('  - enrichment: content_facts, succeeded');
+    expect(indexWrite).toContain('  - valueHealth: usable_with_limits');
     expect(indexWrite).toContain('  - previewPlan: system_file_handler, open_file');
     expect(indexWrite).toContain('  - reuseKind: template');
     expect(indexWrite).toContain('- [Other](outputs/reports/art_other.md)');

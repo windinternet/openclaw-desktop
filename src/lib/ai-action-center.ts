@@ -78,6 +78,8 @@ export function createAiActionRun(options: {
   agentId?: string;
   input: string;
   executionMode?: AiActionExecutionMode;
+  workItemId?: string;
+  workItemPath?: string;
 }): AiActionRun {
   const timestamp = now();
   const id = generateActionRunId();
@@ -97,6 +99,8 @@ export function createAiActionRun(options: {
     status: 'draft',
     executionMode,
     input: options.input,
+    workItemId: options.workItemId,
+    workItemPath: options.workItemPath,
     gatewaySessionKey,
     childSessionKeys: [],
     approvals: [],

@@ -1,4 +1,5 @@
 import type {
+  ArtifactContentFacts,
   ArtifactContentExtract,
   ArtifactExecutionStatus,
   ArtifactExternalFormat,
@@ -12,11 +13,15 @@ import type {
 } from './artifact-types';
 import { artifactService, type GenerateParams } from './artifact-service';
 import { artifactPersistence } from './artifact-persistence';
-import { buildArtifactPreviewCard, buildArtifactSearchText } from './artifact-display';
+import { buildArtifactAgentPreviewCard, buildArtifactSearchText } from './artifact-display';
+import { buildArtifactContentFacts, resolveArtifactContentFactsEligibility } from './artifact-content-facts';
 import { buildArtifactContentExtract, resolveArtifactContentExtractEligibility } from './artifact-content-extract';
+import { recordArtifactEnrichmentEvent } from './artifact-enrichment-events';
 import { buildArtifactFileInspection, shouldInspectArtifactFile } from './artifact-file-inspection';
 import { buildArtifactPreviewPlan } from './artifact-preview-plan';
+import { buildArtifactThumbnail, resolveArtifactThumbnailEligibility } from './artifact-thumbnail';
 import { buildArtifactReuseReference } from './artifact-reference';
+import { buildArtifactValueHealth } from './artifact-value-health';
 import { recordArtifactExecutionEvent } from './artifact-execution-record';
 import { recordArtifactReuseEvent } from './artifact-reuse-record';
 import { buildArtifactVersionHistory } from './artifact-version-history';
@@ -265,7 +270,9 @@ function buildArtifactSearchResult(artifact: ArtifactMeta) {
   const lastExecutionEvent = artifact.executionEvents?.[artifact.executionEvents.length - 1];
   const fileInspection = artifact.fileInspection;
   const contentExtract = artifact.contentExtract;
+  const contentFacts = artifact.contentFacts;
   const previewPlan = artifact.previewPlan;
+  const valueHealth = buildArtifactValueHealth(artifact);
   return {
     id: artifact.id,
     title: artifact.title,
@@ -286,8 +293,10 @@ function buildArtifactSearchResult(artifact: ArtifactMeta) {
     command: artifact.command,
     fileInspection,
     contentExtract,
+    contentFacts,
     previewPlan,
-    previewCard: buildArtifactPreviewCard(artifact),
+    valueHealth,
+    previewCard: buildArtifactAgentPreviewCard(artifact),
     executionEventCount: artifact.executionEvents?.length ?? 0,
     lastExecutionEvent,
     updatedAt: artifact.updatedAt,
@@ -709,6 +718,14 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
 
     const eligibility = resolveArtifactContentExtractEligibility(artifact);
     if (!eligibility.eligible) {
+      const enrichmentEvents = recordArtifactEnrichmentEvent(artifact, {
+        kind: 'content_extract',
+        status: 'unavailable',
+        format: eligibility.format,
+        attemptedAt: numberValue(params.extractedAt) ?? Date.now(),
+        reason: eligibility.reason,
+      }).enrichmentEvents;
+      await artifactService.update(artifactId, { enrichmentEvents });
       return {
         ok: false,
         error: 'content-extract-unavailable',
@@ -718,11 +735,28 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
       };
     }
 
+    const attemptedAt = numberValue(params.extractedAt) ?? Date.now();
     let extract: ArtifactContentExtract;
+    let enrichmentEvents: ArtifactMeta['enrichmentEvents'];
     try {
       const read = await artifactPersistence.readImportedText(artifactId);
-      extract = buildArtifactContentExtract(artifact, read, numberValue(params.extractedAt) ?? Date.now());
+      extract = buildArtifactContentExtract(artifact, read, attemptedAt);
+      enrichmentEvents = recordArtifactEnrichmentEvent(artifact, {
+        kind: 'content_extract',
+        status: 'succeeded',
+        format: extract.format,
+        attemptedAt,
+        resultSummary: extract.summary,
+      }).enrichmentEvents;
     } catch (error) {
+      const failedEvents = recordArtifactEnrichmentEvent(artifact, {
+        kind: 'content_extract',
+        status: 'failed',
+        format: eligibility.format,
+        attemptedAt,
+        error: error instanceof Error ? error.message : String(error),
+      }).enrichmentEvents;
+      await artifactService.update(artifactId, { enrichmentEvents: failedEvents });
       return {
         ok: false,
         error: 'content-extract-failed',
@@ -733,11 +767,13 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
 
     await artifactService.update(artifactId, {
       contentExtract: extract,
+      enrichmentEvents,
     });
     const persistedArtifact = await artifactPersistence.loadMeta(artifactId);
     const outputArtifact = persistedArtifact
       ? { ...persistedArtifact, contentExtract: extract }
       : { ...artifact, contentExtract: extract };
+    outputArtifact.enrichmentEvents = enrichmentEvents;
 
     const repoPath = stringValue(params.repoPath);
     let output: RepositoryOutputResult | null = null;
@@ -766,6 +802,208 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
     };
   }
 
+  if (command === 'desktop.artifacts.content.facts.extract') {
+    const artifactId = stringValue(params.artifactId);
+    if (!artifactId) return invalidParams('artifactId is required');
+    const artifact = await artifactPersistence.loadMeta(artifactId);
+    if (!artifact) return { ok: false, error: 'not-found', artifactId };
+
+    const eligibility = resolveArtifactContentFactsEligibility(artifact);
+    if (!eligibility.eligible) {
+      const enrichmentEvents = recordArtifactEnrichmentEvent(artifact, {
+        kind: 'content_facts',
+        status: 'unavailable',
+        format: eligibility.format,
+        attemptedAt: numberValue(params.extractedAt) ?? Date.now(),
+        reason: eligibility.reason,
+      }).enrichmentEvents;
+      await artifactService.update(artifactId, { enrichmentEvents });
+      return {
+        ok: false,
+        error: 'content-facts-unavailable',
+        artifactId,
+        format: eligibility.format,
+        reason: eligibility.reason,
+      };
+    }
+
+    const attemptedAt = numberValue(params.extractedAt) ?? Date.now();
+    let facts: ArtifactContentFacts;
+    let enrichmentEvents: ArtifactMeta['enrichmentEvents'];
+    try {
+      const read = await artifactPersistence.readImportedFileFacts(artifactId);
+      facts = buildArtifactContentFacts(artifact, read, attemptedAt);
+      enrichmentEvents = recordArtifactEnrichmentEvent(artifact, {
+        kind: 'content_facts',
+        status: 'succeeded',
+        format: facts.format,
+        attemptedAt,
+        resultSummary: facts.summary,
+      }).enrichmentEvents;
+    } catch (error) {
+      const failedEvents = recordArtifactEnrichmentEvent(artifact, {
+        kind: 'content_facts',
+        status: 'failed',
+        format: eligibility.format,
+        attemptedAt,
+        error: error instanceof Error ? error.message : String(error),
+      }).enrichmentEvents;
+      await artifactService.update(artifactId, { enrichmentEvents: failedEvents });
+      return {
+        ok: false,
+        error: 'content-facts-failed',
+        artifactId,
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    await artifactService.update(artifactId, {
+      contentFacts: facts,
+      enrichmentEvents,
+    });
+    const persistedArtifact = await artifactPersistence.loadMeta(artifactId);
+    const outputArtifact = persistedArtifact
+      ? { ...persistedArtifact, contentFacts: facts }
+      : { ...artifact, contentFacts: facts };
+    outputArtifact.enrichmentEvents = enrichmentEvents;
+
+    const repoPath = stringValue(params.repoPath);
+    let output: RepositoryOutputResult | null = null;
+    if (repoPath) {
+      output = await mirrorArtifactSnapshotToRepository({
+        artifactId,
+        artifact: outputArtifact,
+        repoPath,
+        gatewayInstanceId: stringValue(params.gatewayInstanceId),
+      });
+    }
+
+    return {
+      ok: true,
+      artifactId,
+      facts,
+      ...(output
+        ? {
+            output: {
+              outputId: output.outputId,
+              path: output.outputPath,
+              previewPath: output.previewPath,
+            },
+          }
+        : {}),
+    };
+  }
+
+  if (command === 'desktop.artifacts.thumbnail.extract') {
+    const artifactId = stringValue(params.artifactId);
+    if (!artifactId) return invalidParams('artifactId is required');
+    const artifact = await artifactPersistence.loadMeta(artifactId);
+    if (!artifact) return { ok: false, error: 'not-found', artifactId };
+
+    const eligibility = resolveArtifactThumbnailEligibility(artifact);
+    if (!eligibility.eligible) {
+      const enrichmentEvents = recordArtifactEnrichmentEvent(artifact, {
+        kind: 'thumbnail',
+        status: 'unavailable',
+        format: eligibility.format,
+        attemptedAt: numberValue(params.extractedAt) ?? Date.now(),
+        reason: eligibility.reason,
+      }).enrichmentEvents;
+      await artifactService.update(artifactId, { enrichmentEvents });
+      return {
+        ok: false,
+        error: 'thumbnail-unavailable',
+        artifactId,
+        format: eligibility.format,
+        reason: eligibility.reason,
+      };
+    }
+
+    const attemptedAt = numberValue(params.extractedAt) ?? Date.now();
+    let thumbnail: string | undefined;
+    let enrichmentEvents: ArtifactMeta['enrichmentEvents'];
+    try {
+      const read = await artifactPersistence.readImportedImageThumbnail(artifactId);
+      thumbnail = buildArtifactThumbnail(artifact, read);
+    } catch (error) {
+      const failedEvents = recordArtifactEnrichmentEvent(artifact, {
+        kind: 'thumbnail',
+        status: 'failed',
+        format: eligibility.format,
+        attemptedAt,
+        error: error instanceof Error ? error.message : String(error),
+      }).enrichmentEvents;
+      await artifactService.update(artifactId, { enrichmentEvents: failedEvents });
+      return {
+        ok: false,
+        error: 'thumbnail-failed',
+        artifactId,
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+    if (!thumbnail) {
+      const failedEvents = recordArtifactEnrichmentEvent(artifact, {
+        kind: 'thumbnail',
+        status: 'failed',
+        format: eligibility.format,
+        attemptedAt,
+        error: 'invalid image thumbnail data',
+      }).enrichmentEvents;
+      await artifactService.update(artifactId, { enrichmentEvents: failedEvents });
+      return {
+        ok: false,
+        error: 'thumbnail-failed',
+        artifactId,
+        message: 'invalid image thumbnail data',
+      };
+    }
+
+    const previewPlan = buildArtifactPreviewPlan({ ...artifact, thumbnail }, attemptedAt);
+    enrichmentEvents = recordArtifactEnrichmentEvent(artifact, {
+      kind: 'thumbnail',
+      status: 'succeeded',
+      format: eligibility.format,
+      attemptedAt,
+      resultSummary: 'thumbnail available',
+    }).enrichmentEvents;
+    await artifactService.update(artifactId, {
+      thumbnail,
+      previewPlan,
+      enrichmentEvents,
+    });
+    const persistedArtifact = await artifactPersistence.loadMeta(artifactId);
+    const outputArtifact = persistedArtifact
+      ? { ...persistedArtifact, thumbnail, previewPlan }
+      : { ...artifact, thumbnail, previewPlan };
+    outputArtifact.enrichmentEvents = enrichmentEvents;
+
+    const repoPath = stringValue(params.repoPath);
+    let output: RepositoryOutputResult | null = null;
+    if (repoPath) {
+      output = await mirrorArtifactSnapshotToRepository({
+        artifactId,
+        artifact: outputArtifact,
+        repoPath,
+        gatewayInstanceId: stringValue(params.gatewayInstanceId),
+      });
+    }
+
+    return {
+      ok: true,
+      artifactId,
+      thumbnail,
+      ...(output
+        ? {
+            output: {
+              outputId: output.outputId,
+              path: output.outputPath,
+              previewPath: output.previewPath,
+            },
+          }
+        : {}),
+    };
+  }
+
   if (command === 'desktop.artifacts.describe') {
     const artifactId = stringValue(params.artifactId);
     if (!artifactId) return invalidParams('artifactId is required');
@@ -776,6 +1014,7 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
     const lastExecutionEvent = artifact.executionEvents?.[artifact.executionEvents.length - 1];
     const versions = buildArtifactVersionHistory(artifact);
     const latestVersion = versions[versions.length - 1];
+    const valueHealth = buildArtifactValueHealth(artifact);
     return {
       ok: true,
       artifact: {
@@ -792,6 +1031,8 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
         fileInspection: artifact.fileInspection,
         previewPlan: artifact.previewPlan,
         contentExtract: artifact.contentExtract,
+        contentFacts: artifact.contentFacts,
+        valueHealth,
         reuseKind: artifact.reuseKind,
         reuseEventCount: artifact.reuseEvents?.length ?? 0,
         lastReuseEvent,
@@ -801,7 +1042,7 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
         repositoryPreviewPath: artifact.repositoryPreviewPath,
         fileName: artifact.fileName,
         url: artifact.url,
-        previewCard: buildArtifactPreviewCard(artifact),
+        previewCard: buildArtifactAgentPreviewCard(artifact),
       },
       reference: reference.markdown,
     };

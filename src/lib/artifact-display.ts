@@ -1,4 +1,6 @@
 import type { ArtifactExternalFormat, ArtifactMeta } from './artifact-types';
+import { formatArtifactPdfFacts } from './artifact-content-facts';
+import { buildArtifactValueHealth } from './artifact-value-health';
 import { buildArtifactValueSummary, inferArtifactExternalFormat } from './artifact-value-summary';
 
 export type ArtifactPreviewPrimaryAction = 'preview_html' | 'open_file' | 'open_link' | 'copy_command' | 'view_detail';
@@ -6,11 +8,16 @@ export type ArtifactPreviewPrimaryAction = 'preview_html' | 'open_file' | 'open_
 export interface ArtifactPreviewCard {
   formatLabel: string;
   thumbnailLabel: string;
+  thumbnailUrl?: string;
   summary: string;
   location?: string;
   primaryAction: ArtifactPreviewPrimaryAction;
   actionLabel: string;
   safetyNote?: string;
+}
+
+export interface ArtifactAgentPreviewCard extends Omit<ArtifactPreviewCard, 'thumbnailUrl'> {
+  thumbnailAvailable?: boolean;
 }
 
 const GENERIC_VALUE_SUMMARIES = new Set([
@@ -34,6 +41,7 @@ export function buildArtifactOutputDescription(artifact: ArtifactMeta): string {
   const inferredSummary = meaningfulSummary(buildArtifactValueSummary(artifact));
 
   return firstNonEmpty(
+    artifact.contentFacts?.summary,
     artifact.contentSummary,
     inferredSummary,
     artifact.repositoryOutputPath,
@@ -63,6 +71,7 @@ export function buildArtifactDisplayLine(artifact: ArtifactMeta, dateLabel?: str
 
 export function buildArtifactSearchText(artifact: ArtifactMeta): string {
   const previewCard = buildArtifactPreviewCard(artifact);
+  const valueHealth = buildArtifactValueHealth(artifact);
   const fields = [
     artifact.id,
     artifact.title,
@@ -98,6 +107,25 @@ export function buildArtifactSearchText(artifact: ArtifactMeta): string {
     artifact.contentExtract?.fileName,
     artifact.contentExtract?.mimeType,
     artifact.contentExtract?.snippet,
+    artifact.contentFacts?.status,
+    artifact.contentFacts?.format,
+    artifact.contentFacts?.sourceKind,
+    artifact.contentFacts?.summary,
+    artifact.contentFacts?.fileName,
+    artifact.contentFacts?.mimeType,
+    artifact.contentFacts?.sha256,
+    artifact.contentFacts?.signatureHex,
+    artifact.contentFacts?.imageDimensions
+      ? `${artifact.contentFacts.imageDimensions.width}x${artifact.contentFacts.imageDimensions.height}`
+      : undefined,
+    artifact.contentFacts?.imageDimensions?.kind,
+    formatArtifactPdfFacts(artifact.contentFacts?.pdfInfo),
+    artifact.thumbnail ? 'thumbnail available' : undefined,
+    valueHealth.status,
+    valueHealth.summary,
+    ...valueHealth.strengths,
+    ...valueHealth.gaps,
+    ...valueHealth.nextActions,
     artifact.previewPlan?.format,
     artifact.previewPlan?.sourceKind,
     artifact.previewPlan?.strategy,
@@ -116,6 +144,14 @@ export function buildArtifactSearchText(artifact: ArtifactMeta): string {
     previewCard.location,
     previewCard.actionLabel,
     previewCard.safetyNote,
+    ...(artifact.enrichmentEvents ?? []).flatMap((event) => [
+      event.kind,
+      event.status,
+      event.format,
+      event.reason,
+      event.resultSummary,
+      event.error,
+    ]),
     ...(artifact.executionEvents ?? []).flatMap((event) => [
       event.status,
       event.sourceId,
@@ -141,6 +177,7 @@ export function buildArtifactPreviewCard(artifact: ArtifactMeta): ArtifactPrevie
   const format = inferArtifactExternalFormat(artifact);
   const primaryAction = resolvePreviewPrimaryAction(artifact, format);
   const summary = firstNonEmpty(
+    artifact.contentFacts?.summary,
     artifact.contentSummary,
     meaningfulSummary(buildArtifactValueSummary({ ...artifact, externalFormat: format })),
     artifact.description,
@@ -150,6 +187,7 @@ export function buildArtifactPreviewCard(artifact: ArtifactMeta): ArtifactPrevie
   return {
     formatLabel: FORMAT_LABELS[format],
     thumbnailLabel: THUMBNAIL_LABELS[format],
+    thumbnailUrl: resolveThumbnailUrl(artifact),
     summary,
     location: firstNonEmpty(
       artifact.repositoryOutputPath,
@@ -166,6 +204,14 @@ export function buildArtifactPreviewCard(artifact: ArtifactMeta): ArtifactPrevie
   };
 }
 
+export function buildArtifactAgentPreviewCard(artifact: ArtifactMeta): ArtifactAgentPreviewCard {
+  const { thumbnailUrl, ...previewCard } = buildArtifactPreviewCard(artifact);
+  return {
+    ...previewCard,
+    thumbnailAvailable: thumbnailUrl ? true : undefined,
+  };
+}
+
 export function formatArtifactSource(artifact: ArtifactMeta): string {
   const id = artifact.source.id ? `/${artifact.source.id}` : '';
   const name = artifact.source.name ? ` ${artifact.source.name}` : '';
@@ -179,6 +225,12 @@ function firstNonEmpty(...values: Array<string | undefined>): string {
 function meaningfulSummary(value?: string): string | undefined {
   if (!value || GENERIC_VALUE_SUMMARIES.has(value)) return undefined;
   return value;
+}
+
+function resolveThumbnailUrl(artifact: ArtifactMeta): string | undefined {
+  if (!artifact.thumbnail) return undefined;
+  const thumbnail = artifact.thumbnail.trim();
+  return thumbnail.startsWith('data:image/') ? thumbnail : undefined;
 }
 
 const FORMAT_LABELS: Record<ArtifactExternalFormat, string> = {

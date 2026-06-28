@@ -157,6 +157,26 @@ interface Window {
         bytesRead: number;
         truncated: boolean;
       }>;
+      readImportedFileFacts: (artifactId: string) => Promise<{
+        fileSize: number;
+        bytesRead: number;
+        sha256: string;
+        signatureHex: string;
+        imageDimensions?: {
+          width: number;
+          height: number;
+          kind: 'png' | 'jpeg' | 'gif' | 'webp';
+        };
+        pdfInfo?: {
+          version?: string;
+          pageCount?: number;
+        };
+      }>;
+      readImportedImageThumbnail: (artifactId: string) => Promise<{
+        dataUrl: string;
+        bytesRead: number;
+        mimeType: string;
+      }>;
       list: () => Promise<unknown[]>;
       updateIndex: (entries: unknown) => Promise<void>;
       requestAuth: (

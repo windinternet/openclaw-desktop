@@ -48,7 +48,11 @@ ActionRun 的结果可以是：
 - 3D Office 布局方案。
 - 复盘或健康检查结果。
 
-当 ActionRun 产生产物时，本地记录会保存 `artifactIds`。仓库 `runs/action-runs/*.md` 摘要会尽量解析对应 Artifact meta，列出产物标题、类型、Artifact 引用，以及 `outputs/` 中的 markdown 和 HTML preview 路径；读取不到 meta 时仍保留产物 ID，避免丢失审计线索。
+当 ActionRun 产生产物时，本地记录会保存 `artifactIds`。仓库 `runs/action-runs/*.md` 摘要会尽量解析对应 Artifact meta，列出产物标题、类型、价值摘要、`valueHealth` 状态/缺口/建议动作、`previewPlan` 线索、`reuseKind`、Artifact 引用，以及 `outputs/` 中的 markdown 和 HTML preview 路径；读取不到 meta 时仍保留产物 ID，避免丢失审计线索。
+
+当 ActionRun 归属于某个工作事项时，本地记录可以携带 `workItemId` 和 `workItemPath`。仓库绑定就绪且 `workItemPath` 指向当前仓库 `work/` 下的 Markdown 时，终态 ActionRun 会先写入 `runs/action-runs/<id>.md`，再把一条执行记录追加到事项页的 `## 执行记录` 小节，并追加 `## 收尾动作` 检查清单。执行记录包含时间、ActionRun 类型、状态、运行摘要链接和结果摘要；收尾动作提示用户继续判断是否更新事项状态、沉淀成果、更新知识库和写入复盘；同一个运行路径已存在时不会重复追加。Workbench 快照会解析事项中的 `## 收尾动作`，未勾选项会进入 Dashboard “待确认”；Dashboard 会把这些尾动作分类为 `tail-action:status`、`tail-action:output`、`tail-action:knowledge` 或 `tail-action:review`，并分别导向 Workbench 状态处理、Artifacts、Knowledge 或 Workbench 复盘后续。目标 URL 会携带 `tailAction`、`tailActionId` 和 `workItemPath`，让目标页保留来源事项上下文；成果类会打开 Artifacts 的 AI 产物创建入口并带上来源事项，同时预填“基于来源事项和最近执行记录沉淀有价值成果”的提示，避免用户进入空白输入框。知识类会进入 Knowledge 维护上下文，状态和复盘类会进入 Workbench 对应上下文。用户可在 Dashboard 将单条收尾动作标记完成，Desktop 会把对应事项 Markdown 中的该行写回为 `[x]`；这只表示该收尾动作已确认，不会自动执行状态更新、成果沉淀、知识库更新或复盘写入。
+
+Workbench 预览工作事项 Markdown 时，用户可以从该事项直接发起“生成成果”。这会创建 `sourcePage: workbench` 的 `artifact_create` ActionRun，并把当前 `workItemPath` 写入运行记录；如果事项 frontmatter 中存在 `id`，也会同时写入 `workItemId`。事项内容、写入边界和具体仓库规则仍以 Repository Context 与仓库 `AGENTS.md` 为准。
 
 当终态 ActionRun 的 `lastAssistantResponse` 包含 `<artifact>` 块时，Desktop 会自动把这些块保存为 `source: action_run` 的 Artifact，并把保存后的 Artifact id 回写到 ActionRun。
 
@@ -56,7 +60,15 @@ ActionRun 的结果可以是：
 
 当 ActionRun 生成或复用文件型、Office、PDF、媒体、链接、应用入口或命令型产物后，可以调用 `desktop.artifacts.inspect` 写入 `fileInspection` 并刷新 `previewPlan`，把格式、来源、打开方式、预览状态、安全预览策略、路径、当前限制和下一步预览缺口同步到 Artifact metadata 与 Repository output。该命令不读取文件内容、不渲染 Office，也不执行命令。
 
-当 ActionRun 生成已导入的文本、代码或 HTML 文件副本时，Desktop 会在安全可读时自动写入 `contentExtract`，把读取字节数、文本长度、截断状态和抽取片段同步到 Artifact metadata；也可以调用 `desktop.artifacts.content.extract` 刷新既有产物并同步到 Repository output。该能力只读取 Artifact storage 中的导入副本，不读取任意本地路径，不解析 Office/PDF/媒体文件，也不执行命令。
+当 ActionRun 生成已导入的文本、代码、HTML、PDF 或 Word/Excel/PowerPoint OOXML 文件副本时，Desktop 会在安全可读时自动写入 `contentExtract`，把读取字节数、文本长度、截断状态和抽取片段同步到 Artifact metadata；也可以调用 `desktop.artifacts.content.extract` 刷新既有产物并同步到 Repository output。PDF 与 OOXML 抽取是基于导入副本中 PDF text streams 或 OOXML XML entries 的 best-effort 文本抽取，可能不完整；该能力只读取 Artifact storage 中的导入副本，不读取任意本地路径，不解析旧版二进制 Office/音频/视频文件，不生成原生预览，也不执行命令。
+
+当 ActionRun 生成已导入的非文本文件副本时，Desktop 会在安全可读时自动写入 `contentFacts`，把文件大小、已哈希字节数、sha256、文件头签名、可识别的图片尺寸，以及可识别的 PDF 版本/页数同步到 Artifact metadata；也可以调用 `desktop.artifacts.content.facts.extract` 刷新既有产物并同步到 Repository output。该能力只读取 Artifact storage 中的导入副本，不读取任意本地路径，不替代 `contentExtract`，不解析旧版二进制 Office 正文，不生成 Office/PDF/媒体原生缩略图，也不执行命令。
+
+ActionRun 或 Gateway 读取产物时会看到 `valueHealth`，用于判断产物是 `ready`、`usable_with_limits` 还是 `needs_attention`。这个字段从既有 Artifact 事实计算，用于提示下一步补齐动作，不会自动执行动作、打开文件或授予权限。
+
+当 ActionRun 生成已导入的图片文件副本时，Desktop 会在安全可读且大小在限制内时自动写入 `thumbnail`，让 Artifacts 列表和详情页显示真实图片预览；也可以调用 `desktop.artifacts.thumbnail.extract` 刷新既有图片产物并同步到 Repository output。Repository output 只记录 `thumbnail: available`，不会嵌入 data URL。该能力只读取 Artifact storage 中的导入副本，不读取任意本地路径，不为 Office/PDF/音视频生成原生缩略图，也不执行命令。
+
+ActionRun 生成或刷新产物增强信息时，Desktop 会把内容抽取、文件事实抽取和缩略图生成尝试写入 `enrichmentEvents`。成功、不可用和失败都会保留 kind、format、reason、resultSummary 或 error，并进入 Artifact 详情页、搜索文本、Repository output markdown 和 `outputs/index.md`，方便复盘“这次 AI 操作产物为什么已可用 / 为什么还需要补”。该记录只做审计，不自动重试、不打开文件、不执行命令，也不授予权限。
 
 当 ActionRun 复用已有产物时，可以调用 `desktop.artifacts.reuse.record` 写入上下文、用途、状态、结果摘要和来源信息；仓库路径就绪时可同时刷新对应 Repository output。该记录用于追踪“用了哪个既有成果做了什么”，不代表 Desktop 直接执行该产物。
 
@@ -64,4 +76,4 @@ ActionRun 的结果可以是：
 
 当 ActionRun 通过外部审批通道使用了 `tool`、`script` 或 `workflow` 类产物时，可以调用 `desktop.artifacts.execution.record` 归档审批、runner、命令文本、状态、结果摘要和输出线索。该命令只记录执行事实，不执行命令，也不绕过 ActionRun 审批。
 
-HTML 产物里的 `artifactBridge.exec()` 仍不是可用执行入口。若它被调用，Desktop 会拒绝执行，并把 unsupported bridge 调用和被阻止的命令执行意图分别写入 `bridgeEvents` 与 `executionEvents`；真正的命令使用仍应走 ActionRun 或外部 runner 的审批、执行和归档流程。
+HTML 产物里的 `artifactBridge.exec(command, options?)` 只用于提出 prepare-only 命令执行审批意图。Desktop 会把 Bridge 调用写入 `bridgeEvents`，把 `approval_required` 执行意图写入 `executionEvents`，并返回 pending approval 载荷；真正的命令运行仍应走 ActionRun 或外部 runner 的审批、执行和归档流程。

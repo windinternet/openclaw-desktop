@@ -193,15 +193,93 @@ describe('AI ActionRun repository summaries', () => {
         id: 'action-99',
         type: 'artifact_create',
         status: 'done',
+        workItemPath: 'work/active/release.md',
         input: '生成报告',
         resultSummary: '报告已生成',
         artifactIds: ['art_1', 'art_2'],
       }),
     );
 
+    expect(markdown).toContain('workItemPath: work/active/release.md');
     expect(markdown).toContain('## Artifacts');
     expect(markdown).toContain('- art_1');
     expect(markdown).toContain('- art_2');
+  });
+
+  it('writes completed ActionRun execution records back to the owning work item', async () => {
+    const writeText = vi.fn();
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'runs/action-runs/index.md') return '# Action Runs\n';
+      if (relativePath === 'work/active/release.md') {
+        return ['# 发布推进', '', '## 目标', '', '完成发布。', '', '## 执行记录', '', '- 暂无', ''].join('\n');
+      }
+      return '';
+    });
+    const saveInstanceData = vi.fn();
+    const loadInstanceData = vi.fn(async (_instanceId: string, key: string) => {
+      if (key === AI_ACTION_RUNS_STORAGE_KEY) return [];
+      if (key === AGENTIC_REPOSITORY_STORAGE_KEY) {
+        return {
+          id: 'repo_instance-1',
+          name: 'Repo',
+          location: 'desktop-local',
+          repoPath: '/repo',
+          gatewayInstanceId: 'instance-1',
+          status: 'repo_ready',
+          paths: {
+            sources: 'sources',
+            wiki: 'wiki',
+            work: 'work',
+            plans: 'plans',
+            runs: 'runs',
+            outputs: 'outputs',
+            reviews: 'reviews',
+            schemas: 'schemas',
+          },
+        };
+      }
+      return null;
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        storage: {
+          loadInstanceData,
+          saveInstanceData,
+        },
+        repository: {
+          readText,
+          writeText,
+        },
+      },
+    });
+
+    await upsertAiActionRun(
+      'instance-1',
+      createRun({
+        id: 'action-42',
+        type: 'artifact_create',
+        sourcePage: 'artifacts',
+        status: 'done',
+        input: '生成发布报告',
+        resultSummary: '发布报告已生成',
+        workItemPath: 'work/active/release.md',
+        updatedAt: 2,
+      }),
+    );
+
+    const workItemWrite = writeText.mock.calls.find((call) => call[1] === 'work/active/release.md')?.[2] as string;
+    expect(workItemWrite).toContain('## 执行记录');
+    expect(workItemWrite).toContain(
+      '- 1970-01-01T00:00:00.002Z · artifact_create · done · [runs/action-runs/action-42.md](../../runs/action-runs/action-42.md) · 发布报告已生成',
+    );
+    expect(workItemWrite).toContain('## 收尾动作');
+    expect(workItemWrite).toContain(
+      '- [ ] 根据 [runs/action-runs/action-42.md](../../runs/action-runs/action-42.md) 更新事项状态。',
+    );
+    expect(workItemWrite).toContain('- [ ] 判断是否需要把本次执行结果沉淀为成果，并关联到事项。');
+    expect(workItemWrite).toContain('- [ ] 判断是否需要更新知识库。');
+    expect(workItemWrite).toContain('- [ ] 判断是否需要写入复盘。');
+    expect(workItemWrite).not.toContain('- 暂无');
   });
 
   it('includes artifact details and repository output paths when metadata is available', () => {
@@ -220,6 +298,60 @@ describe('AI ActionRun repository summaries', () => {
     expect(markdown).toContain('- [交互式复盘报告](outputs/reports/art_1.md) (`art_1`, report)');
     expect(markdown).toContain('  - preview: outputs/html/art_1.html');
     expect(markdown).toContain('  - detail: artifact://art_1');
+  });
+
+  it('includes artifact value readiness in ActionRun repository summaries', () => {
+    const markdown = buildAiActionRunMarkdown(
+      createRun({
+        id: 'action-99',
+        type: 'artifact_create',
+        status: 'done',
+        input: '生成路线图 PPT',
+        resultSummary: '路线图 PPT 已生成',
+        artifactIds: ['art_1'],
+      }),
+      [
+        createArtifact({
+          title: '路线图 PPT',
+          type: 'file',
+          externalFormat: 'powerpoint',
+          contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+          reuseKind: 'asset',
+          previewPlan: {
+            plannedAt: 3,
+            format: 'powerpoint',
+            sourceKind: 'imported_file',
+            strategy: 'system_file_handler',
+            surface: 'system_default_app',
+            primaryAction: 'open_file',
+            summary: 'PowerPoint · roadmap.pptx · 4 KB',
+            limitations: ['native-preview-missing', 'content-extraction-missing'],
+            nextSteps: ['open-with-system-app', 'add-native-preview', 'add-content-extraction'],
+          },
+          enrichmentEvents: [
+            {
+              id: 'enrich_3_1',
+              kind: 'content_extract',
+              status: 'failed',
+              artifactVersion: 1,
+              format: 'powerpoint',
+              attemptedAt: 3,
+              error: 'OOXML text extract returned no text',
+            },
+          ],
+        }),
+      ],
+    );
+
+    expect(markdown).toContain('  - summary: PowerPoint · roadmap.pptx · 4 KB');
+    expect(markdown).toContain('  - valueHealth: usable_with_limits');
+    expect(markdown).toContain('  - valueHealthGaps: native-preview-missing, content-extraction-missing');
+    expect(markdown).toContain(
+      '  - valueHealthNextActions: open-with-system-app, add-native-preview, add-content-extraction',
+    );
+    expect(markdown).toContain('  - previewPlan: system_file_handler, open_file');
+    expect(markdown).toContain('  - enrichment: content_extract, failed');
+    expect(markdown).toContain('  - reuseKind: asset');
   });
 
   it('mirrors ActionRun summaries with artifact metadata from local Artifact storage', async () => {
@@ -453,11 +585,7 @@ describe('AI ActionRun repository summaries', () => {
         contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
       }),
     );
-    expect(importFile).toHaveBeenCalledWith(
-      savedArtifact?.id,
-      '/Users/deepin/Documents/roadmap.pptx',
-      'roadmap.pptx',
-    );
+    expect(importFile).toHaveBeenCalledWith(savedArtifact?.id, '/Users/deepin/Documents/roadmap.pptx', 'roadmap.pptx');
     expect(writeText).toHaveBeenCalledWith(
       '/repo',
       `outputs/files/${savedArtifact?.id}.md`,

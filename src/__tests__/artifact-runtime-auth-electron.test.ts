@@ -32,7 +32,7 @@ describe('artifact runtime authorization recording', () => {
     expect(source).toContain('resultSummary: `exported ${exportRequest.bytes} bytes`');
   });
 
-  it('implements fetch through network authorization while keeping shell exec unsupported', () => {
+  it('implements fetch through network authorization while preparing shell exec approval intents', () => {
     const source = readFileSync('electron/artifact-handlers.ts', 'utf8');
 
     expect(source).toContain("case 'fetch'");
@@ -41,8 +41,12 @@ describe('artifact runtime authorization recording', () => {
     expect(source).toContain('await fetch(fetchRequest.url');
     expect(source).toContain('buildArtifactBridgeFetchResponse(response');
     expect(source).toContain("case 'exec':");
-    expect(source).toContain('Artifact bridge method exec is not implemented yet');
-    expect(source).toContain('recordArtifactBridgeExecBlocked');
-    expect(source).toContain("params.method === 'exec'");
+    expect(source).toContain('prepareArtifactBridgeExecApproval');
+    expect(source).toContain('recordArtifactBridgeExecApprovalRequired');
+    expect(source).toContain('desktopExecutes: false');
+    expect(source).not.toContain('Artifact bridge method exec is not implemented yet');
+    expect(source).not.toContain('node:child_process');
+    expect(source).not.toContain('execFile');
+    expect(source).not.toContain('spawn(');
   });
 });

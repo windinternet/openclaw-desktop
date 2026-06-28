@@ -13,8 +13,22 @@ export type ArtifactContentExtractEligibility =
   | { eligible: true; format: ArtifactExternalFormat }
   | { eligible: false; format: ArtifactExternalFormat; reason: ArtifactContentExtractIneligibilityReason };
 
-const EXTRACTABLE_FORMATS = new Set<ArtifactExternalFormat>(['html', 'text', 'code']);
+const EXTRACTABLE_FORMATS = new Set<ArtifactExternalFormat>([
+  'html',
+  'text',
+  'code',
+  'pdf',
+  'word',
+  'excel',
+  'powerpoint',
+]);
 const MAX_SNIPPET_CHARS = 1200;
+const SUMMARY_LABELS: Partial<Record<ArtifactExternalFormat, string>> = {
+  pdf: 'PDF text extract',
+  word: 'Word text extract',
+  excel: 'Excel text extract',
+  powerpoint: 'PowerPoint text extract',
+};
 
 export function resolveArtifactContentExtractEligibility(artifact: ArtifactMeta): ArtifactContentExtractEligibility {
   const format = inferArtifactExternalFormat(artifact);
@@ -44,7 +58,7 @@ export function buildArtifactContentExtract(
     status: 'extracted',
     format,
     sourceKind: 'imported_file',
-    summary: buildSummary(fileName, textLength, truncated),
+    summary: buildSummary(format, fileName, textLength, truncated),
     fileName,
     mimeType: artifact.mimeType,
     bytesRead: normalizeByteCount(read.bytesRead),
@@ -62,8 +76,18 @@ function normalizeByteCount(value: number): number {
   return Number.isFinite(value) && value >= 0 ? Math.trunc(value) : 0;
 }
 
-function buildSummary(fileName: string | undefined, textLength: number, truncated: boolean): string {
-  return ['Text extract', fileName, `${textLength} chars`, truncated ? 'truncated' : undefined]
+function buildSummary(
+  format: ArtifactExternalFormat,
+  fileName: string | undefined,
+  textLength: number,
+  truncated: boolean,
+): string {
+  return [
+    SUMMARY_LABELS[format] ?? 'Text extract',
+    fileName,
+    `${textLength} chars`,
+    truncated ? 'truncated' : undefined,
+  ]
     .filter((part): part is string => Boolean(part))
     .join(' · ');
 }

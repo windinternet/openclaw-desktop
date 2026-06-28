@@ -64,32 +64,30 @@ export function recordArtifactBridgeCallResult(
   };
 }
 
-export interface RecordArtifactBridgeExecBlockedParams {
-  startedAt: number;
-  endedAt: number;
+export interface RecordArtifactBridgeExecApprovalRequiredParams {
+  requestedAt: number;
   command?: string;
-  error?: string;
+  approvalTitle?: string;
+  approvalRisk?: string;
+  approvalReason?: string;
   id?: string;
 }
 
-export function recordArtifactBridgeExecBlocked(
+export function recordArtifactBridgeExecApprovalRequired(
   meta: ArtifactMeta,
-  params: RecordArtifactBridgeExecBlockedParams,
+  params: RecordArtifactBridgeExecApprovalRequiredParams,
 ): ArtifactMeta {
   return recordArtifactExecutionEvent(meta, {
     id: params.id,
-    status: 'denied',
+    status: 'approval_required',
     sourceName: 'artifactBridge.exec',
     runner: 'artifactBridge.exec',
     command: params.command,
-    approvalTitle: 'Artifact Bridge command execution blocked',
-    approvalRisk: 'high',
+    approvalTitle: params.approvalTitle ?? 'Artifact Bridge command execution requested',
+    approvalRisk: params.approvalRisk ?? 'high',
     approvalReason:
-      'artifactBridge.exec remains unsupported; use Desktop node execution approval commands and an external runner instead.',
-    resultSummary: 'Blocked unsupported artifactBridge.exec request',
-    error: params.error,
-    requestedAt: params.startedAt,
-    startedAt: params.startedAt,
-    endedAt: params.endedAt,
+      params.approvalReason ?? 'HTML Artifact requested shell execution; Desktop only records the approval intent.',
+    resultSummary: 'Prepared artifactBridge.exec approval request; Desktop did not execute the command.',
+    requestedAt: params.requestedAt,
   });
 }

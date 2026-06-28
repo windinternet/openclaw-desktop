@@ -11,10 +11,7 @@ export interface RecordArtifactReuseEventParams {
   id?: string;
 }
 
-export function recordArtifactReuseEvent(
-  meta: ArtifactMeta,
-  params: RecordArtifactReuseEventParams,
-): ArtifactMeta {
+export function recordArtifactReuseEvent(meta: ArtifactMeta, params: RecordArtifactReuseEventParams): ArtifactMeta {
   const reuseEvents = meta.reuseEvents ?? [];
   const event = {
     id: params.id ?? `reuse_${params.usedAt.toString(36)}_${reuseEvents.length + 1}`,

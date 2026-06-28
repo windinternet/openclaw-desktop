@@ -35,6 +35,7 @@ describe('dashboard redesign', () => {
     const dashboard = readFileSync('src/pages/DashboardPage.tsx', 'utf8');
     const usage = readFileSync('src/lib/gateway-usage.ts', 'utf8');
 
+    expect(dashboard).toContain('buildDashboardWorkSystemSummary');
     expect(dashboard).toContain('buildArtifactDisplayLine');
     expect(dashboard).toContain('loadRepositoryBinding');
     expect(dashboard).toContain('loadWorkbenchSnapshot');
@@ -50,6 +51,72 @@ describe('dashboard redesign', () => {
     expect(dashboard).toContain("t('dashboard.realUsageUnavailable')");
     expect(dashboard).toContain("t('dashboard.repositoryUnavailable')");
     expect(dashboard).not.toContain('Math.random');
+  });
+
+  it('prioritizes the user work system summary before Gateway infrastructure status', () => {
+    const dashboard = readFileSync('src/pages/DashboardPage.tsx', 'utf8');
+    const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
+    const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
+
+    expect(dashboard).toContain('renderWorkSystemSection');
+    expect(dashboard).toContain("t('dashboard.workSystem')");
+    expect(dashboard).toContain("t('dashboard.todayContinue')");
+    expect(dashboard).toContain("t('dashboard.pendingConfirmations')");
+    expect(dashboard).toContain("t('dashboard.stuckItems')");
+    expect(dashboard).toContain("t('dashboard.knowledgeUpdates')");
+    expect(dashboard).toContain("t('dashboard.recentOutputs')");
+    expect(dashboard.indexOf('{renderWorkSystemSection()}')).toBeLessThan(
+      dashboard.indexOf('{renderGatewayStatusSection()}'),
+    );
+    expect(getByPath(zh, 'dashboard.workSystem')).toBeTruthy();
+    expect(getByPath(zh, 'dashboard.todayContinue')).toBeTruthy();
+    expect(getByPath(zh, 'dashboard.pendingConfirmations')).toBeTruthy();
+    expect(getByPath(zh, 'dashboard.stuckItems')).toBeTruthy();
+    expect(getByPath(zh, 'dashboard.knowledgeUpdates')).toBeTruthy();
+    expect(getByPath(zh, 'dashboard.recentOutputs')).toBeTruthy();
+    expect(getByPath(en, 'dashboard.workSystem')).toBeTruthy();
+    expect(getByPath(en, 'dashboard.todayContinue')).toBeTruthy();
+    expect(getByPath(en, 'dashboard.pendingConfirmations')).toBeTruthy();
+    expect(getByPath(en, 'dashboard.stuckItems')).toBeTruthy();
+    expect(getByPath(en, 'dashboard.knowledgeUpdates')).toBeTruthy();
+    expect(getByPath(en, 'dashboard.recentOutputs')).toBeTruthy();
+  });
+
+  it('lets Dashboard pending tail actions be completed back into the work item', () => {
+    const dashboard = readFileSync('src/pages/DashboardPage.tsx', 'utf8');
+    const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
+    const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
+
+    expect(dashboard).toContain('completeWorkbenchTailAction');
+    expect(dashboard).toContain('handleCompleteTailAction');
+    expect(dashboard).toContain("item.status?.startsWith('tail-action')");
+    expect(dashboard).toContain("t('dashboard.completeTailAction')");
+    expect(dashboard).toContain("t('dashboard.tailActionCompleted')");
+    expect(getByPath(zh, 'dashboard.completeTailAction')).toBeTruthy();
+    expect(getByPath(zh, 'dashboard.tailActionCompleted')).toBeTruthy();
+    expect(getByPath(en, 'dashboard.completeTailAction')).toBeTruthy();
+    expect(getByPath(en, 'dashboard.tailActionCompleted')).toBeTruthy();
+  });
+
+  it('puts repository setup into the dashboard work-system onboarding path', () => {
+    const dashboard = readFileSync('src/pages/DashboardPage.tsx', 'utf8');
+    const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
+    const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
+
+    expect(dashboard).toContain('renderWorkSystemOnboarding');
+    expect(dashboard).toContain("t('dashboard.onboardingTitle')");
+    expect(dashboard).toContain("t('dashboard.onboardingGatewayDone')");
+    expect(dashboard).toContain("t('dashboard.onboardingRepositoryNext')");
+    expect(dashboard).toContain("t('dashboard.onboardingFirstThingNext')");
+    expect(dashboard).toContain('repositorySetupNeeded');
+    expect(dashboard).toContain('<RepositoryGate area="workbench"');
+    expect(dashboard.indexOf('{renderWorkSystemOnboarding()}')).toBeLessThan(
+      dashboard.indexOf('{renderGatewayStatusSection()}'),
+    );
+    expect(getByPath(zh, 'dashboard.onboardingTitle')).toBeTruthy();
+    expect(getByPath(zh, 'dashboard.onboardingRepositoryNext')).toBeTruthy();
+    expect(getByPath(en, 'dashboard.onboardingTitle')).toBeTruthy();
+    expect(getByPath(en, 'dashboard.onboardingRepositoryNext')).toBeTruthy();
   });
 
   it('renders rich real Gateway usage instead of local estimate-only metrics', () => {

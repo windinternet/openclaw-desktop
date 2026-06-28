@@ -107,6 +107,37 @@ export interface ArtifactContentExtract {
   snippet: string;
 }
 
+export type ArtifactContentFactsStatus = 'recorded';
+export type ArtifactContentFactsSourceKind = 'imported_file';
+export type ArtifactImageFactKind = 'png' | 'jpeg' | 'gif' | 'webp';
+
+export interface ArtifactImageDimensions {
+  width: number;
+  height: number;
+  kind: ArtifactImageFactKind;
+}
+
+export interface ArtifactPdfFacts {
+  version?: string;
+  pageCount?: number;
+}
+
+export interface ArtifactContentFacts {
+  extractedAt: number;
+  status: ArtifactContentFactsStatus;
+  format: ArtifactExternalFormat;
+  sourceKind: ArtifactContentFactsSourceKind;
+  summary: string;
+  fileName?: string;
+  mimeType?: string;
+  fileSize?: number;
+  bytesRead: number;
+  sha256: string;
+  signatureHex: string;
+  imageDimensions?: ArtifactImageDimensions;
+  pdfInfo?: ArtifactPdfFacts;
+}
+
 export interface ArtifactSource {
   type: 'chat' | 'workflow' | 'agent_team' | 'manual' | 'mcp_tool' | 'action_run';
   id?: string;
@@ -179,6 +210,8 @@ export type ArtifactReuseContext =
   | 'action_run'
   | 'repository';
 export type ArtifactReuseStatus = 'used' | 'succeeded' | 'failed' | 'cancelled';
+export type ArtifactEnrichmentKind = 'content_extract' | 'content_facts' | 'thumbnail';
+export type ArtifactEnrichmentStatus = 'succeeded' | 'unavailable' | 'failed';
 export type ArtifactExecutionStatus =
   | 'approval_required'
   | 'approved'
@@ -198,6 +231,18 @@ export interface ArtifactReuseEvent {
   sourceName?: string;
   purpose?: string;
   resultSummary?: string;
+}
+
+export interface ArtifactEnrichmentEvent {
+  id: string;
+  kind: ArtifactEnrichmentKind;
+  status: ArtifactEnrichmentStatus;
+  artifactVersion: number;
+  format: ArtifactExternalFormat;
+  attemptedAt: number;
+  reason?: string;
+  resultSummary?: string;
+  error?: string;
 }
 
 export interface ArtifactExecutionEvent {
@@ -248,6 +293,7 @@ export interface ArtifactMeta {
   fileInspection?: ArtifactFileInspection;
   previewPlan?: ArtifactPreviewPlan;
   contentExtract?: ArtifactContentExtract;
+  contentFacts?: ArtifactContentFacts;
   reuseKind?: ArtifactReuseKind;
   repositoryOutputPath?: string;
   repositoryPreviewPath?: string;
@@ -255,6 +301,7 @@ export interface ArtifactMeta {
   authEvents?: ArtifactRuntimeAuthEvent[];
   bridgeEvents?: ArtifactRuntimeBridgeEvent[];
   reuseEvents?: ArtifactReuseEvent[];
+  enrichmentEvents?: ArtifactEnrichmentEvent[];
   executionEvents?: ArtifactExecutionEvent[];
 }
 

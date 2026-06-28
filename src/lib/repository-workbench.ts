@@ -42,6 +42,14 @@ export interface WorkbenchTaskGroup {
   items: WorkbenchTaskItem[];
 }
 
+export interface WorkbenchTailAction {
+  id: string;
+  text: string;
+  sourcePath: string;
+  completed: boolean;
+  updatedAt: number;
+}
+
 export interface WorkbenchSnapshot {
   inboxMarkdown: string;
   activeWork: RepositoryMarkdownFile[];
@@ -57,6 +65,7 @@ export interface WorkbenchSnapshot {
   semanticSections: WorkbenchSemanticSection[];
   projects: WorkbenchProject[];
   taskGroups: WorkbenchTaskGroup[];
+  tailActions: WorkbenchTailAction[];
 }
 
 export interface RepositoryPlanMetadata {
@@ -98,11 +107,14 @@ export async function loadWorkbenchSnapshot(binding: RepositoryBinding): Promise
     repository.listMarkdown(binding.repoPath, binding.paths.reviews),
   ]);
 
-  const planMetadata = await Promise.all(
-    [...activePlans, ...completedPlans].map(async (file) =>
-      parsePlanMetadata(file.path, await repository.readText(binding.repoPath, file.path)),
+  const [planMetadata, tailActions] = await Promise.all([
+    Promise.all(
+      [...activePlans, ...completedPlans].map(async (file) =>
+        parsePlanMetadata(file.path, await repository.readText(binding.repoPath, file.path)),
+      ),
     ),
-  );
+    loadWorkbenchTailActions(binding, [...activeWork, ...completedWork, ...somedayWork]),
+  ]);
 
   return {
     inboxMarkdown,
@@ -119,6 +131,7 @@ export async function loadWorkbenchSnapshot(binding: RepositoryBinding): Promise
     semanticSections: [],
     projects: [],
     taskGroups: [],
+    tailActions,
   };
 }
 
@@ -126,6 +139,11 @@ async function loadSemanticWorkbenchSnapshot(binding: RepositoryBinding): Promis
   const semanticSections = await loadSemanticSections(binding);
   const sectionByKey = new Map(semanticSections.map((section) => [section.key, section]));
   const reviews = semanticSections.find((section) => section.key === 'reviews')?.files ?? [];
+  const tailActions = semanticSections.flatMap((section) =>
+    section.documents.flatMap((document) =>
+      parseWorkbenchTailActions(document.path, document.content, document.file.updatedAt),
+    ),
+  );
   return {
     inboxMarkdown: sectionByKey.get('inbox')?.markdown ?? '',
     activeWork: sectionByKey.get('current')?.files ?? [],
@@ -145,6 +163,7 @@ async function loadSemanticWorkbenchSnapshot(binding: RepositoryBinding): Promis
       deriveTaskGroup('next', sectionByKey.get('next')),
       deriveTaskGroup('done', sectionByKey.get('done')),
     ].filter((group): group is WorkbenchTaskGroup => Boolean(group)),
+    tailActions,
   };
 }
 
@@ -221,6 +240,23 @@ export async function readWorkbenchMarkdown(binding: RepositoryBinding, relative
   return getWorkbenchTextApi().readText(binding.repoPath, relativePath);
 }
 
+export async function completeWorkbenchTailAction(
+  binding: RepositoryBinding,
+  action: Pick<WorkbenchTailAction, 'id' | 'text' | 'sourcePath'>,
+): Promise<boolean> {
+  const sourcePath = normalizeWritableWorkbenchMarkdownPath(action.sourcePath);
+  const actionIndex = parseTailActionIndex(action.id);
+  if (!sourcePath || actionIndex === null) return false;
+
+  const repository = getWorkbenchWriteApi();
+  const markdown = await repository.readText(binding.repoPath, sourcePath);
+  const next = markWorkbenchTailActionCompleted(markdown, actionIndex, action.text);
+  if (!next || next === markdown) return false;
+
+  await repository.writeText(binding.repoPath, sourcePath, next);
+  return true;
+}
+
 export function parsePlanMetadata(path: string, markdown: string): RepositoryPlanMetadata {
   const metadata: RepositoryPlanMetadata = { path };
   for (const line of markdown.split('\n').slice(0, 24)) {
@@ -232,6 +268,81 @@ export function parsePlanMetadata(path: string, markdown: string): RepositoryPla
     if (key === 'approval') metadata.approval = value;
   }
   return metadata;
+}
+
+async function loadWorkbenchTailActions(
+  binding: RepositoryBinding,
+  workFiles: RepositoryMarkdownFile[],
+): Promise<WorkbenchTailAction[]> {
+  const repository = getWorkbenchReadApi();
+  const groups = await Promise.all(
+    workFiles.map(async (file) =>
+      parseWorkbenchTailActions(file.path, await repository.readText(binding.repoPath, file.path), file.updatedAt),
+    ),
+  );
+  return groups.flat();
+}
+
+export function parseWorkbenchTailActions(sourcePath: string, markdown: string, updatedAt = 0): WorkbenchTailAction[] {
+  const lines = markdown.split(/\r?\n/);
+  const headerIndex = lines.findIndex((line) => line.trim() === '## 收尾动作');
+  if (headerIndex === -1) return [];
+
+  const actions: WorkbenchTailAction[] = [];
+  for (const line of lines.slice(headerIndex + 1)) {
+    const trimmed = line.trim();
+    if (/^#{1,6}\s+/.test(trimmed)) break;
+    const match = /^-\s+\[([ xX])\]\s+(.+)$/.exec(trimmed);
+    if (!match) continue;
+    const text = match[2]?.trim();
+    if (!text || text.startsWith('暂无')) continue;
+    actions.push({
+      id: `${sourcePath}:tail-action:${actions.length}`,
+      text,
+      sourcePath,
+      completed: match[1]?.toLowerCase() === 'x',
+      updatedAt,
+    });
+  }
+  return actions;
+}
+
+function markWorkbenchTailActionCompleted(markdown: string, actionIndex: number, expectedText: string): string | null {
+  const lines = markdown.split(/\r?\n/);
+  const headerIndex = lines.findIndex((line) => line.trim() === '## 收尾动作');
+  if (headerIndex === -1) return null;
+
+  let currentIndex = 0;
+  for (let index = headerIndex + 1; index < lines.length; index += 1) {
+    const trimmed = lines[index].trim();
+    if (/^#{1,6}\s+/.test(trimmed)) break;
+    const match = /^(\s*-\s+\[)([ xX])(\]\s+)(.+)$/.exec(lines[index]);
+    if (!match) continue;
+
+    if (currentIndex === actionIndex) {
+      const text = match[4]?.trim();
+      if (text !== expectedText.trim() || match[2]?.toLowerCase() === 'x') return null;
+      lines[index] = `${match[1]}x${match[3]}${match[4]}`;
+      return lines.join('\n');
+    }
+    currentIndex += 1;
+  }
+  return null;
+}
+
+function parseTailActionIndex(id: string): number | null {
+  const match = /:tail-action:(\d+)$/.exec(id);
+  if (!match) return null;
+  return Number.parseInt(match[1], 10);
+}
+
+function normalizeWritableWorkbenchMarkdownPath(value: string): string | null {
+  const path = value.trim().replace(/^\/+/, '');
+  const segments = path.split('/');
+  if (!path.endsWith('.md') || segments.some((segment) => !segment || segment === '.' || segment === '..')) {
+    return null;
+  }
+  return path;
 }
 
 export function deriveProjects(section?: WorkbenchSemanticSection): WorkbenchProject[] {
@@ -354,5 +465,16 @@ function getWorkbenchTextApi() {
   }
   return {
     readText: repository.readText,
+  };
+}
+
+function getWorkbenchWriteApi() {
+  const repository = (globalThis as { window?: Window }).window?.electronAPI?.repository;
+  if (!repository?.readText || !repository.writeText) {
+    throw new Error('electronAPI.repository workbench write methods not available');
+  }
+  return {
+    readText: repository.readText,
+    writeText: repository.writeText,
   };
 }

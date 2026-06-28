@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
 import {
+  completeWorkbenchTailAction,
   groupReviewsByFolder,
   loadWorkbenchSnapshot,
   parsePlanMetadata,
@@ -33,6 +34,19 @@ describe('repository workbench', () => {
       if (relativePath === 'work/inbox.md') return '# Inbox';
       if (relativePath === 'runs/index.md') return '# Runs';
       if (relativePath === 'outputs/index.md') return '# Outputs';
+      if (relativePath === 'work/active/project.md')
+        return [
+          '# 发布推进',
+          '',
+          '## 收尾动作',
+          '',
+          '- [ ] 根据 [runs/action-runs/action-42.md](../../runs/action-runs/action-42.md) 更新事项状态。',
+          '- [x] 判断是否需要写入复盘。',
+          '',
+          '## 复盘',
+          '',
+          '- [ ] 这里不是收尾动作。',
+        ].join('\n');
       if (relativePath === 'plans/active/plan.md') return 'status: approved\napproval: user-approved\n# Plan';
       if (relativePath === 'plans/completed/plan-done.md') return 'status: done\n# Plan Done';
       return '';
@@ -57,6 +71,22 @@ describe('repository workbench', () => {
     expect(snapshot.planMetadata).toEqual([
       { path: 'plans/active/plan.md', status: 'approved', approval: 'user-approved' },
       { path: 'plans/completed/plan-done.md', status: 'done' },
+    ]);
+    expect(snapshot.tailActions).toEqual([
+      {
+        id: 'work/active/project.md:tail-action:0',
+        text: '根据 [runs/action-runs/action-42.md](../../runs/action-runs/action-42.md) 更新事项状态。',
+        sourcePath: 'work/active/project.md',
+        completed: false,
+        updatedAt: 1,
+      },
+      {
+        id: 'work/active/project.md:tail-action:1',
+        text: '判断是否需要写入复盘。',
+        sourcePath: 'work/active/project.md',
+        completed: true,
+        updatedAt: 1,
+      },
     ]);
     expect(snapshot.reviewGroups).toEqual([
       {
@@ -362,6 +392,56 @@ describe('repository workbench', () => {
       },
       { group: 'weekly', files: [{ path: 'reviews/weekly/2026-W26.md', name: '2026-W26.md', size: 10, updatedAt: 1 }] },
     ]);
+  });
+
+  it('marks a selected tail action as completed in the repository markdown', async () => {
+    const readText = vi.fn(async () =>
+      [
+        '# 发布推进',
+        '',
+        '## 收尾动作',
+        '',
+        '- [ ] 根据 ActionRun 更新事项状态。',
+        '- [ ] 判断是否需要写入复盘。',
+        '',
+        '## 复盘',
+        '',
+        '- [ ] 这里不是收尾动作。',
+      ].join('\n'),
+    );
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const completed = await completeWorkbenchTailAction(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        id: 'work/active/release.md:tail-action:1',
+        text: '判断是否需要写入复盘。',
+        sourcePath: 'work/active/release.md',
+      },
+    );
+
+    expect(completed).toBe(true);
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'work/active/release.md',
+      [
+        '# 发布推进',
+        '',
+        '## 收尾动作',
+        '',
+        '- [ ] 根据 ActionRun 更新事项状态。',
+        '- [x] 判断是否需要写入复盘。',
+        '',
+        '## 复盘',
+        '',
+        '- [ ] 这里不是收尾动作。',
+      ].join('\n'),
+    );
   });
 
   it('reads selected workbench markdown for inline preview', async () => {

@@ -128,6 +128,9 @@ function resolveLimitations(
   if (artifact.contentExtract) {
     limitations.delete('content-extraction-missing');
   }
+  if (artifact.thumbnail?.trim().startsWith('data:image/')) {
+    limitations.delete('thumbnail-missing');
+  }
 
   return [...limitations];
 }

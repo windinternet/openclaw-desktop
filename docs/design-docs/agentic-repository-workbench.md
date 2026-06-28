@@ -336,8 +336,15 @@ desktopCompanion.plugin.uninstall
 
 ```text
 desktop.artifacts.create
+desktop.artifacts.search
+desktop.artifacts.inspect
+desktop.artifacts.content.extract
+desktop.artifacts.content.facts.extract
+desktop.artifacts.thumbnail.extract
 desktop.artifacts.describe
 desktop.artifacts.reuse.record
+desktop.artifacts.execution.prepare
+desktop.artifacts.execution.record
 desktop.artifacts.open
 desktop.artifacts.update
 desktop.artifacts.append

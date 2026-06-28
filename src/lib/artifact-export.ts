@@ -60,7 +60,11 @@ function normalizeExportType(value: unknown): ArtifactExportType {
   return 'html';
 }
 
-function normalizeExportContent(value: unknown, type: ArtifactExportType, currentHtml: string | null | undefined): string {
+function normalizeExportContent(
+  value: unknown,
+  type: ArtifactExportType,
+  currentHtml: string | null | undefined,
+): string {
   if (typeof value === 'string') return value;
   if (value !== undefined && value !== null) {
     return type === 'json' ? JSON.stringify(value, null, 2) : String(value);
@@ -75,7 +79,12 @@ function sanitizeExportFileName(
   extension: string,
 ): string {
   const rawBase = preferredFileName.trim() || fallbackBase.trim() || 'artifact-export';
-  const base = isPathLike ? rawBase.split(/[\\/]+/).filter(Boolean).pop() ?? rawBase : rawBase;
+  const base = isPathLike
+    ? (rawBase
+        .split(/[\\/]+/)
+        .filter(Boolean)
+        .pop() ?? rawBase)
+    : rawBase;
   const sanitized =
     base
       .split('')

@@ -29,8 +29,9 @@ describe('artifact bridge fetch request normalization', () => {
     expect(() => resolveArtifactBridgeFetchRequest({ url: 'file:///etc/passwd' })).toThrow(
       'Artifact Bridge fetch only allows http(s) URLs',
     );
-    expect(() => resolveArtifactBridgeFetchRequest({ url: 'https://api.example.com', init: { method: 'CONNECT' } }))
-      .toThrow('Artifact Bridge fetch method is not allowed');
+    expect(() =>
+      resolveArtifactBridgeFetchRequest({ url: 'https://api.example.com', init: { method: 'CONNECT' } }),
+    ).toThrow('Artifact Bridge fetch method is not allowed');
   });
 
   it('serializes fetch responses with size-limited body text', async () => {

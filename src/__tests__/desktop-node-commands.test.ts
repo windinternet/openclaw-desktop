@@ -18,6 +18,8 @@ vi.mock('../lib/artifact-persistence', () => ({
     loadMeta: vi.fn(),
     loadHtml: vi.fn(),
     readImportedText: vi.fn(),
+    readImportedFileFacts: vi.fn(),
+    readImportedImageThumbnail: vi.fn(),
     openWindow: vi.fn(),
   },
 }));
@@ -416,6 +418,10 @@ describe('desktop node commands', () => {
           thumbnailLabel: 'HTML',
           primaryAction: 'preview_html',
         }),
+        valueHealth: expect.objectContaining({
+          status: 'ready',
+          strengths: expect.arrayContaining(['html-preview-ready', 'repository-output-recorded']),
+        }),
         reuseKind: 'workflow',
         previewPlan: expect.objectContaining({
           strategy: 'artifact_html_preview',
@@ -430,6 +436,43 @@ describe('desktop node commands', () => {
       }),
       reference: expect.stringContaining('[成果](artifact://art_2)'),
     });
+  });
+
+  it('redacts image thumbnail data urls from Gateway-facing artifact descriptions', async () => {
+    mockedArtifactPersistence.loadMeta.mockResolvedValue({
+      id: 'art_cover',
+      title: '封面图',
+      icon: '🖼️',
+      type: 'image',
+      source: { type: 'action_run', id: 'run-cover' },
+      tags: ['cover'],
+      currentVersion: 1,
+      status: 'draft',
+      createdAt: 1,
+      updatedAt: 2,
+      externalFormat: 'image',
+      contentSummary: 'Image · cover.png · 2 KB',
+      fileName: 'cover.png',
+      thumbnail: 'data:image/png;base64,iVBORw0KGgo=',
+    });
+
+    const result = (await handleDesktopNodeCommand('desktop.artifacts.describe', {
+      artifactId: 'art_cover',
+    })) as {
+      artifact: {
+        previewCard: {
+          thumbnailAvailable?: boolean;
+          thumbnailUrl?: string;
+        };
+      };
+      reference: string;
+    };
+
+    expect(JSON.stringify(result)).not.toContain('data:image/png;base64');
+    expect(result.artifact.previewCard.thumbnailAvailable).toBe(true);
+    expect(result.artifact.previewCard.thumbnailUrl).toBeUndefined();
+    expect(result.reference).toContain('thumbnail: available');
+    expect(result.reference).not.toContain('data:image/png;base64');
   });
 
   it('searches existing artifacts by query and reusable value metadata', async () => {
@@ -531,6 +574,10 @@ describe('desktop node commands', () => {
             primaryAction: 'open_file',
             actionLabel: '查看文件',
           }),
+          valueHealth: expect.objectContaining({
+            status: 'usable_with_limits',
+            gaps: ['native-preview-missing', 'thumbnail-missing', 'content-extraction-missing'],
+          }),
           previewPlan: expect.objectContaining({
             strategy: 'system_file_handler',
             surface: 'system_default_app',
@@ -544,6 +591,45 @@ describe('desktop node commands', () => {
     });
 
     expect(mockedArtifactPersistence.list).toHaveBeenCalledOnce();
+  });
+
+  it('redacts image thumbnail data urls from Gateway-facing artifact search results', async () => {
+    mockedArtifactPersistence.list.mockResolvedValue([
+      {
+        id: 'art_cover',
+        title: '封面图',
+        icon: '🖼️',
+        type: 'image',
+        source: { type: 'manual' },
+        tags: ['cover'],
+        currentVersion: 1,
+        status: 'draft',
+        createdAt: 1,
+        updatedAt: 2,
+        externalFormat: 'image',
+        contentSummary: 'Image · cover.png · 2 KB',
+        fileName: 'cover.png',
+        thumbnail: 'data:image/png;base64,iVBORw0KGgo=',
+      },
+    ]);
+
+    const result = (await handleDesktopNodeCommand('desktop.artifacts.search', {
+      query: 'cover',
+    })) as {
+      results: Array<{
+        previewCard: {
+          thumbnailAvailable?: boolean;
+          thumbnailUrl?: string;
+        };
+        reference: string;
+      }>;
+    };
+
+    expect(JSON.stringify(result)).not.toContain('data:image/png;base64');
+    expect(result.results[0].previewCard.thumbnailAvailable).toBe(true);
+    expect(result.results[0].previewCard.thumbnailUrl).toBeUndefined();
+    expect(result.results[0].reference).toContain('thumbnail: available');
+    expect(result.results[0].reference).not.toContain('data:image/png;base64');
   });
 
   it('inspects file artifacts into durable metadata and mirrors the updated output', async () => {
@@ -698,12 +784,199 @@ describe('desktop node commands', () => {
         sourceKind: 'imported_file',
         snippet: '# 推进计划\n\nShip the content extraction slice.',
       }),
+      enrichmentEvents: [
+        expect.objectContaining({
+          kind: 'content_extract',
+          status: 'succeeded',
+          format: 'text',
+          attemptedAt: 80,
+          resultSummary: 'Text extract · plan.md · 42 chars',
+        }),
+      ],
     });
     expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(
       expect.objectContaining({
         artifact: expect.objectContaining({
           id: 'art_text',
           contentExtract: expect.objectContaining({ status: 'extracted' }),
+          enrichmentEvents: [
+            expect.objectContaining({
+              kind: 'content_extract',
+              status: 'succeeded',
+            }),
+          ],
+        }),
+        binding: expect.objectContaining({ repoPath: '/repo', gatewayInstanceId: 'inst-1' }),
+      }),
+    );
+  });
+
+  it('extracts imported PDF text into durable metadata and mirrors the updated output', async () => {
+    const artifact = {
+      id: 'art_pdf',
+      title: '路线图 PDF',
+      icon: '📎',
+      type: 'file' as const,
+      source: { type: 'manual' as const },
+      tags: ['roadmap'],
+      currentVersion: 1,
+      status: 'draft' as const,
+      createdAt: 1,
+      updatedAt: 2,
+      fileName: 'brief.pdf',
+      filePath: '/artifact-storage/art_pdf/files/brief.pdf',
+      originalFilePath: '/Users/deepin/Documents/brief.pdf',
+      fileSize: 4096,
+      mimeType: 'application/pdf',
+      externalFormat: 'pdf' as const,
+      contentSummary: 'PDF · brief.pdf · 4 KB',
+    };
+    mockedArtifactPersistence.loadMeta.mockResolvedValue(artifact);
+    mockedArtifactPersistence.loadHtml.mockResolvedValue(null);
+    mockedArtifactPersistence.readImportedText.mockResolvedValue({
+      text: 'Quarterly roadmap and delivery risks.',
+      bytesRead: 2048,
+      truncated: false,
+    });
+    mockedCreateRepositoryOutput.mockResolvedValue({
+      outputId: 'art_pdf',
+      outputPath: 'outputs/files/art_pdf.md',
+    });
+
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.content.extract', {
+        repoPath: '/repo',
+        gatewayInstanceId: 'inst-1',
+        artifactId: 'art_pdf',
+        extractedAt: 90,
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      artifactId: 'art_pdf',
+      extract: expect.objectContaining({
+        extractedAt: 90,
+        status: 'extracted',
+        format: 'pdf',
+        sourceKind: 'imported_file',
+        fileName: 'brief.pdf',
+        bytesRead: 2048,
+        truncated: false,
+        summary: 'PDF text extract · brief.pdf · 37 chars',
+        snippet: 'Quarterly roadmap and delivery risks.',
+      }),
+      output: {
+        outputId: 'art_pdf',
+        path: 'outputs/files/art_pdf.md',
+        previewPath: undefined,
+      },
+    });
+
+    expect(mockedArtifactPersistence.readImportedText).toHaveBeenCalledWith('art_pdf');
+    expect(mockedArtifactService.update).toHaveBeenCalledWith('art_pdf', {
+      contentExtract: expect.objectContaining({
+        status: 'extracted',
+        format: 'pdf',
+        snippet: 'Quarterly roadmap and delivery risks.',
+      }),
+      enrichmentEvents: [
+        expect.objectContaining({
+          kind: 'content_extract',
+          status: 'succeeded',
+          format: 'pdf',
+          attemptedAt: 90,
+        }),
+      ],
+    });
+    expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(
+      expect.objectContaining({
+        artifact: expect.objectContaining({
+          id: 'art_pdf',
+          contentExtract: expect.objectContaining({ format: 'pdf' }),
+        }),
+        binding: expect.objectContaining({ repoPath: '/repo', gatewayInstanceId: 'inst-1' }),
+      }),
+    );
+  });
+
+  it('extracts imported Office OOXML text into durable metadata and mirrors the updated output', async () => {
+    const artifact = {
+      id: 'art_ppt',
+      title: '路线图 PPT',
+      icon: '📎',
+      type: 'file' as const,
+      source: { type: 'manual' as const },
+      tags: ['roadmap'],
+      currentVersion: 1,
+      status: 'draft' as const,
+      createdAt: 1,
+      updatedAt: 2,
+      fileName: 'roadmap.pptx',
+      filePath: '/artifact-storage/art_ppt/files/roadmap.pptx',
+      originalFilePath: '/Users/deepin/Documents/roadmap.pptx',
+      fileSize: 8192,
+      mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      externalFormat: 'powerpoint' as const,
+      contentSummary: 'PowerPoint · roadmap.pptx · 8 KB',
+    };
+    mockedArtifactPersistence.loadMeta.mockResolvedValue(artifact);
+    mockedArtifactPersistence.loadHtml.mockResolvedValue(null);
+    mockedArtifactPersistence.readImportedText.mockResolvedValue({
+      text: 'Quarterly Roadmap Delivery risks',
+      bytesRead: 8192,
+      truncated: false,
+    });
+    mockedCreateRepositoryOutput.mockResolvedValue({
+      outputId: 'art_ppt',
+      outputPath: 'outputs/files/art_ppt.md',
+    });
+
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.content.extract', {
+        repoPath: '/repo',
+        gatewayInstanceId: 'inst-1',
+        artifactId: 'art_ppt',
+        extractedAt: 95,
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      artifactId: 'art_ppt',
+      extract: expect.objectContaining({
+        extractedAt: 95,
+        status: 'extracted',
+        format: 'powerpoint',
+        sourceKind: 'imported_file',
+        fileName: 'roadmap.pptx',
+        bytesRead: 8192,
+        summary: 'PowerPoint text extract · roadmap.pptx · 32 chars',
+        snippet: 'Quarterly Roadmap Delivery risks',
+      }),
+      output: {
+        outputId: 'art_ppt',
+        path: 'outputs/files/art_ppt.md',
+        previewPath: undefined,
+      },
+    });
+
+    expect(mockedArtifactPersistence.readImportedText).toHaveBeenCalledWith('art_ppt');
+    expect(mockedArtifactService.update).toHaveBeenCalledWith('art_ppt', {
+      contentExtract: expect.objectContaining({
+        status: 'extracted',
+        format: 'powerpoint',
+      }),
+      enrichmentEvents: [
+        expect.objectContaining({
+          kind: 'content_extract',
+          status: 'succeeded',
+          format: 'powerpoint',
+          attemptedAt: 95,
+        }),
+      ],
+    });
+    expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(
+      expect.objectContaining({
+        artifact: expect.objectContaining({
+          id: 'art_ppt',
+          contentExtract: expect.objectContaining({ format: 'powerpoint' }),
         }),
         binding: expect.objectContaining({ repoPath: '/repo', gatewayInstanceId: 'inst-1' }),
       }),
@@ -713,22 +986,22 @@ describe('desktop node commands', () => {
   it('does not read content from unsupported artifact formats', async () => {
     mockedArtifactPersistence.loadMeta.mockResolvedValue({
       id: 'art_file',
-      title: '路线图 PPT',
+      title: '会议录音',
       icon: '📎',
-      type: 'file',
+      type: 'audio',
       source: { type: 'manual' },
-      tags: ['roadmap'],
+      tags: ['meeting'],
       currentVersion: 1,
       status: 'draft',
       createdAt: 1,
       updatedAt: 2,
-      fileName: 'roadmap.pptx',
-      filePath: '/artifact-storage/art_file/files/roadmap.pptx',
-      originalFilePath: '/Users/deepin/Documents/roadmap.pptx',
+      fileName: 'meeting.mp3',
+      filePath: '/artifact-storage/art_file/files/meeting.mp3',
+      originalFilePath: '/Users/deepin/Documents/meeting.mp3',
       fileSize: 4096,
-      mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      externalFormat: 'powerpoint',
-      contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+      mimeType: 'audio/mpeg',
+      externalFormat: 'audio',
+      contentSummary: 'Audio · meeting.mp3 · 4 KB',
     });
 
     await expect(
@@ -739,12 +1012,257 @@ describe('desktop node commands', () => {
       ok: false,
       error: 'content-extract-unavailable',
       artifactId: 'art_file',
-      format: 'powerpoint',
+      format: 'audio',
       reason: 'unsupported-format',
     });
 
     expect(mockedArtifactPersistence.readImportedText).not.toHaveBeenCalled();
-    expect(mockedArtifactService.update).not.toHaveBeenCalled();
+    expect(mockedArtifactService.update).toHaveBeenCalledWith('art_file', {
+      enrichmentEvents: [
+        expect.objectContaining({
+          kind: 'content_extract',
+          status: 'unavailable',
+          format: 'audio',
+          reason: 'unsupported-format',
+        }),
+      ],
+    });
+  });
+
+  it('extracts imported non-text artifact file facts into durable metadata and mirrors the updated output', async () => {
+    const artifact = {
+      id: 'art_file',
+      title: '路线图 PPT',
+      icon: '📎',
+      type: 'file' as const,
+      source: { type: 'manual' as const },
+      tags: ['roadmap'],
+      currentVersion: 1,
+      status: 'draft' as const,
+      createdAt: 1,
+      updatedAt: 2,
+      fileName: 'roadmap.pptx',
+      filePath: '/artifact-storage/art_file/files/roadmap.pptx',
+      originalFilePath: '/Users/deepin/Documents/roadmap.pptx',
+      fileSize: 4096,
+      mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      externalFormat: 'powerpoint' as const,
+      contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+    };
+    mockedArtifactPersistence.loadMeta.mockResolvedValue(artifact);
+    mockedArtifactPersistence.loadHtml.mockResolvedValue(null);
+    mockedArtifactPersistence.readImportedFileFacts.mockResolvedValue({
+      fileSize: 4096,
+      bytesRead: 4096,
+      sha256: 'a'.repeat(64),
+      signatureHex: '504b0304140000000800',
+    });
+    mockedCreateRepositoryOutput.mockResolvedValue({
+      outputId: 'art_file',
+      outputPath: 'outputs/files/art_file.md',
+    });
+
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.content.facts.extract', {
+        repoPath: '/repo',
+        gatewayInstanceId: 'inst-1',
+        artifactId: 'art_file',
+        extractedAt: 90,
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      artifactId: 'art_file',
+      facts: expect.objectContaining({
+        extractedAt: 90,
+        status: 'recorded',
+        format: 'powerpoint',
+        sourceKind: 'imported_file',
+        summary: 'PowerPoint facts · roadmap.pptx · 4 KB · sha256 aaaaaaaaaaaa',
+        fileName: 'roadmap.pptx',
+        bytesRead: 4096,
+        sha256: 'a'.repeat(64),
+        signatureHex: '504b0304140000000800',
+      }),
+      output: {
+        outputId: 'art_file',
+        path: 'outputs/files/art_file.md',
+        previewPath: undefined,
+      },
+    });
+
+    expect(mockedArtifactPersistence.readImportedFileFacts).toHaveBeenCalledWith('art_file');
+    expect(mockedArtifactService.update).toHaveBeenCalledWith('art_file', {
+      contentFacts: expect.objectContaining({
+        status: 'recorded',
+        sourceKind: 'imported_file',
+        sha256: 'a'.repeat(64),
+      }),
+      enrichmentEvents: [
+        expect.objectContaining({
+          kind: 'content_facts',
+          status: 'succeeded',
+          format: 'powerpoint',
+          attemptedAt: 90,
+        }),
+      ],
+    });
+    expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(
+      expect.objectContaining({
+        artifact: expect.objectContaining({
+          id: 'art_file',
+          contentFacts: expect.objectContaining({ status: 'recorded' }),
+        }),
+        binding: expect.objectContaining({ repoPath: '/repo', gatewayInstanceId: 'inst-1' }),
+      }),
+    );
+  });
+
+  it('preserves PDF version and page count when extracting file facts', async () => {
+    const artifact = {
+      id: 'art_pdf',
+      title: '项目简报',
+      icon: '📎',
+      type: 'file' as const,
+      source: { type: 'manual' as const },
+      tags: ['brief'],
+      currentVersion: 1,
+      status: 'draft' as const,
+      createdAt: 1,
+      updatedAt: 2,
+      fileName: 'brief.pdf',
+      filePath: '/artifact-storage/art_pdf/files/brief.pdf',
+      originalFilePath: '/Users/deepin/Documents/brief.pdf',
+      fileSize: 4096,
+      mimeType: 'application/pdf',
+      externalFormat: 'pdf' as const,
+      contentSummary: 'PDF · brief.pdf · 4 KB',
+    };
+    mockedArtifactPersistence.loadMeta.mockResolvedValue(artifact);
+    mockedArtifactPersistence.loadHtml.mockResolvedValue(null);
+    mockedArtifactPersistence.readImportedFileFacts.mockResolvedValue({
+      fileSize: 4096,
+      bytesRead: 4096,
+      sha256: 'c'.repeat(64),
+      signatureHex: '255044462d312e37',
+      pdfInfo: { version: '1.7', pageCount: 12 },
+    });
+    mockedCreateRepositoryOutput.mockResolvedValue({
+      outputId: 'art_pdf',
+      outputPath: 'outputs/files/art_pdf.md',
+    });
+
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.content.facts.extract', {
+        repoPath: '/repo',
+        artifactId: 'art_pdf',
+        extractedAt: 95,
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      artifactId: 'art_pdf',
+      facts: expect.objectContaining({
+        summary: 'PDF facts · brief.pdf · PDF 1.7 · 12 pages · 4 KB · sha256 cccccccccccc',
+        pdfInfo: { version: '1.7', pageCount: 12 },
+      }),
+      output: {
+        outputId: 'art_pdf',
+        path: 'outputs/files/art_pdf.md',
+        previewPath: undefined,
+      },
+    });
+
+    expect(mockedArtifactService.update).toHaveBeenCalledWith('art_pdf', {
+      contentFacts: expect.objectContaining({
+        format: 'pdf',
+        pdfInfo: { version: '1.7', pageCount: 12 },
+      }),
+      enrichmentEvents: [
+        expect.objectContaining({
+          kind: 'content_facts',
+          status: 'succeeded',
+          format: 'pdf',
+          attemptedAt: 95,
+        }),
+      ],
+    });
+  });
+
+  it('extracts imported image thumbnails into durable metadata and mirrors the updated output', async () => {
+    const artifact = {
+      id: 'art_image',
+      title: '封面图',
+      icon: '🖼️',
+      type: 'image' as const,
+      source: { type: 'manual' as const },
+      tags: ['cover'],
+      currentVersion: 1,
+      status: 'draft' as const,
+      createdAt: 1,
+      updatedAt: 2,
+      fileName: 'cover.png',
+      filePath: '/artifact-storage/art_image/files/cover.png',
+      originalFilePath: '/Users/deepin/Pictures/cover.png',
+      fileSize: 2048,
+      mimeType: 'image/png',
+      externalFormat: 'image' as const,
+      contentSummary: 'Image · cover.png · 2 KB',
+    };
+    mockedArtifactPersistence.loadMeta.mockResolvedValue(artifact);
+    mockedArtifactPersistence.loadHtml.mockResolvedValue(null);
+    mockedArtifactPersistence.readImportedImageThumbnail.mockResolvedValue({
+      dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+      bytesRead: 2048,
+      mimeType: 'image/png',
+    });
+    mockedCreateRepositoryOutput.mockResolvedValue({
+      outputId: 'art_image',
+      outputPath: 'outputs/media/art_image.md',
+    });
+
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.thumbnail.extract', {
+        repoPath: '/repo',
+        gatewayInstanceId: 'inst-1',
+        artifactId: 'art_image',
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      artifactId: 'art_image',
+      thumbnail: 'data:image/png;base64,iVBORw0KGgo=',
+      output: {
+        outputId: 'art_image',
+        path: 'outputs/media/art_image.md',
+        previewPath: undefined,
+      },
+    });
+
+    expect(mockedArtifactPersistence.readImportedImageThumbnail).toHaveBeenCalledWith('art_image');
+    expect(mockedArtifactService.update).toHaveBeenCalledWith('art_image', {
+      thumbnail: 'data:image/png;base64,iVBORw0KGgo=',
+      previewPlan: expect.objectContaining({
+        limitations: ['native-preview-missing', 'content-extraction-missing'],
+      }),
+      enrichmentEvents: [
+        expect.objectContaining({
+          kind: 'thumbnail',
+          status: 'succeeded',
+          format: 'image',
+          resultSummary: 'thumbnail available',
+        }),
+      ],
+    });
+    expect(mockedCreateRepositoryOutput).toHaveBeenCalledWith(
+      expect.objectContaining({
+        artifact: expect.objectContaining({
+          id: 'art_image',
+          thumbnail: 'data:image/png;base64,iVBORw0KGgo=',
+          previewPlan: expect.objectContaining({
+            limitations: ['native-preview-missing', 'content-extraction-missing'],
+          }),
+        }),
+        binding: expect.objectContaining({ repoPath: '/repo', gatewayInstanceId: 'inst-1' }),
+      }),
+    );
   });
 
   it('does not write file inspection records for pure HTML artifacts', async () => {

@@ -4,10 +4,11 @@ import { Typography, Button, Input, Select, Tag, Card, Spin, Empty, Toast, Popco
 import { IconArrowLeft, IconPlay, IconDeleteStroked, IconRefresh } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
-import type { ArtifactMeta } from '../lib/artifact-types';
+import type { ArtifactEnrichmentStatus, ArtifactMeta } from '../lib/artifact-types';
 import { buildArtifactReuseReference } from '../lib/artifact-reference';
 import { buildArtifactVersionHistory } from '../lib/artifact-version-history';
 import { buildArtifactPreviewCard } from '../lib/artifact-display';
+import { buildArtifactValueHealth, type ArtifactValueHealthStatus } from '../lib/artifact-value-health';
 
 const { Text, Title } = Typography;
 
@@ -70,6 +71,9 @@ export default function ArtifactDetailPage() {
   };
   const versions = buildArtifactVersionHistory(meta).slice().reverse();
   const previewCard = buildArtifactPreviewCard(meta);
+  const valueHealth = buildArtifactValueHealth(meta);
+  const enrichmentEvents = meta.enrichmentEvents ?? [];
+  const lastEnrichmentEvent = enrichmentEvents[enrichmentEvents.length - 1];
 
   return (
     <div style={{ padding: 24, height: '100%', overflow: 'auto' }}>
@@ -236,6 +240,27 @@ export default function ArtifactDetailPage() {
                   <Tag size="small">{meta.externalFormat}</Tag>
                 </div>
               )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div>
+                  <Text type="tertiary">{t('artifact.valueHealth')}: </Text>
+                  <Tag size="small" color={valueHealthColor(valueHealth.status)} type="light">
+                    {valueHealth.status}
+                  </Tag>
+                </div>
+                <Text type="secondary">{valueHealth.summary}</Text>
+                {valueHealth.gaps.length > 0 && (
+                  <div>
+                    <Text type="tertiary">{t('artifact.valueHealthGaps')}: </Text>
+                    <Text>{valueHealth.gaps.join(', ')}</Text>
+                  </div>
+                )}
+                {valueHealth.nextActions.length > 0 && (
+                  <div>
+                    <Text type="tertiary">{t('artifact.valueHealthNextActions')}: </Text>
+                    <Text>{valueHealth.nextActions.join(', ')}</Text>
+                  </div>
+                )}
+              </div>
               <div
                 style={{
                   display: 'grid',
@@ -252,6 +277,7 @@ export default function ArtifactDetailPage() {
                     borderRadius: 6,
                     background: 'var(--semi-color-fill-0)',
                     border: '1px solid var(--semi-color-border)',
+                    overflow: 'hidden',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -259,7 +285,15 @@ export default function ArtifactDetailPage() {
                     fontWeight: 700,
                   }}
                 >
-                  {previewCard.thumbnailLabel}
+                  {previewCard.thumbnailUrl ? (
+                    <img
+                      src={previewCard.thumbnailUrl}
+                      alt=""
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    />
+                  ) : (
+                    previewCard.thumbnailLabel
+                  )}
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <Text strong>
@@ -368,6 +402,30 @@ export default function ArtifactDetailPage() {
                       {meta.contentExtract.snippet}
                     </Text>
                   </div>
+                </div>
+              )}
+              {lastEnrichmentEvent && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div>
+                    <Text type="tertiary">{t('artifact.enrichmentEvents')}: </Text>
+                    <Tag size="small" color={enrichmentStatusColor(lastEnrichmentEvent.status)} type="light">
+                      {lastEnrichmentEvent.status}
+                    </Tag>
+                    <Tag size="small" type="light">
+                      {lastEnrichmentEvent.kind}
+                    </Tag>
+                    <Tag size="small" type="light">
+                      {lastEnrichmentEvent.format}
+                    </Tag>
+                  </div>
+                  {(lastEnrichmentEvent.resultSummary || lastEnrichmentEvent.reason || lastEnrichmentEvent.error) && (
+                    <Text type="secondary">
+                      {lastEnrichmentEvent.resultSummary ?? lastEnrichmentEvent.reason ?? lastEnrichmentEvent.error}
+                    </Text>
+                  )}
+                  <Text type="tertiary" size="small">
+                    {t('artifact.enrichmentEventCount', { count: enrichmentEvents.length })}
+                  </Text>
                 </div>
               )}
               {meta.reuseKind && (
@@ -652,6 +710,18 @@ export default function ArtifactDetailPage() {
       </div>
     </div>
   );
+}
+
+function valueHealthColor(status: ArtifactValueHealthStatus): 'green' | 'orange' | 'red' {
+  if (status === 'ready') return 'green';
+  if (status === 'usable_with_limits') return 'orange';
+  return 'red';
+}
+
+function enrichmentStatusColor(status: ArtifactEnrichmentStatus): 'green' | 'orange' | 'red' {
+  if (status === 'succeeded') return 'green';
+  if (status === 'unavailable') return 'orange';
+  return 'red';
 }
 
 export { ArtifactDetailPage };

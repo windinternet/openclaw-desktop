@@ -17,23 +17,28 @@
 - Repository `outputs/index.md` 会写入可扫读的富条目，包含 Artifact 链接、`artifact://` 引用、来源、更新时间、预览、格式、摘要、复用分类和标签；同一路径再次镜像时会刷新旧条目。
 - Artifacts 页面和详情页会展示仓库输出状态与路径。
 - AI 魔法创建保存产物时会以 `action_run` 作为来源，并把产物 ID 回写到对应 ActionRun。
-- ActionRun 仓库摘要会尽量解析本次运行生成的 Artifact meta，列出产物标题、类型、Artifact 引用和 Repository output / preview 路径；读取不到 meta 时退回产物 ID。
+- ActionRun 仓库摘要会尽量解析本次运行生成的 Artifact meta，列出产物标题、类型、价值摘要、`valueHealth` 状态/缺口/建议动作、`previewPlan` 线索、`reuseKind`、Artifact 引用和 Repository output / preview 路径；读取不到 meta 时退回产物 ID。
 - 终态 ActionRun 的 `lastAssistantResponse` 如果包含 `<artifact>` block，Desktop 会自动保存为 `source: action_run` 的 Artifact，并把 Artifact id 回写到 ActionRun。
 - 普通聊天中已完成的 assistant 消息如果包含一个或多个 `<artifact>` block，Desktop 会逐个解析并保存为 `source: chat` 的 Artifact；仓库绑定就绪时同样走 Repository `outputs/` 镜像并回写 output / preview 路径。
 - Artifact meta 已支持 `versions` 版本历史；生成产物会记录 v1，HTML 追加会记录新版本，旧数据会按 `currentVersion` 生成兼容历史用于展示和输出。
 - HTML 产物生成和追加时会记录 `htmlAudit`，标记自包含状态、审批需求和检查项。
 - HTML 产物运行时授权决策会回写到 Artifact meta 的 `authEvents`，记录能力、目标、授权结果、授权级别和请求/决策时间。
 - HTML 产物预览窗口通过专用 preload 暴露受控 `window.artifactBridge`，Bridge 调用会进入主进程执行链路。
-- Desktop Bridge 当前支持 HTML 产物读取自身 meta / HTML 版本、经审批代理 `artifactBridge.fetch` 的 HTTP(S) 网络请求、读取本地文本文件、写入本地文本文件、导出 HTML / 文本 / Markdown / JSON 文件和发送系统通知；命令执行接口仍保持未实现，不会静默开放。
-- HTML 产物 Desktop Bridge 调用结果会回写到 Artifact meta 的 `bridgeEvents`，记录 method、detail、status、resultSummary、error 和起止时间；当 `artifactBridge.exec()` 被拦截为 unsupported 时，Desktop 还会把被阻止的命令执行意图写入 `executionEvents`，但仍不执行命令、不授予权限。
+- Desktop Bridge 当前支持 HTML 产物读取自身 meta / HTML 版本、经审批代理 `artifactBridge.fetch` 的 HTTP(S) 网络请求、读取本地文本文件、写入本地文本文件、导出 HTML / 文本 / Markdown / JSON 文件、发送系统通知，以及通过 `artifactBridge.exec(command, options?)` 提出 prepare-only 命令执行审批意图；Desktop 不会静默执行命令。
+- HTML 产物 Desktop Bridge 调用结果会回写到 Artifact meta 的 `bridgeEvents`，记录 method、detail、status、resultSummary、error 和起止时间；`artifactBridge.exec(command, options?)` 会额外把 `approval_required` 执行意图写入 `executionEvents` 并返回 pending approval 载荷，但仍不执行命令、不授予权限、不绕过外部 runner 审批流程。
 - Repository output markdown 会沉淀 HTML 审计摘要，Artifacts UI 会显示非自包含和需审批提示。
 - 文件、图片、音频、视频等非 HTML 产物可记录 `filePath` 或 `url`，打开时交给系统文件处理器或外部 URL 处理器。
 - 手动创建文件型产物时，填写本地 `filePath` 会复制一份到 Artifact storage，并记录 `originalFilePath`。
 - 非 HTML 产物会记录 `externalFormat` 和 `contentSummary`，用于把 Word、Excel、PPT、PDF、链接、应用入口和媒体文件从“路径”提升为可搜索、可复用、可沉淀的价值对象。
 - 非 HTML / Office / 文件型产物已具备最小预览卡片契约：Desktop 会根据 `externalFormat`、`contentSummary`、仓库路径、文件/链接/命令线索生成 format label、thumbnail label、summary、location、primary action 和 safety note；Artifacts UI、Desktop node `search/describe` 和 Repository output markdown 会暴露同一份线索。
+- Gateway-facing 的 Desktop node `search/describe` 会使用瘦身预览卡片：图片 data URL 只留给本地 Artifacts UI，Gateway 返回值只暴露 `thumbnailAvailable`，避免把本地缩略图缓存塞进聊天上下文。
 - Artifact meta 已支持 `fileInspection`，用于沉淀文件型、Office、PDF、媒体、链接、应用入口和命令型产物的检查事实：格式、来源类型、打开方式、预览状态、摘要、存储/原始路径和当前限制；Desktop node command `desktop.artifacts.inspect` 可为既有产物补写该记录并刷新 Repository output。该检查只基于现有 metadata，不读取文件内容、不生成 Office 原生预览、不执行命令。
-- Artifact meta 已支持 `previewPlan`，用于为所有新产物和 `desktop.artifacts.inspect` 刷新的文件型产物沉淀安全预览策略：strategy、surface、primary action、安全说明、当前限制和下一步预览缺口；Artifacts UI、Desktop node `search/inspect`、Repository output markdown 和 `outputs/index.md` 会暴露该计划。该计划不解析 Office/PDF/媒体正文、不生成真实缩略图、不执行命令。
-- Artifact meta 已支持 `contentExtract`，用于沉淀已导入文本、代码和 HTML 文件副本的内容抽取事实：读取字节数、文本长度、是否截断、抽取片段和抽取时间；新导入的文本/代码/HTML 文件会在安全可读时自动写入 `contentExtract`，Desktop node command `desktop.artifacts.content.extract` 也可为既有产物刷新该记录。该能力只读取 Artifact storage 中的导入副本，不读取任意本地路径，不解析 Office/PDF/媒体文件，也不执行命令或授予权限。
+- Artifact meta 已支持 `previewPlan`，用于为所有新产物和 `desktop.artifacts.inspect` 刷新的文件型产物沉淀安全预览策略：strategy、surface、primary action、安全说明、当前限制和下一步预览缺口；Artifacts UI、Desktop node `search/inspect`、Repository output markdown 和 `outputs/index.md` 会暴露该计划。该计划不解析 Office/PDF/媒体正文、不生成 Office/PDF/媒体原生预览、不执行命令。
+- Desktop 已支持只读 `valueHealth`，用于从 `previewPlan`、`contentExtract`、`contentFacts`、`thumbnail`、Repository output 和 `reuseKind` 等事实派生产物就绪度：`ready`、`usable_with_limits` 或 `needs_attention`，并列出 strengths、gaps 和 nextActions；Artifacts UI、Desktop node `search/describe`、`artifact://` 引用、Repository output markdown 和 `outputs/index.md` 会暴露该状态。该摘要不执行动作、不打开文件、不授予权限。
+- Artifact meta 已支持 `contentExtract`，用于沉淀已导入文本、代码、HTML、PDF 和 Word/Excel/PowerPoint OOXML 文件副本的内容抽取事实：读取字节数、文本长度、是否截断、抽取片段和抽取时间；新导入的文本/代码/HTML/PDF/Office OOXML 文件会在安全可读时自动写入 `contentExtract`，Desktop node command `desktop.artifacts.content.extract` 也可为既有产物刷新该记录。PDF 与 OOXML 抽取是基于导入副本 PDF text streams 或 OOXML XML entries 的 best-effort 文本抽取，可能不完整；该能力只读取 Artifact storage 中的导入副本，不读取任意本地路径，不解析旧版二进制 Office/音视频文件、不生成原生预览，也不执行命令或授予权限。
+- Artifact meta 已支持 `contentFacts`，用于沉淀已导入非文本文件副本的文件事实：文件大小、已哈希字节数、sha256、文件头签名、可识别图片尺寸和 best-effort PDF 版本/页数；新导入的 Office/PDF/图片/音频/视频/普通文件会在安全可读时自动写入 `contentFacts`，Desktop node command `desktop.artifacts.content.facts.extract` 也可为既有产物刷新该记录。该能力只读取 Artifact storage 中的导入副本，不读取任意本地路径，不替代 `contentExtract`、不解析旧版二进制 Office 正文、不生成 Office/PDF/媒体原生缩略图，也不执行命令或授予权限。
+- Artifact meta 已支持 `thumbnail`，用于沉淀已导入图片文件副本的 data URL 缩略图；新导入且安全可读、大小在限制内的图片会自动写入 `thumbnail`，Desktop node command `desktop.artifacts.thumbnail.extract` 也可为既有图片产物刷新该记录。Artifacts UI 会显示真实图片缩略图；Repository output 只写入 `thumbnail: available`，不嵌入 data URL。该能力只读取 Artifact storage 中的导入副本，不读取任意本地路径，不为 Office/PDF/音视频生成原生缩略图，也不执行命令或授予权限。
+- Artifact meta 已支持 `enrichmentEvents`，用于记录内容抽取、文件事实抽取和缩略图生成的尝试事实：kind、status（`succeeded / unavailable / failed`）、format、reason、resultSummary 或 error；自动导入和 Desktop node command 刷新都会写入该审计记录，Artifact 详情页、搜索文本、Repository output markdown 和 `outputs/index.md` 会暴露最后一次或相关事件线索。该记录只做观测和复盘，不自动重试、不打开文件、不生成原生预览、不执行命令或授予权限。
 - ActionRun 生成文件型 `<artifact>` block 时，可以通过 `filePath / fileName / mimeType / fileSize / externalFormat / contentSummary / importFile` 传递非 HTML 产物元数据；`importFile: true` 会把本地文件复制到 Artifact storage。
 - ActionRun 自动保存的新产物会在仓库绑定就绪时尝试镜像到 Repository `outputs/`；文件型产物的 markdown 记录写入 `outputs/files/`，并回写 `repositoryOutputPath` 供 ActionRun 摘要引用。
 - Artifact 详情页可以复制稳定复用引用 `artifact://<artifactId>`；Desktop node command `desktop.artifacts.describe` 可返回同一份引用摘要，供 Gateway 普通聊天或 ActionRun 继续使用已有产物。
@@ -47,9 +52,9 @@
 
 仍需继续收口：
 
-- 继续补齐非 HTML ActionRun 产物的 Office 原生预览和真实缩略图；当前已有预览卡片、`previewPlan`、文件检查记录和动作/安全说明，但还不是文件内容级渲染。
+- 继续补齐非 HTML ActionRun 产物的 Office/PDF/音视频原生预览和内容级渲染；当前已有预览卡片、`previewPlan`、文件检查记录、图片缩略图、PDF best-effort 文本抽取、Word/Excel/PowerPoint OOXML best-effort 正文抽取和动作/安全说明，但 Office/PDF/音视频还不是原生文件内容级渲染。
 - 继续扩展 HTML 产物 Desktop Bridge 的命令执行策略；网络请求和导出已具备最小审批/记录能力，但命令执行仍不能静默开放，必须继续走更严格的审批与运行记录设计。
-- 补 Office/PDF/媒体文件型产物的真实缩略图和内容级摘要抽取；当前 `previewPlan` / `fileInspection` 已记录格式、来源、打开方式、安全预览策略、路径、限制和下一步缺口，`contentExtract` 已覆盖已导入文本/代码/HTML 副本，但 Office/PDF/媒体正文解析仍未开放。
+- 补 Office/PDF/音视频文件型产物的原生缩略图和内容级摘要抽取；当前 `previewPlan` / `fileInspection` 已记录格式、来源、打开方式、安全预览策略、路径、限制和下一步缺口，`contentExtract` 已覆盖已导入文本/代码/HTML 副本、PDF best-effort 文本抽取和 Word/Excel/PowerPoint OOXML best-effort 正文抽取，`contentFacts` 已覆盖已导入非文本副本的文件指纹、图片尺寸和 PDF 版本/页数事实，`thumbnail` 已覆盖已导入图片副本，`enrichmentEvents` 已覆盖增强尝试的成功/失败/不可用审计，但旧版二进制 Office 正文解析、Office/PDF 原生渲染/缩略图和音视频内容解析仍未开放。
 - 继续补齐可复用资产的版本策略和真正执行器边界；当前已有执行前审批意图记录与执行事实归档，但没有开放静默执行能力。
 
 ## 1. 定位
@@ -96,7 +101,9 @@ link / app / file / audio / image / video
 - Desktop 会自动识别常见外部格式并写入 `externalFormat`，同时生成 `contentSummary` 用于列表、详情页和 Repository output。
 - Desktop 会为文件型、Office、PDF、媒体、链接、应用入口和命令型产物写入 `fileInspection`，记录来源类型、打开方式、预览状态、摘要、路径和限制。
 - Desktop 会为新产物写入 `previewPlan`，并在 `desktop.artifacts.inspect` 时刷新，记录当前安全预览策略、展示 surface、主动作、安全说明、限制和下一步预览缺口。
-- Desktop 会为安全可读的新导入文本、代码和 HTML 文件副本自动写入 `contentExtract`，记录读取字节数、文本长度、截断状态和内容片段；该能力只读取 Artifact storage 副本，也可通过 `desktop.artifacts.content.extract` 为既有产物刷新。
+- Desktop 会计算 `valueHealth`，把已有事实折叠成 ready / usable_with_limits / needs_attention、strengths、gaps 和 nextActions，帮助普通用户和 Gateway 判断产物下一步该补什么。
+- Desktop 会为安全可读的新导入文本、代码、HTML 和 PDF 文件副本自动写入 `contentExtract`，记录读取字节数、文本长度、截断状态和内容片段；PDF 是 best-effort 文本抽取，可能不完整。该能力只读取 Artifact storage 副本，也可通过 `desktop.artifacts.content.extract` 为既有产物刷新。
+- Desktop 会为安全可读且大小在限制内的新导入图片副本自动写入 `thumbnail`，并通过 Artifact UI 显示真实图片缩略图；该能力只读取 Artifact storage 副本，也可通过 `desktop.artifacts.thumbnail.extract` 为既有图片产物刷新。
 - Word / Excel / PPT 等 Office 成果先作为 `file` 产物记录，并通过 `fileInspection` 与 `previewPlan` 标记当前只能外部应用打开、缺原生预览/缩略图/内容抽取；后续再补摘要、缩略图和原生预览。
 
 ## 3. HTML 特色能力
@@ -128,7 +135,7 @@ HTML 产物约束：
 - Desktop 会记录 `bridgeEvents`，用于保存运行时 Desktop Bridge 调用结果。
 - HTML 产物可以通过 `artifactBridge.fetch(url, init)` 请求 HTTP(S) 网络数据；Desktop 会先请求 `network.fetch` 授权，再由主进程代理请求并把状态码、响应摘要和裁剪后的文本结果写入 `bridgeEvents`。直连 `fetch()` 仍被 CSP 阻止。
 - HTML 产物可以通过 `artifactBridge.exportAs(typeOrOptions, content, fileName)` 请求导出 HTML、文本、Markdown 或 JSON；Desktop 会先请求授权，再打开系统保存对话框并记录执行结果。
-- `artifactBridge.exec()` 仍保持未实现，不作为 P0 默认命令执行入口。
+- `artifactBridge.exec(command, options?)` 只记录 `approval_required` 执行意图并返回 pending approval 载荷；它不作为 P0 默认命令执行入口，不直接执行命令。
 - 可以镜像到 Repository `outputs/html/`。
 
 ## 4. 与 Repository outputs 的关系
@@ -231,8 +238,12 @@ Artifact 应记录：
 11. Repository `outputs/index.md` 能作为可扫读目录展示 Artifact 价值线索，并在重新镜像同一产物时刷新旧条目。
 12. 执行型复用产物能在真正执行前记录 `approval_required` 意图，在执行后记录结果事实；Desktop 只沉淀审批与运行线索，不静默执行命令。
 13. 文件型、Office、PDF、媒体、链接、应用入口和命令型产物能记录 `fileInspection`，并在 Artifact 详情、Desktop node `inspect/describe/search`、Repository output 中暴露检查事实和当前限制。
-14. 已导入文本、代码和 HTML 文件副本能自动或通过 `desktop.artifacts.content.extract` 记录 `contentExtract`，并在 Artifact 详情、Desktop node `content.extract/describe/search`、Repository output 和 `outputs/index.md` 中暴露抽取事实。
+14. 已导入文本、代码、HTML、PDF 和 Word/Excel/PowerPoint OOXML 文件副本能自动或通过 `desktop.artifacts.content.extract` 记录 `contentExtract`，并在 Artifact 详情、Desktop node `content.extract/describe/search`、Repository output 和 `outputs/index.md` 中暴露抽取事实；PDF 与 OOXML 抽取必须保持 best-effort、只读导入副本和可失败不阻断保存的边界。
 15. 所有新产物和被 `desktop.artifacts.inspect` 刷新的文件型产物能记录 `previewPlan`，并在 Artifact 详情、Desktop node `inspect/search`、Repository output 和 `outputs/index.md` 中暴露安全预览策略、限制和下一步缺口。
+16. 已导入图片文件副本能自动或通过 `desktop.artifacts.thumbnail.extract` 记录 `thumbnail`，在 Artifact UI 显示真实图片缩略图，并在 Repository output 中只记录缩略图可用状态、不嵌入 data URL。
+17. Artifact 能通过 `valueHealth` 暴露只读价值就绪度，并在 Artifact UI、Desktop node `search/describe`、`artifact://` 引用、Repository output 和 `outputs/index.md` 中给出状态、优势、缺口和下一步动作。
+18. 内容抽取、文件事实抽取和缩略图生成尝试能记录 `enrichmentEvents`，并在 Artifact 详情、搜索文本、Repository output markdown、`outputs/index.md` 和 ActionRun 仓库摘要中暴露成功、不可用或失败线索。
+19. ActionRun 仓库摘要能从 Artifact meta 中带出价值摘要、`valueHealth`、`previewPlan`、`enrichmentEvents`、`reuseKind` 和 Repository output / preview 路径，使非聊天式 AI 操作的产物可复盘、可继续使用。
 
 ## 8. 非目标
 

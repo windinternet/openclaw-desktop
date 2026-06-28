@@ -1,14 +1,25 @@
-import { useState } from 'react';
-import { Button, Empty, Tabs, Typography } from '@douyinfe/semi-ui';
+import { useEffect, useMemo, useState } from 'react';
+import { Button, Empty, Tabs, Tag, Typography } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import RepositoryGate from '../components/RepositoryGate';
 import KnowledgeRepositoryPanel, { type KnowledgeSection } from '../components/KnowledgeRepositoryPanel';
+import { getKnowledgeTailActionTab, parseDashboardTailActionRoute } from '../lib/dashboard-tail-action-routing';
 
 const { Title, Text } = Typography;
 
 export default function KnowledgeBasePage() {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<KnowledgeSection | 'repository'>('dashboard');
+  const location = useLocation();
+  const tailActionContext = useMemo(() => parseDashboardTailActionRoute(location.search), [location.search]);
+  const [activeTab, setActiveTab] = useState<KnowledgeSection | 'repository'>(
+    (getKnowledgeTailActionTab(tailActionContext) as KnowledgeSection | undefined) ?? 'dashboard',
+  );
+
+  useEffect(() => {
+    const nextTab = getKnowledgeTailActionTab(tailActionContext);
+    if (nextTab) setActiveTab(nextTab as KnowledgeSection);
+  }, [tailActionContext]);
 
   const repositoryFallback = (
     <Empty title={t('knowledge.repositoryRequiredTitle')} description={t('knowledge.repositoryRequiredDesc')}>
@@ -30,6 +41,34 @@ export default function KnowledgeBasePage() {
         {t('nav.knowledge')}
       </Title>
       <Text type="tertiary">{t('knowledge.pageDesc')}</Text>
+      {tailActionContext?.kind === 'knowledge' ? (
+        <div
+          style={{
+            border: '1px solid var(--semi-color-border)',
+            borderRadius: 8,
+            padding: 12,
+            marginTop: 12,
+            background: 'var(--semi-color-fill-0)',
+          }}
+        >
+          <Tag color="green" size="small">
+            {t('knowledge.tailActionContextTitle')}
+          </Tag>
+          <Text size="small" style={{ display: 'block', marginTop: 8 }}>
+            {t('knowledge.tailActionContextDesc')}
+          </Text>
+          {tailActionContext.workItemPath ? (
+            <Text
+              type="tertiary"
+              size="small"
+              ellipsis={{ showTooltip: true }}
+              style={{ display: 'block', marginTop: 4 }}
+            >
+              {t('knowledge.tailActionSource')}: {tailActionContext.workItemPath}
+            </Text>
+          ) : null}
+        </div>
+      ) : null}
       <Tabs
         activeKey={activeTab}
         onChange={(key) => setActiveTab(key as KnowledgeSection | 'repository')}

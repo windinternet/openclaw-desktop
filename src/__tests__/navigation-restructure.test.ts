@@ -148,7 +148,7 @@ describe('navigation hub pages', () => {
     expect(workbench).toContain('<ActionCenterPage embedded');
     expect(workbench).not.toContain('<ArtifactsPage embedded');
     expect(workbench).toContain('WorkbenchRepositoryPanel');
-    expect(workbench).toContain("useState('dashboard')");
+    expect(workbench).toContain("getWorkbenchTailActionTab(tailActionContext) ?? 'dashboard'");
     expect(workbench).toContain("renderRepositoryPanel('dashboard')");
     expect(workbench).toContain("renderRepositoryPanel('projects')");
     expect(workbench).toContain("renderRepositoryPanel('tasks')");

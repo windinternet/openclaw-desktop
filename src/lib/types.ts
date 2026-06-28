@@ -169,6 +169,8 @@ export interface AiActionRun {
   gatewayAgentId?: string;
   gatewaySessionKey?: string;
   gatewayRunId?: string;
+  workItemId?: string;
+  workItemPath?: string;
   artifactIds?: string[];
   childSessionKeys?: string[];
   approvals?: AiActionApproval[];

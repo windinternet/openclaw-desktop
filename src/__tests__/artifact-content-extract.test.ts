@@ -64,14 +64,40 @@ describe('artifact content extract', () => {
     expect(
       resolveArtifactContentExtractEligibility(
         createArtifact({
+          externalFormat: 'pdf',
+          fileName: 'brief.pdf',
+          mimeType: 'application/pdf',
+        }),
+      ),
+    ).toEqual({
+      eligible: true,
+      format: 'pdf',
+    });
+
+    expect(
+      resolveArtifactContentExtractEligibility(
+        createArtifact({
           externalFormat: 'powerpoint',
           fileName: 'roadmap.pptx',
           mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
         }),
       ),
     ).toEqual({
-      eligible: false,
+      eligible: true,
       format: 'powerpoint',
+    });
+
+    expect(
+      resolveArtifactContentExtractEligibility(
+        createArtifact({
+          externalFormat: 'audio',
+          fileName: 'meeting.mp3',
+          mimeType: 'audio/mpeg',
+        }),
+      ),
+    ).toEqual({
+      eligible: false,
+      format: 'audio',
       reason: 'unsupported-format',
     });
 
@@ -86,5 +112,58 @@ describe('artifact content extract', () => {
       format: 'text',
       reason: 'not-imported-file',
     });
+  });
+
+  it('labels imported PDF extracts as best-effort PDF text', () => {
+    const text = 'Quarterly roadmap and delivery risks.';
+    const extract = buildArtifactContentExtract(
+      createArtifact({
+        externalFormat: 'pdf',
+        fileName: 'brief.pdf',
+        mimeType: 'application/pdf',
+      }),
+      {
+        text,
+        bytesRead: 4096,
+        truncated: false,
+      },
+      60,
+    );
+
+    expect(extract).toEqual(
+      expect.objectContaining({
+        format: 'pdf',
+        fileName: 'brief.pdf',
+        mimeType: 'application/pdf',
+        summary: `PDF text extract · brief.pdf · ${text.length} chars`,
+        snippet: text,
+      }),
+    );
+  });
+
+  it('labels imported Office extracts by external format', () => {
+    const text = 'Quarterly Roadmap Delivery risks';
+    const extract = buildArtifactContentExtract(
+      createArtifact({
+        externalFormat: 'powerpoint',
+        fileName: 'roadmap.pptx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      }),
+      {
+        text,
+        bytesRead: 8192,
+        truncated: false,
+      },
+      70,
+    );
+
+    expect(extract).toEqual(
+      expect.objectContaining({
+        format: 'powerpoint',
+        fileName: 'roadmap.pptx',
+        summary: `PowerPoint text extract · roadmap.pptx · ${text.length} chars`,
+        snippet: text,
+      }),
+    );
   });
 });

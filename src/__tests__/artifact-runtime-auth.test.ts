@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   recordArtifactAuthDecision,
   recordArtifactBridgeCallResult,
-  recordArtifactBridgeExecBlocked,
+  recordArtifactBridgeExecApprovalRequired,
 } from '../lib/artifact-runtime-auth';
 import type { ArtifactMeta } from '../lib/artifact-types';
 
@@ -73,36 +73,35 @@ describe('artifact runtime auth records', () => {
     ]);
   });
 
-  it('records unsupported artifactBridge.exec calls as blocked execution intents', () => {
-    const updated = recordArtifactBridgeExecBlocked(createArtifact(), {
+  it('records artifactBridge.exec calls as approval-required execution intents', () => {
+    const updated = recordArtifactBridgeExecApprovalRequired(createArtifact(), {
       id: 'exec_1',
       command: 'npm run deploy',
-      startedAt: 50,
-      endedAt: 60,
-      error: 'Artifact bridge method exec is not implemented yet',
+      requestedAt: 50,
+      approvalTitle: 'Artifact Bridge command execution requested',
+      approvalReason: 'HTML Artifact requested shell execution; Desktop only records the approval intent.',
     });
 
-    expect(updated.updatedAt).toBe(60);
+    expect(updated.updatedAt).toBe(50);
     expect(updated.executionEvents).toEqual([
       {
         id: 'exec_1',
-        status: 'denied',
+        status: 'approval_required',
         artifactVersion: 1,
         requestedAt: 50,
-        startedAt: 50,
-        endedAt: 60,
+        startedAt: undefined,
+        endedAt: undefined,
         sourceId: undefined,
         sourceName: 'artifactBridge.exec',
         runner: 'artifactBridge.exec',
         command: 'npm run deploy',
-        approvalTitle: 'Artifact Bridge command execution blocked',
+        approvalTitle: 'Artifact Bridge command execution requested',
         approvalRisk: 'high',
-        approvalReason:
-          'artifactBridge.exec remains unsupported; use Desktop node execution approval commands and an external runner instead.',
+        approvalReason: 'HTML Artifact requested shell execution; Desktop only records the approval intent.',
         outputArtifactId: undefined,
         repositoryOutputPath: undefined,
-        resultSummary: 'Blocked unsupported artifactBridge.exec request',
-        error: 'Artifact bridge method exec is not implemented yet',
+        resultSummary: 'Prepared artifactBridge.exec approval request; Desktop did not execute the command.',
+        error: undefined,
       },
     ]);
   });
