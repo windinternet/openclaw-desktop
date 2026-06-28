@@ -5,12 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from '../lib';
 import type { ArtifactMeta } from '../lib/artifact-types';
-import {
-  buildArtifactDisplayLine,
-  buildArtifactPreviewCard,
-  buildArtifactSearchText,
-  formatArtifactSource,
-} from '../lib/artifact-display';
+import { buildArtifactDisplayLine, buildArtifactPreviewCard, formatArtifactSource } from '../lib/artifact-display';
+import { filterArtifactList, type ArtifactReuseKindFilter } from '../lib/artifact-list-filter';
 import { buildArtifactValueHealth, type ArtifactValueHealthStatus } from '../lib/artifact-value-health';
 import { ArtifactCreateDialog } from '../components/ArtifactCreateDialog';
 import { ArtifactAICreateDrawer } from '../components/ArtifactAICreateDrawer';
@@ -42,6 +38,7 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
   }, [artifactTailActionContext?.workItemPath]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [reuseKindFilter, setReuseKindFilter] = useState<ArtifactReuseKindFilter>('all');
   const [showCreate, setShowCreate] = useState(false);
   const [showAICreate, setShowAICreate] = useState(false);
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
@@ -82,15 +79,27 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
     [t],
   );
 
-  const filteredArtifacts = useMemo(() => {
-    let list = artifacts;
-    if (typeFilter !== 'all') list = list.filter((a) => a.type === typeFilter);
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter((a) => buildArtifactSearchText(a).includes(q));
-    }
-    return list.sort((a, b) => b.updatedAt - a.updatedAt);
-  }, [artifacts, typeFilter, search]);
+  const reuseKindOptions = useMemo(
+    () => [
+      { value: 'all', label: t('artifact.reuseKindAll') },
+      { value: 'asset', label: t('artifact.reuseKindAsset') },
+      { value: 'template', label: t('artifact.reuseKindTemplate') },
+      { value: 'tool', label: t('artifact.reuseKindTool') },
+      { value: 'script', label: t('artifact.reuseKindScript') },
+      { value: 'workflow', label: t('artifact.reuseKindWorkflow') },
+    ],
+    [t],
+  );
+
+  const filteredArtifacts = useMemo(
+    () =>
+      filterArtifactList(artifacts, {
+        typeFilter,
+        reuseKindFilter,
+        search,
+      }),
+    [artifacts, typeFilter, reuseKindFilter, search],
+  );
 
   const HTML_TYPES = ['report', 'dashboard', 'analysis', 'checklist', 'code', 'document', 'slide', 'form', 'other'];
 
@@ -141,6 +150,12 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
           optionList={typeOptions}
           style={{ width: 140 }}
         />
+        <Select
+          value={reuseKindFilter}
+          onChange={(v) => setReuseKindFilter(v as ArtifactReuseKindFilter)}
+          optionList={reuseKindOptions}
+          style={{ width: 150 }}
+        />
         <Button onClick={() => setViewMode(viewMode === 'card' ? 'list' : 'card')} theme="borderless">
           <IconAppCenter />
         </Button>
@@ -158,7 +173,7 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
         </Button>
       </>
     ),
-    [search, t, typeFilter, typeOptions, viewMode],
+    [search, t, typeFilter, typeOptions, reuseKindFilter, reuseKindOptions, viewMode],
   );
 
   useEffect(() => {

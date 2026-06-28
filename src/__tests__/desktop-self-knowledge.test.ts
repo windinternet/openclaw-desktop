@@ -84,6 +84,8 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('Search existing Artifacts before asking the user for an artifact id');
     expect(skillContent).toContain('ordinary Chinese reusable-asset queries');
     expect(skillContent).toContain('可复用的脚本');
+    expect(skillContent).toContain('Artifacts UI also exposes a reuse-kind filter');
+    expect(skillContent).toContain('combines it with type and text search before sorting by recency');
     expect(skillContent).toContain('assetExecutionSummary');
     expect(skillContent).toContain('recordOnly');
     expect(skillContent).toContain('desktopExecutes: false');
@@ -183,6 +185,7 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('externalFormat');
     expect(skillContent).toContain('reuseKind');
     expect(skillContent).toContain('asset`, `template`, `tool`, `script`, or `workflow`');
+    expect(skillContent).toContain('Artifacts page reuse-kind filter');
     expect(skillContent).toContain('classification and traceability');
     expect(skillContent).toContain('desktop.artifacts.reuse.record');
     expect(skillContent).toContain('records reuse/audit facts only');

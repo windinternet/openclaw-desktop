@@ -5,6 +5,7 @@ describe('artifact UI metadata', () => {
   it('surfaces repository output metadata in artifact list and detail pages', () => {
     const listPage = readFileSync('src/pages/ArtifactsPage.tsx', 'utf8');
     const detailPage = readFileSync('src/pages/ArtifactDetailPage.tsx', 'utf8');
+    const listFilter = readFileSync('src/lib/artifact-list-filter.ts', 'utf8');
     const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
     const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
 
@@ -53,8 +54,12 @@ describe('artifact UI metadata', () => {
     expect(listPage).toContain('buildArtifactDisplayLine');
     expect(listPage).toContain('buildArtifactPreviewCard');
     expect(listPage).toContain('buildArtifactValueHealth');
-    expect(listPage).toContain('buildArtifactSearchText');
+    expect(listFilter).toContain('buildArtifactSearchText');
+    expect(listPage).toContain('filterArtifactList');
     expect(listPage).toContain('formatArtifactSource');
+    expect(listPage).toContain('reuseKindFilter');
+    expect(listPage).toContain('reuseKindOptions');
+    expect(listPage).toContain("t('artifact.reuseKindAll')");
     expect(listPage).toContain('a.reuseKind');
     expect(listPage).toContain('previewCard.thumbnailLabel');
     expect(listPage).toContain('previewCard.thumbnailUrl');
@@ -101,6 +106,9 @@ describe('artifact UI metadata', () => {
     expect(zh.artifact.contentSummary).toBeTruthy();
     expect(zh.artifact.externalFormat).toBeTruthy();
     expect(zh.artifact.reuseKind).toBeTruthy();
+    expect(zh.artifact.reuseKindAll).toBeTruthy();
+    expect(zh.artifact.reuseKindScript).toBeTruthy();
+    expect(zh.artifact.reuseKindWorkflow).toBeTruthy();
     expect(zh.artifact.copyReference).toBeTruthy();
     expect(zh.artifact.referenceCopied).toBeTruthy();
     expect(en.artifact.repositoryOutput).toBeTruthy();
@@ -131,6 +139,9 @@ describe('artifact UI metadata', () => {
     expect(en.artifact.contentSummary).toBeTruthy();
     expect(en.artifact.externalFormat).toBeTruthy();
     expect(en.artifact.reuseKind).toBeTruthy();
+    expect(en.artifact.reuseKindAll).toBeTruthy();
+    expect(en.artifact.reuseKindScript).toBeTruthy();
+    expect(en.artifact.reuseKindWorkflow).toBeTruthy();
     expect(en.artifact.copyReference).toBeTruthy();
     expect(en.artifact.referenceCopied).toBeTruthy();
   });

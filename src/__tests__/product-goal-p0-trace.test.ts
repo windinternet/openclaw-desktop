@@ -30,9 +30,13 @@ describe('product goal P0 traceability', () => {
     expect(plans).toContain('截图追溯 P0 基线');
     expect(plans).toContain('不得在后续推进中降级为 P1/P2');
     expect(roadmap).toContain('不得判定 P0 已整体完成');
+    expect(plans).toContain('Artifacts 页面已提供复用分类筛选');
+    expect(roadmap).toContain('Artifacts 页面已提供复用分类筛选');
     expect(source).toContain('这些也是 P0 级别的内容');
     expect(source).toContain('截图追溯确认');
+    expect(source).toContain('Artifacts 页面复用分类筛选');
     expect(skillContent).toContain('Screenshot-confirmed P0 baseline');
     expect(skillContent).toContain('Do not demote these scopes to P1/P2');
+    expect(skillContent).toContain('Artifacts UI also exposes a reuse-kind filter');
   });
 });
