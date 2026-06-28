@@ -84,6 +84,11 @@ export interface WorkbenchMatterStatusUpdateInput {
   status: string;
 }
 
+export interface WorkbenchKnowledgeTailActionConfirmInput {
+  workItemPath: string;
+  tailActionId: string;
+}
+
 export interface WorkbenchOutputPreservationInput {
   workItemPath: string;
   tailActionId?: string;
@@ -331,6 +336,28 @@ export async function updateWorkbenchMatterStatusFromTailAction(
   if (!statusUpdated) return false;
 
   const next = markWorkbenchTailActionCompleted(statusUpdated, actionIndex, tailAction.text);
+  if (!next || next === markdown) return false;
+
+  await repository.writeText(binding.repoPath, workItemPath, next);
+  return true;
+}
+
+export async function confirmWorkbenchKnowledgeTailAction(
+  binding: RepositoryBinding,
+  input: WorkbenchKnowledgeTailActionConfirmInput,
+): Promise<boolean> {
+  const workItemPath = normalizeWritableWorkbenchMarkdownPath(input.workItemPath);
+  const actionIndex = parseTailActionIndex(input.tailActionId);
+  if (!workItemPath || !workItemPath.startsWith('work/') || actionIndex === null) return false;
+
+  const repository = getWorkbenchWriteApi();
+  const markdown = await repository.readText(binding.repoPath, workItemPath);
+  const tailAction = parseWorkbenchTailActions(workItemPath, markdown).find(
+    (action) => action.id === input.tailActionId,
+  );
+  if (!tailAction || tailAction.completed || !isKnowledgeTailActionText(tailAction.text)) return false;
+
+  const next = markWorkbenchTailActionCompleted(markdown, actionIndex, tailAction.text);
   if (!next || next === markdown) return false;
 
   await repository.writeText(binding.repoPath, workItemPath, next);
@@ -637,6 +664,10 @@ function normalizeWorkbenchMatterStatus(value: string): string | null {
   const status = value.trim();
   if (!WORKBENCH_MATTER_STATUSES.has(status)) return null;
   return status;
+}
+
+function isKnowledgeTailActionText(text: string): boolean {
+  return /知识库|知识|wiki|knowledge/i.test(text);
 }
 
 function relativeWorkbenchMarkdownLink(fromPath: string, toPath: string): string {

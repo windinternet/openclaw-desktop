@@ -13,7 +13,7 @@ import {
   Toast,
   Typography,
 } from '@douyinfe/semi-ui';
-import { IconBolt, IconFile, IconLink, IconPlus, IconSearch, IconUpload } from '@douyinfe/semi-icons';
+import { IconBolt, IconFile, IconLink, IconPlus, IconSearch, IconTickCircle, IconUpload } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway, useStore } from '../lib';
@@ -40,6 +40,7 @@ import {
   searchKnowledge,
   writeKnowledgeHealthReview,
 } from '../lib/repository-knowledge';
+import { confirmWorkbenchKnowledgeTailAction } from '../lib/repository-workbench';
 import MarkdownView from './MarkdownView';
 
 const { Text, Title } = Typography;
@@ -87,6 +88,8 @@ export default function KnowledgeRepositoryPanel({
   const [documentLoading, setDocumentLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [rewriteLoading, setRewriteLoading] = useState(false);
+  const [tailActionConfirming, setTailActionConfirming] = useState(false);
+  const [tailActionConfirmed, setTailActionConfirmed] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
   const [healthReviewLoading, setHealthReviewLoading] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<KnowledgeDocument | null>(null);
@@ -102,6 +105,10 @@ export default function KnowledgeRepositoryPanel({
   const [importUrlNote, setImportUrlNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   const knowledgeTailActionContext = tailActionContext?.kind === 'knowledge' ? tailActionContext : null;
+
+  useEffect(() => {
+    setTailActionConfirmed(false);
+  }, [knowledgeTailActionContext?.id, knowledgeTailActionContext?.workItemPath]);
 
   useEffect(() => {
     if (section) setActiveSection(section);
@@ -395,6 +402,33 @@ export default function KnowledgeRepositoryPanel({
       workItemPath: knowledgeTailActionContext.workItemPath,
       tailActionId: knowledgeTailActionContext.id,
     });
+  };
+
+  const handleConfirmKnowledgeTailAction = async () => {
+    const workItemPath = knowledgeTailActionContext?.workItemPath;
+    const tailActionId = knowledgeTailActionContext?.id;
+    if (!workItemPath || !tailActionId) {
+      Toast.warning(t('knowledge.tailActionConfirmUnavailable'));
+      return;
+    }
+
+    setTailActionConfirming(true);
+    try {
+      const confirmed = await confirmWorkbenchKnowledgeTailAction(binding, {
+        workItemPath,
+        tailActionId,
+      });
+      if (!confirmed) {
+        Toast.warning(t('knowledge.tailActionConfirmUnavailable'));
+        return;
+      }
+      setTailActionConfirmed(true);
+      Toast.success(t('knowledge.tailActionConfirmed'));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('knowledge.tailActionConfirmFailed'));
+    } finally {
+      setTailActionConfirming(false);
+    }
   };
 
   const renderFileButton = (file: RepositoryMarkdownFile) => (
@@ -936,15 +970,28 @@ export default function KnowledgeRepositoryPanel({
                   </Text>
                 ) : null}
               </div>
-              <Button
-                type="primary"
-                icon={<IconBolt />}
-                loading={rewriteLoading}
-                disabled={!knowledgeTailActionContext.workItemPath}
-                onClick={handleKnowledgeTailActionRewrite}
-              >
-                {t('knowledge.startTailActionRewrite')}
-              </Button>
+              <Space wrap>
+                <Button
+                  type="primary"
+                  icon={<IconBolt />}
+                  loading={rewriteLoading}
+                  disabled={!knowledgeTailActionContext.workItemPath}
+                  onClick={handleKnowledgeTailActionRewrite}
+                >
+                  {t('knowledge.startTailActionRewrite')}
+                </Button>
+                <Button
+                  type="secondary"
+                  icon={<IconTickCircle />}
+                  loading={tailActionConfirming}
+                  disabled={
+                    !knowledgeTailActionContext.workItemPath || !knowledgeTailActionContext.id || tailActionConfirmed
+                  }
+                  onClick={() => void handleConfirmKnowledgeTailAction()}
+                >
+                  {tailActionConfirmed ? t('knowledge.tailActionConfirmed') : t('knowledge.confirmTailAction')}
+                </Button>
+              </Space>
             </Space>
           </div>
         ) : null}

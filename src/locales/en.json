@@ -274,9 +274,13 @@
     "tailActionContextTitle": "Knowledge Update Pending",
     "tailActionContextDesc": "A Dashboard knowledge tail action. Refresh the index/log or start a knowledge rewrite when ready.",
     "tailActionSource": "Source matter",
-    "tailActionRewriteDesc": "Create an update plan from the source matter, execution records, outputs, and existing knowledge. Writes still require approval.",
+    "tailActionRewriteDesc": "Create an update plan from the source matter, execution records, outputs, and existing knowledge. After updating knowledge or confirming no write is needed, manually complete this tail action.",
     "startTailActionRewrite": "Start Knowledge ActionRun",
-    "tailActionRewriteUnavailable": "This knowledge tail action cannot be started"
+    "tailActionRewriteUnavailable": "This knowledge tail action cannot be started",
+    "confirmTailAction": "Confirm Tail Action",
+    "tailActionConfirmed": "Knowledge tail action completed",
+    "tailActionConfirmUnavailable": "This knowledge tail action cannot be confirmed",
+    "tailActionConfirmFailed": "Failed to confirm knowledge tail action"
   },
   "repositoryGate": {
     "knowledgeTitle": "Knowledge Repository",

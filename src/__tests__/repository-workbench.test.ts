@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
 import {
+  confirmWorkbenchKnowledgeTailAction,
   confirmWorkbenchReviewDraft,
   completeWorkbenchTailAction,
   groupReviewsByFolder,
@@ -774,6 +775,96 @@ describe('repository workbench', () => {
         '- [ ] 判断是否需要更新知识库。',
       ].join('\n'),
     );
+  });
+
+  it('confirms a knowledge tail action without changing other work state', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'work/active/release.md') {
+        return [
+          '---',
+          'id: release',
+          'status: active',
+          '---',
+          '',
+          '# 发布推进',
+          '',
+          '## 收尾动作',
+          '',
+          '- [ ] 根据 ActionRun 更新事项状态。',
+          '- [ ] 判断是否需要更新知识库。',
+          '- [ ] 判断是否需要写入复盘。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const confirmed = await confirmWorkbenchKnowledgeTailAction(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'work/active/release.md:tail-action:1',
+      },
+    );
+
+    expect(confirmed).toBe(true);
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'work/active/release.md',
+      [
+        '---',
+        'id: release',
+        'status: active',
+        '---',
+        '',
+        '# 发布推进',
+        '',
+        '## 收尾动作',
+        '',
+        '- [ ] 根据 ActionRun 更新事项状态。',
+        '- [x] 判断是否需要更新知识库。',
+        '- [ ] 判断是否需要写入复盘。',
+      ].join('\n'),
+    );
+  });
+
+  it('refuses to confirm a non-knowledge tail action through the knowledge path', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'work/active/release.md') {
+        return [
+          '# 发布推进',
+          '',
+          '## 收尾动作',
+          '',
+          '- [ ] 根据 ActionRun 更新事项状态。',
+          '- [ ] 判断是否需要把本次执行结果沉淀为成果，并关联到事项。',
+          '- [ ] 判断是否需要更新知识库。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const confirmed = await confirmWorkbenchKnowledgeTailAction(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'work/active/release.md:tail-action:0',
+      },
+    );
+
+    expect(confirmed).toBe(false);
+    expect(writeText).not.toHaveBeenCalled();
   });
 
   it('records an output-preservation diagnostic artifact without requiring a checklist tail action id', async () => {
