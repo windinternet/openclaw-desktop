@@ -221,6 +221,32 @@ describe('AI Action Center session rules', () => {
     });
   });
 
+  it('keeps structured repository write payloads on work-matter plan approvals', () => {
+    const run = createAiActionRun({
+      type: 'work_matter_plan',
+      sourcePage: 'workbench',
+      instanceId: 'instance-1',
+      input: '事项计划生成',
+      workItemPath: 'work/active/release.md',
+    });
+
+    const updated = applyAiActionAssistantResponse(
+      run,
+      `计划草案如下。
+
+\`\`\`ai-action
+{"version":1,"kind":"approval_required","summary":"写入发布计划","approval":{"title":"写入事项计划","risk":"medium","reason":"将把计划写入 plans/active/ 并关联来源事项"},"repositoryWrite":{"path":"plans/active/release-plan.md","workItemPath":"work/active/release.md","content":"# 发布计划\\n\\n来源事项: work/active/release.md\\n"}}
+\`\`\``,
+    );
+
+    expect(updated.status).toBe('awaiting_approval');
+    expect(updated.approvals?.[0].repositoryWrite).toEqual({
+      path: 'plans/active/release-plan.md',
+      workItemPath: 'work/active/release.md',
+      content: '# 发布计划\n\n来源事项: work/active/release.md',
+    });
+  });
+
   it('captures the real Gateway agent id from a completed create response', () => {
     const run = createAiActionRun({
       type: 'gateway_agent_create',
@@ -448,6 +474,8 @@ describe('AI Action Center session rules', () => {
     expect(matterPlanPrompt).toContain('work/active/release.md');
     expect(matterPlanPrompt).toContain('plans/active/');
     expect(matterPlanPrompt).toContain('approval_required');
+    expect(matterPlanPrompt).toContain('repositoryWrite');
+    expect(matterPlanPrompt).toContain('"workItemPath":"work/active/release.md"');
     expect(matterPlanPrompt).toContain('关联资料');
     expect(matterPlanPrompt).toContain('关联成果');
 

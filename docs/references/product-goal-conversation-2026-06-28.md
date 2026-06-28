@@ -1155,3 +1155,19 @@ HTML 的独特优势：
 - 仍需要把审批通过后的计划写入、计划与事项互链、计划执行入口和执行状态观测继续接上。
 - 仍需要把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”的完整金线做成一条自然入口。
 - 仍需要真正的全局 ActionRun 发起协议，让未来新增非聊天 AI 操作默认遵守事项归属、计划、执行记录和尾动作边界。
+
+### 10.51 2026-06-28 当前实施记录：事项计划审批写入与互链
+
+围绕“开始一件事闭环”中“生成计划 -> 审批 -> 写入计划 -> 关联回事项”的 P0 缺口，当前继续落地一段代码事实：
+
+- `work-matter-plan.md` 的 `approval_required` 结构化块现在要求携带 `repositoryWrite.path/content/workItemPath`。
+- `parseAiActionAssistantResponse` / `applyAiActionAssistantResponse` 会把 `repositoryWrite` 保存到 `AiActionApproval`，让审批项携带可执行但受限的仓库写入载荷。
+- Action Center 批准 `work_matter_plan` 后，会调用 `applyWorkbenchMatterPlanApproval`。
+- `applyWorkbenchMatterPlanApproval` 只允许写入当前绑定仓库 `plans/active/` 下的 Markdown，来源事项必须位于 `work/` 下，并且 `repositoryWrite.workItemPath` 必须与 ActionRun 来源事项一致。
+- 写入计划时，Desktop 会补充 `source: work_matter_plan`、`workItemPath`、`actionRunId`、`approval: approved`、`approvedAt` 等前置元数据。
+- 写入计划后，Desktop 会把计划相对链接追加到来源事项 `## 关联计划`，并移除该小节里的 `- 暂无` 占位。
+- 该步骤只做审批后的计划落盘和互链；不会自动执行计划、写运行记录、沉淀成果、更新知识库、写复盘或移动事项文件。
+
+仍未完成的 P0 后续：
+
+- 仍需要把计划执行入口、执行状态观测、执行后的产物沉淀、知识更新和复盘金线继续接上。

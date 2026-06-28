@@ -197,6 +197,8 @@ failed            -> ActionRun.status = failed
 
 审批通过后，Desktop 向同一个 `gatewaySessionKey` 发送批准决定，Agent 继续执行已经批准的方案；审批拒绝后，Desktop 发送拒绝决定并把 ActionRun 标记为 `cancelled`。如果执行过程中出现新的、实质不同的风险，Agent 可以再次返回新的 `approval_required`。
 
+部分产品层 ActionRun 可以在 `approval_required` 块中携带受限结构化载荷。例如 `work_matter_plan` 使用 `repositoryWrite.path/content/workItemPath` 描述计划写入目标和内容；Desktop 只在用户批准后处理该载荷，并再次校验目标路径、来源事项和当前绑定 Repository 边界。当前实现仅允许 `work_matter_plan` 写入 `plans/active/` 并链接回来源事项 `## 关联计划`，不把该机制扩展为任意仓库写入。
+
 Gateway 执行会话完成后，Desktop 使用 `sessions.get({ key })` 读取完整消息，而不是依赖会截断长文本的 `sessions.preview`。为兼容旧回复，解析器也识别“需要你确认”“确认后执行”等明确确认语句。
 
 ## 提示词模板
@@ -207,6 +209,7 @@ Gateway 执行会话完成后，Desktop 使用 `sessions.get({ key })` 读取完
 src/prompts/ai-actions/gateway-agent-create.md
 src/prompts/ai-actions/agent-team-compose.md
 src/prompts/ai-actions/approval-decision.md
+src/prompts/ai-actions/work-matter-plan.md
 ```
 
 模板通过 `src/lib/ai-action-prompts.ts` 渲染。模板负责约束只读探查、副作用前审批、结构化回复和审批后的继续执行；页面只负责提供用户输入和本地扩展画像。

@@ -1109,6 +1109,8 @@
     "approvedContinue": "Approved, AI will continue execution",
     "rejectedCancelled": "Rejected, action cancelled",
     "decisionFailed": "Failed to submit approval decision",
+    "workMatterPlanWritten": "Work matter plan written: {{path}}",
+    "workMatterPlanWriteNoRepository": "No writable local Repository is available for writing the work matter plan",
     "notConnectedResync": "Not connected to Gateway, cannot resync",
     "resynced": "Resynced",
     "statusRefreshed": "Status refreshed",

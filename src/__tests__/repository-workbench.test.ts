@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
 import {
+  applyWorkbenchMatterPlanApproval,
   archiveCompletedWorkbenchMatter,
   confirmWorkbenchKnowledgeTailAction,
   confirmWorkbenchReviewDraft,
@@ -1010,6 +1011,95 @@ describe('repository workbench', () => {
     expect(writeText).not.toHaveBeenCalled();
   });
 
+  it('writes an approved work-matter plan and links it back to the source matter', async () => {
+    const writes: Array<{ path: string; content: string }> = [];
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'work/active/release.md') {
+        return [
+          '---',
+          'id: release',
+          'status: active',
+          '---',
+          '',
+          '# 发布事项',
+          '',
+          '## 关联计划',
+          '',
+          '- 暂无',
+          '',
+          '## 执行记录',
+          '',
+          '- 暂无',
+        ].join('\n');
+      }
+      if (relativePath === 'plans/active/release-plan.md') return '';
+      return '';
+    });
+    const writeText = vi.fn(async (_repoPath: string, relativePath: string, content: string) => {
+      writes.push({ path: relativePath, content });
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const result = await applyWorkbenchMatterPlanApproval(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        actionRunId: 'action-plan-1',
+        workItemPath: 'work/active/release.md',
+        repositoryWrite: {
+          path: 'plans/active/release-plan.md',
+          workItemPath: 'work/active/release.md',
+          content: '# 发布计划\n\n## 验收标准\n\n- 完成桌面版发布。',
+        },
+        approvedAt: new Date('2026-06-28T12:00:00.000Z'),
+      },
+    );
+
+    expect(result).toEqual({
+      planPath: 'plans/active/release-plan.md',
+      workItemPath: 'work/active/release.md',
+    });
+    expect(writes[0]).toMatchObject({ path: 'plans/active/release-plan.md' });
+    expect(writes[0].content).toContain('source: work_matter_plan');
+    expect(writes[0].content).toContain('workItemPath: work/active/release.md');
+    expect(writes[0].content).toContain('actionRunId: action-plan-1');
+    expect(writes[0].content).toContain('approval: approved');
+    expect(writes[0].content).toContain('# 发布计划');
+    expect(writes[1]).toMatchObject({ path: 'work/active/release.md' });
+    expect(writes[1].content).toContain('- [发布计划](../../plans/active/release-plan.md)');
+    expect(writes[1].content).toContain('action: `action-plan-1`');
+    expect(writes[1].content).not.toContain('## 关联计划\n\n- 暂无');
+  });
+
+  it('rejects approved work-matter plan writes outside plans/active', async () => {
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: {
+          readText: vi.fn(async () => ''),
+          writeText: vi.fn(),
+        },
+      },
+    });
+
+    await expect(
+      applyWorkbenchMatterPlanApproval(
+        createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+        {
+          actionRunId: 'action-plan-1',
+          workItemPath: 'work/active/release.md',
+          repositoryWrite: {
+            path: 'plans/completed/release-plan.md',
+            workItemPath: 'work/active/release.md',
+            content: '# 发布计划',
+          },
+        },
+      ),
+    ).rejects.toThrow('plans/active');
+  });
+
   it('reads selected workbench markdown for inline preview', async () => {
     const readText = vi.fn(async () => '# Matter Preview');
     vi.stubGlobal('window', {
@@ -1055,6 +1145,8 @@ describe('repository workbench', () => {
     expect(source).toContain('buildWorkMatterPlanPrompt');
     expect(source).toContain("type: 'work_matter_plan'");
     expect(source).toContain("sourcePage: 'workbench'");
+    expect(actionCenterPage).toContain('applyWorkbenchMatterPlanApproval');
+    expect(actionCenterPage).toContain('approval.repositoryWrite');
     expect(source).toContain('workItemId: selectedWorkItemId');
     expect(source).toContain('workItemPath: selectedWorkItemPath');
     expect(source).toContain("t('workbench.generatePlanForMatter')");

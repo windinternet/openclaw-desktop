@@ -1,4 +1,4 @@
-import type { AiActionExecutionMode, AiActionRun, ChatSendResult, SessionInfo } from './types';
+import type { AiActionExecutionMode, AiActionRepositoryWrite, AiActionRun, ChatSendResult, SessionInfo } from './types';
 import { buildApprovalDecisionPrompt } from './ai-action-prompts';
 import { extractSessionMessageText } from './session-content';
 import { parseModelJsonObjects } from './model-json';
@@ -17,6 +17,7 @@ export interface AiActionAssistantResponse {
     risk: 'low' | 'medium' | 'high';
     reason: string;
   };
+  repositoryWrite?: AiActionRepositoryWrite;
   result?: {
     agentId?: string;
   };
@@ -148,6 +149,19 @@ function normalizeRisk(value: unknown): 'low' | 'medium' | 'high' {
   return value === 'high' || value === 'low' ? value : 'medium';
 }
 
+function normalizeRepositoryWrite(value: unknown): AiActionRepositoryWrite | undefined {
+  if (!isRecord(value)) return undefined;
+  const path = typeof value.path === 'string' ? value.path.trim() : '';
+  const content = typeof value.content === 'string' ? value.content.trim() : '';
+  const workItemPath = typeof value.workItemPath === 'string' ? value.workItemPath.trim() : '';
+  if (!path || !content) return undefined;
+  return {
+    path,
+    content,
+    workItemPath: workItemPath || undefined,
+  };
+}
+
 function normalizeStructuredResponse(value: unknown): AiActionAssistantResponse | null {
   if (!isRecord(value)) return null;
   const rawKind = value.kind;
@@ -170,6 +184,7 @@ function normalizeStructuredResponse(value: unknown): AiActionAssistantResponse 
         risk: normalizeRisk(value.approval.risk),
         reason,
       },
+      repositoryWrite: normalizeRepositoryWrite(value.repositoryWrite),
     };
   }
 
@@ -240,6 +255,7 @@ export function applyAiActionAssistantResponse(run: AiActionRun, text: string): 
       status: 'pending' as const,
       requestedAt: timestamp,
       reason: response.approval.reason,
+      repositoryWrite: response.repositoryWrite,
     };
     return {
       ...run,

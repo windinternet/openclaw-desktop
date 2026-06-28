@@ -54,7 +54,10 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('ActionRun 发起前事项面板组件化');
     expect(source).toContain('ActionRunWorkItemPicker');
     expect(source).toContain('工作事项发起计划 ActionRun');
+    expect(source).toContain('事项计划审批写入与互链');
     expect(source).toContain('work_matter_plan');
+    expect(source).toContain('applyWorkbenchMatterPlanApproval');
+    expect(source).toContain('repositoryWrite');
     expect(source).toContain('Knowledge 发起前事项选择');
     expect(source).toContain('Teams 发起前事项选择');
     expect(source).toContain('Repository 语义映射发起前事项选择');
@@ -75,7 +78,10 @@ describe('product goal P0 traceability', () => {
     expect(plans).toContain('ActionRun 发起前事项面板组件化');
     expect(plans).toContain('ActionRunWorkItemPicker');
     expect(plans).toContain('工作事项发起计划 ActionRun');
+    expect(plans).toContain('事项计划审批写入与互链');
     expect(plans).toContain('work_matter_plan');
+    expect(plans).toContain('applyWorkbenchMatterPlanApproval');
+    expect(plans).toContain('repositoryWrite.path/content/workItemPath');
     expect(plans).toContain('Knowledge 普通自动改写发起前事项选择');
     expect(plans).toContain('Teams 自然语言编排发起前事项选择');
     expect(plans).toContain('Repository 语义映射发起前事项选择');
@@ -93,6 +99,8 @@ describe('product goal P0 traceability', () => {
     expect(roadmap).toContain('ActionRunWorkItemPicker');
     expect(roadmap).toContain('work_matter_plan');
     expect(roadmap).toContain('buildWorkMatterPlanPrompt');
+    expect(roadmap).toContain('applyWorkbenchMatterPlanApproval');
+    expect(roadmap).toContain('repositoryWrite.path/content/workItemPath');
     expect(skillContent).toContain('Screenshot-confirmed P0 baseline');
     expect(skillContent).toContain('Do not demote these scopes to P1/P2');
     expect(skillContent).toContain('Knowledge tail actions can start a source-bound `knowledge_rewrite` ActionRun');
@@ -112,6 +120,8 @@ describe('product goal P0 traceability', () => {
     expect(skillContent).toContain('shared pre-run matter picker');
     expect(skillContent).toContain('work_matter_plan');
     expect(skillContent).toContain('buildWorkMatterPlanPrompt');
+    expect(skillContent).toContain('applyWorkbenchMatterPlanApproval');
+    expect(skillContent).toContain('repositoryWrite.path/content/workItemPath');
     expect(skillContent).toContain('Artifacts UI also exposes a reuse-kind filter');
     expect(skillContent).toContain('Repository `outputs/assets/index.md`');
     expect(skillContent).toContain('post-run review clues');

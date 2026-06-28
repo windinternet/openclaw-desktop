@@ -26,7 +26,7 @@ import {
   upsertAiActionRun,
 } from '../lib/ai-action-run-store';
 import { loadRepositoryBinding } from '../lib/agentic-repository-store';
-import { loadWorkbenchSnapshot } from '../lib/repository-workbench';
+import { applyWorkbenchMatterPlanApproval, loadWorkbenchSnapshot } from '../lib/repository-workbench';
 import MarkdownView from '../components/MarkdownView';
 import { useStore } from '../lib';
 import type { AiActionApproval, AiActionRun, AiActionRunStatus } from '../lib/types';
@@ -211,9 +211,29 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
 
       setDecisionLoadingId(approval.id);
       try {
-        const updated = await resolveAiActionApprovalWithGateway(activeClient, selectedRun, approval.id, decision);
+        let updated = await resolveAiActionApprovalWithGateway(activeClient, selectedRun, approval.id, decision);
         await upsertAiActionRun(currentInstanceId, updated);
         setRuns((current) => current.map((run) => (run.id === updated.id ? updated : run)));
+
+        if (decision === 'approved' && selectedRun.type === 'work_matter_plan' && approval.repositoryWrite) {
+          const binding = await loadRepositoryBinding(currentInstanceId);
+          if (!binding || binding.status !== 'repo_ready') {
+            throw new Error(t('actions.workMatterPlanWriteNoRepository'));
+          }
+          const writeResult = await applyWorkbenchMatterPlanApproval(binding, {
+            actionRunId: selectedRun.id,
+            workItemPath: selectedRun.workItemPath,
+            repositoryWrite: approval.repositoryWrite,
+          });
+          updated = {
+            ...updated,
+            resultSummary: t('actions.workMatterPlanWritten', { path: writeResult.planPath }),
+            updatedAt: Date.now(),
+          };
+          await upsertAiActionRun(currentInstanceId, updated);
+          setRuns((current) => current.map((run) => (run.id === updated.id ? updated : run)));
+        }
+
         Toast.success(decision === 'approved' ? t('actions.approvedContinue') : t('actions.rejectedCancelled'));
       } catch (err) {
         Toast.error(err instanceof Error ? err.message : t('actions.decisionFailed'));

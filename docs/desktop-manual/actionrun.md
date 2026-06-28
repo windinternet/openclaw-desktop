@@ -58,7 +58,7 @@ ActionRun 默认需要归属工作事项。本地记录会写入 `workItemRequir
 
 Workbench 预览工作事项 Markdown 时，用户可以从该事项直接发起“生成成果”。这会创建 `sourcePage: workbench` 的 `artifact_create` ActionRun，并把当前 `workItemPath` 写入运行记录；如果事项 frontmatter 中存在 `id`，也会同时写入 `workItemId`。事项内容、写入边界和具体仓库规则仍以 Repository Context 与仓库 `AGENTS.md` 为准。
 
-Workbench 预览工作事项 Markdown 时，用户也可以从该事项直接发起“生成计划”。这会创建 `sourcePage: workbench` 的 `work_matter_plan` ActionRun，并把当前 `workItemPath` 与事项 frontmatter `id` 写入运行记录。该 ActionRun 使用 `work-matter-plan.md` 提示词，要求先读取来源事项、关联资料、关联计划、执行记录和关联成果，再提出计划草案与建议 `plans/active/<slug>.md` 路径。写入或更新计划文件前必须返回 `approval_required`；该入口不会静默写计划、更新事项、沉淀成果、更新知识库或写复盘。
+Workbench 预览工作事项 Markdown 时，用户也可以从该事项直接发起“生成计划”。这会创建 `sourcePage: workbench` 的 `work_matter_plan` ActionRun，并把当前 `workItemPath` 与事项 frontmatter `id` 写入运行记录。该 ActionRun 使用 `work-matter-plan.md` 提示词，要求先读取来源事项、关联资料、关联计划、执行记录和关联成果，再提出计划草案与建议 `plans/active/<slug>.md` 路径。写入或更新计划文件前必须返回 `approval_required`，并携带结构化 `repositoryWrite.path/content/workItemPath`；用户在 Action Center 批准后，Desktop 会校验目标只在 `plans/active/`、来源事项只在 `work/`，写入计划 Markdown，并把计划链接回来源事项 `## 关联计划`。该入口不会自动执行计划、沉淀成果、更新知识库、写复盘或移动事项文件。
 
 Artifacts 普通“AI 魔法创建”入口在没有外部来源事项时，会加载当前绑定 Repository 的 Workbench Snapshot，从 `work/active`、`work/someday` 和 `work/completed` 列出已有事项。用户可以在发起前选择关联事项；Desktop 会读取事项 frontmatter `id`，创建 `artifact_create` ActionRun 时写入 `workItemPath` 和 `workItemId`。如果没有合适事项，用户也可以在同一入口输入标题并显式创建 `work/active/YYYY-MM-DD-HHmmss-*.md`，新事项会标记 `source: desktop-action-run`，并自动作为本次 `artifact_create` ActionRun 的事项上下文。如果用户跳过选择和创建，运行仍会按 `workItemRequired: true` 和 `workItemUnassignedReason: pending_work_item_assignment` 进入未归属诊断；该入口不会自动猜测归属或绕过 Repository Context。
 

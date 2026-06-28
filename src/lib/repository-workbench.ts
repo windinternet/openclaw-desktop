@@ -1,6 +1,7 @@
 import type { RepositoryBinding, SemanticSlot } from './agentic-repository';
 import type { ArtifactMeta } from './artifact-types';
 import type { RepositoryMarkdownFile } from './repository-knowledge';
+import type { AiActionRepositoryWrite } from './types';
 
 const WORKBENCH_MATTER_STATUSES = new Set(['active', 'blocked', 'done', 'paused']);
 
@@ -102,6 +103,18 @@ export interface WorkbenchOutputPreservationInput {
   workItemPath: string;
   tailActionId?: string;
   artifact: Pick<ArtifactMeta, 'id' | 'title' | 'type' | 'repositoryOutputPath' | 'repositoryPreviewPath'>;
+}
+
+export interface WorkbenchMatterPlanApprovalInput {
+  actionRunId: string;
+  workItemPath?: string;
+  repositoryWrite: AiActionRepositoryWrite;
+  approvedAt?: Date;
+}
+
+export interface WorkbenchMatterPlanApprovalResult {
+  planPath: string;
+  workItemPath: string;
 }
 
 export interface WorkbenchSnapshot {
@@ -422,6 +435,59 @@ export async function preserveWorkbenchOutputFromTailAction(
   return true;
 }
 
+export async function applyWorkbenchMatterPlanApproval(
+  binding: RepositoryBinding,
+  input: WorkbenchMatterPlanApprovalInput,
+): Promise<WorkbenchMatterPlanApprovalResult> {
+  const planPath = normalizeWritableWorkbenchMarkdownPath(input.repositoryWrite.path);
+  const plansActiveRoot = normalizeWorkbenchRoot(`${binding.paths.plans}/active`);
+  if (!planPath || !isPathWithinRoot(planPath, plansActiveRoot)) {
+    throw new Error(`Approved work-matter plans can only be written under ${plansActiveRoot}/`);
+  }
+
+  const writeWorkItemPath = input.repositoryWrite.workItemPath?.trim();
+  const expectedWorkItemPath = input.workItemPath?.trim();
+  if (writeWorkItemPath && expectedWorkItemPath && writeWorkItemPath !== expectedWorkItemPath) {
+    throw new Error('Approved work-matter plan source does not match the ActionRun work item');
+  }
+
+  const workItemPath = normalizeWritableWorkbenchMarkdownPath(writeWorkItemPath || expectedWorkItemPath || '');
+  const workRoot = normalizeWorkbenchRoot(binding.paths.work);
+  if (!workItemPath || !isPathWithinRoot(workItemPath, workRoot)) {
+    throw new Error(`Approved work-matter plans must be linked to a work item under ${workRoot}/`);
+  }
+
+  const rawPlanContent = input.repositoryWrite.content.trim();
+  if (!rawPlanContent) throw new Error('Approved work-matter plan content is empty');
+
+  const repository = getWorkbenchWriteApi();
+  const existingPlan = await repository.readText(binding.repoPath, planPath);
+  const planContent = addWorkbenchPlanApprovalMetadata(rawPlanContent, {
+    actionRunId: input.actionRunId,
+    workItemPath,
+    approvedAt: input.approvedAt ?? new Date(),
+  });
+  if (existingPlan.trim() && existingPlan.trim() !== planContent.trim()) {
+    throw new Error(`Approved work-matter plan target already exists: ${planPath}`);
+  }
+
+  const workMarkdown = await repository.readText(binding.repoPath, workItemPath);
+  const nextWorkMarkdown = appendWorkbenchMatterPlan(
+    workMarkdown,
+    workItemPath,
+    planPath,
+    planContent,
+    input.actionRunId,
+  );
+
+  await repository.writeText(binding.repoPath, planPath, planContent);
+  if (nextWorkMarkdown !== workMarkdown) {
+    await repository.writeText(binding.repoPath, workItemPath, nextWorkMarkdown);
+  }
+
+  return { planPath, workItemPath };
+}
+
 export async function writeWorkbenchReviewDraft(
   binding: RepositoryBinding,
   input: WorkbenchReviewDraftInput,
@@ -679,6 +745,79 @@ function buildWorkbenchMatterOutputLine(
   const lines = [`- [${escapeMarkdownLinkText(artifact.title)}](${href}) (\`${artifact.id}\`, ${artifact.type})`];
   if (artifact.repositoryPreviewPath) lines.push(`  - preview: ${artifact.repositoryPreviewPath}`);
   return lines;
+}
+
+function appendWorkbenchMatterPlan(
+  markdown: string,
+  workItemPath: string,
+  planPath: string,
+  planContent: string,
+  actionRunId: string,
+): string {
+  const href = relativeWorkbenchMarkdownLink(workItemPath, planPath);
+  if (markdown.includes(planPath) || markdown.includes(href)) return markdown;
+
+  const title = extractTitle(planContent) || planPath.split('/').pop()?.replace(/\.md$/i, '') || '事项计划';
+  const planLine = `- [${escapeMarkdownLinkText(title)}](${href}) - action: \`${actionRunId}\``;
+  const lines = markdown.split(/\r?\n/);
+  const headerIndex = lines.findIndex((line) => line.trim() === '## 关联计划');
+  if (headerIndex === -1) return `${markdown.trimEnd()}\n\n## 关联计划\n\n${planLine}\n`;
+
+  let insertIndex = headerIndex + 1;
+  while (insertIndex < lines.length && lines[insertIndex].trim() === '') insertIndex += 1;
+  while (insertIndex < lines.length && lines[insertIndex].trim() === '- 暂无') {
+    lines.splice(insertIndex, 1);
+    while (insertIndex < lines.length && lines[insertIndex].trim() === '') lines.splice(insertIndex, 1);
+  }
+  const insertLines = [planLine];
+  if (/^#{1,6}\s+/.test(lines[insertIndex]?.trim() ?? '')) insertLines.push('');
+  lines.splice(insertIndex, 0, ...insertLines);
+  return lines.join('\n').trimEnd();
+}
+
+function addWorkbenchPlanApprovalMetadata(
+  markdown: string,
+  input: { actionRunId: string; workItemPath: string; approvedAt: Date },
+): string {
+  const fields = {
+    source: 'work_matter_plan',
+    workItemPath: input.workItemPath,
+    actionRunId: input.actionRunId,
+    approval: 'approved',
+    approvedAt: input.approvedAt.toISOString(),
+  };
+  return upsertMarkdownFrontmatter(markdown.trim(), fields);
+}
+
+function upsertMarkdownFrontmatter(markdown: string, fields: Record<string, string>): string {
+  const lines = markdown.split(/\r?\n/);
+  const fieldEntries = Object.entries(fields);
+  if (lines[0]?.trim() === '---') {
+    const endIndex = lines.findIndex((line, index) => index > 0 && line.trim() === '---');
+    if (endIndex > 0) {
+      const frontmatter = lines.slice(1, endIndex);
+      for (const [key, value] of fieldEntries) {
+        const existingIndex = frontmatter.findIndex((line) => new RegExp(`^${escapeRegExp(key)}\\s*:`).test(line));
+        if (existingIndex === -1) frontmatter.push(`${key}: ${value}`);
+        else frontmatter[existingIndex] = `${key}: ${value}`;
+      }
+      return ['---', ...frontmatter, '---', ...lines.slice(endIndex + 1)].join('\n').trimEnd();
+    }
+  }
+
+  return ['---', ...fieldEntries.map(([key, value]) => `${key}: ${value}`), '---', '', markdown].join('\n').trimEnd();
+}
+
+function normalizeWorkbenchRoot(value: string): string {
+  return value.trim().replace(/^\/+|\/+$/g, '');
+}
+
+function isPathWithinRoot(path: string, root: string): boolean {
+  return Boolean(path && root && path === root) || path.startsWith(`${root}/`);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function parseTailActionIndex(id: string): number | null {
