@@ -109,7 +109,7 @@ OpenClaw Desktop
 5. **Knowledge 导入、消化、健康检查是 P0**
    - 导入中心：支持拖文件、粘贴文本、剪藏 URL、选择文件夹；原始内容先进入 `sources/`，自动生成来源元数据。
    - 消化队列：新增“未消化资料”视图；用户点击“消化为知识”后，AI 先提出计划，批准后写入 `wiki/`，更新 `wiki/index.md` 和 `wiki/log.md`。
-   - 健康检查：定期检查孤立资料、过期索引、断链、没有来源引用的 Wiki、长期未复盘项目、相互矛盾记录；结果进入 `reviews/weekly/`。
+   - 健康检查：定期检查孤立资料、过期索引、断链、没有来源引用的 Wiki、长期未复盘事项、相互矛盾记录；结果进入 `reviews/weekly/`。
 
 6. **事务推进闭环是 P0**
    - 每个工作事项必须有唯一 ID。
@@ -236,12 +236,12 @@ HTML 产物是特色能力：
 - 未消化资料队列。
 - 资料消化为 Wiki。
 - 自动更新 `wiki/index.md` 和 `wiki/log.md`。
-- 健康检查：孤立资料、断链、过期索引、无来源 Wiki、长期未复盘项目。
+- 健康检查：孤立资料、断链、过期索引、无来源 Wiki、长期未复盘事项。
 
 当前代码事实：
 
-- `loadKnowledgeSnapshot` 会基于 `sources/`、`wiki/`、`wiki/index.md` 和 Wiki 内部链接生成只读 `health` 报告。
-- 第一片健康检查已覆盖孤立资料、未进入索引的 Wiki、陈旧索引条目、知识库内断链、没有来源引用的 Wiki。
+- `loadKnowledgeSnapshot` 会基于 `sources/`、`wiki/`、`wiki/index.md`、Wiki 内部链接、`work/active/`、`work/someday/` 和 `reviews/weekly/` 生成只读 `health` 报告。
+- 第一片健康检查已覆盖孤立资料、未进入索引的 Wiki、陈旧索引条目、知识库内断链、没有来源引用的 Wiki 和长期未复盘事项。
 - Knowledge 页面新增“健康检查”视图，`/knowledge?section=health` 会直接打开问题列表。
 - Dashboard 会把知识健康问题作为 `knowledgeUpdates` 展示，并通过 `/knowledge?section=health` 跳转到 Knowledge 健康检查。
 - `loadKnowledgeSnapshot` 现在会生成 `undigestedSources`，把未出现在索引、也未被 Wiki 引用的资料源列为未消化资料。
@@ -252,6 +252,7 @@ HTML 产物是特色能力：
 - Knowledge 页面新增“拖拽导入”入口，可把本地 Markdown/TXT 文本文件拖入 Knowledge 页面，复用 `source: desktop-file` 写入 `sources/imported/` 并进入未消化资料队列。
 - Knowledge 页面新增“剪藏 URL”入口，可把网页链接和可选摘录/备注写入 `sources/imported/YYYY-MM-DD-HHmmss-*.md`，frontmatter 标记 `source: desktop-url` 和 `url`；当前不后台抓取网页正文。
 - Knowledge 页面新增“写入周复盘”入口，可把当前健康报告写入 `reviews/weekly/YYYY-MM-DD-knowledge-health.md`，让健康检查进入复盘事实源。
+- 长期未复盘事项会检查 `work/active/` 与 `work/someday/` 中超过阈值且没有近期 `reviews/weekly/` 复盘引用的工作事项。
 - 当前健康检查不自动修复索引、Wiki 或资料来源；Office/PDF/二进制内容导入仍是 P0 后续。
 
 验收：

@@ -67,7 +67,8 @@ export type KnowledgeHealthIssueKind =
   | 'unindexed_wiki'
   | 'stale_index_entry'
   | 'broken_knowledge_link'
-  | 'wiki_without_source_reference';
+  | 'wiki_without_source_reference'
+  | 'long_unreviewed_work_item';
 
 export interface KnowledgeHealthIssue {
   id: string;
@@ -129,15 +130,33 @@ interface KnowledgeGitApi {
   gitLog?: (repoPath: string, relativePath: string, limit?: number) => Promise<RepositoryGitLogEntry[]>;
 }
 
-export async function loadKnowledgeSnapshot(binding: RepositoryBinding): Promise<KnowledgeSnapshot> {
+export interface KnowledgeSnapshotOptions {
+  now?: Date;
+  unreviewedAfterDays?: number;
+}
+
+export async function loadKnowledgeSnapshot(
+  binding: RepositoryBinding,
+  options: KnowledgeSnapshotOptions = {},
+): Promise<KnowledgeSnapshot> {
   const repository = getKnowledgeReadApi();
   const mapping = binding.knowledge;
-  const [sources, rawWiki, indexMarkdown, logMarkdown] = await Promise.all([
-    repository.listMarkdown(binding.repoPath, mapping.sourceRoot),
-    repository.listMarkdown(binding.repoPath, mapping.wikiRoot),
-    repository.readText(binding.repoPath, mapping.indexPath),
-    repository.readText(binding.repoPath, mapping.logPath),
-  ]);
+  const [sources, rawWiki, indexMarkdown, logMarkdown, activeWorkItems, somedayWorkItems, weeklyReviews] =
+    await Promise.all([
+      repository.listMarkdown(binding.repoPath, mapping.sourceRoot),
+      repository.listMarkdown(binding.repoPath, mapping.wikiRoot),
+      repository.readText(binding.repoPath, mapping.indexPath),
+      repository.readText(binding.repoPath, mapping.logPath),
+      safeListMarkdown(repository, binding.repoPath, `${binding.paths.work}/active`),
+      safeListMarkdown(repository, binding.repoPath, `${binding.paths.work}/someday`),
+      safeListMarkdown(repository, binding.repoPath, `${binding.paths.reviews}/weekly`),
+    ]);
+  const weeklyReviewContents = await Promise.all(
+    weeklyReviews.map(async (file) => ({
+      file,
+      content: await safeReadText(repository, binding.repoPath, file.path),
+    })),
+  );
   const wiki = rawWiki.filter((file) => !isNestedKnowledgeSource(binding, file.path));
   const wikiContents = await Promise.all(
     wiki.map(async (file) => ({
@@ -209,6 +228,10 @@ export async function loadKnowledgeSnapshot(binding: RepositoryBinding): Promise
       indexEntries,
       linkedKnowledgePaths,
       brokenKnowledgeLinks,
+      workItems: [...activeWorkItems, ...somedayWorkItems],
+      weeklyReviewContents,
+      now: options.now ?? new Date(),
+      unreviewedAfterDays: options.unreviewedAfterDays ?? 14,
     }),
   };
 }
@@ -490,6 +513,7 @@ export function buildKnowledgeHealthReview(input: KnowledgeHealthReviewInput): K
     '- [ ] 消化孤立资料，或把不再需要的资料标记为归档候选。',
     '- [ ] 更新 `wiki/index.md`，移除或修正陈旧索引。',
     '- [ ] 复查本周新增 Wiki 是否引用了原始资料源。',
+    '- [ ] 为长期未复盘事项补一条 `reviews/weekly/` 复盘，或把事项状态调整为完成/暂停。',
     '- [ ] 必要时发起 Knowledge ActionRun，写入 Wiki、索引和日志。',
     '',
   ].join('\n');
@@ -576,6 +600,10 @@ function buildKnowledgeHealthReport(options: {
   indexEntries: KnowledgeIndexEntry[];
   linkedKnowledgePaths: Set<string>;
   brokenKnowledgeLinks: KnowledgeHealthIssue[];
+  workItems: RepositoryMarkdownFile[];
+  weeklyReviewContents: Array<{ file: RepositoryMarkdownFile; content: string }>;
+  now: Date;
+  unreviewedAfterDays: number;
 }): KnowledgeHealthReport {
   const mapping = options.binding.knowledge;
   const sourcePaths = new Set(options.sources.map((file) => file.path));
@@ -645,6 +673,16 @@ function buildKnowledgeHealthReport(options: {
     });
   }
 
+  issues.push(
+    ...buildLongUnreviewedWorkIssues({
+      binding: options.binding,
+      workItems: options.workItems,
+      weeklyReviewContents: options.weeklyReviewContents,
+      now: options.now,
+      unreviewedAfterDays: options.unreviewedAfterDays,
+    }),
+  );
+
   const sortedIssues = dedupeKnowledgeHealthIssues(issues).sort((a, b) => {
     const severityDiff = severityRank(b.severity) - severityRank(a.severity);
     if (severityDiff !== 0) return severityDiff;
@@ -662,6 +700,48 @@ function buildKnowledgeHealthReport(options: {
   };
 }
 
+function buildLongUnreviewedWorkIssues(options: {
+  binding: RepositoryBinding;
+  workItems: RepositoryMarkdownFile[];
+  weeklyReviewContents: Array<{ file: RepositoryMarkdownFile; content: string }>;
+  now: Date;
+  unreviewedAfterDays: number;
+}): KnowledgeHealthIssue[] {
+  const threshold = options.now.getTime() - options.unreviewedAfterDays * 24 * 60 * 60 * 1000;
+  return options.workItems
+    .filter((file) => file.updatedAt > 0 && file.updatedAt <= threshold)
+    .filter((file) => !hasRecentReviewForWorkItem(file, options.weeklyReviewContents))
+    .map((file) => ({
+      id: `long-unreviewed-work:${file.path}`,
+      kind: 'long_unreviewed_work_item',
+      severity: 'warning',
+      title: '长期未复盘事项',
+      detail: `工作事项超过 ${options.unreviewedAfterDays} 天没有近期复盘。`,
+      path: file.path,
+      targetPath: `${options.binding.paths.reviews}/weekly/`,
+      updatedAt: file.updatedAt,
+    }));
+}
+
+function hasRecentReviewForWorkItem(
+  workItem: RepositoryMarkdownFile,
+  reviewContents: Array<{ file: RepositoryMarkdownFile; content: string }>,
+): boolean {
+  return reviewContents.some(
+    (review) => review.file.updatedAt >= workItem.updatedAt && reviewReferencesWorkItem(review, workItem.path),
+  );
+}
+
+function reviewReferencesWorkItem(
+  review: { file: RepositoryMarkdownFile; content: string },
+  workItemPath: string,
+): boolean {
+  if (review.content.includes(workItemPath)) return true;
+  return extractMarkdownLinks(review.content)
+    .map((href) => normalizeRepositoryLink(review.file.path, href))
+    .some((path) => path === workItemPath);
+}
+
 function dedupeKnowledgeHealthIssues(issues: KnowledgeHealthIssue[]): KnowledgeHealthIssue[] {
   const seen = new Set<string>();
   const result: KnowledgeHealthIssue[] = [];
@@ -677,6 +757,26 @@ function severityRank(severity: KnowledgeHealthIssue['severity']): number {
   if (severity === 'critical') return 3;
   if (severity === 'warning') return 2;
   return 1;
+}
+
+async function safeListMarkdown(
+  repository: KnowledgeReadApi,
+  repoPath: string,
+  directory: string,
+): Promise<RepositoryMarkdownFile[]> {
+  try {
+    return await repository.listMarkdown(repoPath, directory);
+  } catch {
+    return [];
+  }
+}
+
+async function safeReadText(repository: KnowledgeReadApi, repoPath: string, relativePath: string): Promise<string> {
+  try {
+    return await repository.readText(repoPath, relativePath);
+  } catch {
+    return '';
+  }
 }
 
 export function buildKnowledgeRewritePrompt(options: {

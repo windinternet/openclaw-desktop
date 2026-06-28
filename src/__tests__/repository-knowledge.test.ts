@@ -405,6 +405,76 @@ describe('repository knowledge', () => {
     expect(snapshot.undigestedSources.map((file) => file.path)).toEqual(['sources/orphan.md']);
   });
 
+  it('flags long-unreviewed work items in knowledge health', async () => {
+    const now = new Date('2026-06-28T00:00:00.000Z');
+    const oldActive = {
+      path: 'work/active/old.md',
+      name: 'old.md',
+      size: 20,
+      updatedAt: Date.parse('2026-06-01T00:00:00.000Z'),
+    };
+    const freshActive = {
+      path: 'work/active/fresh.md',
+      name: 'fresh.md',
+      size: 20,
+      updatedAt: Date.parse('2026-06-24T00:00:00.000Z'),
+    };
+    const reviewedSomeday = {
+      path: 'work/someday/reviewed.md',
+      name: 'reviewed.md',
+      size: 20,
+      updatedAt: Date.parse('2026-05-20T00:00:00.000Z'),
+    };
+    const weeklyReview = {
+      path: 'reviews/weekly/2026-06-27.md',
+      name: '2026-06-27.md',
+      size: 20,
+      updatedAt: Date.parse('2026-06-27T00:00:00.000Z'),
+    };
+    const listMarkdown = vi.fn(async (_repoPath: string, directory: string) => {
+      if (directory === 'work/active') return [oldActive, freshActive];
+      if (directory === 'work/someday') return [reviewedSomeday];
+      if (directory === 'reviews/weekly') return [weeklyReview];
+      return [];
+    });
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'wiki/index.md') return '# Knowledge Index';
+      if (relativePath === 'wiki/log.md') return '# Wiki Log';
+      if (relativePath === weeklyReview.path) {
+        return '# 周复盘\n\n- 已复盘 [Reviewed](../../work/someday/reviewed.md)';
+      }
+      return '';
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { listMarkdown, readText },
+      },
+    });
+
+    const snapshot = await loadKnowledgeSnapshot(
+      {
+        ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+        status: 'repo_ready',
+      },
+      { now, unreviewedAfterDays: 14 },
+    );
+
+    expect(listMarkdown).toHaveBeenCalledWith('/repo', 'work/active');
+    expect(listMarkdown).toHaveBeenCalledWith('/repo', 'work/someday');
+    expect(listMarkdown).toHaveBeenCalledWith('/repo', 'reviews/weekly');
+    expect(snapshot.health.counts.total).toBe(1);
+    expect(snapshot.health.issues).toEqual([
+      expect.objectContaining({
+        id: 'long-unreviewed-work:work/active/old.md',
+        kind: 'long_unreviewed_work_item',
+        severity: 'warning',
+        title: '长期未复盘事项',
+        path: 'work/active/old.md',
+        targetPath: 'reviews/weekly/',
+      }),
+    ]);
+  });
+
   it('builds and writes weekly knowledge health reviews', async () => {
     const now = new Date('2026-06-28T07:08:09.000Z');
     const health = {
@@ -471,6 +541,7 @@ describe('repository knowledge', () => {
         '- [ ] 消化孤立资料，或把不再需要的资料标记为归档候选。',
         '- [ ] 更新 `wiki/index.md`，移除或修正陈旧索引。',
         '- [ ] 复查本周新增 Wiki 是否引用了原始资料源。',
+        '- [ ] 为长期未复盘事项补一条 `reviews/weekly/` 复盘，或把事项状态调整为完成/暂停。',
         '- [ ] 必要时发起 Knowledge ActionRun，写入 Wiki、索引和日志。',
         '',
       ].join('\n'),

@@ -21,6 +21,7 @@ describe('knowledge digest queue', () => {
     const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
 
     expect(repositoryKnowledge).toContain('undigestedSources');
+    expect(repositoryKnowledge).toContain('long_unreviewed_work_item');
     expect(panel).toContain("| 'digest'");
     expect(panel).toContain('snapshot?.undigestedSources');
     expect(panel).toContain("t('knowledge.digestQueue')");
@@ -86,23 +87,27 @@ describe('knowledge digest queue', () => {
     expect(manual).toContain('导入文件夹');
     expect(manual).toContain('拖拽导入');
     expect(manual).toContain('写入周复盘');
+    expect(manual).toContain('长期未复盘事项');
     expect(roadmap).toContain('Knowledge 页面新增“导入文本”入口');
     expect(roadmap).toContain('Knowledge 页面新增“剪藏 URL”入口');
     expect(roadmap).toContain('Knowledge 页面新增“导入文件”入口');
     expect(roadmap).toContain('Knowledge 页面新增“导入文件夹”入口');
     expect(roadmap).toContain('Knowledge 页面新增“拖拽导入”入口');
     expect(roadmap).toContain('Knowledge 页面新增“写入周复盘”入口');
+    expect(roadmap).toContain('长期未复盘事项');
     expect(plans).toContain('导入文本入口');
     expect(plans).toContain('剪藏 URL 入口');
     expect(plans).toContain('导入文件入口');
     expect(plans).toContain('导入文件夹入口');
     expect(plans).toContain('拖拽导入');
     expect(plans).toContain('写入周复盘');
+    expect(plans).toContain('长期未复盘事项');
     expect(selfKnowledge).toContain('import pasted text into `sources/imported/`');
     expect(selfKnowledge).toContain('clip URLs into `sources/imported/`');
     expect(selfKnowledge).toContain('import local text files into `sources/imported/`');
     expect(selfKnowledge).toContain('import selected folders into `sources/imported/`');
     expect(selfKnowledge).toContain('drop local text files into `sources/imported/`');
     expect(selfKnowledge).toContain('write knowledge health reviews into `reviews/weekly/`');
+    expect(selfKnowledge).toContain('long-unreviewed work items');
   });
 });
