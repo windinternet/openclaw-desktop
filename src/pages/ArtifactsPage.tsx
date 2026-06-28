@@ -43,14 +43,24 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
     artifactTailActionRun && artifactTailActionRun.id === artifactTailActionRunId
       ? artifactTailActionRun.resultSummary
       : undefined;
+  const artifactTailActionRunAssistantResponse =
+    artifactTailActionRun && artifactTailActionRun.id === artifactTailActionRunId
+      ? artifactTailActionRun.lastAssistantResponse
+      : undefined;
   const artifactTailActionInitialInput = useMemo(() => {
     if (!artifactTailActionContext?.workItemPath) return undefined;
     return buildArtifactOutputPreservationPrompt({
       workItemPath: artifactTailActionContext.workItemPath,
       actionRunOutputId: artifactTailActionRunId ? `action-run-output:${artifactTailActionRunId}` : undefined,
       resultSummary: artifactTailActionRunResultSummary,
+      assistantResponse: artifactTailActionRunAssistantResponse,
     });
-  }, [artifactTailActionContext?.workItemPath, artifactTailActionRunId, artifactTailActionRunResultSummary]);
+  }, [
+    artifactTailActionContext?.workItemPath,
+    artifactTailActionRunAssistantResponse,
+    artifactTailActionRunId,
+    artifactTailActionRunResultSummary,
+  ]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [reuseKindFilter, setReuseKindFilter] = useState<ArtifactReuseKindFilter>('all');

@@ -49,4 +49,26 @@ describe('artifact output preservation prompt', () => {
     expect(prompt).toContain('- outputs/release-checklist.xlsx - Excel 验收表');
     expect(prompt).toContain('请在产物说明中保留来源事项、来源执行记录和价值摘要。');
   });
+
+  it('uses the latest assistant response as an additional candidate source', () => {
+    const prompt = buildArtifactOutputPreservationPrompt({
+      workItemPath: 'work/active/release.md',
+      actionRunOutputId: 'action-run-output:run-plan',
+      resultSummary: '执行完成，详情见 assistant 回复。',
+      assistantResponse: [
+        '本次生成了一个可交互 HTML 成果。',
+        '<artifact>',
+        '{"title":"发布验收仪表盘","type":"dashboard","contentSummary":"HTML 交互仪表盘"}',
+        '<!doctype html><html><body>ok</body></html>',
+        '</artifact>',
+        '',
+        '## 输出',
+        '- outputs/release-notes.docx - Word 版本发布说明',
+      ].join('\n'),
+    });
+
+    expect(prompt).toContain('候选成果：');
+    expect(prompt).toContain('- 发布验收仪表盘 · dashboard · HTML 交互仪表盘');
+    expect(prompt).toContain('- outputs/release-notes.docx - Word 版本发布说明');
+  });
 });

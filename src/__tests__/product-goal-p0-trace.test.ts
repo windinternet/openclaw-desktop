@@ -64,10 +64,14 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('findLatestPlanExecutionRun');
     expect(source).toContain('计划执行成果沉淀入口');
     expect(source).toContain('计划执行成果候选提取');
+    expect(source).toContain('计划执行成果候选来源扩展');
     expect(source).toContain('ActionRun 成果沉淀后的 Dashboard 去重');
     expect(source).toContain('shouldOfferPlanExecutionOutputPreservation');
     expect(source).toContain('extractActionRunOutputCandidates');
     expect(source).toContain('buildArtifactOutputPreservationPrompt');
+    expect(source).toContain('lastAssistantResponse');
+    expect(source).toContain('parseArtifactsFromText');
+    expect(source).toContain('<artifact>');
     expect(source).toContain('action-run-output:<runId>');
     expect(source).toContain('artifact.source.type === "action_run"');
     expect(source).toContain('计划执行知识更新入口');
@@ -123,6 +127,9 @@ describe('product goal P0 traceability', () => {
     expect(plans).toContain('shouldOfferPlanExecutionOutputPreservation');
     expect(plans).toContain('extractActionRunOutputCandidates');
     expect(plans).toContain('buildArtifactOutputPreservationPrompt');
+    expect(plans).toContain('lastAssistantResponse');
+    expect(plans).toContain('parseArtifactsFromText');
+    expect(plans).toContain('<artifact>');
     expect(plans).toContain('action-run-output:<runId>');
     expect(plans).toContain('source.type=action_run');
     expect(plans).toContain('计划执行知识更新入口');
@@ -169,6 +176,9 @@ describe('product goal P0 traceability', () => {
     expect(roadmap).toContain('shouldOfferPlanExecutionOutputPreservation');
     expect(roadmap).toContain('extractActionRunOutputCandidates');
     expect(roadmap).toContain('buildArtifactOutputPreservationPrompt');
+    expect(roadmap).toContain('lastAssistantResponse');
+    expect(roadmap).toContain('parseArtifactsFromText');
+    expect(roadmap).toContain('<artifact>');
     expect(roadmap).toContain('action-run-output:<runId>');
     expect(roadmap).toContain('source.type=action_run');
     expect(roadmap).toContain('计划执行知识更新入口');
@@ -217,6 +227,9 @@ describe('product goal P0 traceability', () => {
     expect(skillContent).toContain('Preserve Output');
     expect(skillContent).toContain('extractActionRunOutputCandidates');
     expect(skillContent).toContain('buildArtifactOutputPreservationPrompt');
+    expect(skillContent).toContain('lastAssistantResponse');
+    expect(skillContent).toContain('parseArtifactsFromText');
+    expect(skillContent).toContain('<artifact>');
     expect(skillContent).toContain('explicit output candidates');
     expect(skillContent).toContain('source.type=action_run');
     expect(skillContent).toContain('shouldOfferPlanExecutionKnowledgeUpdate');

@@ -51,6 +51,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('Preserve Output');
     expect(skillContent).toContain('extractActionRunOutputCandidates');
     expect(skillContent).toContain('buildArtifactOutputPreservationPrompt');
+    expect(skillContent).toContain('lastAssistantResponse');
+    expect(skillContent).toContain('parseArtifactsFromText');
+    expect(skillContent).toContain('<artifact>');
     expect(skillContent).toContain('explicit output candidates');
     expect(skillContent).toContain('shouldOfferPlanExecutionKnowledgeUpdate');
     expect(skillContent).toContain('`action-run-knowledge:<runId>`');

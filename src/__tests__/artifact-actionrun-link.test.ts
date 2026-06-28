@@ -62,7 +62,11 @@ describe('artifact ActionRun linkage', () => {
     expect(artifacts).toContain('loadAiActionRuns(currentInstanceId)');
     expect(artifacts).toContain('artifactTailActionRun');
     expect(artifacts).toContain('artifactTailActionRun.id === artifactTailActionRunId');
+    expect(artifacts).toContain('artifactTailActionRunAssistantResponse');
+    expect(artifacts).toContain('assistantResponse: artifactTailActionRunAssistantResponse');
     expect(prompt).toContain('extractActionRunOutputCandidates');
+    expect(prompt).toContain('assistantResponse');
+    expect(prompt).toContain('parseArtifactsFromText');
     expect(prompt).toContain('候选成果');
     expect(prompt).toContain('请根据来源事项');
     expect(artifacts).toContain('artifactTailActionRunId');
