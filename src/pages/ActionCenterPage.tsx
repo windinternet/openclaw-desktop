@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Button,
   Card,
@@ -94,6 +94,12 @@ const RUN_TITLE_KEYS: Record<string, string> = {
   plan_execute: 'actions.typePlanExecute',
 };
 
+function getActionCenterSearchRunId(search: string): string | null {
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  const runId = params.get('runId')?.trim() ?? '';
+  return runId || null;
+}
+
 interface EmbeddedPageProps {
   embedded?: boolean;
   onHeaderActionsChange?: (actions: ReactNode | null) => void;
@@ -102,6 +108,7 @@ interface EmbeddedPageProps {
 export default function ActionCenterPage({ embedded = false, onHeaderActionsChange }: EmbeddedPageProps = {}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const activeClient = useStore((s) => s.activeClient);
@@ -116,6 +123,7 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
   const [workItemOptions, setWorkItemOptions] = useState<RepositoryMarkdownFile[]>([]);
   const [selectedAssignmentPath, setSelectedAssignmentPath] = useState('');
   const [assignmentLoading, setAssignmentLoading] = useState(false);
+  const selectedSearchRunId = useMemo(() => getActionCenterSearchRunId(location.search), [location.search]);
 
   const selectedRun = useMemo(
     () => runs.find((run) => run.id === selectedRunId) ?? runs[0] ?? null,
@@ -160,6 +168,12 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
       void loadRuns();
     });
   }, [actionRunsVersion, loadRuns]);
+
+  useEffect(() => {
+    if (!selectedSearchRunId) return;
+    if (!runs.some((run) => run.id === selectedSearchRunId)) return;
+    setSelectedRunId(selectedSearchRunId);
+  }, [runs, selectedSearchRunId]);
 
   useEffect(() => {
     let cancelled = false;

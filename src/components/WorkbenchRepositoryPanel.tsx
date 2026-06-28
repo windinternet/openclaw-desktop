@@ -556,7 +556,7 @@ export default function WorkbenchRepositoryPanel({
 
       useStore.getState().fetchSessions();
       Toast.success(t('workbench.generatePlanStarted'));
-      navigate('/actions');
+      navigate(`/actions?runId=${encodeURIComponent(latestRun.id)}`);
     } catch (err) {
       const error = err instanceof Error ? err.message : t('workbench.generatePlanFailed');
       await upsertAiActionRun(binding.gatewayInstanceId, {
@@ -640,7 +640,7 @@ export default function WorkbenchRepositoryPanel({
 
       useStore.getState().fetchSessions();
       Toast.success(t('workbench.executePlanStarted'));
-      navigate('/actions');
+      navigate(`/actions?runId=${encodeURIComponent(latestRun.id)}`);
     } catch (err) {
       const error = err instanceof Error ? err.message : t('workbench.executePlanFailed');
       await upsertAiActionRun(binding.gatewayInstanceId, {
@@ -1124,6 +1124,9 @@ export default function WorkbenchRepositoryPanel({
         <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }}>
           {t('workbench.latestPlanExecution')}: {summary || t('workbench.planExecutionNoSummary')}
         </Text>
+        <Button size="small" type="tertiary" onClick={() => navigate(`/actions?runId=${encodeURIComponent(run.id)}`)}>
+          {t('workbench.openPlanExecutionRuns')}
+        </Button>
       </Space>
     );
   };

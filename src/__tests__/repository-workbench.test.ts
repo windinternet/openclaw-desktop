@@ -1513,7 +1513,10 @@ describe('repository workbench', () => {
     expect(source).toContain('workItemPath: selectedWorkItemPath');
     expect(source).toContain("t('workbench.generatePlanForMatter')");
     expect(source).toContain("t('workbench.generatePlanActionTitle')");
-    expect(source).toContain("navigate('/actions')");
+    expect(source).toContain('`/actions?runId=${encodeURIComponent(latestRun.id)}`');
+    expect(actionCenterPage).toContain('getActionCenterSearchRunId');
+    expect(actionCenterPage).toContain('selectedSearchRunId');
+    expect(actionCenterPage).toContain('setSelectedRunId(selectedSearchRunId)');
     expect(promptSource).toContain('workMatterPlanTemplate');
     expect(promptSource).toContain('buildWorkMatterPlanPrompt');
     expect(actionCenterPage).toContain("work_matter_plan: 'actions.typeWorkMatterPlan'");
@@ -1538,7 +1541,7 @@ describe('repository workbench', () => {
     expect(source).toContain('workItemPath: safeSelectedPlanWorkItemPath');
     expect(source).toContain("t('workbench.executePlanForMatter')");
     expect(source).toContain("t('workbench.executePlanActionTitle')");
-    expect(source).toContain("navigate('/actions')");
+    expect(source).toContain('`/actions?runId=${encodeURIComponent(latestRun.id)}`');
     expect(promptSource).toContain('planExecuteTemplate');
     expect(promptSource).toContain('buildPlanExecutePrompt');
     expect(zh).toContain('"executePlanForMatter": "执行计划"');
@@ -1554,7 +1557,7 @@ describe('repository workbench', () => {
     expect(source).toContain('renderPlanExecutionState');
     expect(source).toContain("t('workbench.latestPlanExecution')");
     expect(source).toContain("t('workbench.openPlanExecutionRuns')");
-    expect(source).toContain("navigate('/actions')");
+    expect(source).toContain('`/actions?runId=${encodeURIComponent(run.id)}`');
     expect(source).toContain('setActivityRuns(runs)');
     expect(source).not.toContain('setActivityRuns(runs.slice(0, 5))');
     expect(zh).toContain('"latestPlanExecution": "最近执行"');

@@ -351,6 +351,7 @@ HTML 产物是特色能力：
 - 该入口创建 `plan_execute` ActionRun，`sourcePage: workbench`，并使用 `buildPlanExecutePrompt` / `plan-execute.md` 带入 `planPath`、计划内容，以及计划元数据中通过 `work/(active|completed|someday)/*.md` 边界校验的 `workItemPath` 和来源事项内容。
 - 如果计划有关联且安全的来源事项，`plan_execute` 会写入 `workItemPath` / `workItemId`，终态后复用现有 ActionRun 仓库镜像、事项 `## 执行记录` 和 `## 收尾动作` 机制；没有来源事项或来源事项路径不在工作事项边界内时仍进入未归属诊断，不猜测事项。
 - 计划执行状态观测已接入 Workbench：`findLatestPlanExecutionRun` 会从 `plan_execute` ActionRun 输入中的独立 `planPath` 行关联活跃计划，并在活跃计划列表和选中计划预览头部展示最近执行状态、摘要和进入 Action Center 的入口。
+- Workbench 发起 `work_matter_plan` / `plan_execute` 后会打开 `/actions?runId=<run>`；计划列表和计划预览里的最近执行入口也会携带对应 `runId`。Action Center 会读取 URL 中的 `runId` 并选中对应运行，让用户直接看到这次非聊天式 AI 操作的审批、状态、结果或错误。
 - 计划执行成果沉淀入口已接入 Workbench：`shouldOfferPlanExecutionOutputPreservation` 会在最近一次 `plan_execute` 已完成、有 `resultSummary`、有安全 `workItemPath` 且没有 `artifactIds` 时，在计划预览头部显示“沉淀成果 / Preserve Output”。
 - “沉淀成果 / Preserve Output”会打开 Artifacts 的 `tailAction=output` 上下文，携带 `tailActionId=action-run-output:<runId>` 和来源 `workItemPath`；Artifacts 的 AI 创建提示会保留来源事项和来源执行记录。
 - 计划执行成果候选提取已接入：Artifacts 从 `action-run-output:<runId>` 进入成果沉淀时，会加载来源 ActionRun，并通过 `buildArtifactOutputPreservationPrompt` / `extractActionRunOutputCandidates` 把 `resultSummary`、`lastAssistantResponse`、`parseArtifactsFromText` 解析出的 `<artifact>` 块，以及显式输出段落中的文件、链接、HTML、文档、表格、演示等候选成果带入 AI 创建初始提示；这只是提示上下文，不自动创建 Artifact 或 Repository output，不读取任意本地文件、不执行文件、不授予权限。

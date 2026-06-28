@@ -44,6 +44,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('/workbench?view=plans&planPath=<plan>');
     expect(skillContent).toContain('only accepts `plans/active/*.md` plan paths');
     expect(skillContent).toContain('explicitly choose Execute Plan');
+    expect(skillContent).toContain('/actions?runId=<run>');
+    expect(skillContent).toContain('Action Center reads that `runId` from the URL');
+    expect(skillContent).toContain('selects the matching ActionRun');
     expect(skillContent).toContain('plan_execute');
     expect(skillContent).toContain('buildPlanExecutePrompt');
     expect(skillContent).toContain('Terminal `plan_execute` runs reuse the existing ActionRun repository summary');

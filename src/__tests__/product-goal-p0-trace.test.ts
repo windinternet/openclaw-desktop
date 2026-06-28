@@ -59,6 +59,9 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('/workbench?view=plans&planPath=<plan>');
     expect(source).toContain('plans 视图自动打开一次该计划预览');
     expect(source).toContain('执行计划');
+    expect(source).toContain('ActionRun 详情定位');
+    expect(source).toContain('/actions?runId=<run>');
+    expect(source).toContain('自动选中对应 ActionRun');
     expect(source).toContain('work_matter_plan');
     expect(source).toContain('plan_execute');
     expect(source).toContain('applyWorkbenchMatterPlanApproval');
@@ -171,6 +174,8 @@ describe('product goal P0 traceability', () => {
     expect(plans).toContain('事项计划审批写入与互链');
     expect(plans).toContain('事项计划审批后进入计划预览');
     expect(plans).toContain('/workbench?view=plans&planPath=<plan>');
+    expect(plans).toContain('ActionRun 详情定位');
+    expect(plans).toContain('/actions?runId=<run>');
     expect(plans).toContain('活跃计划发起执行 ActionRun');
     expect(plans).toContain('work_matter_plan');
     expect(plans).toContain('plan_execute');
@@ -253,6 +258,8 @@ describe('product goal P0 traceability', () => {
     expect(roadmap).toContain('plan_execute');
     expect(roadmap).toContain('/workbench?view=plans&planPath=<plan>');
     expect(roadmap).toContain('plans 视图自动打开一次该计划预览');
+    expect(roadmap).toContain('/actions?runId=<run>');
+    expect(roadmap).toContain('选中对应运行');
     expect(roadmap).toContain('buildWorkMatterPlanPrompt');
     expect(roadmap).toContain('buildPlanExecutePrompt');
     expect(roadmap).toContain('计划执行状态观测');
@@ -339,6 +346,8 @@ describe('product goal P0 traceability', () => {
     expect(skillContent).toContain('/workbench?view=plans&planPath=<plan>');
     expect(skillContent).toContain('only accepts `plans/active/*.md` plan paths');
     expect(skillContent).toContain('explicitly choose Execute Plan');
+    expect(skillContent).toContain('/actions?runId=<run>');
+    expect(skillContent).toContain('selects the matching ActionRun');
     expect(skillContent).toContain('plan_execute');
     expect(skillContent).toContain('buildWorkMatterPlanPrompt');
     expect(skillContent).toContain('buildPlanExecutePrompt');
