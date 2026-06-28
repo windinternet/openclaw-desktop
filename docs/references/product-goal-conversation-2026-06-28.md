@@ -693,7 +693,7 @@ HTML 的独特优势：
 
 - “每次 AI 执行必须归属事项”的全局 UI / 协议强约束仍待补齐。
 - 尾动作仍需要升级为更具体的处理入口，例如预填状态更新、成果沉淀、知识库更新和复盘草稿。
-- 成果沉淀缺口和跨事项风险还需要继续进入 Dashboard 真实状态诊断。
+- 成果沉淀缺口的第一片诊断已在后续 10.26 接入；跨事项风险还需要继续进入 Dashboard 真实状态诊断。
 
 ### 10.25 2026-06-28 当前实施记录：未归属 ActionRun 进入 Dashboard 待确认
 
@@ -709,4 +709,20 @@ HTML 的独特优势：
 
 - 需要补真正的全局事项选择器或“创建/关联事项”处理面板，让用户能从这条待确认直接完成归属。
 - 尾动作仍需要升级为更具体的处理入口，例如预填状态更新、成果沉淀、知识库更新和复盘草稿。
-- 成果沉淀缺口和跨事项风险还需要继续进入 Dashboard 真实状态诊断。
+- 成果沉淀缺口的第一片诊断已在后续 10.26 接入；跨事项风险还需要继续进入 Dashboard 真实状态诊断。
+
+### 10.26 2026-06-28 当前实施记录：成果沉淀缺口进入 Dashboard 待确认
+
+围绕“执行结束必须触发沉淀成果尾动作”和“产物是 P0 价值沉淀对象”的内容，当前继续落地一段代码事实：
+
+- Dashboard work-system summary 会检查已完成、已归属事项、有 `resultSummary` 但没有 `artifactIds` 的 ActionRun。
+- 当 Workbench 上下文可用，且同事项没有未完成的成果类收尾动作覆盖时，这类 ActionRun 会进入 Dashboard “待确认”。
+- 如果 Workbench Snapshot 提供了 `runs/action-runs/index.md`，这类提示要求该 ActionRun 已经能在运行索引中找到，避免在“运行记录未归档”之前重复提示成果沉淀。
+- 这类待确认条目的状态是 `action-run:output-unpreserved`，详情显示 `成果未沉淀 · <workItemPath>`。
+- 点击条目会进入 Artifacts 的 `tailAction=output` 成果沉淀入口，并携带 `tailActionId=action-run-output:<runId>` 和 `workItemPath`，让 Artifacts 能保留来源事项上下文。
+- 该能力只做观测和用户确认入口，不自动创建 Artifact，不自动写 Repository output，也不替代成果类收尾动作的真正处理流程。
+
+仍未完成的 P0 后续：
+
+- 成果沉淀入口仍需要更具体的“一键把本次结果保存为 Artifact / output”流程，而不是只打开 AI 产物创建入口。
+- 跨事项风险还需要继续进入 Dashboard 真实状态诊断。

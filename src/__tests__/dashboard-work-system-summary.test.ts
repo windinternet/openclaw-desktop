@@ -322,6 +322,7 @@ describe('dashboard work system summary', () => {
           input: '消化发布资料',
           resultSummary: '发布知识已更新',
           workItemPath: 'work/active/release.md',
+          artifactIds: ['art_archived'],
           updatedAt: 210,
         }),
       ],
@@ -369,6 +370,7 @@ describe('dashboard work system summary', () => {
           input: '生成发布报告',
           resultSummary: '发布报告已生成',
           workItemPath: 'work/active/release.md',
+          artifactIds: ['art_assigned'],
           updatedAt: 220,
         }),
       ],
@@ -393,6 +395,102 @@ describe('dashboard work system summary', () => {
         status: 'action-run:unassigned',
       }),
     ]);
+  });
+
+  it('surfaces terminal work item ActionRun summaries without artifacts as output preservation confirmations', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [
+        createActionRun({
+          id: 'run_unpreserved_output',
+          type: 'artifact_create',
+          status: 'done',
+          input: '总结发布材料',
+          resultSummary: '沉淀了发布报告草稿',
+          workItemPath: 'work/active/release.md',
+          updatedAt: 230,
+        }),
+        createActionRun({
+          id: 'run_preserved_output',
+          type: 'artifact_create',
+          status: 'done',
+          input: '生成交互报告',
+          resultSummary: '交互报告已生成',
+          workItemPath: 'work/active/release.md',
+          artifactIds: ['art_known'],
+          updatedAt: 220,
+        }),
+      ],
+      artifacts: [
+        createArtifact({
+          id: 'art_known',
+          title: '交互报告',
+          repositoryOutputPath: 'outputs/reports/art_known.md',
+        }),
+      ],
+      workbench: {
+        activeWork: [],
+        activePlans: [],
+        planMetadata: [],
+        tailActions: [],
+        reviews: [],
+      },
+      limit: 8,
+    });
+
+    expect(summary.pendingConfirmations).toEqual([
+      expect.objectContaining({
+        id: 'unpreserved-action-run-output:run_unpreserved_output',
+        kind: 'action_run',
+        title: '总结发布材料',
+        target:
+          '/artifacts?tailAction=output&tailActionId=action-run-output%3Arun_unpreserved_output&workItemPath=work%2Factive%2Frelease.md',
+        path: 'work/active/release.md',
+        detail: '成果未沉淀 · work/active/release.md',
+        status: 'action-run:output-unpreserved',
+      }),
+    ]);
+  });
+
+  it('does not duplicate output preservation confirmations covered by pending output tail actions', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [
+        createActionRun({
+          id: 'run_tail_action_covered',
+          type: 'artifact_create',
+          status: 'done',
+          input: '整理发布复盘',
+          resultSummary: '形成了一份可沉淀成果',
+          workItemPath: 'work/active/release.md',
+          updatedAt: 230,
+        }),
+      ],
+      artifacts: [],
+      workbench: {
+        activeWork: [],
+        activePlans: [],
+        planMetadata: [],
+        tailActions: [
+          {
+            id: 'work/active/release.md:tail-action:1',
+            text: '判断是否需要把本次执行结果沉淀为成果，并关联到事项。',
+            sourcePath: 'work/active/release.md',
+            completed: false,
+            updatedAt: 240,
+          },
+        ],
+        reviews: [],
+      },
+      limit: 8,
+    });
+
+    expect(summary.pendingConfirmations.map((item) => item.id)).toEqual(['work/active/release.md:tail-action:1']);
+    expect(summary.pendingConfirmations[0]).toMatchObject({
+      status: 'tail-action:output',
+      target:
+        '/artifacts?tailAction=output&tailActionId=work%2Factive%2Frelease.md%3Atail-action%3A1&workItemPath=work%2Factive%2Frelease.md',
+    });
   });
 
   it('surfaces explicit output clues from review deliverable sections', () => {

@@ -231,6 +231,11 @@ export function buildDashboardWorkSystemSummary(
     ...artifactIds,
     ...repositoryOutputItems.map(({ output }) => output.artifactId).filter((id): id is string => Boolean(id)),
   ]);
+  const pendingOutputTailActionWorkItemPaths = new Set(
+    (params.workbench?.tailActions ?? [])
+      .filter((action) => !action.completed && classifyTailAction(action.text).kind === 'output')
+      .map((action) => action.sourcePath),
+  );
   const actionRunOutputItems = params.actionRuns
     .filter((run) => run.status === 'done' && Boolean(run.resultSummary))
     .filter((run) => !(run.artifactIds ?? []).some((artifactId) => knownOutputArtifactIds.has(artifactId)))
@@ -247,6 +252,32 @@ export function buildDashboardWorkSystemSummary(
         status: run.status,
       },
     }));
+  const unpreservedActionRunOutputItems = params.workbench
+    ? params.actionRuns
+        .filter((run) => run.status === 'done' && Boolean(run.resultSummary))
+        .filter(hasWorkItemPath)
+        .filter((run) => (run.artifactIds ?? []).length === 0)
+        .filter((run) => !pendingOutputTailActionWorkItemPaths.has(run.workItemPath))
+        .filter((run) =>
+          params.workbench?.runsMarkdown === undefined
+            ? true
+            : isActionRunArchivedInRepository(run, params.workbench.runsMarkdown),
+        )
+        .map((run) => ({
+          id: `unpreserved-action-run-output:${run.id}`,
+          kind: 'action_run' as const,
+          title: run.input || run.type,
+          target: buildDashboardTailActionTarget('/artifacts', {
+            kind: 'output',
+            id: `action-run-output:${run.id}`,
+            workItemPath: run.workItemPath,
+          }),
+          updatedAt: run.updatedAt,
+          path: run.workItemPath,
+          detail: `成果未沉淀 · ${run.workItemPath}`,
+          status: 'action-run:output-unpreserved',
+        }))
+    : [];
   const recentOutputItems = [
     ...artifactOutputItems.map(({ item }) => item),
     ...repositoryOutputItems.map(({ item }) => item),
@@ -282,6 +313,7 @@ export function buildDashboardWorkSystemSummary(
     ...pendingTailActionItems,
     ...unassignedActionRunItems,
     ...unarchivedActionRunItems,
+    ...unpreservedActionRunOutputItems,
   ]).slice(0, limit);
   const stuckItems = sortItems([...failedRunItems, ...blockedPlanItems]).slice(0, limit);
   const recentOutputs = sortItems(recentOutputItems).slice(0, limit);
@@ -505,6 +537,10 @@ function sortItems(items: DashboardWorkSystemSummaryItem[]): DashboardWorkSystem
 
 function isTerminalActionRun(run: AiActionRun): boolean {
   return run.status === 'done' || run.status === 'failed' || run.status === 'cancelled';
+}
+
+function hasWorkItemPath(run: AiActionRun): run is AiActionRun & { workItemPath: string } {
+  return Boolean(run.workItemPath);
 }
 
 function isActionRunArchivedInRepository(run: AiActionRun, runsMarkdown: string): boolean {

@@ -35,6 +35,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('`action-run:unarchived` pending confirmation');
     expect(skillContent).toContain('has no `workItemPath`');
     expect(skillContent).toContain('`action-run:unassigned` pending confirmation');
+    expect(skillContent).toContain('`action-run:output-unpreserved` pending confirmation');
+    expect(skillContent).toContain('opens Artifacts with `tailAction=output`');
+    expect(skillContent).toContain('does not auto-create an Artifact or Repository output');
     expect(skillContent).toContain(
       'unfinished `## 收尾动作` checklist items surface as Dashboard pending confirmations',
     );
@@ -107,6 +110,8 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('not an automatic repository repair');
     expect(skillContent).toContain('Terminal ActionRuns without `workItemPath`');
     expect(skillContent).toContain('not an automatic assignment');
+    expect(skillContent).toContain('Completed work-item ActionRuns with `resultSummary` and no Artifact ids');
+    expect(skillContent).toContain('do not auto-create Artifacts or Repository outputs');
     expect(skillContent).toContain('Knowledge health issues');
     expect(skillContent).toContain('orphan sources, stale index entries, broken knowledge links');
     expect(skillContent).toContain('undigested sources queue');
