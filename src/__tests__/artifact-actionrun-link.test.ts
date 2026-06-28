@@ -39,9 +39,7 @@ describe('artifact ActionRun linkage', () => {
     const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
     const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
 
-    expect(drawer).toContain('loadRepositoryBinding');
-    expect(drawer).toContain('loadWorkbenchSnapshot');
-    expect(drawer).toContain('extractWorkbenchMatterId');
+    expect(drawer).toContain('useWorkbenchWorkItemOptions');
     expect(drawer).toContain('selectedWorkItemPath');
     expect(drawer).toContain('selectedWorkItemId');
     expect(drawer).toContain("t('artifact.aiCreateWorkItemPlaceholder')");

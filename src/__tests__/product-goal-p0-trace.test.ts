@@ -49,6 +49,7 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('事项知识尾动作确认联动');
     expect(source).toContain('事项完成后显式归档');
     expect(source).toContain('Artifacts 发起前事项选择');
+    expect(source).toContain('Knowledge 发起前事项选择');
     expect(source).toContain('ActionRun 未归属原因协议');
     expect(source).toContain('ActionRun 补归属流程');
     expect(source).toContain('archiveCompletedWorkbenchMatter');
@@ -61,12 +62,14 @@ describe('product goal P0 traceability', () => {
     expect(plans).toContain('workItemRequired: true');
     expect(plans).toContain('已有无事项运行的补归属流程已接入 ActionCenter');
     expect(plans).toContain('Artifacts 普通魔法创建发起前事项选择');
+    expect(plans).toContain('Knowledge 普通自动改写发起前事项选择');
     expect(roadmap).toContain('Dashboard 知识类尾动作进入 Knowledge');
     expect(roadmap).toContain('确认已处理并完成尾动作');
     expect(roadmap).toContain('归档完成事项');
     expect(roadmap).toContain('workItemUnassignedReason');
     expect(roadmap).toContain('assignAiActionRunToWorkItem');
     expect(roadmap).toContain('Artifacts 普通“AI 魔法创建”入口');
+    expect(roadmap).toContain('Knowledge 普通“消化资料 / 自动改写 / 刷新索引日志”入口');
     expect(skillContent).toContain('Screenshot-confirmed P0 baseline');
     expect(skillContent).toContain('Do not demote these scopes to P1/P2');
     expect(skillContent).toContain('Knowledge tail actions can start a source-bound `knowledge_rewrite` ActionRun');
@@ -75,6 +78,7 @@ describe('product goal P0 traceability', () => {
     expect(skillContent).toContain('workItemUnassignedReason: pending_work_item_assignment');
     expect(skillContent).toContain('ActionCenter can let the user choose an existing work item to backfill assignment');
     expect(skillContent).toContain('Standalone Artifacts AI creation can also list existing');
+    expect(skillContent).toContain('Ordinary Knowledge rewrite entry points');
     expect(skillContent).toContain('Artifacts UI also exposes a reuse-kind filter');
     expect(skillContent).toContain('Repository `outputs/assets/index.md`');
     expect(skillContent).toContain('post-run review clues');

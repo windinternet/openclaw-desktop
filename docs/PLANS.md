@@ -44,6 +44,7 @@
 ## 当前推进补充
 
 - **Artifacts 普通魔法创建发起前事项选择**：Artifacts 页面普通“AI 魔法创建”入口在没有外部来源事项时，已读取当前绑定 Repository 的 Workbench Snapshot，从 `work/active`、`work/someday` 和 `work/completed` 列出已有事项；用户可在发起 `artifact_create` ActionRun 前选择关联事项，Desktop 会把事项 `workItemPath` 和 frontmatter `id` 写入运行记录。用户跳过选择时，运行仍按 `workItemRequired: true` 与 `workItemUnassignedReason: pending_work_item_assignment` 进入未归属诊断，不自动创建事项或猜测归属。后续仍需把该模式提升为所有新 ActionRun 的全局事项选择/创建体验。
+- **Knowledge 普通自动改写发起前事项选择**：事项候选加载已抽为共享 `useWorkbenchWorkItemOptions` / `loadWorkbenchWorkItemOptions` 能力；Knowledge 页面普通“消化资料 / 自动改写 / 刷新索引日志”入口在没有 Dashboard 尾动作来源事项时，也会列出当前 Repository 的已有事项，用户可在发起 `knowledge_rewrite` ActionRun 前选择关联事项，并写入 `workItemPath` 与 frontmatter `id`。Dashboard 知识尾动作仍以来源 URL 中的 `workItemPath` 为准。后续仍需把共享选择器接到 Teams、Repository 语义映射等其它非聊天式 AI 入口，并补发起前即时创建事项。
 
 ## 已完成计划
 

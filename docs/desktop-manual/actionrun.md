@@ -60,6 +60,8 @@ Workbench 预览工作事项 Markdown 时，用户可以从该事项直接发起
 
 Artifacts 普通“AI 魔法创建”入口在没有外部来源事项时，会加载当前绑定 Repository 的 Workbench Snapshot，从 `work/active`、`work/someday` 和 `work/completed` 列出已有事项。用户可以在发起前选择关联事项；Desktop 会读取事项 frontmatter `id`，创建 `artifact_create` ActionRun 时写入 `workItemPath` 和 `workItemId`。如果用户跳过选择，运行仍会按 `workItemRequired: true` 和 `workItemUnassignedReason: pending_work_item_assignment` 进入未归属诊断；该入口不会自动创建事项、猜测归属或绕过 Repository Context。
 
+Knowledge 普通“消化资料 / 自动改写 / 刷新索引日志”入口在没有 Dashboard 尾动作来源事项时，也会加载同一批 Workbench 事项候选。用户可以在发起 `knowledge_rewrite` ActionRun 前选择关联事项；Desktop 会写入 `workItemPath` 和 `workItemId`。Dashboard 知识尾动作入口已有来源 `workItemPath` 时，仍以该来源事项为准，不用普通选择器覆盖。
+
 当终态 ActionRun 的 `lastAssistantResponse` 包含 `<artifact>` 块时，Desktop 会自动把这些块保存为 `source: action_run` 的 Artifact，并把保存后的 Artifact id 回写到 ActionRun。
 
 文件型 `<artifact>` 可以显式携带 `filePath`、`fileName`、`mimeType`、`fileSize`、`externalFormat`、`contentSummary`、`reuseKind` 和 `importFile`。当 `importFile: true` 时，Desktop 会导入本地文件；仓库绑定就绪时会把产物元数据镜像到 `outputs/files/` 并让 ActionRun 摘要链接该 output。`reuseKind` 可标记 `asset`、`template`、`tool`、`script` 或 `workflow`，用于后续复用和审计分类，不代表自动获得执行权限。

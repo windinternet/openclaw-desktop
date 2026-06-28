@@ -760,6 +760,26 @@ HTML 的独特优势：
 - 仍需要把计划、执行、产物和复盘串成“开始一件事”专题金线。
 - 仍需要在 Knowledge、Teams、Repository 语义映射等其它非聊天式 AI 入口逐步统一事项选择或来源上下文。
 
+### 10.44 2026-06-28 当前实施记录：Knowledge 发起前事项选择
+
+围绕“每次 AI 执行应归属事项”和“知识库更新不应成为孤立 ActionRun”的 P0 验收，当前继续落地一段代码事实：
+
+- 事项候选加载已抽为共享 `useWorkbenchWorkItemOptions` / `loadWorkbenchWorkItemOptions` 能力。
+- 该共享能力从当前绑定 Repository 的 Workbench Snapshot 读取 `work/active`、`work/someday` 和 `work/completed` 事项。
+- 共享能力会读取事项 Markdown frontmatter 中的 `id`，用于发起 ActionRun 时写入 `workItemId`。
+- Artifacts 普通“AI 魔法创建”入口已改用这条共享能力，不再在组件内复制仓库事项读取逻辑。
+- Knowledge 普通“消化资料 / 自动改写 / 刷新索引日志”入口在没有 Dashboard 尾动作来源事项时，会显示事项选择器。
+- 用户可在发起 `knowledge_rewrite` ActionRun 前选择关联事项；Desktop 会同时写入 `workItemPath` 和 `workItemId`。
+- Dashboard 知识尾动作入口已有来源 `workItemPath` 和 `tailActionId` 时，仍以该来源事项为准，不被普通选择器覆盖。
+- 该入口不自动创建事项、不猜测归属、不直接写 Wiki、不勾选尾动作、不绕过 Repository Context 或写入审批。
+
+仍未完成的 P0 后续：
+
+- 仍需要把共享事项选择接入 Teams、Repository 语义映射等其它非聊天式 AI 入口。
+- 仍需要发起前直接创建新事项的产品流。
+- 仍需要把普通 Knowledge rewrite 结束后的复盘建议和结构化上下文带入做深。
+- 仍需要把计划、执行、产物和复盘串成“开始一件事”专题金线。
+
 ### 10.55 2026-06-28 当前实施记录：ActionRun 补归属流程
 
 围绕“每次 AI 执行必须归属事项”和“已有无事项 ActionRun 不能只停留在 Dashboard 告警”的 P0 验收，当前继续落地一段代码事实：

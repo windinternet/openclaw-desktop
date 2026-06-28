@@ -5,6 +5,7 @@ import {
   Empty,
   Input,
   Modal,
+  Select,
   Space,
   Spin,
   Tabs,
@@ -41,6 +42,7 @@ import {
   writeKnowledgeHealthReview,
 } from '../lib/repository-knowledge';
 import { confirmWorkbenchKnowledgeTailAction } from '../lib/repository-workbench';
+import { useWorkbenchWorkItemOptions } from '../lib/workbench-work-items';
 import MarkdownView from './MarkdownView';
 
 const { Text, Title } = Typography;
@@ -60,6 +62,7 @@ export type KnowledgeSection =
 
 interface KnowledgeRewriteOptions {
   userInstruction?: string;
+  workItemId?: string;
   workItemPath?: string;
   tailActionId?: string;
 }
@@ -105,6 +108,16 @@ export default function KnowledgeRepositoryPanel({
   const [importUrlNote, setImportUrlNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   const knowledgeTailActionContext = tailActionContext?.kind === 'knowledge' ? tailActionContext : null;
+  const {
+    options: workItemOptions,
+    selectedPath: selectedKnowledgeWorkItemPath,
+    setSelectedPath: setSelectedKnowledgeWorkItemPath,
+    selectedWorkItem: selectedKnowledgeWorkItem,
+    selectedWorkItemId: selectedKnowledgeWorkItemId,
+  } = useWorkbenchWorkItemOptions({
+    binding,
+    enabled: !knowledgeTailActionContext?.workItemPath,
+  });
 
   useEffect(() => {
     setTailActionConfirmed(false);
@@ -334,6 +347,8 @@ export default function KnowledgeRepositoryPanel({
         : selectedDocument?.sourceType === 'sources'
           ? selectedDocument.path
           : undefined;
+    const resolvedWorkItemPath = options.workItemPath || selectedKnowledgeWorkItem?.path;
+    const resolvedWorkItemId = options.workItemId || selectedKnowledgeWorkItemId;
     setRewriteLoading(true);
     try {
       const input = [
@@ -343,7 +358,7 @@ export default function KnowledgeRepositoryPanel({
             ? t('knowledge.updateSelected')
             : t('knowledge.refreshIndexLog'),
         selectedPath ? `path: ${selectedPath}` : '',
-        options.workItemPath ? `${t('knowledge.tailActionSource')}: ${options.workItemPath}` : '',
+        resolvedWorkItemPath ? `${t('knowledge.tailActionSource')}: ${resolvedWorkItemPath}` : '',
         options.tailActionId ? `tailActionId: ${options.tailActionId}` : '',
       ]
         .filter(Boolean)
@@ -355,7 +370,8 @@ export default function KnowledgeRepositoryPanel({
         agentId: agent.id,
         executionMode: 'isolated-session',
         input,
-        workItemPath: options.workItemPath,
+        workItemId: resolvedWorkItemId,
+        workItemPath: resolvedWorkItemPath,
       });
       await upsertAiActionRun(currentInstanceId, { ...actionRun, status: 'planning', updatedAt: Date.now() });
       const runningRun = await executeAiActionRunWithGateway(activeClient, actionRun, {
@@ -1002,6 +1018,27 @@ export default function KnowledgeRepositoryPanel({
             <Tag color="green">{t('knowledge.wikiCount', { count: snapshot?.wiki.length ?? 0 })}</Tag>
           </Space>
           <Space wrap>
+            {!knowledgeTailActionContext && workItemOptions.length > 0 ? (
+              <div style={{ minWidth: 280, maxWidth: 360 }}>
+                <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 4 }}>
+                  {t('knowledge.rewriteWorkItemDesc')}
+                </Text>
+                <Select
+                  size="small"
+                  value={selectedKnowledgeWorkItemPath}
+                  placeholder={t('knowledge.rewriteWorkItemPlaceholder')}
+                  onChange={(value) => setSelectedKnowledgeWorkItemPath(String(value))}
+                  disabled={rewriteLoading}
+                  style={{ width: '100%' }}
+                >
+                  {workItemOptions.map((item) => (
+                    <Select.Option key={item.path} value={item.path}>
+                      {item.name} · {item.path}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </div>
+            ) : null}
             <input
               ref={fileInputRef}
               type="file"

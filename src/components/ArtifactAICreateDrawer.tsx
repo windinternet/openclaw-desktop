@@ -6,9 +6,7 @@ import { useStore } from '../lib';
 import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway } from '../lib/ai-action-center';
 import { buildArtifactCreatePrompt } from '../lib/ai-action-prompts';
 import { upsertAiActionRun } from '../lib/ai-action-run-store';
-import { loadRepositoryBinding } from '../lib/agentic-repository-store';
-import { loadWorkbenchSnapshot, readWorkbenchMarkdown } from '../lib/repository-workbench';
-import { extractWorkbenchMatterId } from '../lib/workbench-matter';
+import { useWorkbenchWorkItemOptions } from '../lib/workbench-work-items';
 import type { AiActionRun } from '../lib/types';
 import type { ArtifactMeta, ArtifactType } from '../lib/artifact-types';
 
@@ -22,12 +20,6 @@ interface ParsedArtifactResult {
   url?: string;
   command?: string;
   fileName?: string;
-}
-
-interface WorkItemOption {
-  id?: string;
-  name: string;
-  path: string;
 }
 
 interface Props {
@@ -55,8 +47,16 @@ export function ArtifactAICreateDrawer({
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const agents = useStore((s) => s.agents);
   const [input, setInput] = useState(initialInput ?? '');
-  const [workItemOptions, setWorkItemOptions] = useState<WorkItemOption[]>([]);
-  const [selectedWorkItemPath, setSelectedWorkItemPath] = useState('');
+  const {
+    options: workItemOptions,
+    selectedPath: selectedWorkItemPath,
+    setSelectedPath: setSelectedWorkItemPath,
+    selectedWorkItem,
+    selectedWorkItemId,
+  } = useWorkbenchWorkItemOptions({
+    instanceId: currentInstanceId,
+    enabled: visible && !workItemPath,
+  });
   const [generating, setGenerating] = useState(false);
   const [preview, setPreview] = useState<ParsedArtifactResult | null>(null);
   const [previewRun, setPreviewRun] = useState<AiActionRun | null>(null);
@@ -66,48 +66,6 @@ export function ArtifactAICreateDrawer({
   useEffect(() => {
     if (visible && initialInput !== undefined) setInput(initialInput);
   }, [initialInput, visible]);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!visible || workItemPath || !currentInstanceId) {
-      setWorkItemOptions([]);
-      setSelectedWorkItemPath('');
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    loadRepositoryBinding(currentInstanceId)
-      .then(async (binding) => {
-        if (!binding || binding.status !== 'repo_ready') return [];
-        const snapshot = await loadWorkbenchSnapshot(binding);
-        const files = [...snapshot.activeWork, ...snapshot.somedayWork, ...snapshot.completedWork];
-        return Promise.all(
-          files.map(async (file) => {
-            const markdown = await readWorkbenchMarkdown(binding, file.path);
-            return {
-              id: extractWorkbenchMatterId(markdown),
-              name: file.name,
-              path: file.path,
-            };
-          }),
-        );
-      })
-      .then((options) => {
-        if (cancelled) return;
-        setWorkItemOptions(options);
-        setSelectedWorkItemPath((current) =>
-          current && options.some((option) => option.path === current) ? current : '',
-        );
-      })
-      .catch(() => {
-        if (!cancelled) setWorkItemOptions([]);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentInstanceId, visible, workItemPath]);
 
   const isValidType = (t: string): boolean =>
     [
@@ -148,8 +106,6 @@ export function ArtifactAICreateDrawer({
       return;
     }
 
-    const selectedWorkItem = workItemOptions.find((option) => option.path === selectedWorkItemPath);
-    const selectedWorkItemId = selectedWorkItem?.id;
     const resolvedWorkItemPath = workItemPath || selectedWorkItem?.path;
     const resolvedWorkItemId = workItemId || selectedWorkItemId;
 
@@ -227,8 +183,8 @@ export function ArtifactAICreateDrawer({
     sourcePage,
     workItemId,
     workItemPath,
-    selectedWorkItemPath,
-    workItemOptions,
+    selectedWorkItem,
+    selectedWorkItemId,
   ]);
 
   const handleSave = useCallback(async () => {
