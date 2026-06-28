@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
 import {
+  buildKnowledgeHealthReview,
   buildKnowledgeFileSourceImport,
   buildKnowledgeTextSourceImport,
   buildKnowledgeUrlSourceImport,
@@ -11,6 +12,7 @@ import {
   extractMarkdownLinks,
   findBacklinks,
   importKnowledgeFileSource,
+  writeKnowledgeHealthReview,
   importKnowledgeTextSource,
   importKnowledgeUrlSource,
   loadKnowledgeSnapshot,
@@ -333,6 +335,96 @@ describe('repository knowledge', () => {
       ]),
     );
     expect(snapshot.undigestedSources.map((file) => file.path)).toEqual(['sources/orphan.md']);
+  });
+
+  it('builds and writes weekly knowledge health reviews', async () => {
+    const now = new Date('2026-06-28T07:08:09.000Z');
+    const health = {
+      issues: [
+        {
+          id: 'orphan-source:sources/orphan.md',
+          kind: 'orphan_source' as const,
+          severity: 'warning' as const,
+          title: '孤立资料',
+          detail: '资料还没有被索引或 Wiki 引用。',
+          path: 'sources/orphan.md',
+          updatedAt: 1782620000000,
+        },
+        {
+          id: 'stale-index:wiki/index.md->wiki/missing.md',
+          kind: 'stale_index_entry' as const,
+          severity: 'warning' as const,
+          title: '索引陈旧',
+          detail: '知识索引指向不存在的文件：wiki/missing.md',
+          path: 'wiki/index.md',
+          targetPath: 'wiki/missing.md',
+        },
+      ],
+      counts: { total: 2, critical: 0, warning: 2, info: 0 },
+    };
+
+    const review = buildKnowledgeHealthReview({
+      health,
+      now,
+      reviewsRoot: 'reviews',
+    });
+
+    expect(review).toEqual({
+      path: 'reviews/weekly/2026-06-28-knowledge-health.md',
+      markdown: [
+        '---',
+        'title: "知识库健康周复盘 2026-06-28"',
+        'source: desktop-knowledge-health',
+        'generatedAt: 2026-06-28T07:08:09.000Z',
+        'issueCount: 2',
+        'criticalCount: 0',
+        'warningCount: 2',
+        'infoCount: 0',
+        '---',
+        '',
+        '# 知识库健康周复盘 2026-06-28',
+        '',
+        '## 摘要',
+        '',
+        '- 总问题：2',
+        '- 严重：0',
+        '- 警告：2',
+        '- 提醒：0',
+        '',
+        '## 问题列表',
+        '',
+        '| 严重度 | 类型 | 文件 | 目标 | 说明 |',
+        '| --- | --- | --- | --- | --- |',
+        '| warning | orphan_source | `sources/orphan.md` |  | 资料还没有被索引或 Wiki 引用。 |',
+        '| warning | stale_index_entry | `wiki/index.md` | `wiki/missing.md` | 知识索引指向不存在的文件：wiki/missing.md |',
+        '',
+        '## 建议收尾动作',
+        '',
+        '- [ ] 消化孤立资料，或把不再需要的资料标记为归档候选。',
+        '- [ ] 更新 `wiki/index.md`，移除或修正陈旧索引。',
+        '- [ ] 复查本周新增 Wiki 是否引用了原始资料源。',
+        '- [ ] 必要时发起 Knowledge ActionRun，写入 Wiki、索引和日志。',
+        '',
+      ].join('\n'),
+    });
+
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { writeText },
+      },
+    });
+
+    const written = await writeKnowledgeHealthReview(
+      {
+        ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+        status: 'repo_ready',
+      },
+      { health, now },
+    );
+
+    expect(written.path).toBe('reviews/weekly/2026-06-28-knowledge-health.md');
+    expect(writeText).toHaveBeenCalledWith('/repo', written.path, written.markdown);
   });
 
   it('parses wiki index links into navigable knowledge entries', async () => {

@@ -76,9 +76,10 @@ OpenClaw Desktop
 
 判定规则：只要开箱体验、Dashboard 真实推进状态、Repository 初始化、Knowledge 导入/消化/健康检查、事务推进闭环、开始一件事闭环、可复用资产一等对象中的任一项还没有形成可用闭环，就不得判定 P0 已整体完成。某个切片可以标记为“第一片落地”或“核心金线已落地”，但不能因此把该 P0 项降级为 P1/P2。
 
-1. **外部生态入口不是当前 P0 风险**
-   - SkillHub / ClawHub / GitHub release 等入口可通过开源源码、协议开放和数据可迁移性保证自由边界。
-   - 当前不把这些外部入口列为 P0 实施阻塞。
+1. **自由边界是 P0；外部生态入口不是当前实施阻塞**
+   - 保持自由、不被第三方商业生态绑定，是产品北极星里的 P0 约束，不能从验收口径中移走。
+   - SkillHub / ClawHub / GitHub release 等入口当前不作为本阶段具体代码实施阻塞。
+   - 当前验收重点是：源码可改、协议开放、数据可迁移、仓库是长期事实源，用户不被 Desktop 私有状态或第三方市场锁死。
 
 2. **开箱体验是 P0**
    - 不隐藏 Gateway，但要把 Gateway 从“用户目标”降级为“基础设施”。
@@ -249,7 +250,8 @@ HTML 产物是特色能力：
 - Knowledge 页面新增“导入文件”入口，可通过系统文件选择器读取本地 Markdown/TXT 文本文件，写入 `sources/imported/YYYY-MM-DD-HHmmss-*.md`，frontmatter 标记 `source: desktop-file`、原始文件名和 MIME 类型，导入后刷新 Snapshot、切到未消化资料队列并打开最后一个导入的资料源。
 - Knowledge 页面新增“拖拽导入”入口，可把本地 Markdown/TXT 文本文件拖入 Knowledge 页面，复用 `source: desktop-file` 写入 `sources/imported/` 并进入未消化资料队列。
 - Knowledge 页面新增“剪藏 URL”入口，可把网页链接和可选摘录/备注写入 `sources/imported/YYYY-MM-DD-HHmmss-*.md`，frontmatter 标记 `source: desktop-url` 和 `url`；当前不后台抓取网页正文。
-- 当前健康检查只做可观测事实，不自动写入 `reviews/weekly/`，也不自动修复索引、Wiki 或资料来源；文件夹导入和 Office/PDF/二进制内容导入仍是 P0 后续。
+- Knowledge 页面新增“写入周复盘”入口，可把当前健康报告写入 `reviews/weekly/YYYY-MM-DD-knowledge-health.md`，让健康检查进入复盘事实源。
+- 当前健康检查不自动修复索引、Wiki 或资料来源；文件夹导入和 Office/PDF/二进制内容导入仍是 P0 后续。
 
 验收：
 

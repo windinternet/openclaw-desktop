@@ -90,6 +90,17 @@ export interface KnowledgeHealthReport {
   };
 }
 
+export interface KnowledgeHealthReviewInput {
+  health: KnowledgeHealthReport;
+  now?: Date;
+  reviewsRoot?: string;
+}
+
+export interface KnowledgeHealthReview {
+  path: string;
+  markdown: string;
+}
+
 export interface KnowledgeRepositoryMappingResponse {
   isKnowledgeRepository: boolean;
   confidence?: 'low' | 'medium' | 'high';
@@ -371,6 +382,81 @@ export async function importKnowledgeFileSource(
   });
   await getKnowledgeWriteApi().writeText(binding.repoPath, imported.path, imported.markdown);
   return imported;
+}
+
+export function buildKnowledgeHealthReview(input: KnowledgeHealthReviewInput): KnowledgeHealthReview {
+  const now = input.now ?? new Date();
+  const date = now.toISOString().slice(0, 10);
+  const reviewsRoot = normalizeSourceRoot(input.reviewsRoot ?? 'reviews');
+  const issueRows =
+    input.health.issues.length > 0
+      ? input.health.issues.map((issue) =>
+          [
+            '|',
+            issue.severity,
+            '|',
+            issue.kind,
+            '|',
+            formatMarkdownCodeCell(issue.path),
+            '|',
+            formatMarkdownCodeCell(issue.targetPath),
+            '|',
+            escapeMarkdownTableCell(issue.detail),
+            '|',
+          ].join(' '),
+        )
+      : ['| info | none |  |  | 当前没有健康问题。 |'];
+  const markdown = [
+    '---',
+    `title: ${JSON.stringify(`知识库健康周复盘 ${date}`)}`,
+    'source: desktop-knowledge-health',
+    `generatedAt: ${now.toISOString()}`,
+    `issueCount: ${input.health.counts.total}`,
+    `criticalCount: ${input.health.counts.critical}`,
+    `warningCount: ${input.health.counts.warning}`,
+    `infoCount: ${input.health.counts.info}`,
+    '---',
+    '',
+    `# 知识库健康周复盘 ${date}`,
+    '',
+    '## 摘要',
+    '',
+    `- 总问题：${input.health.counts.total}`,
+    `- 严重：${input.health.counts.critical}`,
+    `- 警告：${input.health.counts.warning}`,
+    `- 提醒：${input.health.counts.info}`,
+    '',
+    '## 问题列表',
+    '',
+    '| 严重度 | 类型 | 文件 | 目标 | 说明 |',
+    '| --- | --- | --- | --- | --- |',
+    ...issueRows,
+    '',
+    '## 建议收尾动作',
+    '',
+    '- [ ] 消化孤立资料，或把不再需要的资料标记为归档候选。',
+    '- [ ] 更新 `wiki/index.md`，移除或修正陈旧索引。',
+    '- [ ] 复查本周新增 Wiki 是否引用了原始资料源。',
+    '- [ ] 必要时发起 Knowledge ActionRun，写入 Wiki、索引和日志。',
+    '',
+  ].join('\n');
+
+  return {
+    path: `${reviewsRoot}/weekly/${date}-knowledge-health.md`,
+    markdown,
+  };
+}
+
+export async function writeKnowledgeHealthReview(
+  binding: RepositoryBinding,
+  input: Omit<KnowledgeHealthReviewInput, 'reviewsRoot'>,
+): Promise<KnowledgeHealthReview> {
+  const review = buildKnowledgeHealthReview({
+    ...input,
+    reviewsRoot: binding.paths.reviews,
+  });
+  await getKnowledgeWriteApi().writeText(binding.repoPath, review.path, review.markdown);
+  return review;
 }
 
 export async function loadKnowledgeDocumentHistory(
@@ -788,6 +874,15 @@ function normalizeSourceRoot(value: string): string {
   const root = value.trim().replace(/^\/+|\/+$/g, '');
   if (!root || root.includes('..')) throw new Error('Unsafe knowledge source root');
   return root;
+}
+
+function escapeMarkdownTableCell(value: string): string {
+  return value.replace(/\r?\n/g, ' ').replace(/\|/g, '\\|').trim();
+}
+
+function formatMarkdownCodeCell(value: string | undefined): string {
+  if (!value) return '';
+  return `\`${escapeMarkdownTableCell(value)}\``;
 }
 
 function cleanMarkdownCell(cell: string): string {

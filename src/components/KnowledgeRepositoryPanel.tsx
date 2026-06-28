@@ -35,6 +35,7 @@ import {
   loadKnowledgeSnapshot,
   readKnowledgeDocument,
   searchKnowledge,
+  writeKnowledgeHealthReview,
 } from '../lib/repository-knowledge';
 import MarkdownView from './MarkdownView';
 
@@ -75,6 +76,7 @@ export default function KnowledgeRepositoryPanel({
   const [historyLoading, setHistoryLoading] = useState(false);
   const [rewriteLoading, setRewriteLoading] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
+  const [healthReviewLoading, setHealthReviewLoading] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<KnowledgeDocument | null>(null);
   const [documentHistory, setDocumentHistory] = useState<RepositoryGitLogEntry[]>([]);
   const [activeSection, setActiveSection] = useState<KnowledgeSection>(section ?? 'wiki');
@@ -250,6 +252,24 @@ export default function KnowledgeRepositoryPanel({
     event.preventDefault();
     setDragImportActive(false);
     void handleImportFiles(event.dataTransfer.files);
+  };
+
+  const handleWriteHealthReview = async () => {
+    const health = snapshot?.health;
+    if (!health) return;
+
+    setHealthReviewLoading(true);
+    setError(null);
+    try {
+      const review = await writeKnowledgeHealthReview(binding, { health });
+      await openDocument(review.path);
+      setActiveSection('recent');
+      Toast.success(t('knowledge.healthReviewWritten'));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('knowledge.healthReviewFailed'));
+    } finally {
+      setHealthReviewLoading(false);
+    }
   };
 
   const handleKnowledgeRewrite = async (
@@ -908,9 +928,19 @@ export default function KnowledgeRepositoryPanel({
               <Title heading={5} style={{ margin: 0 }}>
                 {t('knowledge.health')}
               </Title>
-              <Tag color={(snapshot?.health.counts.total ?? 0) > 0 ? 'orange' : 'green'}>
-                {t('knowledge.healthIssueCount', { count: snapshot?.health.counts.total ?? 0 })}
-              </Tag>
+              <Space align="center" wrap>
+                <Tag color={(snapshot?.health.counts.total ?? 0) > 0 ? 'orange' : 'green'}>
+                  {t('knowledge.healthIssueCount', { count: snapshot?.health.counts.total ?? 0 })}
+                </Tag>
+                <Button
+                  size="small"
+                  icon={<IconFile />}
+                  loading={healthReviewLoading}
+                  onClick={() => void handleWriteHealthReview()}
+                >
+                  {t('knowledge.writeHealthReview')}
+                </Button>
+              </Space>
             </Space>
             {renderHealthIssues()}
           </Card>
