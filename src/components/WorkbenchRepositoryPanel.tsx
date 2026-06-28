@@ -6,11 +6,12 @@ import { useNavigate } from 'react-router-dom';
 import { useStore } from '../lib';
 import type { RepositoryBinding } from '../lib/agentic-repository';
 import { loadAiActionRuns } from '../lib/ai-action-run-store';
+import { buildArtifactOutputDescription } from '../lib/artifact-display';
+import type { ArtifactMeta } from '../lib/artifact-types';
+import type { DashboardTailActionRouteContext } from '../lib/dashboard-tail-action-routing';
+import type { RepositoryMarkdownFile } from '../lib/repository-knowledge';
 import type { WorkbenchSnapshot } from '../lib/repository-workbench';
 import { loadWorkbenchSnapshot, readWorkbenchMarkdown } from '../lib/repository-workbench';
-import type { RepositoryMarkdownFile } from '../lib/repository-knowledge';
-import type { ArtifactMeta } from '../lib/artifact-types';
-import { buildArtifactOutputDescription } from '../lib/artifact-display';
 import type { AiActionRun, AiActionRunStatus } from '../lib/types';
 import { extractWorkbenchMatterId, isWorkbenchMatterPath } from '../lib/workbench-matter';
 import { ArtifactAICreateDrawer } from './ArtifactAICreateDrawer';
@@ -130,9 +131,11 @@ function dedupeDeliverables(items: ProjectDeliverable[]): ProjectDeliverable[] {
 export default function WorkbenchRepositoryPanel({
   binding,
   panelView = 'projects',
+  tailActionContext,
 }: {
   binding: RepositoryBinding;
   panelView?: WorkbenchPanelView;
+  tailActionContext?: DashboardTailActionRouteContext | null;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -983,6 +986,41 @@ export default function WorkbenchRepositoryPanel({
     );
   };
 
+  const renderReviewTailActionCard = () => {
+    const reviewTailActionContext = tailActionContext?.kind === 'review' ? tailActionContext : null;
+    if (!reviewTailActionContext) return null;
+    return (
+      <div
+        style={{
+          border: '1px solid var(--semi-color-border)',
+          borderRadius: 8,
+          padding: 12,
+          marginBottom: 12,
+          background: 'var(--semi-color-fill-0)',
+        }}
+      >
+        <Space vertical align="start" style={{ width: '100%' }}>
+          <Space align="center" wrap>
+            <Tag color="orange">{t('workbench.reviewTailActionTitle')}</Tag>
+            <Tag color="blue">reviews/weekly/</Tag>
+          </Space>
+          <Text size="small">{t('workbench.reviewTailActionDesc')}</Text>
+          {reviewTailActionContext.workItemPath ? (
+            <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }}>
+              {t('workbench.tailActionSource')}: {reviewTailActionContext.workItemPath}
+            </Text>
+          ) : null}
+          <Text type="tertiary" size="small" style={{ fontFamily: 'var(--semi-font-family-monospace)' }}>
+            {t('workbench.reviewTailActionWriteCommand')}: desktop.artifacts.execution.review.write
+          </Text>
+          <Button size="small" type="tertiary" onClick={() => openRepositoryFile('reviews/weekly/')}>
+            {t('workbench.openReviewFolder')}
+          </Button>
+        </Space>
+      </div>
+    );
+  };
+
   const renderReviewsView = () => (
     <div
       style={{
@@ -1007,6 +1045,7 @@ export default function WorkbenchRepositoryPanel({
         <Title heading={6} style={{ marginTop: 0 }}>
           {t('workbench.reviews')}
         </Title>
+        {renderReviewTailActionCard()}
         {snapshot?.reviewGroups && snapshot.reviewGroups.length > 0 ? (
           <Space vertical align="start" style={{ width: '100%' }}>
             {snapshot.reviewGroups.map((group) => (

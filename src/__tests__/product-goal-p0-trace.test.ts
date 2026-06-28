@@ -40,6 +40,7 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('Repository 可复用资产索引第一片');
     expect(source).toContain('可复用资产运行后复盘线索');
     expect(source).toContain('可复用资产运行后复盘写入入口');
+    expect(source).toContain('事项尾动作复盘入口');
     expect(skillContent).toContain('Screenshot-confirmed P0 baseline');
     expect(skillContent).toContain('Do not demote these scopes to P1/P2');
     expect(skillContent).toContain('Artifacts UI also exposes a reuse-kind filter');

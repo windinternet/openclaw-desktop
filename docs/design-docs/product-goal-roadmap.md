@@ -290,6 +290,7 @@ HTML 产物是特色能力：
 - Workbench 快照会解析工作事项里的 `## 收尾动作`，Dashboard “待确认”会显示未勾选收尾动作，让 ActionRun 结束后的后续判断进入每日推进面板。
 - Dashboard 会把未完成收尾动作分类为 `tail-action:status`、`tail-action:output`、`tail-action:knowledge` 或 `tail-action:review`，分别导向 Workbench 状态处理、Artifacts、Knowledge 或 Workbench 复盘后续。
 - 这些目标 URL 会携带 `tailAction`、`tailActionId` 和 `workItemPath`；Artifacts 会据此打开 AI 产物创建入口并带上来源事项，成果类尾动作会预填基于来源事项和最近执行记录沉淀成果的提示；Knowledge 会进入维护上下文，Workbench 会切到状态或复盘相关 tab 并显示来源事项。
+- Workbench 复盘视图已接收 `tailAction=review` 上下文，并显示“复盘收尾动作”卡片；卡片保留来源事项 `workItemPath`、建议目标 `reviews/weekly/` 和复盘写入命令线索 `desktop.artifacts.execution.review.write`，可打开复盘目录，但不会自动写复盘或勾选尾动作。
 - Dashboard 会读取 Workbench Snapshot 中的 `runs/action-runs/index.md`；已归属事项的终态 ActionRun 如果没有被索引，会作为 `action-run:unarchived` 待确认展示，并跳转到 `/workbench?view=actions` 让用户回到执行记录视图检查。
 - Dashboard 会把没有 `workItemPath` 的终态 ActionRun 作为 `action-run:unassigned` 待确认展示，并跳转到 `/workbench?view=actions`；这是对“每次 AI 执行应归属事项”的只读诊断，不自动创建事项或改写运行记录。
 - Dashboard 会把已完成、有 `workItemPath`、有 `resultSummary` 但没有 `artifactIds` 的 ActionRun 作为 `action-run:output-unpreserved` 待确认展示；如果同事项已有未完成成果尾动作则不重复提示，如果运行索引可用则要求该 run 已经归档。点击会进入 Artifacts 的 `tailAction=output` 成果沉淀入口，并携带 `tailActionId=action-run-output:<runId>` 和 `workItemPath`；这只是沉淀提示，不自动创建 Artifact 或 Repository output。
@@ -343,6 +344,7 @@ HTML 产物是特色能力：
 - `desktop.artifacts.search` 和 `desktop.artifacts.describe` 会返回 `assetExecutionSummary`，把执行型资产的审批要求、最近执行状态/结果/输出线索、终态执行后的 `reviewSummary` 复盘建议，以及 Desktop 只记录、不执行、不授予权限的边界直接暴露给 Gateway。
 - Repository `outputs/assets/index.md` 会为 `succeeded / failed / cancelled` 的最近执行写入 `review: pending, write reviews/weekly/ entry` 和结果摘要线索，用于提醒后续复盘，但不会自动写复盘。
 - `desktop.artifacts.execution.review.write` 已提供用户确认后的复盘写入入口，可把最近终态执行、输出 Artifact、Repository output、关联事项、复用判断和后续动作写入 `reviews/weekly/YYYY-MM-DD-artifact-*-review.md`；该入口不执行资产、不授予权限、不自动更新事项或勾选尾动作。
+- Workbench 复盘视图会在 Dashboard `tail-action:review` 路由进入时展示复盘收尾动作卡片，把 `reviews/weekly/` 和 `desktop.artifacts.execution.review.write` 作为 UI 侧线索暴露给用户；这仍只是入口提示，不会直接执行资产、写复盘或授予权限。
 - Dashboard 最近产物和本周新增成果会把带 `reuseKind` 的 Artifact 与 Repository output 标为“可复用资产”，并在详情中展示复用分类、最近执行状态或待审批边界。
 - 这仍是第一片可观测入口；更完整的 Repository 资产目录协议、资产权限面板、UI 侧复盘入口、事项尾动作联动和更细的处理工作流仍需继续补齐。
 

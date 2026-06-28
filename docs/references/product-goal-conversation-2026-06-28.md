@@ -835,6 +835,20 @@ HTML 的独特优势：
 
 - 后续仍需要资产权限/审批面板、UI 侧复盘入口、事项尾动作联动、更完整的 Repository 资产目录协议、更细的处理入口，以及从手动仓库文件导入资产的流程。
 
+### 10.37 2026-06-28 当前实施记录：事项尾动作复盘入口
+
+围绕“ActionRun 结束后必须触发是否写入复盘”和“可复用资产运行后需要进入 `reviews/weekly/` 复盘”的 P0 验收，当前继续落地一段代码事实：
+
+- Dashboard 的 `tail-action:review` 会继续打开 Workbench 复盘视图，并携带 `tailAction`、`tailActionId` 和 `workItemPath`。
+- Workbench 复盘视图现在会接收该上下文，并显示“复盘收尾动作”卡片。
+- 该卡片保留来源事项 `workItemPath`、建议目标 `reviews/weekly/`，以及可复用资产执行复盘写入命令线索 `desktop.artifacts.execution.review.write`。
+- 用户可从该卡片打开 `reviews/weekly/`，回到仓库复盘事实源继续处理。
+- 该入口只做 UI 侧联动提示，不自动写复盘、不更新事项状态、不自动勾选尾动作、不执行资产、不授予权限。
+
+仍未完成的 P0 后续：
+
+- 后续仍需要真正的复盘草稿/表单、从事项尾动作或 Artifact 详情带入 `artifactId` 并调用 `desktop.artifacts.execution.review.write`、写入成功后的尾动作勾选联动、资产权限/审批面板、更完整的 Repository 资产目录协议、更细的处理入口，以及从手动仓库文件导入资产的流程。
+
 ### 10.28 2026-06-28 当前实施记录：跨事项依赖风险过滤已完成依赖
 
 围绕“Dashboard 卡住项应展示真实推进风险，而不是把已经收口的历史依赖继续报红”的 P0 内容，当前继续落地一段代码事实：

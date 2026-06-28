@@ -168,6 +168,10 @@
     "tailActionStatusContextDesc": "A Dashboard status tail action. Check the matter status and acceptance criteria first.",
     "tailActionReviewContextDesc": "A Dashboard review tail action. Check the matter run records and output clues first.",
     "tailActionSource": "Source matter",
+    "reviewTailActionTitle": "Review Tail Action",
+    "reviewTailActionDesc": "Check run records, outputs, and knowledge changes, then write the confirmed review into reviews/weekly/.",
+    "reviewTailActionWriteCommand": "Reusable asset execution review command",
+    "openReviewFolder": "Open Review Folder",
     "viewMarkdown": "View Markdown"
   },
   "knowledge": {

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 describe('dashboard tail action routing', () => {
   it('makes target pages consume Dashboard tail action context from the URL', () => {
     const workbench = readFileSync('src/pages/WorkbenchPage.tsx', 'utf8');
+    const workbenchPanel = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
     const artifacts = readFileSync('src/pages/ArtifactsPage.tsx', 'utf8');
     const knowledge = readFileSync('src/pages/KnowledgeBasePage.tsx', 'utf8');
 
@@ -11,6 +12,13 @@ describe('dashboard tail action routing', () => {
     expect(workbench).toContain('getWorkbenchTailActionTab(tailActionContext)');
     expect(workbench).toContain("t('workbench.tailActionContextTitle')");
     expect(workbench).toContain('context.workItemPath');
+    expect(workbench).toContain('tailActionContext={tailActionContext}');
+
+    expect(workbenchPanel).toContain("tailActionContext?.kind === 'review'");
+    expect(workbenchPanel).toContain("t('workbench.reviewTailActionTitle')");
+    expect(workbenchPanel).toContain("t('workbench.reviewTailActionWriteCommand')");
+    expect(workbenchPanel).toContain('desktop.artifacts.execution.review.write');
+    expect(workbenchPanel).toContain('reviews/weekly/');
 
     expect(artifacts).toContain('parseDashboardTailActionRoute(location.search)');
     expect(artifacts).toContain("tailActionContext?.kind === 'output'");

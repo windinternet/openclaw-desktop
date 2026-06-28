@@ -168,6 +168,10 @@
     "tailActionStatusContextDesc": "来自 Dashboard 的状态收尾动作，先核对事项当前状态和验收标准。",
     "tailActionReviewContextDesc": "来自 Dashboard 的复盘收尾动作，先核对事项执行记录和产出线索。",
     "tailActionSource": "来源事项",
+    "reviewTailActionTitle": "复盘收尾动作",
+    "reviewTailActionDesc": "先核对执行记录、成果和知识变更，再把确认后的复盘写入 reviews/weekly/。",
+    "reviewTailActionWriteCommand": "可复用资产执行复盘命令",
+    "openReviewFolder": "打开复盘目录",
     "viewMarkdown": "查看 Markdown"
   },
   "knowledge": {

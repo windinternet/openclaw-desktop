@@ -129,7 +129,9 @@ export default function WorkbenchPage() {
         </Empty>
       }
     >
-      {(binding) => <WorkbenchRepositoryPanel binding={binding} panelView={panelView} />}
+      {(binding) => (
+        <WorkbenchRepositoryPanel binding={binding} panelView={panelView} tailActionContext={tailActionContext} />
+      )}
     </RepositoryGate>
   );
 
