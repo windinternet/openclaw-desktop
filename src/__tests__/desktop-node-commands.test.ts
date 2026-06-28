@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleDesktopNodeCommand } from '../lib/desktop-node-commands';
 import { artifactService } from '../lib/artifact-service';
 import { artifactPersistence } from '../lib/artifact-persistence';
-import { createRepositoryOutput } from '../lib/repository-outputs';
+import { createRepositoryOutput, recordRepositoryAssetIndexEntry } from '../lib/repository-outputs';
 
 vi.mock('../lib/artifact-service', () => ({
   artifactService: {
@@ -30,11 +30,13 @@ vi.mock('../lib/repository-outputs', () => ({
     repositoryPreviewPath: output.previewPath,
   }),
   createRepositoryOutput: vi.fn(),
+  recordRepositoryAssetIndexEntry: vi.fn(),
 }));
 
 const mockedArtifactService = vi.mocked(artifactService);
 const mockedArtifactPersistence = vi.mocked(artifactPersistence);
 const mockedCreateRepositoryOutput = vi.mocked(createRepositoryOutput);
+const mockedRecordRepositoryAssetIndexEntry = vi.mocked(recordRepositoryAssetIndexEntry);
 
 describe('desktop node commands', () => {
   beforeEach(() => {
@@ -2090,6 +2092,56 @@ describe('desktop node commands', () => {
 
     expect(readText).toHaveBeenCalledWith('/repo', 'wiki/index.md');
     expect(search).toHaveBeenCalledWith('/repo', 'Index', ['wiki']);
+  });
+
+  it('records repository-local reusable assets through a structured repository command', async () => {
+    mockedRecordRepositoryAssetIndexEntry.mockResolvedValue({
+      indexPath: 'outputs/assets/index.md',
+      assetId: 'tools-release-check-sh',
+      assetPath: 'tools/release-check.sh',
+      recordOnly: true,
+      desktopExecutes: false,
+      grantsPermission: false,
+    });
+
+    await expect(
+      handleDesktopNodeCommand('desktop.repository.assets.record', {
+        repoPath: '/repo',
+        gatewayInstanceId: 'inst-1',
+        title: '发布检查脚本',
+        path: 'tools/release-check.sh',
+        reuseKind: 'script',
+        summary: '发布前检查脚本',
+        source: 'repository-manual',
+        version: '1',
+        tags: ['release', 'check'],
+        updatedAt: '2026-06-29T01:02:03.000Z',
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      asset: {
+        indexPath: 'outputs/assets/index.md',
+        assetId: 'tools-release-check-sh',
+        assetPath: 'tools/release-check.sh',
+        recordOnly: true,
+        desktopExecutes: false,
+        grantsPermission: false,
+      },
+    });
+
+    expect(mockedRecordRepositoryAssetIndexEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        binding: expect.objectContaining({ repoPath: '/repo', gatewayInstanceId: 'inst-1' }),
+        title: '发布检查脚本',
+        path: 'tools/release-check.sh',
+        reuseKind: 'script',
+        summary: '发布前检查脚本',
+        source: 'repository-manual',
+        version: '1',
+        tags: ['release', 'check'],
+        updatedAt: new Date('2026-06-29T01:02:03.000Z'),
+      }),
+    );
   });
 
   it('initializes and commits repository changes through structured repository commands', async () => {

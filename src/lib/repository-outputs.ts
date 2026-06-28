@@ -1,4 +1,4 @@
-import type { ArtifactMeta } from './artifact-types';
+import type { ArtifactMeta, ArtifactReuseKind } from './artifact-types';
 import type { RepositoryBinding } from './agentic-repository';
 import { loadRepositoryBinding } from './agentic-repository-store';
 import { buildArtifactVersionHistory } from './artifact-version-history';
@@ -20,6 +20,30 @@ export interface RepositoryOutputResult {
 }
 
 export type ArtifactRepositoryOutputUpdates = Pick<ArtifactMeta, 'repositoryOutputPath' | 'repositoryPreviewPath'>;
+
+export interface RecordRepositoryAssetIndexEntryParams {
+  binding: RepositoryBinding;
+  title: string;
+  path: string;
+  reuseKind: ArtifactReuseKind;
+  id?: string;
+  source?: string;
+  version?: string;
+  summary?: string;
+  tags?: string[];
+  updatedAt?: Date | string | number;
+}
+
+export interface RepositoryAssetIndexEntryResult {
+  indexPath: string;
+  assetId: string;
+  assetPath: string;
+  recordOnly: true;
+  desktopExecutes: false;
+  grantsPermission: false;
+}
+
+const DEFAULT_REPOSITORY_ASSET_INDEX_PATH = 'outputs/assets/index.md';
 
 const TYPE_DIR: Record<string, string> = {
   report: 'reports',
@@ -228,7 +252,7 @@ export async function createRepositoryOutput(params: CreateRepositoryOutputParam
   await repository.writeText(params.binding.repoPath, indexPath, nextIndex);
 
   if (params.artifact.reuseKind) {
-    const assetIndexPath = `${params.binding.paths.outputs}/assets/index.md`;
+    const assetIndexPath = getRepositoryAssetIndexPath(params.binding);
     const existingAssetIndex = await repository.readText(params.binding.repoPath, assetIndexPath);
     const nextAssetIndex = upsertOutputIndexEntry(
       ensureIndexTitle(existingAssetIndex, '# Reusable Assets'),
@@ -245,6 +269,33 @@ export function buildArtifactRepositoryOutputUpdates(output: RepositoryOutputRes
   return {
     repositoryOutputPath: output.outputPath,
     repositoryPreviewPath: output.previewPath,
+  };
+}
+
+export async function recordRepositoryAssetIndexEntry(
+  params: RecordRepositoryAssetIndexEntryParams,
+): Promise<RepositoryAssetIndexEntryResult> {
+  const repository = getRepositoryWriteApi();
+  const assetIndexPath = getRepositoryAssetIndexPath(params.binding);
+  const assetPath = normalizeRepositoryAssetPath(params.path, assetIndexPath);
+  const assetId = slugRepositoryAssetId(params.id ?? assetPath);
+  const existingAssetIndex = await repository.readText(params.binding.repoPath, assetIndexPath);
+  const indexEntry = buildRepositoryAssetIndexEntry({ ...params, id: assetId, path: assetPath }, assetIndexPath);
+  const nextAssetIndex = upsertOutputIndexEntry(
+    ensureIndexTitle(existingAssetIndex, '# Reusable Assets'),
+    assetPath,
+    indexEntry,
+  );
+
+  await repository.writeText(params.binding.repoPath, assetIndexPath, nextAssetIndex);
+
+  return {
+    indexPath: assetIndexPath,
+    assetId,
+    assetPath,
+    recordOnly: true,
+    desktopExecutes: false,
+    grantsPermission: false,
   };
 }
 
@@ -336,6 +387,27 @@ function buildReusableAssetIndexEntry(artifact: ArtifactMeta, outputPath: string
     .join('\n');
 }
 
+function buildRepositoryAssetIndexEntry(
+  params: Omit<RecordRepositoryAssetIndexEntryParams, 'binding'> & { id: string },
+  assetIndexPath: string,
+): string {
+  const source = params.source?.trim() || 'repository-manual';
+  const tags = params.tags?.map((tag) => tag.trim()).filter((tag) => tag.length > 0) ?? [];
+  const updatedAt = formatRepositoryAssetDate(params.updatedAt);
+  return [
+    `- [${params.title}](${buildRepositoryAssetIndexLink(params.path, assetIndexPath)}) (\`${params.id}\`, ${params.reuseKind}, ${source})`,
+    `  - source: ${source}`,
+    `  - path: ${params.path}`,
+    params.version ? `  - version: ${params.version}` : undefined,
+    updatedAt ? `  - updatedAt: ${updatedAt}` : undefined,
+    params.summary ? `  - summary: ${formatInlineText(params.summary)}` : undefined,
+    '  - boundary: recordOnly, desktopExecutes=false, grantsPermission=false',
+    tags.length > 0 ? `  - tags: ${tags.join(', ')}` : undefined,
+  ]
+    .filter((line): line is string => typeof line === 'string')
+    .join('\n');
+}
+
 function ensureIndexTitle(existingIndex: string, title: string): string {
   const trimmed = existingIndex.trimEnd();
   if (!trimmed) return `${title}\n`;
@@ -354,6 +426,51 @@ function upsertOutputIndexEntry(existingIndex: string, outputPath: string, index
   while (end < lines.length && lines[end].startsWith('  - ')) end += 1;
 
   return [...lines.slice(0, start), ...indexEntry.split('\n'), ...lines.slice(end)].join('\n').trimEnd() + '\n';
+}
+
+function getRepositoryAssetIndexPath(binding: RepositoryBinding): string {
+  return binding.paths.outputs ? `${binding.paths.outputs}/assets/index.md` : DEFAULT_REPOSITORY_ASSET_INDEX_PATH;
+}
+
+function normalizeRepositoryAssetPath(value: string, assetIndexPath: string): string {
+  const normalized = value.trim().replace(/\\/g, '/').replace(/\/+/g, '/').replace(/^\.\//, '');
+  const isWindowsAbsolutePath = /^[a-zA-Z]:\//.test(normalized);
+  const parts = normalized.split('/');
+  if (
+    !normalized ||
+    normalized.startsWith('/') ||
+    isWindowsAbsolutePath ||
+    normalized === assetIndexPath ||
+    parts.some((part) => !part || part === '.' || part === '..' || part === '.git')
+  ) {
+    throw new Error('invalid repository asset path');
+  }
+  return normalized;
+}
+
+function buildRepositoryAssetIndexLink(assetPath: string, assetIndexPath: string): string {
+  const fromParts = assetIndexPath.split('/').slice(0, -1);
+  const toParts = assetPath.split('/');
+  let common = 0;
+  while (common < fromParts.length && common < toParts.length && fromParts[common] === toParts[common]) common += 1;
+  const upParts = fromParts.slice(common).map(() => '..');
+  return [...upParts, ...toParts.slice(common)].join('/') || '.';
+}
+
+function slugRepositoryAssetId(value: string): string {
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'repository-asset'
+  );
+}
+
+function formatRepositoryAssetDate(value: Date | string | number | undefined): string | undefined {
+  if (value === undefined) return new Date().toISOString();
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : undefined;
 }
 
 function formatArtifactSource(artifact: ArtifactMeta): string {

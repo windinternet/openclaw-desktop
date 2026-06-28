@@ -1562,3 +1562,17 @@ HTML 的独特优势：
 仍未完成的 P0 后续：
 
 - 仍需要 AI 消化计划更细 UI、批准后写入 `wiki/` / 更新索引日志后的复盘联动、旧版二进制 Office/图片/OCR/音视频资料导入，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
+
+### 10.76 2026-06-29 当前实施记录：Repository 手动资产登记入口
+
+围绕“可复用资产一等对象不只来自 Artifact，也可能已经存在于仓库”的 P0 缺口，当前继续补齐仓库资产目录入口：
+
+- 新增 `recordRepositoryAssetIndexEntry`，可把仓库内已有脚本、模板、流程、HTML 或其他价值资产登记到 `outputs/assets/index.md`。
+- 新增 Desktop node command `desktop.repository.assets.record`，Gateway 可传入 `repoPath`、标题、仓库相对 `path`、`reuseKind`，以及可选来源、版本、摘要、标签和更新时间。
+- 资产索引条目会写入标题、相对链接、资产 id、复用分类、来源、路径、版本、摘要、标签和硬边界 `recordOnly, desktopExecutes=false, grantsPermission=false`。
+- 这让“仓库里已有的可复用资产”进入与 Artifact reusable outputs 相同的 Repository 可检索资产目录，而不是只能等待先变成 Artifact。
+- 该能力以当前代码事实为准：只维护资产索引，不读取任意本机路径、不打开文件、不执行资产、不授予权限、不自动生成运行记录、不自动写复盘、不更新事项状态、不写知识库。
+
+仍未完成的 P0 后续：
+
+- 仍需要更完整的 Repository 资产目录协议、资产权限面板、资产运行记录 UI、运行后成果/知识/复盘联动，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。

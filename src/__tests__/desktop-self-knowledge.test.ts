@@ -281,6 +281,8 @@ describe('desktop self-knowledge helpers', () => {
     );
     expect(skillContent).toContain('Repository `outputs/assets/index.md`');
     expect(skillContent).toContain('under the "Reusable Assets" heading');
+    expect(skillContent).toContain('desktop.repository.assets.record');
+    expect(skillContent).toContain('Repository-relative `path`');
     expect(skillContent).toContain('post-run review clue when available');
     expect(skillContent).toContain('recordOnly, desktopExecutes=false, grantsPermission=false');
     expect(skillContent).toContain('externalFormat');

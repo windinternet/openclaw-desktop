@@ -30,6 +30,7 @@ import { createDefaultRepositoryBinding, getRepositoryGateStatus } from './agent
 import {
   buildArtifactRepositoryOutputUpdates,
   createRepositoryOutput,
+  recordRepositoryAssetIndexEntry,
   type RepositoryOutputResult,
 } from './repository-outputs';
 
@@ -654,6 +655,35 @@ export async function handleDesktopNodeCommand(command: string, params: unknown)
     if (!repository?.writeText) return { ok: false, error: 'repository-api-unavailable' };
     await repository.writeText(repoPath, relativePath, content);
     return { ok: true, path: relativePath };
+  }
+
+  if (command === 'desktop.repository.assets.record') {
+    const repoPath = stringValue(params.repoPath);
+    const title = stringValue(params.title);
+    const relativePath = stringValue(params.path);
+    const reuseKind = artifactReuseKindValue(params.reuseKind);
+    if (!repoPath) return invalidParams('repoPath is required');
+    if (!title) return invalidParams('title is required');
+    if (!relativePath) return invalidParams('path is required');
+    if (!reuseKind) return invalidParams('reuseKind is required');
+
+    const asset = await recordRepositoryAssetIndexEntry({
+      binding: createDefaultRepositoryBinding({
+        gatewayInstanceId: stringValue(params.gatewayInstanceId) ?? 'desktop-node',
+        repoPath,
+      }),
+      id: stringValue(params.id),
+      title,
+      path: relativePath,
+      reuseKind,
+      source: stringValue(params.source) ?? 'repository-manual',
+      version: stringValue(params.version),
+      summary: stringValue(params.summary),
+      tags: tagsValue(params.tags),
+      updatedAt: dateValue(params.updatedAt),
+    });
+
+    return { ok: true, asset };
   }
 
   if (command === 'desktop.repository.search') {

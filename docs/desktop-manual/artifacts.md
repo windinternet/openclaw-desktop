@@ -112,3 +112,5 @@ HTML 产物可以通过 `artifactBridge.exportAs(typeOrOptions, content, fileNam
 `outputs/index.md` 是可扫读的产物目录。Desktop 会为每个镜像产物写入 Artifact 链接、`artifact://` 引用、来源、创建时间、更新时间、预览路径、外部格式、价值摘要、价值健康状态、内容抽取状态、内容事实状态、PDF 版本/页数、复用分类和标签等线索；同一路径再次镜像时会刷新旧条目，避免目录停留在过期状态。详细审计仍以单个产物 markdown 为准。
 
 普通聊天和 ActionRun 自动保存的产物都会优先进入 Artifact storage；仓库绑定就绪时，Desktop 会把它们镜像为 Repository outputs。若产物来自 ActionRun，ActionRun 的仓库摘要会尽量反向列出这些产物的标题、类型、Artifact 引用、Repository output 路径和 HTML preview 路径，让“非聊天式 AI 操作 -> 结果 -> 产物 -> 仓库沉淀”形成可追踪链路。文件型产物会镜像为 `outputs/files/<artifactId>.md`，其中包含来源、格式、摘要、版本历史摘要、可复用资产分类、复用记录摘要、文件路径审计信息、安全内容抽取事实，以及 PDF/Office OOXML best-effort 抽取和 PDF 版本/页数事实。
+
+仓库中已经存在的脚本、模板、流程、HTML 或其他价值资产，也可以通过 `desktop.repository.assets.record` 登记进 `outputs/assets/index.md`。该命令使用仓库相对路径、标题、`reuseKind`、来源、版本、摘要和标签维护资产目录，并写明 `recordOnly, desktopExecutes=false, grantsPermission=false` 边界；它不读取任意本机路径、不打开文件、不执行资产、不授予权限。

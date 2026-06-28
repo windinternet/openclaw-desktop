@@ -4,6 +4,7 @@ import {
   buildOutputMarkdown,
   createRepositoryOutput,
   mirrorArtifactToReadyRepositoryOutput,
+  recordRepositoryAssetIndexEntry,
 } from '../lib/repository-outputs';
 import type { ArtifactMeta } from '../lib/artifact-types';
 
@@ -591,6 +592,58 @@ describe('repository outputs', () => {
 
     expect(readText).not.toHaveBeenCalledWith('/repo', 'outputs/assets/index.md');
     expect(writeText.mock.calls.some((call) => call[1] === 'outputs/assets/index.md')).toBe(false);
+  });
+
+  it('records repository-local reusable assets into the asset index without executing them', async () => {
+    const writeText = vi.fn();
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'outputs/assets/index.md') return '# Reusable Assets\n';
+      return '';
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: {
+          writeText,
+          readText,
+        },
+      },
+    });
+
+    const result = await recordRepositoryAssetIndexEntry({
+      binding: createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      title: '发布检查脚本',
+      path: 'tools/release-check.sh',
+      reuseKind: 'script',
+      summary: '发布前检查脚本',
+      source: 'repository-manual',
+      version: '1',
+      tags: ['release', 'check'],
+      updatedAt: new Date('2026-06-29T01:02:03.000Z'),
+    });
+
+    expect(result).toEqual({
+      indexPath: 'outputs/assets/index.md',
+      assetId: 'tools-release-check-sh',
+      assetPath: 'tools/release-check.sh',
+      recordOnly: true,
+      desktopExecutes: false,
+      grantsPermission: false,
+    });
+    expect(readText).toHaveBeenCalledWith('/repo', 'outputs/assets/index.md');
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'outputs/assets/index.md',
+      expect.stringContaining(
+        '- [发布检查脚本](../../tools/release-check.sh) (`tools-release-check-sh`, script, repository-manual)',
+      ),
+    );
+    const assetIndexWrite = writeText.mock.calls.find((call) => call[1] === 'outputs/assets/index.md')?.[2] as string;
+    expect(assetIndexWrite).toContain('  - source: repository-manual');
+    expect(assetIndexWrite).toContain('  - path: tools/release-check.sh');
+    expect(assetIndexWrite).toContain('  - version: 1');
+    expect(assetIndexWrite).toContain('  - summary: 发布前检查脚本');
+    expect(assetIndexWrite).toContain('  - boundary: recordOnly, desktopExecutes=false, grantsPermission=false');
+    expect(assetIndexWrite).toContain('  - tags: release, check');
   });
 
   it('writes file artifacts into the repository files output bucket', async () => {
