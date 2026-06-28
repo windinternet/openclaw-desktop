@@ -360,11 +360,12 @@ HTML 产物是特色能力：
 - 创建复盘草稿时，Desktop 会把草稿相对链接写回来源事项的 `## 复盘` 小节；如果原小节只有 `- 暂无` 占位，会先移除占位。
 - `action-run-review:<runId>` 是来源执行记录，不是事项 `## 收尾动作` checklist ID；Workbench 可基于它创建 `reviews/weekly/` 复盘草稿，但不会显示或执行“确认复盘并完成尾动作”。
 - 如果 `reviews/weekly/` 已有同一 `workItemPath` 且 frontmatter 记录 `sourceExecutionId` 或 `tailActionId` 为 `action-run-review:<runId>` 的复盘草稿或复盘文档，Workbench 不再重复显示该计划执行的“写复盘”入口。
+- 当创建 `action-run-review:<runId>` 来源的复盘草稿时，Workbench 会查找同一来源事项下未失败/未取消、且输入包含 `action-run-knowledge:<runId>` 的 `knowledge_rewrite` ActionRun，把这些运行 ID 写入草稿 frontmatter 的 `relatedKnowledgeRunIds`、正文的“相关知识更新 ActionRun”和核对清单，帮助用户复盘知识更新是否已写入 Wiki/index/log 或确认无需写入。
 - 这些入口只提示用户显式判断并进入后续流程，不自动创建 Artifact 或 Repository output、不自动写 Wiki/index/log、不自动勾选事项 checklist 尾动作、不自动确认复盘、不移动事项文件。
 
 仍未完成：
 
-- 执行后的成果、知识更新和复盘已有发起入口；成果保存后的 Dashboard 重复提醒、知识更新发起后的 Workbench 重复入口、复盘草稿存在后的 Workbench 重复入口已按仓库事实消除，但真正 Wiki 写入后的复盘联动、复盘确认后的更完整状态表达和更自然的端到端体验仍需继续接上；成果候选提取和保存表单也仍需继续打磨。
+- 执行后的成果、知识更新和复盘已有发起入口；成果保存后的 Dashboard 重复提醒、知识更新发起后的 Workbench 重复入口、复盘草稿存在后的 Workbench 重复入口已按仓库事实消除；计划执行复盘草稿也会带入同源知识更新 ActionRun 供复盘核对。但真正 Wiki 写入后的复盘建议、复盘确认后的更完整状态表达和更自然的端到端体验仍需继续接上；成果候选提取和保存表单也仍需继续打磨。
 - 新用户从开箱第一事项自然进入计划、执行和产物沉淀的端到端体验仍未完整闭环。
 
 ### P0-7 可复用资产一等对象

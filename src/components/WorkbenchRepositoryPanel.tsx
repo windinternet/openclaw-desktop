@@ -26,6 +26,7 @@ import {
 import type { AiActionRun, AiActionRunStatus } from '../lib/types';
 import { extractWorkbenchMatterId, isWorkbenchMatterPath } from '../lib/workbench-matter';
 import {
+  findPlanExecutionKnowledgeFollowUpRuns,
   findLatestPlanExecutionRun,
   shouldOfferPlanExecutionKnowledgeUpdate,
   shouldOfferPlanExecutionOutputPreservation,
@@ -277,9 +278,16 @@ export default function WorkbenchRepositoryPanel({
 
     setReviewDraftWriting(true);
     try {
+      const sourceRun = context.id?.startsWith('action-run-review:')
+        ? activityRuns.find((run) => run.id === context.id?.replace(/^action-run-review:/, ''))
+        : undefined;
+      const relatedKnowledgeRunIds = findPlanExecutionKnowledgeFollowUpRuns(sourceRun, {
+        actionRuns: activityRuns,
+      }).map((run) => run.id);
       const draft = await writeWorkbenchReviewDraft(binding, {
         workItemPath: context.workItemPath,
         tailActionId: context.id,
+        relatedKnowledgeRunIds,
       });
       setSelectedPreviewPath(draft.path);
       setSelectedPreviewContent(draft.content);

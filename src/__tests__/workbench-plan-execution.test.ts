@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  findPlanExecutionKnowledgeFollowUpRuns,
   findLatestPlanExecutionRun,
   getPlanExecutionPlanPath,
   shouldOfferPlanExecutionKnowledgeUpdate,
@@ -186,6 +187,45 @@ describe('workbench plan execution observability', () => {
     });
 
     expect(shouldOfferPlanExecutionKnowledgeUpdate(planRun, { actionRuns: [knowledgeRun] })).toBe(false);
+  });
+
+  it('finds active source-bound knowledge follow-up runs for a plan execution', () => {
+    const planRun = createRun({
+      id: 'run-plan',
+      status: 'done',
+      resultSummary: '完成打包验证',
+      workItemPath: 'work/active/release.md',
+    });
+    const runningKnowledgeRun = createRun({
+      id: 'run-knowledge-running',
+      type: 'knowledge_rewrite',
+      status: 'running',
+      input: '知识更新\n来源执行记录 action-run-knowledge:run-plan',
+      workItemPath: 'work/active/release.md',
+      updatedAt: 10,
+    });
+    const failedKnowledgeRun = createRun({
+      id: 'run-knowledge-failed',
+      type: 'knowledge_rewrite',
+      status: 'failed',
+      input: '知识更新\n来源执行记录 action-run-knowledge:run-plan',
+      workItemPath: 'work/active/release.md',
+      updatedAt: 11,
+    });
+    const otherMatterKnowledgeRun = createRun({
+      id: 'run-knowledge-other',
+      type: 'knowledge_rewrite',
+      status: 'done',
+      input: '知识更新\n来源执行记录 action-run-knowledge:run-plan',
+      workItemPath: 'work/active/other.md',
+      updatedAt: 12,
+    });
+
+    expect(
+      findPlanExecutionKnowledgeFollowUpRuns(planRun, {
+        actionRuns: [failedKnowledgeRun, otherMatterKnowledgeRun, runningKnowledgeRun],
+      }).map((run) => run.id),
+    ).toEqual(['run-knowledge-running']);
   });
 
   it('still offers knowledge update when the previous source-bound knowledge ActionRun failed', () => {

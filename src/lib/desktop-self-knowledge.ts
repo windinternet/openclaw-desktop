@@ -87,6 +87,8 @@ export function buildDesktopSelfKnowledgeSkillContent(): string {
     '',
     'Workbench plan execution follow-up buttons also observe existing downstream facts. If the same work matter already has a non-failed, non-cancelled `knowledge_rewrite` ActionRun whose input mentions `action-run-knowledge:<runId>`, the selected plan preview should not show another Update Knowledge button for that `plan_execute` run. If a loaded review document has matching `workItemPath` and `sourceExecutionId` or `tailActionId` equal to `action-run-review:<runId>`, the selected plan preview should not show another Write Review button for that run. This only deduplicates follow-up entry points; it does not write Wiki/index/log, confirm reviews, check off matter tail actions, update matter status, preserve outputs, or move matter files.',
     '',
+    'When Workbench creates a review draft for `action-run-review:<runId>`, it can carry same-matter, non-failed, non-cancelled `knowledge_rewrite` follow-ups whose input mentions `action-run-knowledge:<runId>` into the draft as `relatedKnowledgeRunIds`, a related ActionRun line, and a checklist item to verify whether Wiki/index/log was updated or no write was needed. This is review context only; it does not write knowledge, confirm the review, or check off matter tail actions.',
+    '',
     '## Artifacts',
     '',
     'Artifacts are OpenClaw Desktop P0 value objects. Any valuable result can become an Artifact when it can be saved, previewed, reused, delivered, or tracked.',

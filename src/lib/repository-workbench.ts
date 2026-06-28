@@ -64,6 +64,7 @@ export interface WorkbenchTailAction {
 export interface WorkbenchReviewDraftInput {
   workItemPath: string;
   tailActionId?: string;
+  relatedKnowledgeRunIds?: string[];
   createdAt?: Date;
 }
 
@@ -506,6 +507,7 @@ export async function writeWorkbenchReviewDraft(
   const content = buildWorkbenchReviewDraftMarkdown({
     workItemPath,
     tailActionId: input.tailActionId,
+    relatedKnowledgeRunIds: input.relatedKnowledgeRunIds,
     createdAt,
   });
 
@@ -928,9 +930,11 @@ function buildWorkbenchReviewDraftSourceSlug(tailActionId?: string): string {
 function buildWorkbenchReviewDraftMarkdown(input: {
   workItemPath: string;
   tailActionId?: string;
+  relatedKnowledgeRunIds?: string[];
   createdAt: Date;
 }): string {
   const sourceExecutionId = isActionRunReviewTailActionId(input.tailActionId) ? input.tailActionId : undefined;
+  const relatedKnowledgeRunIds = dedupeRelatedRunIds(input.relatedKnowledgeRunIds);
   return [
     '---',
     sourceExecutionId
@@ -939,6 +943,7 @@ function buildWorkbenchReviewDraftMarkdown(input: {
     `workItemPath: ${input.workItemPath}`,
     input.tailActionId ? `tailActionId: ${input.tailActionId}` : undefined,
     sourceExecutionId ? `sourceExecutionId: ${sourceExecutionId}` : undefined,
+    relatedKnowledgeRunIds.length ? `relatedKnowledgeRunIds: ${relatedKnowledgeRunIds.join(', ')}` : undefined,
     `createdAt: ${input.createdAt.toISOString()}`,
     'status: draft',
     '---',
@@ -951,6 +956,9 @@ function buildWorkbenchReviewDraftMarkdown(input: {
       : input.tailActionId
         ? `来源尾动作: \`${input.tailActionId}\``
         : undefined,
+    relatedKnowledgeRunIds.length
+      ? `相关知识更新 ActionRun: ${relatedKnowledgeRunIds.map((id) => `\`${id}\``).join(', ')}`
+      : undefined,
     '',
     '## 核对清单',
     '',
@@ -958,6 +966,9 @@ function buildWorkbenchReviewDraftMarkdown(input: {
     '- [ ] 核对关联执行记录、运行摘要和错误信息。',
     '- [ ] 核对已经沉淀的成果、产物或 Repository output。',
     '- [ ] 判断是否需要更新知识库、计划或后续事项。',
+    relatedKnowledgeRunIds.length
+      ? '- [ ] 核对相关知识更新 ActionRun 是否已写入 Wiki/index/log 或确认无需写入。'
+      : undefined,
     '- [ ] 判断是否需要把该尾动作标记完成。',
     '',
     '## 复盘正文',
@@ -971,6 +982,18 @@ function buildWorkbenchReviewDraftMarkdown(input: {
   ]
     .filter((line): line is string => line !== undefined)
     .join('\n');
+}
+
+function dedupeRelatedRunIds(values?: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values ?? []) {
+    const trimmed = value.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    result.push(trimmed);
+  }
+  return result;
 }
 
 function markWorkbenchReviewDraftConfirmed(markdown: string, reviewedAt: Date): string | null {

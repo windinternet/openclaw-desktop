@@ -623,6 +623,36 @@ describe('repository workbench', () => {
     );
   });
 
+  it('writes related knowledge ActionRuns into a plan execution review draft', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'work/active/release.md') {
+        return ['# 发布推进', '', '## 复盘', '', '- 暂无'].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const input = {
+      workItemPath: 'work/active/release.md',
+      tailActionId: 'action-run-review:run-1',
+      relatedKnowledgeRunIds: ['run-knowledge'],
+      createdAt: new Date('2026-06-28T10:00:00.000Z'),
+    };
+    const draft = await writeWorkbenchReviewDraft(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      input,
+    );
+
+    expect(draft.content).toContain('relatedKnowledgeRunIds: run-knowledge');
+    expect(draft.content).toContain('相关知识更新 ActionRun: `run-knowledge`');
+    expect(draft.content).toContain('- [ ] 核对相关知识更新 ActionRun 是否已写入 Wiki/index/log 或确认无需写入。');
+  });
+
   it('confirms a review draft and completes the matching source tail action', async () => {
     const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
       if (relativePath === 'reviews/weekly/2026-06-28-work-release-tail-action-1-review.md') {
@@ -1312,6 +1342,7 @@ describe('repository workbench', () => {
 
     expect(source).toContain('shouldOfferPlanExecutionReview');
     expect(source).toContain('reviewDocuments: snapshot?.reviewDocuments');
+    expect(source).toContain('relatedKnowledgeRunIds');
     expect(source).toContain('buildDashboardTailActionTarget');
     expect(source).toContain("kind: 'review'");
     expect(source).toContain('`action-run-review:${selectedPlanLatestRun.id}`');

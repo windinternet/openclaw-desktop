@@ -68,17 +68,23 @@ export function shouldOfferPlanExecutionReview(
   );
 }
 
-function hasPlanExecutionKnowledgeFollowUp(run: AiActionRun, context: PlanExecutionFollowUpContext): boolean {
+export function findPlanExecutionKnowledgeFollowUpRuns(
+  run: AiActionRun | undefined,
+  context: PlanExecutionFollowUpContext,
+): AiActionRun[] {
+  if (!run?.workItemPath) return [];
   const sourceExecutionId = `action-run-knowledge:${run.id}`;
-  return Boolean(
-    context.actionRuns?.some(
-      (candidate) =>
-        candidate.type === 'knowledge_rewrite' &&
-        candidate.workItemPath === run.workItemPath &&
-        isActiveFollowUpRun(candidate) &&
-        candidate.input.includes(sourceExecutionId),
-    ),
+  return (context.actionRuns ?? []).filter(
+    (candidate) =>
+      candidate.type === 'knowledge_rewrite' &&
+      candidate.workItemPath === run.workItemPath &&
+      isActiveFollowUpRun(candidate) &&
+      candidate.input.includes(sourceExecutionId),
   );
+}
+
+function hasPlanExecutionKnowledgeFollowUp(run: AiActionRun, context: PlanExecutionFollowUpContext): boolean {
+  return findPlanExecutionKnowledgeFollowUpRuns(run, context).length > 0;
 }
 
 function hasPlanExecutionReviewFollowUp(run: AiActionRun, context: PlanExecutionFollowUpContext): boolean {
