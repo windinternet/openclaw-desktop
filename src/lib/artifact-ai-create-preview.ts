@@ -71,6 +71,11 @@ export function normalizeArtifactAICreatePreviewDraft(preview: ArtifactAICreateP
     title: preview.title.trim(),
     description: trimmedStringValue(preview.description),
     tags: normalizeTags(preview.tags),
+    url: trimmedStringValue(preview.url),
+    command: trimmedStringValue(preview.command),
+    filePath: trimmedStringValue(preview.filePath),
+    fileName: trimmedStringValue(preview.fileName),
+    mimeType: trimmedStringValue(preview.mimeType),
     contentSummary: trimmedStringValue(preview.contentSummary),
   };
 }

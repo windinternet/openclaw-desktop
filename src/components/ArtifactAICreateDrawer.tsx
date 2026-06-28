@@ -8,6 +8,7 @@ import {
   Spin,
   Tag,
   TagInput,
+  Checkbox,
   Toast,
   Typography,
   Space,
@@ -27,7 +28,7 @@ import {
 import { useWorkbenchWorkItemOptions } from '../lib/workbench-work-items';
 import { ActionRunWorkItemPicker } from './ActionRunWorkItemPicker';
 import type { AiActionRun } from '../lib/types';
-import type { ArtifactMeta, ArtifactType } from '../lib/artifact-types';
+import type { ArtifactExternalFormat, ArtifactMeta, ArtifactReuseKind, ArtifactType } from '../lib/artifact-types';
 
 const { Text, Paragraph } = Typography;
 
@@ -61,7 +62,52 @@ const HTML_PREVIEW_TYPES = new Set<ArtifactType>([
   'other',
 ]);
 
+const LINK_DETAIL_TYPES = new Set<ArtifactType>(['link', 'app']);
+const COMMAND_DETAIL_TYPES = new Set<ArtifactType>(['app', 'code']);
+const FILE_DETAIL_TYPES = new Set<ArtifactType>([
+  'file',
+  'audio',
+  'image',
+  'video',
+  'document',
+  'slide',
+  'code',
+  'other',
+]);
+
+const ARTIFACT_EXTERNAL_FORMAT_OPTIONS: { value: ArtifactExternalFormat; label: string }[] = [
+  { value: 'html', label: 'HTML' },
+  { value: 'link', label: '链接' },
+  { value: 'app', label: '应用' },
+  { value: 'word', label: 'Word' },
+  { value: 'excel', label: 'Excel' },
+  { value: 'powerpoint', label: 'PowerPoint' },
+  { value: 'pdf', label: 'PDF' },
+  { value: 'image', label: '图片' },
+  { value: 'audio', label: '音频' },
+  { value: 'video', label: '视频' },
+  { value: 'text', label: '文本' },
+  { value: 'code', label: '代码' },
+  { value: 'file', label: '文件' },
+  { value: 'unknown', label: '未知' },
+];
+
+const ARTIFACT_REUSE_KIND_OPTIONS: { value: ArtifactReuseKind; label: string }[] = [
+  { value: 'asset', label: '通用资产' },
+  { value: 'template', label: '模板' },
+  { value: 'tool', label: '工具' },
+  { value: 'script', label: '脚本' },
+  { value: 'workflow', label: '工作流' },
+];
+
 const editLabelStyle = { marginBottom: 4, fontSize: 13, fontWeight: 500, color: 'var(--semi-color-text-0)' } as const;
+
+function parseEditedFileSize(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
 
 interface Props {
   visible: boolean;
@@ -113,6 +159,24 @@ export function ArtifactAICreateDrawer({
     preview &&
     preview.html !== undefined &&
     (preview.externalFormat === 'html' || HTML_PREVIEW_TYPES.has(preview.type) || preview.html.trim()),
+  );
+  const canEditLinkDetails = Boolean(preview && (LINK_DETAIL_TYPES.has(preview.type) || preview.url !== undefined));
+  const canEditCommandDetails = Boolean(
+    preview &&
+    (COMMAND_DETAIL_TYPES.has(preview.type) ||
+      preview.command !== undefined ||
+      preview.reuseKind === 'tool' ||
+      preview.reuseKind === 'script' ||
+      preview.reuseKind === 'workflow'),
+  );
+  const canEditFileDetails = Boolean(
+    preview &&
+    (FILE_DETAIL_TYPES.has(preview.type) ||
+      preview.filePath !== undefined ||
+      preview.fileName !== undefined ||
+      preview.fileSize !== undefined ||
+      preview.mimeType !== undefined ||
+      preview.importFile !== undefined),
   );
 
   useEffect(() => {
@@ -351,7 +415,8 @@ export function ArtifactAICreateDrawer({
             )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <Text type="tertiary" size="small">
-                保存前可编辑标题、类型、说明、标签、价值摘要和 HTML 正文；文件、链接和来源记录保持 AI 生成事实。
+                保存前可编辑标题、类型、说明、标签、价值摘要、HTML 正文、文件和链接细节；来源记录和权限边界保持 AI
+                生成事实。
               </Text>
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 132px', gap: 8 }}>
                 <div>
@@ -408,6 +473,114 @@ export function ArtifactAICreateDrawer({
                   </Text>
                 </div>
               )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={editLabelStyle}>{t('artifact.aiCreateExternalDetails')}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 8 }}>
+                  <div>
+                    <Text type="tertiary" size="small">
+                      {t('artifact.externalFormat')}
+                    </Text>
+                    <Select
+                      value={preview.externalFormat}
+                      onChange={(value) =>
+                        updateSelectedPreview({
+                          externalFormat: typeof value === 'string' ? (value as ArtifactExternalFormat) : undefined,
+                        })
+                      }
+                      optionList={ARTIFACT_EXTERNAL_FORMAT_OPTIONS}
+                      placeholder={t('artifact.externalFormat')}
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+                  <div>
+                    <Text type="tertiary" size="small">
+                      {t('artifact.reuseKind')}
+                    </Text>
+                    <Select
+                      value={preview.reuseKind}
+                      onChange={(value) =>
+                        updateSelectedPreview({
+                          reuseKind: typeof value === 'string' ? (value as ArtifactReuseKind) : undefined,
+                        })
+                      }
+                      optionList={ARTIFACT_REUSE_KIND_OPTIONS}
+                      placeholder={t('artifact.reuseKind')}
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+                </div>
+                {canEditLinkDetails && (
+                  <div>
+                    <Text type="tertiary" size="small">
+                      {t('artifact.aiCreateUrl')}
+                    </Text>
+                    <Input value={preview.url ?? ''} onChange={(value) => updateSelectedPreview({ url: value })} />
+                  </div>
+                )}
+                {canEditCommandDetails && (
+                  <div>
+                    <Text type="tertiary" size="small">
+                      {t('artifact.aiCreateCommand')}
+                    </Text>
+                    <TextArea
+                      value={preview.command ?? ''}
+                      onChange={(value) => updateSelectedPreview({ command: value })}
+                      autosize={{ minRows: 2, maxRows: 4 }}
+                    />
+                  </div>
+                )}
+                {canEditFileDetails && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div>
+                      <Text type="tertiary" size="small">
+                        {t('artifact.aiCreateFilePath')}
+                      </Text>
+                      <Input
+                        value={preview.filePath ?? ''}
+                        onChange={(value) => updateSelectedPreview({ filePath: value })}
+                      />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 120px', gap: 8 }}>
+                      <div>
+                        <Text type="tertiary" size="small">
+                          {t('artifact.aiCreateFileName')}
+                        </Text>
+                        <Input
+                          value={preview.fileName ?? ''}
+                          onChange={(value) => updateSelectedPreview({ fileName: value })}
+                        />
+                      </div>
+                      <div>
+                        <Text type="tertiary" size="small">
+                          {t('artifact.aiCreateFileSize')}
+                        </Text>
+                        <Input
+                          value={preview.fileSize === undefined ? '' : String(preview.fileSize)}
+                          onChange={(value) => updateSelectedPreview({ fileSize: parseEditedFileSize(value) })}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Text type="tertiary" size="small">
+                        {t('artifact.aiCreateMimeType')}
+                      </Text>
+                      <Input
+                        value={preview.mimeType ?? ''}
+                        onChange={(value) => updateSelectedPreview({ mimeType: value })}
+                      />
+                    </div>
+                    <Checkbox
+                      checked={preview.importFile === true}
+                      onChange={(event) => updateSelectedPreview({ importFile: event.target.checked ?? false })}
+                    >
+                      {t('artifact.aiCreateImportFile')}
+                    </Checkbox>
+                  </div>
+                )}
+                <Text type="tertiary" size="small">
+                  {t('artifact.aiCreateExternalDetailsHint')}
+                </Text>
+              </div>
             </div>
             <div
               style={{

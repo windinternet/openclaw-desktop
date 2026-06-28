@@ -69,6 +69,32 @@ describe('artifact ActionRun linkage', () => {
     expect(en.artifact.aiCreateHtmlBody).toBeTruthy();
   });
 
+  it('lets users edit selected AI-created file and link details before saving', () => {
+    const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
+    const preview = readFileSync('src/lib/artifact-ai-create-preview.ts', 'utf8');
+    const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
+    const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
+
+    expect(drawer).toContain("t('artifact.aiCreateExternalDetails')");
+    expect(drawer).toContain("t('artifact.aiCreateUrl')");
+    expect(drawer).toContain("t('artifact.aiCreateCommand')");
+    expect(drawer).toContain("t('artifact.aiCreateFilePath')");
+    expect(drawer).toContain("t('artifact.aiCreateFileName')");
+    expect(drawer).toContain("t('artifact.aiCreateMimeType')");
+    expect(drawer).toContain("t('artifact.aiCreateFileSize')");
+    expect(drawer).toContain("t('artifact.aiCreateImportFile')");
+    expect(drawer).toContain('updateSelectedPreview({ url: value })');
+    expect(drawer).toContain('updateSelectedPreview({ command: value })');
+    expect(drawer).toContain('updateSelectedPreview({ filePath: value })');
+    expect(drawer).toContain('updateSelectedPreview({ fileName: value })');
+    expect(drawer).toContain('updateSelectedPreview({ mimeType: value })');
+    expect(drawer).toContain('parseEditedFileSize(value)');
+    expect(preview).toContain('url: trimmedStringValue(preview.url)');
+    expect(preview).toContain('filePath: trimmedStringValue(preview.filePath)');
+    expect(zh.artifact.aiCreateExternalDetails).toBeTruthy();
+    expect(en.artifact.aiCreateExternalDetails).toBeTruthy();
+  });
+
   it('notifies ActionRun observers after saving an AI-created artifact output', () => {
     const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
     const store = readFileSync('src/lib/store.ts', 'utf8');

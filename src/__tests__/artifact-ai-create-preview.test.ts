@@ -141,6 +141,51 @@ describe('artifact AI create preview', () => {
     );
   });
 
+  it('normalizes user-edited link and file details before saving', () => {
+    const draft = normalizeArtifactAICreatePreviewDraft({
+      title: '  用户校正后的资料包  ',
+      type: 'file',
+      url: '  https://example.com/report.xlsx  ',
+      command: '  open report.xlsx  ',
+      filePath: '  /Users/deepin/Documents/report.xlsx  ',
+      fileName: '  report.xlsx  ',
+      fileSize: 4096,
+      mimeType: '  application/vnd.openxmlformats-officedocument.spreadsheetml.sheet  ',
+      externalFormat: 'excel',
+      reuseKind: 'asset',
+      importFile: true,
+    });
+
+    expect(draft).toEqual(
+      expect.objectContaining({
+        title: '用户校正后的资料包',
+        url: 'https://example.com/report.xlsx',
+        command: 'open report.xlsx',
+        filePath: '/Users/deepin/Documents/report.xlsx',
+        fileName: 'report.xlsx',
+        fileSize: 4096,
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        externalFormat: 'excel',
+        reuseKind: 'asset',
+        importFile: true,
+      }),
+    );
+    expect(buildArtifactAICreateGenerateParams(draft, 'run-file')).toEqual(
+      expect.objectContaining({
+        url: 'https://example.com/report.xlsx',
+        command: 'open report.xlsx',
+        filePath: '/Users/deepin/Documents/report.xlsx',
+        fileName: 'report.xlsx',
+        fileSize: 4096,
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        externalFormat: 'excel',
+        reuseKind: 'asset',
+        importFile: true,
+        source: { type: 'action_run', id: 'run-file', name: 'AI 魔法创建' },
+      }),
+    );
+  });
+
   it('keeps legacy ai-action result parsing for simple artifacts', () => {
     const preview = parseArtifactAICreatePreview(
       [
