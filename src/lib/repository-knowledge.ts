@@ -68,7 +68,8 @@ export type KnowledgeHealthIssueKind =
   | 'stale_index_entry'
   | 'broken_knowledge_link'
   | 'wiki_without_source_reference'
-  | 'long_unreviewed_work_item';
+  | 'long_unreviewed_work_item'
+  | 'contradictory_knowledge_record';
 
 export interface KnowledgeHealthIssue {
   id: string;
@@ -228,6 +229,18 @@ export async function loadKnowledgeSnapshot(
       indexEntries,
       linkedKnowledgePaths,
       brokenKnowledgeLinks,
+      contradictionContents: [
+        ...wikiContents.map((file) => ({
+          path: file.path,
+          content: file.content,
+          updatedAt: wiki.find((item) => item.path === file.path)?.updatedAt,
+        })),
+        {
+          path: mapping.logPath,
+          content: logMarkdown,
+          updatedAt: rawWiki.find((file) => file.path === mapping.logPath)?.updatedAt,
+        },
+      ],
       workItems: [...activeWorkItems, ...somedayWorkItems],
       weeklyReviewContents,
       now: options.now ?? new Date(),
@@ -514,6 +527,7 @@ export function buildKnowledgeHealthReview(input: KnowledgeHealthReviewInput): K
     '- [ ] 更新 `wiki/index.md`，移除或修正陈旧索引。',
     '- [ ] 复查本周新增 Wiki 是否引用了原始资料源。',
     '- [ ] 为长期未复盘事项补一条 `reviews/weekly/` 复盘，或把事项状态调整为完成/暂停。',
+    '- [ ] 复核相互矛盾记录，确认保留说法、废弃说法和需要更新的 Wiki/log。',
     '- [ ] 必要时发起 Knowledge ActionRun，写入 Wiki、索引和日志。',
     '',
   ].join('\n');
@@ -600,6 +614,7 @@ function buildKnowledgeHealthReport(options: {
   indexEntries: KnowledgeIndexEntry[];
   linkedKnowledgePaths: Set<string>;
   brokenKnowledgeLinks: KnowledgeHealthIssue[];
+  contradictionContents: Array<{ path: string; content: string; updatedAt?: number }>;
   workItems: RepositoryMarkdownFile[];
   weeklyReviewContents: Array<{ file: RepositoryMarkdownFile; content: string }>;
   now: Date;
@@ -654,6 +669,7 @@ function buildKnowledgeHealthReport(options: {
   }
 
   issues.push(...dedupeKnowledgeHealthIssues(options.brokenKnowledgeLinks));
+  issues.push(...buildContradictionIssues(options.binding, options.contradictionContents));
 
   for (const file of options.wikiContents) {
     if (file.path === mapping.indexPath || file.path === mapping.logPath) continue;
@@ -721,6 +737,50 @@ function buildLongUnreviewedWorkIssues(options: {
       targetPath: `${options.binding.paths.reviews}/weekly/`,
       updatedAt: file.updatedAt,
     }));
+}
+
+function buildContradictionIssues(
+  binding: RepositoryBinding,
+  contents: Array<{ path: string; content: string; updatedAt?: number }>,
+): KnowledgeHealthIssue[] {
+  const issues: KnowledgeHealthIssue[] = [];
+  for (const file of contents) {
+    file.content.split(/\r?\n/).forEach((line, index) => {
+      const marker = extractContradictionMarker(line);
+      if (!marker) return;
+      const targetPath = extractContradictionTarget(binding, file.path, marker);
+      issues.push({
+        id: `contradiction:${file.path}:${index + 1}`,
+        kind: 'contradictory_knowledge_record',
+        severity: 'warning',
+        title: '相互矛盾记录',
+        detail: `检测到明确标记的知识矛盾：${marker}`,
+        path: file.path,
+        targetPath,
+        updatedAt: file.updatedAt,
+      });
+    });
+  }
+  return issues;
+}
+
+function extractContradictionMarker(line: string): string | null {
+  const normalized = line
+    .replace(/^\s*(?:[-*+]|\d+\.)\s+/, '')
+    .replace(/^>\s*/, '')
+    .trim();
+  const match = normalized.match(/^(?:contradiction|conflict|conflictsWith|矛盾|冲突)\s*[:：]\s*(.+)$/i);
+  return match?.[1]?.trim() || null;
+}
+
+function extractContradictionTarget(
+  binding: RepositoryBinding,
+  sourcePath: string,
+  marker: string,
+): string | undefined {
+  const firstLink = extractMarkdownLinks(marker)[0];
+  if (!firstLink) return undefined;
+  return normalizeKnowledgeLink(binding, sourcePath, firstLink) ?? undefined;
 }
 
 function hasRecentReviewForWorkItem(

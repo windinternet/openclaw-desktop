@@ -236,12 +236,12 @@ HTML 产物是特色能力：
 - 未消化资料队列。
 - 资料消化为 Wiki。
 - 自动更新 `wiki/index.md` 和 `wiki/log.md`。
-- 健康检查：孤立资料、断链、过期索引、无来源 Wiki、长期未复盘事项。
+- 健康检查：孤立资料、断链、过期索引、无来源 Wiki、长期未复盘事项、相互矛盾记录。
 
 当前代码事实：
 
-- `loadKnowledgeSnapshot` 会基于 `sources/`、`wiki/`、`wiki/index.md`、Wiki 内部链接、`work/active/`、`work/someday/` 和 `reviews/weekly/` 生成只读 `health` 报告。
-- 第一片健康检查已覆盖孤立资料、未进入索引的 Wiki、陈旧索引条目、知识库内断链、没有来源引用的 Wiki 和长期未复盘事项。
+- `loadKnowledgeSnapshot` 会基于 `sources/`、`wiki/`、`wiki/index.md`、Wiki 内部链接、`work/active/`、`work/someday/`、`reviews/weekly/` 和显式矛盾标记生成只读 `health` 报告。
+- 第一片健康检查已覆盖孤立资料、未进入索引的 Wiki、陈旧索引条目、知识库内断链、没有来源引用的 Wiki、长期未复盘事项和相互矛盾记录。
 - Knowledge 页面新增“健康检查”视图，`/knowledge?section=health` 会直接打开问题列表。
 - Dashboard 会把知识健康问题作为 `knowledgeUpdates` 展示，并通过 `/knowledge?section=health` 跳转到 Knowledge 健康检查。
 - `loadKnowledgeSnapshot` 现在会生成 `undigestedSources`，把未出现在索引、也未被 Wiki 引用的资料源列为未消化资料。
@@ -253,7 +253,8 @@ HTML 产物是特色能力：
 - Knowledge 页面新增“剪藏 URL”入口，可把网页链接和可选摘录/备注写入 `sources/imported/YYYY-MM-DD-HHmmss-*.md`，frontmatter 标记 `source: desktop-url` 和 `url`；当前不后台抓取网页正文。
 - Knowledge 页面新增“写入周复盘”入口，可把当前健康报告写入 `reviews/weekly/YYYY-MM-DD-knowledge-health.md`，让健康检查进入复盘事实源。
 - 长期未复盘事项会检查 `work/active/` 与 `work/someday/` 中超过阈值且没有近期 `reviews/weekly/` 复盘引用的工作事项。
-- 当前健康检查不自动修复索引、Wiki 或资料来源；Office/PDF/二进制内容导入仍是 P0 后续。
+- 相互矛盾记录会检查 Wiki 或 `wiki/log.md` 中用 `矛盾:`、`冲突:`、`contradiction:`、`conflict:` 或 `conflictsWith:` 明确标记的记录。
+- 当前健康检查不自动修复索引、Wiki 或资料来源，也不做模型语义推断式矛盾发现；Office/PDF/二进制内容导入仍是 P0 后续。
 
 验收：
 

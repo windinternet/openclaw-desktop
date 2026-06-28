@@ -475,6 +475,54 @@ describe('repository knowledge', () => {
     ]);
   });
 
+  it('flags explicitly marked contradictions in knowledge health', async () => {
+    const listMarkdown = vi.fn(async (_repoPath: string, directory: string) => {
+      if (directory === 'sources') return [{ path: 'sources/raw.md', name: 'raw.md', size: 20, updatedAt: 1 }];
+      if (directory === 'wiki') {
+        return [
+          { path: 'wiki/topic.md', name: 'topic.md', size: 80, updatedAt: 6 },
+          { path: 'wiki/legacy.md', name: 'legacy.md', size: 60, updatedAt: 5 },
+        ];
+      }
+      return [];
+    });
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'wiki/index.md') {
+        return ['# Knowledge Index', '- [Topic](topic.md)', '- [Legacy](legacy.md)', '- [Raw](../sources/raw.md)'].join(
+          '\n',
+        );
+      }
+      if (relativePath === 'wiki/log.md') return '# Wiki Log';
+      if (relativePath === 'wiki/topic.md') {
+        return '# Topic\n\n矛盾：当前说法与 [Legacy](legacy.md) 冲突，需复核。来源 [Raw](../sources/raw.md)。';
+      }
+      if (relativePath === 'wiki/legacy.md') return '# Legacy\n\n[Raw](../sources/raw.md)';
+      return '';
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { listMarkdown, readText },
+      },
+    });
+
+    const snapshot = await loadKnowledgeSnapshot({
+      ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      status: 'repo_ready',
+    });
+
+    expect(snapshot.health.counts.total).toBe(1);
+    expect(snapshot.health.issues).toEqual([
+      expect.objectContaining({
+        id: 'contradiction:wiki/topic.md:3',
+        kind: 'contradictory_knowledge_record',
+        severity: 'warning',
+        title: '相互矛盾记录',
+        path: 'wiki/topic.md',
+        targetPath: 'wiki/legacy.md',
+      }),
+    ]);
+  });
+
   it('builds and writes weekly knowledge health reviews', async () => {
     const now = new Date('2026-06-28T07:08:09.000Z');
     const health = {
@@ -542,6 +590,7 @@ describe('repository knowledge', () => {
         '- [ ] 更新 `wiki/index.md`，移除或修正陈旧索引。',
         '- [ ] 复查本周新增 Wiki 是否引用了原始资料源。',
         '- [ ] 为长期未复盘事项补一条 `reviews/weekly/` 复盘，或把事项状态调整为完成/暂停。',
+        '- [ ] 复核相互矛盾记录，确认保留说法、废弃说法和需要更新的 Wiki/log。',
         '- [ ] 必要时发起 Knowledge ActionRun，写入 Wiki、索引和日志。',
         '',
       ].join('\n'),

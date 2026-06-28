@@ -123,7 +123,7 @@ Skill 应包含：
 - 终态 ActionRun 的 `lastAssistantResponse` 如果包含 `<artifact>` 块，Desktop 会自动保存为 `source: action_run` 的 Artifact，并把 Artifact id 回写到 ActionRun。
 - ActionRun 产生产物后，仓库 run 摘要会尽量写入产物标题、类型、Artifact 引用和 Repository output / preview 路径。
 - ActionRun 关联事项后追加的 `## 收尾动作` 会进入 Dashboard 待确认；Dashboard 会把它们分类为 `tail-action:status / output / knowledge / review`，分别导向 Workbench 状态处理、Artifacts、Knowledge 或 Workbench 复盘后续。目标 URL 会携带 `tailAction / tailActionId / workItemPath`；Artifacts 会打开 AI 产物创建入口并带上来源事项，成果类尾动作会预填沉淀成果意图，Workbench/Knowledge 会显示来源上下文。标记完成只写回该条 checklist，不自动执行底层更新。
-- Knowledge health issues 会从 Repository `sources/`、`wiki/`、`wiki/index.md`、Wiki 链接、`work/active/`、`work/someday/` 和 `reviews/weekly/` 中计算，覆盖孤立资料、未进入索引的 Wiki、陈旧索引条目、知识库内断链、无来源引用 Wiki 和长期未复盘事项；Dashboard 会把这些问题作为知识动态，并跳转到 `/knowledge?section=health`。这只是可观测事实，不自动改写仓库或写入复盘。
+- Knowledge health issues 会从 Repository `sources/`、`wiki/`、`wiki/index.md`、Wiki 链接、`work/active/`、`work/someday/`、`reviews/weekly/` 和显式矛盾标记中计算，覆盖孤立资料、未进入索引的 Wiki、陈旧索引条目、知识库内断链、无来源引用 Wiki、长期未复盘事项和相互矛盾记录；Dashboard 会把这些问题作为知识动态，并跳转到 `/knowledge?section=health`。相互矛盾记录只来自 `矛盾:`、`冲突:`、`contradiction:`、`conflict:` 或 `conflictsWith:` 等 explicit contradiction markers，不做模型语义推断。这只是可观测事实，不自动改写仓库或写入复盘。
 - Knowledge undigested sources queue 会列出未进入索引、也未被 Wiki 引用的资料源，并可通过 `/knowledge?section=digest` 打开；用户可对单条资料发起 Knowledge ActionRun 消化为 Wiki，写入前仍必须审批。
 
 Skill 不应包含：
