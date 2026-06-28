@@ -1045,6 +1045,30 @@ describe('repository workbench', () => {
     expect(source).toContain("navigate('/actions')");
   });
 
+  it('lets a work matter start a plan-generation ActionRun before execution', () => {
+    const source = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
+    const actionCenterPage = readFileSync('src/pages/ActionCenterPage.tsx', 'utf8');
+    const promptSource = readFileSync('src/lib/ai-action-prompts.ts', 'utf8');
+    const zh = readFileSync('src/locales/zh.json', 'utf8');
+    const en = readFileSync('src/locales/en.json', 'utf8');
+
+    expect(source).toContain('buildWorkMatterPlanPrompt');
+    expect(source).toContain("type: 'work_matter_plan'");
+    expect(source).toContain("sourcePage: 'workbench'");
+    expect(source).toContain('workItemId: selectedWorkItemId');
+    expect(source).toContain('workItemPath: selectedWorkItemPath');
+    expect(source).toContain("t('workbench.generatePlanForMatter')");
+    expect(source).toContain("t('workbench.generatePlanActionTitle')");
+    expect(source).toContain("navigate('/actions')");
+    expect(promptSource).toContain('workMatterPlanTemplate');
+    expect(promptSource).toContain('buildWorkMatterPlanPrompt');
+    expect(actionCenterPage).toContain("work_matter_plan: 'actions.typeWorkMatterPlan'");
+    expect(zh).toContain('"generatePlanForMatter": "生成计划"');
+    expect(zh).toContain('"typeWorkMatterPlan": "事项计划生成"');
+    expect(en).toContain('"generatePlanForMatter": "Generate Plan"');
+    expect(en).toContain('"typeWorkMatterPlan": "Matter Plan Generation"');
+  });
+
   it('wires ActionCenter unassigned ActionRun backfill to repository work items', () => {
     const page = readFileSync('src/pages/ActionCenterPage.tsx', 'utf8');
     const zh = readFileSync('src/locales/zh.json', 'utf8');

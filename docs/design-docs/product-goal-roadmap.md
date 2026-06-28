@@ -335,6 +335,19 @@ HTML 产物是特色能力：
   -> 更新知识库 / 复盘
 ```
 
+当前代码事实：
+
+- Workbench 预览工作事项 Markdown 时，已提供“生成计划”入口。
+- 该入口创建 `work_matter_plan` ActionRun，`sourcePage: workbench`，并写入来源事项 `workItemPath` 和 frontmatter `id`。
+- `buildWorkMatterPlanPrompt` 使用落盘模板 `work-matter-plan.md`，要求 Agent 读取来源事项的目标、状态、验收标准、关联资料、关联计划、执行记录和关联成果，再提出计划草案。
+- 计划草案应包含验收标准、关联资料、关联成果、关键步骤、风险、待确认问题和建议写入的 `plans/active/<slug>.md` 路径。
+- 写入或更新 `plans/active/` 必须通过 `approval_required` 请求 Action Center 审批；当前入口不静默写计划、不自动更新事项、不沉淀成果、不更新知识库、不写复盘。
+
+仍未完成：
+
+- 审批通过后的计划写入、计划与事项互链、计划执行入口、执行状态观测和后续成果/知识/复盘金线仍需继续接上。
+- 新用户从开箱第一事项自然进入计划、执行和产物沉淀的端到端体验仍未完整闭环。
+
 ### P0-7 可复用资产一等对象
 
 目标：把工具、脚本、模板、工作流、提示词和检查清单作为可追踪、可审批、可复用的资产，而不是散落附件。

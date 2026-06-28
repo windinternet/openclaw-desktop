@@ -81,6 +81,8 @@ export function buildDesktopSelfKnowledgeSkillContent(): string {
     '',
     '`ActionRunWorkItemPicker` now provides the shared pre-run matter picker for ordinary Artifacts, Knowledge, Teams, and RepositoryGate non-chat ActionRun entry points. It centralizes choosing an existing matter, creating a new matter, auto-selecting the created matter, and showing success/error feedback. It only handles assignment UI; `useWorkbenchWorkItemOptions`, `loadWorkbenchWorkItemOptions`, and `createWorkbenchWorkItemOption` still provide the repository-backed matter list and explicit creation, while each entry point still owns ActionRun creation, prompts, approvals, and repository writes. It is not a complete global ActionRun launch protocol and must not be treated as automatic planning, output preservation, knowledge update, or review writing.',
     '',
+    'Workbench matter preview can also start a `work_matter_plan` ActionRun before execution. Desktop attaches the source `workItemPath` and frontmatter id, uses the `work-matter-plan.md` prompt through `buildWorkMatterPlanPrompt`, and asks the Agent to read the matter goal, status, acceptance criteria, linked sources, linked plans, run records, and linked outputs before proposing a plan. Any write to `plans/active/` must return `approval_required`; this entry point does not silently write plan files, update the matter, preserve outputs, update knowledge, write reviews, or move matter files.',
+    '',
     '## Artifacts',
     '',
     'Artifacts are OpenClaw Desktop P0 value objects. Any valuable result can become an Artifact when it can be saved, previewed, reused, delivered, or tracked.',

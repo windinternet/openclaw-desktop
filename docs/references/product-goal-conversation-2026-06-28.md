@@ -1138,3 +1138,20 @@ HTML 的独特优势：
 - 仍需要真正的全局 ActionRun 发起前面板或启动协议，让未来新增非聊天 AI 操作默认复用同一入口，而不是只在四个现有入口中组件复用。
 - 仍需要“开始一件事”专题里的计划、执行、产物、知识更新和复盘金线。
 - 仍需要让新事项创建后的计划生成、执行记录观测、尾动作建议和复盘上下文更自然地串起来。
+
+### 10.50 2026-06-28 当前实施记录：工作事项发起计划 ActionRun
+
+围绕“开始一件事闭环”中“工作事项 -> 生成计划 -> 启动 ActionRun”的 P0 缺口，当前落地第一段可用链路：
+
+- Workbench 预览 `work/active`、`work/someday`、`work/completed` 下的工作事项时，除了“生成成果”，现在也显示“生成计划”入口。
+- 点击“生成计划”会创建 `work_matter_plan` ActionRun，`sourcePage: workbench`，并写入来源事项的 `workItemPath` 和 frontmatter `id`。
+- 新增 `work-matter-plan.md` 提示词模板和 `buildWorkMatterPlanPrompt`，要求 Agent 先读取来源事项中的目标、状态、验收标准、关联资料、关联计划、执行记录和关联成果。
+- 该 ActionRun 要求输出计划草案、验收标准、关联资料、关联成果、关键步骤、风险、待确认问题和建议写入的 `plans/active/<slug>.md` 路径。
+- 如果建议写入或更新 Repository 文件，必须通过 `approval_required` 请求 Action Center 审批；当前入口不会静默写 `plans/active/`，不会自动更新事项，不会沉淀成果、更新知识库、写复盘或移动事项文件。
+- Action Center 已为 `work_matter_plan` 增加可读类型标签，避免普通用户只看到裸动作类型。
+
+仍未完成的 P0 后续：
+
+- 仍需要把审批通过后的计划写入、计划与事项互链、计划执行入口和执行状态观测继续接上。
+- 仍需要把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”的完整金线做成一条自然入口。
+- 仍需要真正的全局 ActionRun 发起协议，让未来新增非聊天 AI 操作默认遵守事项归属、计划、执行记录和尾动作边界。

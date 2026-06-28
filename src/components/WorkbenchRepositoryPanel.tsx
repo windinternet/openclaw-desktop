@@ -3,9 +3,10 @@ import { Button, Card, Checkbox, Empty, Select, Space, Tag, Toast, Typography } 
 import { IconBolt, IconBox, IconCheckList, IconFile } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { useStore } from '../lib';
+import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway, useStore } from '../lib';
 import type { RepositoryBinding } from '../lib/agentic-repository';
-import { loadAiActionRuns } from '../lib/ai-action-run-store';
+import { loadAiActionRuns, upsertAiActionRun } from '../lib/ai-action-run-store';
+import { buildWorkMatterPlanPrompt } from '../lib/ai-action-prompts';
 import { buildArtifactOutputDescription } from '../lib/artifact-display';
 import type { ArtifactMeta } from '../lib/artifact-types';
 import type { DashboardTailActionRouteContext } from '../lib/dashboard-tail-action-routing';
@@ -147,6 +148,8 @@ export default function WorkbenchRepositoryPanel({
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const activeClient = useStore((s) => s.activeClient);
+  const agents = useStore((s) => s.agents);
   const actionRunsVersion = useStore((s) => s.actionRunsVersion);
   const artifacts = useStore((s) => s.artifacts);
   const fetchArtifacts = useStore((s) => s.fetchArtifacts);
@@ -161,6 +164,7 @@ export default function WorkbenchRepositoryPanel({
   const [outputTypeFilters, setOutputTypeFilters] = useState<string[]>([]);
   const [outputGroupBy, setOutputGroupBy] = useState<OutputGroupBy>('none');
   const [showMatterArtifactDrawer, setShowMatterArtifactDrawer] = useState(false);
+  const [planActionSubmitting, setPlanActionSubmitting] = useState(false);
   const [reviewDraftWriting, setReviewDraftWriting] = useState(false);
   const [reviewDraftConfirming, setReviewDraftConfirming] = useState(false);
   const [statusTailActionValue, setStatusTailActionValue] =
@@ -354,6 +358,71 @@ export default function WorkbenchRepositoryPanel({
       Toast.error(err instanceof Error ? err.message : t('workbench.completedMatterArchiveFailed'));
     } finally {
       setCompletedMatterArchiving(false);
+    }
+  };
+
+  const handleCreateMatterPlanActionRun = async () => {
+    if (!selectedWorkItemPath) {
+      Toast.warning(t('workbench.generatePlanMissingMatter'));
+      return;
+    }
+    if (!activeClient) {
+      Toast.error(t('workbench.generatePlanNotConnected'));
+      return;
+    }
+    const agent = agents[0];
+    if (!agent) {
+      Toast.error(t('workbench.generatePlanNoAgent'));
+      return;
+    }
+
+    setPlanActionSubmitting(true);
+    const input = [t('workbench.generatePlanActionTitle'), `workItemPath: ${selectedWorkItemPath}`].join('\n');
+    const actionRun = createAiActionRun({
+      type: 'work_matter_plan',
+      sourcePage: 'workbench',
+      instanceId: binding.gatewayInstanceId,
+      agentId: agent.id,
+      executionMode: 'isolated-session',
+      input,
+      workItemId: selectedWorkItemId,
+      workItemPath: selectedWorkItemPath,
+    });
+
+    await upsertAiActionRun(binding.gatewayInstanceId, { ...actionRun, status: 'planning', updatedAt: Date.now() });
+    try {
+      const runningRun = await executeAiActionRunWithGateway(activeClient, actionRun, {
+        title: t('workbench.generatePlanActionTitle'),
+        prompt: buildWorkMatterPlanPrompt({
+          workItemPath: selectedWorkItemPath,
+          workItemContent: selectedPreviewContent,
+        }),
+      });
+      await upsertAiActionRun(binding.gatewayInstanceId, runningRun);
+
+      let latestRun = runningRun;
+      for (let index = 0; index < 4; index += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        latestRun = await syncAiActionRunWithGateway(activeClient, latestRun);
+        await upsertAiActionRun(binding.gatewayInstanceId, latestRun);
+        if (latestRun.status === 'awaiting_approval' || latestRun.status === 'done' || latestRun.status === 'failed')
+          break;
+      }
+
+      useStore.getState().fetchSessions();
+      Toast.success(t('workbench.generatePlanStarted'));
+      navigate('/actions');
+    } catch (err) {
+      const error = err instanceof Error ? err.message : t('workbench.generatePlanFailed');
+      await upsertAiActionRun(binding.gatewayInstanceId, {
+        ...actionRun,
+        status: 'failed',
+        error,
+        updatedAt: Date.now(),
+      });
+      Toast.error(error);
+    } finally {
+      setPlanActionSubmitting(false);
     }
   };
 
@@ -1452,14 +1521,25 @@ export default function WorkbenchRepositoryPanel({
                 {previewTitle}
               </Title>
               {selectedWorkItemPath && (
-                <Button
-                  size="small"
-                  type="tertiary"
-                  icon={<IconBolt />}
-                  onClick={() => setShowMatterArtifactDrawer(true)}
-                >
-                  {t('workbench.createArtifactForMatter')}
-                </Button>
+                <Space align="center" spacing={8}>
+                  <Button
+                    size="small"
+                    type="tertiary"
+                    icon={<IconCheckList />}
+                    loading={planActionSubmitting}
+                    onClick={() => void handleCreateMatterPlanActionRun()}
+                  >
+                    {t('workbench.generatePlanForMatter')}
+                  </Button>
+                  <Button
+                    size="small"
+                    type="tertiary"
+                    icon={<IconBolt />}
+                    onClick={() => setShowMatterArtifactDrawer(true)}
+                  >
+                    {t('workbench.createArtifactForMatter')}
+                  </Button>
+                </Space>
               )}
             </Space>
             {renderPreviewContent()}

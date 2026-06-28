@@ -35,6 +35,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('ActionRunWorkItemPicker');
     expect(skillContent).toContain('shared pre-run matter picker');
     expect(skillContent).toContain('only handles assignment UI');
+    expect(skillContent).toContain('work_matter_plan');
+    expect(skillContent).toContain('buildWorkMatterPlanPrompt');
+    expect(skillContent).toContain('Any write to `plans/active/` must return `approval_required`');
     expect(skillContent).toContain('adds a `## 收尾动作` checklist');
     expect(skillContent).toContain('missing from the repository run index');
     expect(skillContent).toContain('`action-run:unarchived` pending confirmation');

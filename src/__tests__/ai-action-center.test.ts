@@ -17,6 +17,7 @@ import {
   buildAgentTeamComposePrompt,
   buildApprovalDecisionPrompt,
   buildGatewayAgentCreatePrompt,
+  buildWorkMatterPlanPrompt,
 } from '../lib/ai-action-prompts';
 import type { SessionInfo } from '../lib/types';
 
@@ -439,8 +440,18 @@ describe('AI Action Center session rules', () => {
       approvalTitle: '创建 Agent',
       actionInput: '创建产品 Agent',
     });
+    const matterPlanPrompt = buildWorkMatterPlanPrompt({
+      workItemPath: 'work/active/release.md',
+      workItemContent: '# 发布事项\n\n## 目标\n\n完成桌面版发布。',
+    });
 
-    for (const prompt of [createPrompt, composePrompt, decisionPrompt]) {
+    expect(matterPlanPrompt).toContain('work/active/release.md');
+    expect(matterPlanPrompt).toContain('plans/active/');
+    expect(matterPlanPrompt).toContain('approval_required');
+    expect(matterPlanPrompt).toContain('关联资料');
+    expect(matterPlanPrompt).toContain('关联成果');
+
+    for (const prompt of [createPrompt, composePrompt, decisionPrompt, matterPlanPrompt]) {
       expect(prompt).toContain('```ai-action');
       expect(prompt).not.toMatch(/\{\{[^}]+\}\}/);
     }
