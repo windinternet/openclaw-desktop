@@ -27,7 +27,7 @@ import {
 } from '../lib/ai-action-run-store';
 import { loadRepositoryBinding } from '../lib/agentic-repository-store';
 import { applyWorkbenchMatterPlanApproval, loadWorkbenchSnapshot } from '../lib/repository-workbench';
-import { applyKnowledgeRewriteApproval } from '../lib/repository-knowledge';
+import { applyKnowledgeRewriteApproval, formatKnowledgeRewriteWrittenPaths } from '../lib/repository-knowledge';
 import MarkdownView from '../components/MarkdownView';
 import { useStore } from '../lib';
 import type { AiActionApproval, AiActionRun, AiActionRunStatus } from '../lib/types';
@@ -247,7 +247,10 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
           });
           updated = {
             ...updated,
-            resultSummary: t('actions.knowledgeRewriteWritten', { count: writeResult.writtenPaths.length }),
+            resultSummary: t('actions.knowledgeRewriteWritten', {
+              count: writeResult.writtenPaths.length,
+              paths: formatKnowledgeRewriteWrittenPaths(writeResult.writtenPaths),
+            }),
             updatedAt: Date.now(),
           };
           await upsertAiActionRun(currentInstanceId, updated);

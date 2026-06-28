@@ -262,7 +262,7 @@ HTML 产物是特色能力：
 - Knowledge 页面新增“写入周复盘”入口，可把当前健康报告写入 `reviews/weekly/YYYY-MM-DD-knowledge-health.md`，让健康检查进入复盘事实源。
 - Dashboard 知识类尾动作进入 Knowledge 时会显示来源事项上下文，并提供“发起知识更新 ActionRun”入口；该入口创建 `knowledge_rewrite` ActionRun，携带来源 `workItemPath` 和 `tailActionId`，要求先读取来源事项、关联执行记录、关联成果和现有知识库，再提出写入计划或输出 `no_write_needed`。
 - Knowledge 尾动作卡片也提供“确认已处理并完成尾动作”；完成知识更新或确认无需写入后，用户可显式确认，Desktop 会读取来源事项、校验匹配 `tailActionId` 且文本属于知识类尾动作，并只把对应 `## 收尾动作` checklist 行写回为 `[x]`。
-- Knowledge 改写审批写入已接入 Action Center：`knowledge_rewrite` 的 `approval_required` 可携带 `repositoryWrite.writes`，用户批准后 Desktop 调用 `applyKnowledgeRewriteApproval`，只允许写入当前绑定仓库知识库边界内的 Wiki 条目、`wiki/index.md` 和 `wiki/log.md`，不改写 `sources/`、事项、计划、成果或复盘。
+- Knowledge 改写审批写入已接入 Action Center：`knowledge_rewrite` 的 `approval_required` 可携带 `repositoryWrite.writes`，用户批准后 Desktop 调用 `applyKnowledgeRewriteApproval`，只允许写入当前绑定仓库知识库边界内的 Wiki 条目、`wiki/index.md` 和 `wiki/log.md`，不改写 `sources/`、事项、计划、成果或复盘；写入后的 ActionRun `resultSummary` 会保留具体写入路径，便于事项执行记录、计划预览和复盘核对。
 - 长期未复盘事项会检查 `work/active/` 与 `work/someday/` 中超过阈值且没有近期 `reviews/weekly/` 复盘引用的工作事项。
 - 相互矛盾记录会检查 Wiki 或 `wiki/log.md` 中用 `矛盾:`、`冲突:`、`contradiction:`、`conflict:` 或 `conflictsWith:` 明确标记的记录。
 - 当前健康检查不自动修复索引、Wiki 或资料来源，也不做模型语义推断式矛盾发现；Knowledge 导入中心已覆盖 PDF / Word / Excel / PowerPoint best-effort 文本抽取导入，但旧版二进制 Office、图片/OCR、音视频和原生内容渲染仍是 P0 后续。

@@ -14,6 +14,7 @@ import {
   classifyKnowledgeSearchResult,
   extractMarkdownLinks,
   findBacklinks,
+  formatKnowledgeRewriteWrittenPaths,
   importKnowledgeFileSource,
   importKnowledgeFolderSource,
   writeKnowledgeHealthReview,
@@ -832,6 +833,12 @@ describe('repository knowledge', () => {
     );
   });
 
+  it('formats approved knowledge rewrite written paths for ActionRun summaries', () => {
+    expect(
+      formatKnowledgeRewriteWrittenPaths(['wiki/topics/raw.md', 'wiki/index.md', 'wiki/log.md', 'wiki/topics/raw.md']),
+    ).toBe('wiki/topics/raw.md, wiki/index.md, wiki/log.md');
+  });
+
   it('rejects approved knowledge rewrite writes outside the knowledge wiki boundary', async () => {
     const writeText = vi.fn(async () => undefined);
     vi.stubGlobal('window', {
@@ -1059,5 +1066,16 @@ describe('repository knowledge', () => {
     expect(source).toContain("t('knowledge.gitHistory')");
     expect(source).toContain('buildKnowledgeRewritePrompt');
     expect(source).toContain('createAiActionRun({');
+  });
+
+  it('keeps approved knowledge write paths observable in Action Center summaries', () => {
+    const actionCenter = readFileSync('src/pages/ActionCenterPage.tsx', 'utf8');
+    const zh = readFileSync('src/locales/zh.json', 'utf8');
+    const en = readFileSync('src/locales/en.json', 'utf8');
+
+    expect(actionCenter).toContain('formatKnowledgeRewriteWrittenPaths(writeResult.writtenPaths)');
+    expect(actionCenter).toContain('paths:');
+    expect(zh).toContain('{{paths}}');
+    expect(en).toContain('{{paths}}');
   });
 });

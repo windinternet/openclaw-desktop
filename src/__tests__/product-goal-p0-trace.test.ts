@@ -150,6 +150,7 @@ describe('product goal P0 traceability', () => {
     expect(plans).toContain('Knowledge 审批写入 Wiki/index/log');
     expect(plans).toContain('repositoryWrite.writes');
     expect(plans).toContain('applyKnowledgeRewriteApproval');
+    expect(plans).toContain('具体写入路径');
     expect(plans).toContain('归档完成事项');
     expect(plans).toContain('workItemRequired: true');
     expect(plans).toContain('已有无事项运行的补归属流程已接入 ActionCenter');
@@ -299,12 +300,14 @@ describe('product goal P0 traceability', () => {
     expect(roadmap).toContain('repositoryWrite.path/content/workItemPath');
     expect(roadmap).toContain('applyKnowledgeRewriteApproval');
     expect(roadmap).toContain('repositoryWrite.writes');
+    expect(roadmap).toContain('具体写入路径');
     expect(skillContent).toContain('Screenshot-confirmed P0 baseline');
     expect(skillContent).toContain('Do not demote these scopes to P1/P2');
     expect(skillContent).toContain('Knowledge tail actions can start a source-bound `knowledge_rewrite` ActionRun');
     expect(skillContent).toContain('check off only the matching source knowledge tail action');
     expect(skillContent).toContain('applyKnowledgeRewriteApproval');
     expect(skillContent).toContain('repositoryWrite.writes');
+    expect(skillContent).toContain('written path list');
     expect(skillContent).toContain('work/completed/*.md');
     expect(skillContent).toContain('workItemUnassignedReason: pending_work_item_assignment');
     expect(skillContent).toContain('ActionCenter can let the user choose an existing work item to backfill assignment');

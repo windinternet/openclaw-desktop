@@ -591,6 +591,10 @@ export async function applyKnowledgeRewriteApproval(
   return { writtenPaths: entries.map((entry) => entry.path) };
 }
 
+export function formatKnowledgeRewriteWrittenPaths(writtenPaths: string[]): string {
+  return Array.from(new Set(writtenPaths.map((path) => path.trim()).filter(Boolean))).join(', ');
+}
+
 export async function loadKnowledgeDocumentHistory(
   binding: RepositoryBinding,
   relativePath: string,

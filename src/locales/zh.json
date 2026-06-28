@@ -1181,7 +1181,7 @@
     "decisionFailed": "提交审批决定失败",
     "workMatterPlanWritten": "已写入事项计划：{{path}}",
     "workMatterPlanWriteNoRepository": "当前没有可写的本地 Repository，无法写入事项计划",
-    "knowledgeRewriteWritten": "已写入知识库文件：{{count}} 个",
+    "knowledgeRewriteWritten": "已写入知识库文件：{{count}} 个（{{paths}}）",
     "knowledgeRewriteWriteNoRepository": "当前没有可写的本地 Repository，无法写入知识库",
     "notConnectedResync": "未连接 Gateway，无法重新同步",
     "resynced": "已重新同步",
