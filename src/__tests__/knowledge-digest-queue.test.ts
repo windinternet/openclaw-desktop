@@ -13,6 +13,8 @@ describe('knowledge digest queue', () => {
     const panel = readFileSync('src/components/KnowledgeRepositoryPanel.tsx', 'utf8');
     const page = readFileSync('src/pages/KnowledgeBasePage.tsx', 'utf8');
     const repositoryKnowledge = readFileSync('src/lib/repository-knowledge.ts', 'utf8');
+    const preload = readFileSync('electron/preload.ts', 'utf8');
+    const repositoryHandlers = readFileSync('electron/repository-handlers.ts', 'utf8');
     const manual = readFileSync('docs/desktop-manual/knowledge.md', 'utf8');
     const roadmap = readFileSync('docs/design-docs/product-goal-roadmap.md', 'utf8');
     const plans = readFileSync('docs/PLANS.md', 'utf8');
@@ -38,6 +40,9 @@ describe('knowledge digest queue', () => {
     expect(panel).toContain("t('knowledge.importUrlSource')");
     expect(panel).toContain('importKnowledgeFileSource');
     expect(panel).toContain('importKnowledgeFolderSource');
+    expect(panel).toContain('KNOWLEDGE_IMPORT_ACCEPT');
+    expect(panel).toContain('resolveKnowledgeImportFileKind');
+    expect(panel).toContain('extractKnowledgeFileText');
     expect(panel).toContain('fileInputRef');
     expect(panel).toContain('folderInputRef');
     expect(panel).toContain('type="file"');
@@ -53,6 +58,10 @@ describe('knowledge digest queue', () => {
     expect(panel).toContain("t('knowledge.writeHealthReview')");
     expect(panel).toContain("setActiveSection('digest')");
     expect(panel).toContain('openDocument(imported.path)');
+    expect(preload).toContain('repository:extractKnowledgeFileText');
+    expect(repositoryHandlers).toContain('extractPdfTextFromBuffer');
+    expect(repositoryHandlers).toContain('extractOoxmlTextFromBuffer');
+    expect(repositoryHandlers).toContain('repository:extractKnowledgeFileText');
     expect(page).toContain("section === 'digest'");
     expect(page).toContain('itemKey="digest"');
     expect(getByPath(zh, 'knowledge.digestQueue')).toBeTruthy();
@@ -65,6 +74,9 @@ describe('knowledge digest queue', () => {
     expect(getByPath(zh, 'knowledge.importFileDone')).toBeTruthy();
     expect(getByPath(zh, 'knowledge.importFolderSource')).toBeTruthy();
     expect(getByPath(zh, 'knowledge.importFolderDone')).toBeTruthy();
+    expect(getByPath(zh, 'knowledge.importUnsupportedFile')).toBeTruthy();
+    expect(getByPath(zh, 'knowledge.importExtractedFileEmpty')).toBeTruthy();
+    expect(getByPath(zh, 'knowledge.importExtractedFileUnsupportedRuntime')).toBeTruthy();
     expect(getByPath(zh, 'knowledge.dropFilesToImport')).toBeTruthy();
     expect(getByPath(zh, 'knowledge.writeHealthReview')).toBeTruthy();
     expect(getByPath(zh, 'knowledge.healthReviewWritten')).toBeTruthy();
@@ -78,6 +90,9 @@ describe('knowledge digest queue', () => {
     expect(getByPath(en, 'knowledge.importFileDone')).toBeTruthy();
     expect(getByPath(en, 'knowledge.importFolderSource')).toBeTruthy();
     expect(getByPath(en, 'knowledge.importFolderDone')).toBeTruthy();
+    expect(getByPath(en, 'knowledge.importUnsupportedFile')).toBeTruthy();
+    expect(getByPath(en, 'knowledge.importExtractedFileEmpty')).toBeTruthy();
+    expect(getByPath(en, 'knowledge.importExtractedFileUnsupportedRuntime')).toBeTruthy();
     expect(getByPath(en, 'knowledge.dropFilesToImport')).toBeTruthy();
     expect(getByPath(en, 'knowledge.writeHealthReview')).toBeTruthy();
     expect(getByPath(en, 'knowledge.healthReviewWritten')).toBeTruthy();
@@ -85,6 +100,8 @@ describe('knowledge digest queue', () => {
     expect(manual).toContain('sources/imported/');
     expect(manual).toContain('剪藏 URL');
     expect(manual).toContain('导入文件');
+    expect(manual).toContain('PDF / Word / Excel / PowerPoint');
+    expect(manual).toContain('best-effort 抽取文本');
     expect(manual).toContain('导入文件夹');
     expect(manual).toContain('拖拽导入');
     expect(manual).toContain('写入周复盘');
@@ -93,6 +110,7 @@ describe('knowledge digest queue', () => {
     expect(roadmap).toContain('Knowledge 页面新增“导入文本”入口');
     expect(roadmap).toContain('Knowledge 页面新增“剪藏 URL”入口');
     expect(roadmap).toContain('Knowledge 页面新增“导入文件”入口');
+    expect(roadmap).toContain('PDF / Word / Excel / PowerPoint best-effort 文本抽取导入');
     expect(roadmap).toContain('Knowledge 页面新增“导入文件夹”入口');
     expect(roadmap).toContain('Knowledge 页面新增“拖拽导入”入口');
     expect(roadmap).toContain('Knowledge 页面新增“写入周复盘”入口');
@@ -101,6 +119,7 @@ describe('knowledge digest queue', () => {
     expect(plans).toContain('导入文本入口');
     expect(plans).toContain('剪藏 URL 入口');
     expect(plans).toContain('导入文件入口');
+    expect(plans).toContain('PDF / Word / Excel / PowerPoint best-effort 文本抽取导入');
     expect(plans).toContain('导入文件夹入口');
     expect(plans).toContain('拖拽导入');
     expect(plans).toContain('写入周复盘');
@@ -109,8 +128,9 @@ describe('knowledge digest queue', () => {
     expect(selfKnowledge).toContain('import pasted text into `sources/imported/`');
     expect(selfKnowledge).toContain('clip URLs into `sources/imported/`');
     expect(selfKnowledge).toContain('import local text files into `sources/imported/`');
+    expect(selfKnowledge).toContain('import PDF / Word / Excel / PowerPoint files into `sources/imported/`');
     expect(selfKnowledge).toContain('import selected folders into `sources/imported/`');
-    expect(selfKnowledge).toContain('drop local text files into `sources/imported/`');
+    expect(selfKnowledge).toContain('drop local text files or PDF / Word / Excel / PowerPoint files');
     expect(selfKnowledge).toContain('write knowledge health reviews into `reviews/weekly/`');
     expect(selfKnowledge).toContain('long-unreviewed work items');
     expect(selfKnowledge).toContain('explicit contradiction markers');

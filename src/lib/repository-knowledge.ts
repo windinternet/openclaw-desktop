@@ -1,5 +1,6 @@
 import knowledgeSemanticMappingTemplate from '../prompts/repository/knowledge-semantic-mapping.md?raw';
 import type { KnowledgeRepositoryMapping, RepositoryBinding } from './agentic-repository';
+import type { KnowledgeExtractedFileFormat } from './knowledge-file-import';
 import { renderPromptTemplate } from './prompt-template';
 
 export interface RepositoryMarkdownFile {
@@ -287,8 +288,17 @@ export interface KnowledgeFileSourceImportInput {
   fileName: string;
   mimeType?: string;
   body: string;
+  extracted?: KnowledgeFileExtractionMetadata;
   now?: Date;
   sourceRoot?: string;
+}
+
+export interface KnowledgeFileExtractionMetadata {
+  format: KnowledgeExtractedFileFormat;
+  status?: 'best_effort';
+  bytesRead?: number;
+  truncated?: boolean;
+  limitations?: string[];
 }
 
 export interface KnowledgeFolderSourceImportInput extends KnowledgeFileSourceImportInput {
@@ -362,6 +372,7 @@ export function buildKnowledgeFileSourceImport(input: KnowledgeFileSourceImportI
   const time = now.toISOString().slice(11, 19).replace(/:/g, '');
   const sourceRoot = normalizeSourceRoot(input.sourceRoot ?? 'sources');
   const mimeType = input.mimeType?.trim();
+  const extracted = normalizeKnowledgeFileExtraction(input.extracted);
   const path = `${sourceRoot}/imported/${date}-${time}-${slugifyKnowledgeTitle(title)}.md`;
   const markdown = [
     '---',
@@ -369,6 +380,7 @@ export function buildKnowledgeFileSourceImport(input: KnowledgeFileSourceImportI
     'source: desktop-file',
     `fileName: ${JSON.stringify(input.fileName)}`,
     ...(mimeType ? [`mimeType: ${JSON.stringify(mimeType)}`] : []),
+    ...formatKnowledgeExtractionFrontmatter(extracted),
     `importedAt: ${now.toISOString()}`,
     '---',
     '',
@@ -378,8 +390,10 @@ export function buildKnowledgeFileSourceImport(input: KnowledgeFileSourceImportI
     '',
     `- ${input.fileName}`,
     ...(mimeType ? [`- ${mimeType}`] : []),
+    ...formatKnowledgeExtractionSourceFacts(extracted),
     '',
-    '## 原始内容',
+    ...formatKnowledgeExtractionLimitations(extracted),
+    extracted ? '## 抽取文本' : '## 原始内容',
     '',
     body,
     '',
@@ -397,6 +411,7 @@ export function buildKnowledgeFolderSourceImport(input: KnowledgeFolderSourceImp
   const time = now.toISOString().slice(11, 19).replace(/:/g, '');
   const sourceRoot = normalizeSourceRoot(input.sourceRoot ?? 'sources');
   const mimeType = input.mimeType?.trim();
+  const extracted = normalizeKnowledgeFileExtraction(input.extracted);
   const path = `${sourceRoot}/imported/${date}-${time}-${slugifyKnowledgeTitle(relativePath)}.md`;
   const markdown = [
     '---',
@@ -405,6 +420,7 @@ export function buildKnowledgeFolderSourceImport(input: KnowledgeFolderSourceImp
     `fileName: ${JSON.stringify(input.fileName)}`,
     `relativePath: ${JSON.stringify(relativePath)}`,
     ...(mimeType ? [`mimeType: ${JSON.stringify(mimeType)}`] : []),
+    ...formatKnowledgeExtractionFrontmatter(extracted),
     `importedAt: ${now.toISOString()}`,
     '---',
     '',
@@ -415,8 +431,10 @@ export function buildKnowledgeFolderSourceImport(input: KnowledgeFolderSourceImp
     `- ${input.fileName}`,
     `- ${relativePath}`,
     ...(mimeType ? [`- ${mimeType}`] : []),
+    ...formatKnowledgeExtractionSourceFacts(extracted),
     '',
-    '## 原始内容',
+    ...formatKnowledgeExtractionLimitations(extracted),
+    extracted ? '## 抽取文本' : '## 原始内容',
     '',
     body,
     '',
@@ -1074,6 +1092,51 @@ function normalizeSourceFileTitle(fileName: string, body: string): string {
     .replace(/\s+/g, ' ')
     .trim();
   return normalizeSourceTitle(withoutExtension || '导入文件', body);
+}
+
+const DEFAULT_KNOWLEDGE_EXTRACTION_LIMITATION =
+  'PDF/Office 文本抽取为 best-effort：会保留可读取文字，复杂版式、图片和公式可能丢失。';
+
+function normalizeKnowledgeFileExtraction(
+  extracted: KnowledgeFileExtractionMetadata | undefined,
+): Required<KnowledgeFileExtractionMetadata> | null {
+  if (!extracted) return null;
+  const limitations = extracted.limitations?.map((item) => item.trim()).filter(Boolean) ?? [];
+  return {
+    format: extracted.format,
+    status: extracted.status ?? 'best_effort',
+    bytesRead:
+      typeof extracted.bytesRead === 'number' && Number.isFinite(extracted.bytesRead)
+        ? Math.max(0, Math.trunc(extracted.bytesRead))
+        : 0,
+    truncated: Boolean(extracted.truncated),
+    limitations: limitations.length > 0 ? limitations : [DEFAULT_KNOWLEDGE_EXTRACTION_LIMITATION],
+  };
+}
+
+function formatKnowledgeExtractionFrontmatter(extracted: Required<KnowledgeFileExtractionMetadata> | null): string[] {
+  if (!extracted) return [];
+  return [
+    `extractedFormat: ${extracted.format}`,
+    `extractionStatus: ${extracted.status}`,
+    `extractedBytesRead: ${extracted.bytesRead}`,
+    `extractedTruncated: ${extracted.truncated}`,
+  ];
+}
+
+function formatKnowledgeExtractionSourceFacts(extracted: Required<KnowledgeFileExtractionMetadata> | null): string[] {
+  if (!extracted) return [];
+  return [
+    `- format: ${extracted.format}`,
+    `- extraction: ${extracted.status}`,
+    `- bytesRead: ${extracted.bytesRead}`,
+    `- truncated: ${extracted.truncated}`,
+  ];
+}
+
+function formatKnowledgeExtractionLimitations(extracted: Required<KnowledgeFileExtractionMetadata> | null): string[] {
+  if (!extracted) return [];
+  return ['## 抽取限制', '', ...extracted.limitations.map((item) => `- ${item}`), ''];
 }
 
 function slugifyKnowledgeTitle(value: string): string {

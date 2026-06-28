@@ -88,6 +88,12 @@ interface Window {
         directory: string,
       ) => Promise<import('./lib/repository-knowledge').RepositoryMarkdownFile[]>;
       readText?: (repoPath: string, relativePath: string) => Promise<string>;
+      extractKnowledgeFileText?: (params: { fileName: string; mimeType?: string; bytes: ArrayBuffer }) => Promise<{
+        format: import('./lib/knowledge-file-import').KnowledgeExtractedFileFormat;
+        text: string;
+        bytesRead: number;
+        truncated: boolean;
+      }>;
       writeText?: (repoPath: string, relativePath: string, content: string) => Promise<void>;
       moveText?: (repoPath: string, fromRelativePath: string, toRelativePath: string) => Promise<void>;
       search?: (

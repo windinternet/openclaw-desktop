@@ -255,16 +255,16 @@ HTML 产物是特色能力：
 - `loadKnowledgeSnapshot` 现在会生成 `undigestedSources`，把未出现在索引、也未被 Wiki 引用的资料源列为未消化资料。
 - Knowledge 页面新增“未消化资料”视图，`/knowledge?section=digest` 会打开队列，并支持对单条资料发起 `knowledge_rewrite` 消化 ActionRun。
 - Knowledge 页面新增“导入文本”入口，可把粘贴内容写入 `sources/imported/YYYY-MM-DD-HHmmss-*.md`，frontmatter 标记 `source: desktop-paste`，导入后刷新 Snapshot、切到未消化资料队列并打开新资料源。
-- Knowledge 页面新增“导入文件”入口，可通过系统文件选择器读取本地 Markdown/TXT 文本文件，写入 `sources/imported/YYYY-MM-DD-HHmmss-*.md`，frontmatter 标记 `source: desktop-file`、原始文件名和 MIME 类型，导入后刷新 Snapshot、切到未消化资料队列并打开最后一个导入的资料源。
-- Knowledge 页面新增“导入文件夹”入口，可读取用户选择目录中的 Markdown/TXT/text 文件，写入 `sources/imported/YYYY-MM-DD-HHmmss-*.md`，frontmatter 标记 `source: desktop-folder`、原始文件名和相对路径，导入后刷新 Snapshot、切到未消化资料队列并打开最后一个导入的资料源。
-- Knowledge 页面新增“拖拽导入”入口，可把本地 Markdown/TXT 文本文件拖入 Knowledge 页面，复用 `source: desktop-file` 写入 `sources/imported/` 并进入未消化资料队列。
+- Knowledge 页面新增“导入文件”入口，可通过系统文件选择器读取本地 Markdown/TXT 文本文件，也可对 PDF / Word / Excel / PowerPoint best-effort 文本抽取导入，写入 `sources/imported/YYYY-MM-DD-HHmmss-*.md`，frontmatter 标记 `source: desktop-file`、原始文件名和 MIME 类型；抽取型文件还会记录 `extractedFormat`、`extractionStatus: best_effort`、`extractedBytesRead` 和 `extractedTruncated`，导入后刷新 Snapshot、切到未消化资料队列并打开最后一个导入的资料源。
+- Knowledge 页面新增“导入文件夹”入口，可读取用户选择目录中的 Markdown/TXT/text 文件，也可对目录中的 PDF / Word / Excel / PowerPoint best-effort 文本抽取导入，写入 `sources/imported/YYYY-MM-DD-HHmmss-*.md`，frontmatter 标记 `source: desktop-folder`、原始文件名和相对路径，导入后刷新 Snapshot、切到未消化资料队列并打开最后一个导入的资料源。
+- Knowledge 页面新增“拖拽导入”入口，可把本地 Markdown/TXT/PDF/Word/Excel/PowerPoint 文件拖入 Knowledge 页面，复用 `source: desktop-file` 写入 `sources/imported/` 并进入未消化资料队列。
 - Knowledge 页面新增“剪藏 URL”入口，可把网页链接和可选摘录/备注写入 `sources/imported/YYYY-MM-DD-HHmmss-*.md`，frontmatter 标记 `source: desktop-url` 和 `url`；当前不后台抓取网页正文。
 - Knowledge 页面新增“写入周复盘”入口，可把当前健康报告写入 `reviews/weekly/YYYY-MM-DD-knowledge-health.md`，让健康检查进入复盘事实源。
 - Dashboard 知识类尾动作进入 Knowledge 时会显示来源事项上下文，并提供“发起知识更新 ActionRun”入口；该入口创建 `knowledge_rewrite` ActionRun，携带来源 `workItemPath` 和 `tailActionId`，要求先读取来源事项、关联执行记录、关联成果和现有知识库，再提出写入计划或输出 `no_write_needed`。
 - Knowledge 尾动作卡片也提供“确认已处理并完成尾动作”；完成知识更新或确认无需写入后，用户可显式确认，Desktop 会读取来源事项、校验匹配 `tailActionId` 且文本属于知识类尾动作，并只把对应 `## 收尾动作` checklist 行写回为 `[x]`。
 - 长期未复盘事项会检查 `work/active/` 与 `work/someday/` 中超过阈值且没有近期 `reviews/weekly/` 复盘引用的工作事项。
 - 相互矛盾记录会检查 Wiki 或 `wiki/log.md` 中用 `矛盾:`、`冲突:`、`contradiction:`、`conflict:` 或 `conflictsWith:` 明确标记的记录。
-- 当前健康检查不自动修复索引、Wiki 或资料来源，也不做模型语义推断式矛盾发现；Office/PDF/二进制内容导入仍是 P0 后续。
+- 当前健康检查不自动修复索引、Wiki 或资料来源，也不做模型语义推断式矛盾发现；Knowledge 导入中心已覆盖 PDF / Word / Excel / PowerPoint best-effort 文本抽取导入，但旧版二进制 Office、图片/OCR、音视频和原生内容渲染仍是 P0 后续。
 
 验收：
 

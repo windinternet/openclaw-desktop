@@ -5,8 +5,8 @@
 | 用户意图                     | 推荐路径                                                                                                                                                                   |
 | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | “把这段文字加入资料库”       | 先确认 Repository Context；通过 Knowledge 导入文本入口或 Desktop repository write 写入 `sources/imported/`；导入后进入未消化资料队列，不自动改写 Wiki。                    |
-| “导入这个 Markdown/TXT 文件” | 先确认 Repository Context；通过 Knowledge 导入文件入口或拖拽导入读取本地文本文件，写入 `sources/imported/` 并进入未消化资料队列；Office/PDF/二进制内容仍需走后续专门能力。   |
-| “导入这个资料文件夹”         | 先确认 Repository Context；通过 Knowledge 导入文件夹入口读取目录中的 Markdown / TXT / text 文件，写入 `sources/imported/` 并保留相对路径；Office/PDF/二进制内容仍需后续专门能力。 |
+| “导入这个 Markdown/TXT/PDF/Office 文件” | 先确认 Repository Context；通过 Knowledge 导入文件入口或拖拽导入读取本地 Markdown / TXT，或对 PDF / Word / Excel / PowerPoint 做 best-effort 抽取文本，写入 `sources/imported/` 并进入未消化资料队列；旧版二进制 Office、图片/OCR、音视频仍需走后续专门能力。 |
+| “导入这个资料文件夹”         | 先确认 Repository Context；通过 Knowledge 导入文件夹入口读取目录中的 Markdown / TXT / PDF / Word / Excel / PowerPoint 文件，写入 `sources/imported/` 并保留相对路径；旧版二进制 Office、图片/OCR、音视频仍需后续专门能力。 |
 | “收藏/剪藏这个网页”          | 先确认 Repository Context；通过 Knowledge 剪藏 URL 入口把 URL、标题和摘录/备注写入 `sources/imported/`；当前不后台抓网页正文，后续消化再走 ActionRun 审批。                |
 | “帮我整理这份资料到知识库”   | 先确认 Repository Context；读取 `sources/` 和 `wiki/` 规则；必要时发起 Knowledge ActionRun。                                                                               |
 | “有哪些资料还没整理”         | 打开 Knowledge 未消化资料队列 `/knowledge?section=digest`；选择资料后发起消化 ActionRun，写入前请求审批。                                                                  |

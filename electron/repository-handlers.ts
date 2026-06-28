@@ -5,10 +5,16 @@ import * as fs from 'node:fs'
 import { promisify } from 'node:util'
 import { access, cp, mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promises'
 import {
+  resolveKnowledgeImportFileKind,
+  type KnowledgeExtractedFileFormat,
+} from '../src/lib/knowledge-file-import'
+import {
   resolveRepoPath,
   resolveSafeExistingRepoPath,
   resolveSafeWritableRepoPath,
 } from '../src/lib/repository-path-safety'
+import { extractOoxmlTextFromBuffer } from './artifact-ooxml-text-extract'
+import { extractPdfTextFromBuffer } from './artifact-pdf-text-extract'
 
 const execFileAsync = promisify(execFile)
 const agentsFileWatchers = new Map<string, {
@@ -74,6 +80,19 @@ interface RepositoryGitLogEntry {
   date: string
   author: string
   subject: string
+}
+
+interface KnowledgeFileTextExtractRequest {
+  fileName: string
+  mimeType?: string
+  bytes: ArrayBuffer | ArrayBufferView | number[]
+}
+
+interface KnowledgeFileTextExtractResult {
+  format: KnowledgeExtractedFileFormat
+  text: string
+  bytesRead: number
+  truncated: boolean
 }
 
 function templateRoot(): string {
@@ -338,6 +357,36 @@ async function readText(repoPath: string, relativePath: string): Promise<string>
   }
 }
 
+async function extractKnowledgeFileText(
+  request: KnowledgeFileTextExtractRequest,
+): Promise<KnowledgeFileTextExtractResult> {
+  const fileKind = resolveKnowledgeImportFileKind({ name: request.fileName, type: request.mimeType })
+  if (fileKind.kind !== 'extractable') {
+    throw new Error('knowledge-file-unsupported')
+  }
+
+  const bytes = normalizeKnowledgeFileBytes(request.bytes)
+  const extracted =
+    fileKind.format === 'pdf'
+      ? extractPdfTextFromBuffer(bytes)
+      : extractOoxmlTextFromBuffer(bytes, { format: fileKind.format })
+
+  return {
+    format: fileKind.format,
+    text: extracted.text,
+    bytesRead: extracted.bytesRead,
+    truncated: extracted.truncated,
+  }
+}
+
+function normalizeKnowledgeFileBytes(bytes: KnowledgeFileTextExtractRequest['bytes']): Uint8Array {
+  if (bytes instanceof Uint8Array) return bytes
+  if (bytes instanceof ArrayBuffer) return new Uint8Array(bytes)
+  if (ArrayBuffer.isView(bytes)) return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  if (Array.isArray(bytes)) return Uint8Array.from(bytes)
+  throw new Error('knowledge-file-bytes-required')
+}
+
 async function writeText(repoPath: string, relativePath: string, content: string): Promise<void> {
   const target = await resolveSafeWritableRepoPath(repoPath, relativePath)
   await mkdir(path.dirname(target), { recursive: true })
@@ -480,6 +529,9 @@ export function registerRepositoryIpcHandlers(): void {
   ipcMain.handle('repository:listTree', (_event, repoPath: string, maxEntries?: number) => listTree(repoPath, maxEntries))
   ipcMain.handle('repository:listMarkdown', (_event, repoPath: string, directory: string) => listMarkdown(repoPath, directory))
   ipcMain.handle('repository:readText', (_event, repoPath: string, relativePath: string) => readText(repoPath, relativePath))
+  ipcMain.handle('repository:extractKnowledgeFileText', (_event, request: KnowledgeFileTextExtractRequest) =>
+    extractKnowledgeFileText(request),
+  )
   ipcMain.handle('repository:writeText', (_event, repoPath: string, relativePath: string, content: string) =>
     writeText(repoPath, relativePath, content),
   )

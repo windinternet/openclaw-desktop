@@ -1547,3 +1547,18 @@ HTML 的独特优势：
 仍未完成的 P0 后续：
 
 - 仍需要更完整的 Repository 资产目录协议、手动仓库资产导入、运行后成果/知识/复盘联动，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
+
+### 10.75 2026-06-29 当前实施记录：Knowledge PDF/Office 资料导入第一片
+
+围绕“普通人更容易把真实资料放进长期可成长知识库”的 P0 缺口，当前继续补齐 Knowledge 导入中心：
+
+- 新增 `knowledge-file-import` 纯函数模块，统一识别 Markdown / TXT 文本文件，以及 PDF / Word / Excel / PowerPoint 可抽取文件。
+- Knowledge 文件选择器、文件夹选择器和拖拽导入使用同一套 `KNOWLEDGE_IMPORT_ACCEPT`，不再只暴露 Markdown/TXT。
+- Markdown/TXT 继续通过浏览器 `File.text()` 读取；PDF 与 Word/Excel/PowerPoint OOXML 通过 `repository:extractKnowledgeFileText` IPC 传递文件 bytes 到 Electron 主进程，复用已有 PDF text stream 和 OOXML XML entry 的 best-effort 抽取器。
+- 抽取型文件导入 `sources/imported/` 后，资料源 frontmatter 会记录 `extractedFormat`、`extractionStatus: best_effort`、`extractedBytesRead` 和 `extractedTruncated`；正文会写入“抽取限制”和“抽取文本”，明确复杂版式、图片和公式可能丢失。
+- 文件夹导入同样支持上述文件类型，并保留 `source: desktop-folder`、原始文件名和相对路径。
+- 该能力以当前代码事实为准：导入只把资料写入未消化资料队列，不自动生成 Wiki、不更新 `wiki/index.md` / `wiki/log.md`、不绕过 `knowledge_rewrite` 审批；当前不解析旧版二进制 Office、不做图片/OCR、不转写音视频、不抓取网页正文。
+
+仍未完成的 P0 后续：
+
+- 仍需要 AI 消化计划更细 UI、批准后写入 `wiki/` / 更新索引日志后的复盘联动、旧版二进制 Office/图片/OCR/音视频资料导入，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。

@@ -46,6 +46,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     listTree: (repoPath: string, maxEntries?: number) => ipcRenderer.invoke('repository:listTree', repoPath, maxEntries),
     listMarkdown: (repoPath: string, directory: string) => ipcRenderer.invoke('repository:listMarkdown', repoPath, directory),
     readText: (repoPath: string, relativePath: string) => ipcRenderer.invoke('repository:readText', repoPath, relativePath),
+    extractKnowledgeFileText: (params: { fileName: string; mimeType?: string; bytes: ArrayBuffer }) =>
+      ipcRenderer.invoke('repository:extractKnowledgeFileText', params),
     writeText: (repoPath: string, relativePath: string, content: string) =>
       ipcRenderer.invoke('repository:writeText', repoPath, relativePath, content),
     moveText: (repoPath: string, fromRelativePath: string, toRelativePath: string) =>

@@ -199,6 +199,64 @@ describe('repository knowledge', () => {
     expect(writeText).toHaveBeenCalledWith('/repo', written.path, written.markdown);
   });
 
+  it('builds imported extracted files with extraction metadata and limitations', () => {
+    const now = new Date('2026-06-28T07:08:09.000Z');
+    const imported = buildKnowledgeFileSourceImport({
+      fileName: 'Strategy Brief.pdf',
+      mimeType: 'application/pdf',
+      body: 'North star\n\nP0 import center',
+      extracted: {
+        format: 'pdf',
+        status: 'best_effort',
+        bytesRead: 4096,
+        truncated: true,
+        limitations: ['PDF/Office 文本抽取为 best-effort：会保留可读取文字，复杂版式、图片和公式可能丢失。'],
+      },
+      now,
+      sourceRoot: 'sources',
+    });
+
+    expect(imported).toEqual({
+      title: 'Strategy Brief',
+      path: 'sources/imported/2026-06-28-070809-strategy-brief.md',
+      markdown: [
+        '---',
+        'title: "Strategy Brief"',
+        'source: desktop-file',
+        'fileName: "Strategy Brief.pdf"',
+        'mimeType: "application/pdf"',
+        'extractedFormat: pdf',
+        'extractionStatus: best_effort',
+        'extractedBytesRead: 4096',
+        'extractedTruncated: true',
+        'importedAt: 2026-06-28T07:08:09.000Z',
+        '---',
+        '',
+        '# Strategy Brief',
+        '',
+        '## 原始文件',
+        '',
+        '- Strategy Brief.pdf',
+        '- application/pdf',
+        '- format: pdf',
+        '- extraction: best_effort',
+        '- bytesRead: 4096',
+        '- truncated: true',
+        '',
+        '## 抽取限制',
+        '',
+        '- PDF/Office 文本抽取为 best-effort：会保留可读取文字，复杂版式、图片和公式可能丢失。',
+        '',
+        '## 抽取文本',
+        '',
+        'North star',
+        '',
+        'P0 import center',
+        '',
+      ].join('\n'),
+    });
+  });
+
   it('builds and writes folder-imported text files with relative path metadata', async () => {
     const now = new Date('2026-06-28T08:09:10.000Z');
     const imported = buildKnowledgeFolderSourceImport({

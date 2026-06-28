@@ -22,6 +22,7 @@ import type { RepositoryBinding } from '../lib/agentic-repository';
 import type { DashboardTailActionRouteContext } from '../lib/dashboard-tail-action-routing';
 import type {
   KnowledgeDocument,
+  KnowledgeFileExtractionMetadata,
   KnowledgeSnapshot,
   RepositoryGitLogEntry,
   RepositoryMarkdownFile,
@@ -40,13 +41,19 @@ import {
   searchKnowledge,
   writeKnowledgeHealthReview,
 } from '../lib/repository-knowledge';
+import { KNOWLEDGE_IMPORT_ACCEPT, resolveKnowledgeImportFileKind } from '../lib/knowledge-file-import';
 import { confirmWorkbenchKnowledgeTailAction } from '../lib/repository-workbench';
 import { useWorkbenchWorkItemOptions } from '../lib/workbench-work-items';
 import { ActionRunWorkItemPicker } from './ActionRunWorkItemPicker';
 import MarkdownView from './MarkdownView';
 
 const { Text, Title } = Typography;
-const KNOWLEDGE_TEXT_FILE_EXTENSIONS = ['.md', '.markdown', '.txt'];
+
+interface KnowledgeImportedFileContent {
+  body: string;
+  mimeType?: string;
+  extracted?: KnowledgeFileExtractionMetadata;
+}
 
 export type KnowledgeSection =
   | 'dashboard'
@@ -248,27 +255,32 @@ export default function KnowledgeRepositoryPanel({
   };
 
   const handleImportFiles = async (files: FileList | File[] | null, mode: 'files' | 'folder' = 'files') => {
-    const selectedFiles = Array.from(files ?? []).filter(isKnowledgeTextFile);
-    if (selectedFiles.length === 0) return;
+    const selectedFiles = Array.from(files ?? []).filter(isKnowledgeSupportedImportFile);
+    if (selectedFiles.length === 0) {
+      Toast.warning(t('knowledge.importUnsupportedFile'));
+      return;
+    }
 
     setImportLoading(true);
     setError(null);
     try {
       let lastImportedPath: string | undefined;
       for (const file of selectedFiles) {
-        const body = await file.text();
+        const fileContent = await readKnowledgeImportedFileContent(file);
         const imported =
           mode === 'folder'
             ? await importKnowledgeFolderSource(binding, {
                 fileName: file.name,
                 relativePath: getKnowledgeFolderRelativePath(file),
-                mimeType: file.type || undefined,
-                body,
+                mimeType: fileContent.mimeType,
+                body: fileContent.body,
+                extracted: fileContent.extracted,
               })
             : await importKnowledgeFileSource(binding, {
                 fileName: file.name,
-                mimeType: file.type || undefined,
-                body,
+                mimeType: fileContent.mimeType,
+                body: fileContent.body,
+                extracted: fileContent.extracted,
               });
         lastImportedPath = imported.path;
       }
@@ -295,6 +307,43 @@ export default function KnowledgeRepositoryPanel({
         fileInputRef.current.value = '';
       }
     }
+  };
+
+  const readKnowledgeImportedFileContent = async (file: File): Promise<KnowledgeImportedFileContent> => {
+    const mimeType = file.type || undefined;
+    const fileKind = resolveKnowledgeImportFileKind({ name: file.name, type: mimeType });
+    if (fileKind.kind === 'text') {
+      return { body: await file.text(), mimeType };
+    }
+    if (fileKind.kind === 'unsupported') {
+      throw new Error(t('knowledge.importUnsupportedFile', { name: file.name }));
+    }
+
+    const extractKnowledgeFileText = window.electronAPI.repository?.extractKnowledgeFileText;
+    if (!extractKnowledgeFileText) {
+      throw new Error(t('knowledge.importExtractedFileUnsupportedRuntime'));
+    }
+
+    const extracted = await extractKnowledgeFileText({
+      fileName: file.name,
+      mimeType,
+      bytes: await file.arrayBuffer(),
+    });
+    if (!extracted.text.trim()) {
+      throw new Error(t('knowledge.importExtractedFileEmpty', { name: file.name }));
+    }
+
+    return {
+      body: extracted.text,
+      mimeType,
+      extracted: {
+        format: extracted.format,
+        status: 'best_effort',
+        bytesRead: extracted.bytesRead,
+        truncated: extracted.truncated,
+        limitations: ['PDF/Office 文本抽取为 best-effort：会保留可读取文字，复杂版式、图片和公式可能丢失。'],
+      },
+    };
   };
 
   const handleImportDragOver = (event: DragEvent<HTMLDivElement>) => {
@@ -1055,7 +1104,7 @@ export default function KnowledgeRepositoryPanel({
             <input
               ref={fileInputRef}
               type="file"
-              accept=".md,.markdown,.txt,text/markdown,text/plain"
+              accept={KNOWLEDGE_IMPORT_ACCEPT}
               multiple
               style={{ display: 'none' }}
               onChange={(event) => void handleImportFiles(event.currentTarget.files)}
@@ -1063,7 +1112,7 @@ export default function KnowledgeRepositoryPanel({
             <input
               ref={folderInputRef}
               type="file"
-              accept=".md,.markdown,.txt,text/markdown,text/plain"
+              accept={KNOWLEDGE_IMPORT_ACCEPT}
               multiple
               style={{ display: 'none' }}
               onChange={(event) => void handleImportFiles(event.currentTarget.files, 'folder')}
@@ -1329,12 +1378,8 @@ export default function KnowledgeRepositoryPanel({
   );
 }
 
-function isKnowledgeTextFile(file: File): boolean {
-  const lowerName = file.name.toLowerCase();
-  const lowerType = file.type.toLowerCase();
-  return (
-    lowerType.startsWith('text/') || KNOWLEDGE_TEXT_FILE_EXTENSIONS.some((extension) => lowerName.endsWith(extension))
-  );
+function isKnowledgeSupportedImportFile(file: File): boolean {
+  return resolveKnowledgeImportFileKind({ name: file.name, type: file.type }).kind !== 'unsupported';
 }
 
 function getKnowledgeFolderRelativePath(file: File): string {
