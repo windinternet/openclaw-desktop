@@ -237,7 +237,7 @@ export function buildDashboardWorkSystemSummary(
       title: artifact.title,
       target: `/artifacts/${encodeURIComponent(artifact.id)}`,
       updatedAt: artifact.updatedAt,
-      detail: artifact.repositoryOutputPath ?? artifact.contentSummary ?? artifact.type,
+      detail: formatArtifactOutputDetail(artifact),
       status: artifact.status,
     },
   }));
@@ -258,7 +258,7 @@ export function buildDashboardWorkSystemSummary(
         target: '/workbench?view=outputs',
         updatedAt: output.updatedAt,
         path: output.path,
-        detail: output.summary ?? output.format ?? output.path,
+        detail: formatRepositoryOutputDetail(output),
       },
     }));
   const knownOutputPaths = new Set([...artifactOutputPaths, ...repositoryOutputItems.map(({ output }) => output.path)]);
@@ -395,6 +395,8 @@ interface RepositoryOutputIndexItem {
   updatedAt?: number;
   format?: string;
   summary?: string;
+  reuseKind?: string;
+  executionStatus?: string;
 }
 
 interface ReviewOutputClue {
@@ -422,6 +424,8 @@ function parseRepositoryOutputIndex(markdown: string): RepositoryOutputIndexItem
       updatedAt: parseTimestamp(current.metadata.updatedAt),
       format: current.metadata.format,
       summary: current.metadata.summary,
+      reuseKind: current.metadata.reuseKind,
+      executionStatus: parseRepositoryOutputExecutionStatus(current.metadata.execution),
     };
     items.push(next);
   };
@@ -448,6 +452,41 @@ function parseRepositoryOutputIndex(markdown: string): RepositoryOutputIndexItem
 
   pushCurrent();
   return items;
+}
+
+function formatArtifactOutputDetail(artifact: ArtifactMeta): string {
+  if (!artifact.reuseKind) return artifact.repositoryOutputPath ?? artifact.contentSummary ?? artifact.type;
+  return formatReusableAssetDetail({
+    reuseKind: artifact.reuseKind,
+    executionStatus: artifact.executionEvents?.at(-1)?.status,
+    fallback: artifact.repositoryOutputPath ?? artifact.contentSummary ?? artifact.type,
+  });
+}
+
+function formatRepositoryOutputDetail(output: RepositoryOutputIndexItem): string {
+  if (!output.reuseKind) return output.summary ?? output.format ?? output.path;
+  return formatReusableAssetDetail({
+    reuseKind: output.reuseKind,
+    executionStatus: output.executionStatus,
+    fallback: output.summary ?? output.format ?? output.path,
+  });
+}
+
+function formatReusableAssetDetail(input: { reuseKind: string; executionStatus?: string; fallback?: string }): string {
+  return ['可复用资产', input.reuseKind, formatReusableAssetExecutionStatus(input.executionStatus), input.fallback]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function formatReusableAssetExecutionStatus(status?: string): string | undefined {
+  if (!status) return undefined;
+  if (status === 'approval_required') return '需要审批';
+  return `最近运行: ${status}`;
+}
+
+function parseRepositoryOutputExecutionStatus(value?: string): string | undefined {
+  if (!value) return undefined;
+  return value.match(/\blast\s+([^,\s]+)/i)?.[1];
 }
 
 function parseTimestamp(value?: string): number | undefined {

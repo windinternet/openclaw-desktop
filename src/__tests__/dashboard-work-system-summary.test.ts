@@ -256,6 +256,73 @@ describe('dashboard work system summary', () => {
     expect(summary.counts.weeklyOutputs).toBe(1);
   });
 
+  it('surfaces reusable artifact asset metadata in output details', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [
+        createArtifact({
+          id: 'art_script',
+          title: '部署脚本',
+          type: 'code',
+          reuseKind: 'script',
+          contentSummary: '用于部署前检查',
+          executionEvents: [
+            {
+              id: 'exec_1',
+              status: 'approval_required',
+              artifactVersion: 1,
+              requestedAt: 120,
+              approvalRisk: 'high',
+            },
+          ],
+        }),
+      ],
+    });
+
+    expect(summary.recentOutputs).toEqual([
+      expect.objectContaining({
+        id: 'art_script',
+        kind: 'artifact',
+        title: '部署脚本',
+        detail: '可复用资产 · script · 需要审批 · 用于部署前检查',
+      }),
+    ]);
+  });
+
+  it('surfaces reusable repository output metadata from the output index', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [],
+      workbench: {
+        activeWork: [],
+        activePlans: [],
+        planMetadata: [],
+        tailActions: [],
+        reviews: [],
+        outputsMarkdown: [
+          '# Outputs',
+          '- [发布工作流](outputs/workflows/release.md) (`repo_workflow`, workflow, published)',
+          '  - artifact: artifact://repo_workflow',
+          '  - updatedAt: 2026-06-27T11:00:00.000Z',
+          '  - summary: 自动整理发布前检查项',
+          '  - reuseKind: workflow',
+          '  - execution: 3 events, last succeeded',
+        ].join('\n'),
+      },
+    });
+
+    expect(summary.recentOutputs).toEqual([
+      expect.objectContaining({
+        id: 'repository-output:outputs/workflows/release.md',
+        kind: 'output',
+        title: '发布工作流',
+        detail: '可复用资产 · workflow · 最近运行: succeeded · 自动整理发布前检查项',
+      }),
+    ]);
+  });
+
   it('surfaces terminal ActionRun summaries as output clues without duplicating known artifacts', () => {
     const now = Date.parse('2026-06-28T12:00:00.000Z');
     const summary = buildDashboardWorkSystemSummary({

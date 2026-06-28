@@ -741,6 +741,20 @@ HTML 的独特优势：
 
 - 后续仍需要更完整的跨事项风险处理，例如提供可执行的收口动作，并把负责人解析扩展到工作事项等更多对象。
 
+### 10.30 2026-06-28 当前实施记录：可复用资产进入 Dashboard 成果摘要
+
+围绕“工具、脚本只是可复用资产的一类，模板、工作流、提示词、检查清单等也必须是一等对象”的 P0 内容，当前继续落地一段代码事实：
+
+- Artifact 已经能通过 `reuseKind: asset / template / tool / script / workflow` 标记可复用资产，Repository `outputs/index.md` 也会写入 `reuseKind` 和执行事件线索。
+- Dashboard work-system summary 会在最近成果和本周新增成果中识别带 `reuseKind` 的本地 Artifact。
+- Dashboard work-system summary 也会解析 Repository `outputs/index.md` 条目里的 `reuseKind` 和 `execution: <count> events, last <status>`。
+- 这些条目的详情会以 `可复用资产 · <reuseKind>` 开头，并展示 `需要审批` 或 `最近运行: <status>` 等执行边界线索，再接上价值摘要、格式或路径。
+- 该能力只做可观测资产摘要，不自动执行资产、不授予权限、不创建新的资产目录。
+
+仍未完成的 P0 后续：
+
+- 后续仍需要完整 Repository 资产目录、资产权限/审批面板、运行后复盘线索、更细的搜索/筛选入口，以及从手动仓库文件导入资产的流程。
+
 ### 10.28 2026-06-28 当前实施记录：跨事项依赖风险过滤已完成依赖
 
 围绕“Dashboard 卡住项应展示真实推进风险，而不是把已经收口的历史依赖继续报红”的 P0 内容，当前继续落地一段代码事实：

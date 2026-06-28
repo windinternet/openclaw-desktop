@@ -118,7 +118,7 @@ export function buildDesktopSelfKnowledgeSkillContent(): string {
     '',
     'Repository `outputs/index.md` is a skim-readable Artifact directory. Each Artifact entry should expose the artifact URI, source, created time, updated time, preview, format, summary, thumbnail availability, value health, preview plan, content extraction status, content facts status, PDF facts, preview card, reuse kind, and tags when available, while detailed audit facts stay in the per-Artifact output markdown.',
     '',
-    'Artifacts list search, Dashboard recent/weekly outputs, and Workbench outputs surface value summaries, `externalFormat`, `reuseKind`, source, update time, tags, and Repository output / preview clues so users can identify key results rather than only generic files.',
+    'Artifacts list search, Dashboard recent/weekly outputs, and Workbench outputs surface value summaries, `externalFormat`, `reuseKind`, source, update time, tags, and Repository output / preview clues so users can identify key results rather than only generic files. Dashboard recent and weekly outputs mark reusable Artifacts and Repository outputs as reusable assets, include their `reuseKind`, and show the latest execution status or approval-required boundary when execution facts are available.',
     '',
     'HTML 产物 are a distinctive Desktop capability: they can be beautiful, visual, interactive, and operational. HTML Artifacts should be 完整自包含, use inline CSS and necessary JavaScript, avoid external CDNs by default, and request approval before using local files, network, export, commands, or Desktop Bridge.',
     '',
