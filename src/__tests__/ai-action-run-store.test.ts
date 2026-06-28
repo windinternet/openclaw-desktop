@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createEmptyAgentTeamProfile, createInstruction, upsertAgentProfile } from '../lib/agent-team';
 import {
+  assignAiActionRunToWorkItem,
   buildAiActionRunMarkdown,
   reconcileGatewayAgentCreationRun,
   upsertAiActionRun,
@@ -296,6 +297,113 @@ describe('AI ActionRun repository summaries', () => {
     expect(workItemWrite).toContain('- [ ] 判断是否需要更新知识库。');
     expect(workItemWrite).toContain('- [ ] 判断是否需要写入复盘。');
     expect(workItemWrite).not.toContain('- 暂无');
+  });
+
+  it('lets users assign an unbound terminal ActionRun to a work item and backfills repository records', async () => {
+    const writeText = vi.fn();
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'runs/action-runs/index.md') return '# Action Runs\n';
+      if (relativePath === 'work/active/release.md') {
+        return [
+          '---',
+          'id: work-release',
+          'status: active',
+          '---',
+          '',
+          '# 发布推进',
+          '',
+          '## 执行记录',
+          '',
+          '- 暂无',
+          '',
+          '## 收尾动作',
+          '',
+          '- 暂无',
+          '',
+        ].join('\n');
+      }
+      return '';
+    });
+    const saveInstanceData = vi.fn();
+    const existingRun = createRun({
+      id: 'action-unassigned',
+      type: 'artifact_create',
+      sourcePage: 'artifacts',
+      status: 'done',
+      input: '生成发布报告',
+      resultSummary: '发布报告已生成',
+      workItemRequired: true,
+      workItemUnassignedReason: 'pending_work_item_assignment',
+      updatedAt: 2,
+    });
+    const loadInstanceData = vi.fn(async (_instanceId: string, key: string) => {
+      if (key === AI_ACTION_RUNS_STORAGE_KEY) return [existingRun];
+      if (key === AGENTIC_REPOSITORY_STORAGE_KEY) {
+        return {
+          id: 'repo_instance-1',
+          name: 'Repo',
+          location: 'desktop-local',
+          repoPath: '/repo',
+          gatewayInstanceId: 'instance-1',
+          status: 'repo_ready',
+          paths: {
+            sources: 'sources',
+            wiki: 'wiki',
+            work: 'work',
+            plans: 'plans',
+            runs: 'runs',
+            outputs: 'outputs',
+            reviews: 'reviews',
+            schemas: 'schemas',
+          },
+        };
+      }
+      return null;
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        storage: {
+          loadInstanceData,
+          saveInstanceData,
+        },
+        repository: {
+          readText,
+          writeText,
+        },
+      },
+    });
+
+    const updated = await assignAiActionRunToWorkItem('instance-1', 'action-unassigned', 'work/active/release.md');
+
+    expect(updated).toMatchObject({
+      id: 'action-unassigned',
+      workItemRequired: true,
+      workItemPath: 'work/active/release.md',
+      workItemId: 'work-release',
+      workItemUnassignedReason: undefined,
+    });
+    expect(saveInstanceData).toHaveBeenCalledWith(
+      'instance-1',
+      AI_ACTION_RUNS_STORAGE_KEY,
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'action-unassigned',
+          workItemPath: 'work/active/release.md',
+          workItemId: 'work-release',
+          workItemUnassignedReason: undefined,
+        }),
+      ]),
+    );
+    const runWrite = writeText.mock.calls.find((call) => call[1] === 'runs/action-runs/action-unassigned.md')?.[2] as
+      | string
+      | undefined;
+    expect(runWrite).toContain('workItemPath: work/active/release.md');
+    expect(runWrite).not.toContain('workItemUnassignedReason');
+    const workItemWrite = writeText.mock.calls.find((call) => call[1] === 'work/active/release.md')?.[2] as string;
+    expect(workItemWrite).toContain(
+      '- 1970-01-01T00:00:00.002Z · artifact_create · done · [runs/action-runs/action-unassigned.md](../../runs/action-runs/action-unassigned.md) · 发布报告已生成',
+    );
+    expect(workItemWrite).toContain('- [ ] 判断是否需要把本次执行结果沉淀为成果，并关联到事项。');
   });
 
   it('includes artifact details and repository output paths when metadata is available', () => {

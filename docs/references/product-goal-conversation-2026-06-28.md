@@ -741,6 +741,23 @@ HTML 的独特优势：
 
 - 后续仍需要更完整的跨事项风险处理，例如提供可执行的收口动作，并把负责人解析扩展到工作事项等更多对象。
 
+### 10.55 2026-06-28 当前实施记录：ActionRun 补归属流程
+
+围绕“每次 AI 执行必须归属事项”和“已有无事项 ActionRun 不能只停留在 Dashboard 告警”的 P0 验收，当前继续落地一段代码事实：
+
+- `assignAiActionRunToWorkItem` 已加入 ActionRun store，作为已有无事项运行的补归属入口。
+- 用户在 ActionCenter 选择已有 `work/active`、`work/someday` 或 `work/completed` 事项后，Desktop 会读取事项 Markdown，并尽量从 frontmatter 提取事项 `id` 写入 `workItemId`。
+- 补归属会更新本地 ActionRun 的 `workItemPath` / `workItemId`，清除 `workItemUnassignedReason`，并保持原 ActionRun `updatedAt`，避免把补归属时间伪装成执行时间。
+- 对终态 ActionRun，补归属会复用现有仓库镜像流程，重写 `runs/action-runs/<id>.md`，确保摘要里出现 `workItemPath` 且不再出现未归属原因。
+- Desktop 会继续把运行记录追加回来源事项 `## 执行记录`，并追加“更新状态、沉淀成果、更新知识库、写入复盘”的 `## 收尾动作` 清单。
+- ActionCenter 页面已加载当前 Repository Workbench 的 active / someday / completed 事项，未归属且 `workItemRequired` 的 run 会显示“关联事项”卡片。
+- 该入口仍然是用户显式操作，不自动猜事项、不自动创建事项、不自动更新事项状态、不自动沉淀成果、不自动更新知识库、不自动写复盘。
+
+仍未完成的 P0 后续：
+
+- 仍需要在创建新 ActionRun 之前提供全局事项选择/创建体验，让 Teams、Tasks、Knowledge、Artifacts 等入口更早拿到用户可理解的事项上下文。
+- 仍需要把“从未归属运行创建新事项”的流程单独设计清楚，避免把补归属错误地等同于自动生成事项。
+
 ### 10.44 2026-06-28 当前实施记录：事项完成后显式归档
 
 围绕“事务推进闭环”和“完成事项应该从 active 进入 completed，但不能把移动文件伪装成状态更新副作用”的 P0 验收，当前继续落地一段代码事实：

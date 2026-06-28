@@ -109,6 +109,7 @@ export {
   resumeAiActionRunWithGateway,
 } from './ai-action-center';
 export {
+  assignAiActionRunToWorkItem,
   loadAiActionRuns,
   recoverInterruptedAiActionRuns,
   resyncAiActionRun,

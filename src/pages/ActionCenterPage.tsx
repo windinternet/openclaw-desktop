@@ -7,6 +7,7 @@ import {
   Descriptions,
   Empty,
   Modal,
+  Select,
   Space,
   Spin,
   Tag,
@@ -16,6 +17,7 @@ import {
 import { IconBolt, IconClose, IconDelete, IconRefresh, IconSend, IconTickCircle } from '@douyinfe/semi-icons';
 import { resolveAiActionApprovalWithGateway } from '../lib/ai-action-center';
 import {
+  assignAiActionRunToWorkItem,
   loadAiActionRuns,
   resyncAiActionRun,
   resumeStalledAiActionRun,
@@ -23,9 +25,12 @@ import {
   syncAiActionRunsWithGateway,
   upsertAiActionRun,
 } from '../lib/ai-action-run-store';
+import { loadRepositoryBinding } from '../lib/agentic-repository-store';
+import { loadWorkbenchSnapshot } from '../lib/repository-workbench';
 import MarkdownView from '../components/MarkdownView';
 import { useStore } from '../lib';
 import type { AiActionApproval, AiActionRun, AiActionRunStatus } from '../lib/types';
+import type { RepositoryMarkdownFile } from '../lib/repository-knowledge';
 
 const { Title, Text } = Typography;
 
@@ -103,6 +108,9 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
   const [decisionLoadingId, setDecisionLoadingId] = useState<string | null>(null);
   const [resyncLoadingId, setResyncLoadingId] = useState<string | null>(null);
   const [resumeLoadingId, setResumeLoadingId] = useState<string | null>(null);
+  const [workItemOptions, setWorkItemOptions] = useState<RepositoryMarkdownFile[]>([]);
+  const [selectedAssignmentPath, setSelectedAssignmentPath] = useState('');
+  const [assignmentLoading, setAssignmentLoading] = useState(false);
 
   const selectedRun = useMemo(
     () => runs.find((run) => run.id === selectedRunId) ?? runs[0] ?? null,
@@ -147,6 +155,35 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
       void loadRuns();
     });
   }, [actionRunsVersion, loadRuns]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!currentInstanceId) {
+      setWorkItemOptions([]);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    loadRepositoryBinding(currentInstanceId)
+      .then(async (binding) => {
+        if (!binding || binding.status !== 'repo_ready') return [];
+        const snapshot = await loadWorkbenchSnapshot(binding);
+        return [...snapshot.activeWork, ...snapshot.somedayWork, ...snapshot.completedWork];
+      })
+      .then((items) => {
+        if (cancelled) return;
+        setWorkItemOptions(items);
+        setSelectedAssignmentPath((current) => (current && items.some((item) => item.path === current) ? current : ''));
+      })
+      .catch(() => {
+        if (!cancelled) setWorkItemOptions([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentInstanceId]);
 
   const clearRuns = useCallback(() => {
     if (!currentInstanceId || runs.length === 0) return;
@@ -229,6 +266,22 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
     },
     [activeClient, connectionStatus, currentInstanceId, t],
   );
+
+  const handleAssignWorkItem = useCallback(async () => {
+    if (!currentInstanceId || !selectedRun || !selectedAssignmentPath) return;
+
+    setAssignmentLoading(true);
+    try {
+      const updated = await assignAiActionRunToWorkItem(currentInstanceId, selectedRun.id, selectedAssignmentPath);
+      setRuns((current) => current.map((run) => (run.id === updated.id ? updated : run)));
+      setSelectedAssignmentPath('');
+      Toast.success(t('actions.workItemAssigned'));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('actions.workItemAssignFailed'));
+    } finally {
+      setAssignmentLoading(false);
+    }
+  }, [currentInstanceId, selectedAssignmentPath, selectedRun, t]);
 
   const headerActions = useMemo(
     () => (
@@ -378,10 +431,58 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
                     { key: t('actions.fieldExecutionMode'), value: modeLabel(selectedRun.executionMode) },
                     { key: t('actions.fieldGatewaySession'), value: selectedRun.gatewaySessionKey || '—' },
                     { key: t('actions.fieldGatewayRun'), value: selectedRun.gatewayRunId || '—' },
+                    { key: t('actions.fieldWorkItem'), value: selectedRun.workItemPath || '—' },
+                    { key: t('actions.fieldWorkItemRequired'), value: selectedRun.workItemRequired ? 'true' : 'false' },
+                    {
+                      key: t('actions.fieldWorkItemUnassignedReason'),
+                      value: selectedRun.workItemUnassignedReason || '—',
+                    },
                     { key: t('actions.fieldCreatedAt'), value: formatTime(selectedRun.createdAt) },
                     { key: t('actions.fieldUpdatedAt'), value: formatTime(selectedRun.updatedAt) },
                   ]}
                 />
+
+                {selectedRun.workItemRequired && !selectedRun.workItemPath && (
+                  <div style={PANEL_STYLE}>
+                    <div style={{ padding: 14, display: 'grid', gap: 10 }}>
+                      <Space align="center" wrap>
+                        <Tag color="orange">{t('actions.workItemAssignment')}</Tag>
+                        {selectedRun.workItemUnassignedReason && (
+                          <Tag color="grey">{selectedRun.workItemUnassignedReason}</Tag>
+                        )}
+                      </Space>
+                      <Text type="tertiary" size="small">
+                        {t('actions.workItemAssignmentDesc')}
+                      </Text>
+                      <Space align="center" wrap>
+                        <Select
+                          size="small"
+                          value={selectedAssignmentPath}
+                          placeholder={t('actions.workItemPlaceholder')}
+                          onChange={(value) => setSelectedAssignmentPath(String(value))}
+                          style={{ width: 320 }}
+                          disabled={workItemOptions.length === 0}
+                        >
+                          {workItemOptions.map((item) => (
+                            <Select.Option key={item.path} value={item.path}>
+                              {item.name} · {item.path}
+                            </Select.Option>
+                          ))}
+                        </Select>
+                        <Button
+                          size="small"
+                          type="primary"
+                          icon={<IconTickCircle />}
+                          loading={assignmentLoading}
+                          disabled={!selectedAssignmentPath}
+                          onClick={() => void handleAssignWorkItem()}
+                        >
+                          {t('actions.assignWorkItem')}
+                        </Button>
+                      </Space>
+                    </div>
+                  </div>
+                )}
 
                 <div style={PANEL_STYLE}>
                   <div style={{ padding: 14 }}>

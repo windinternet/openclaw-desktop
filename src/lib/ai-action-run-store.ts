@@ -20,6 +20,7 @@ import { buildArtifactRepositoryOutputUpdates, mirrorArtifactToReadyRepositoryOu
 import { buildArtifactOutputDescription } from './artifact-display';
 import { buildArtifactValueHealth } from './artifact-value-health';
 import { loadInstanceData, saveInstanceDataAwaited } from './local-persistence';
+import { extractWorkbenchMatterId, isWorkbenchMatterPath } from './workbench-matter';
 import type { ArtifactMeta } from './artifact-types';
 import type { RepositoryBinding } from './agentic-repository';
 import type { AgentTeamProfile, AiActionRun, AiActionRunStatus } from './types';
@@ -47,6 +48,32 @@ export async function upsertAiActionRun(instanceId: string, run: AiActionRun): P
   await saveAiActionRuns(instanceId, nextRuns);
   await mirrorTerminalAiActionRunToRepository(instanceId, runWithArtifacts);
   return nextRuns;
+}
+
+export async function assignAiActionRunToWorkItem(
+  instanceId: string,
+  actionRunId: string,
+  workItemPath: string,
+): Promise<AiActionRun> {
+  const normalizedWorkItemPath = workItemPath.trim();
+  if (!isWorkbenchMatterPath(normalizedWorkItemPath)) {
+    throw new Error('ActionRun can only be assigned to a work item markdown file');
+  }
+
+  const runs = await loadAiActionRuns(instanceId);
+  const run = runs.find((item) => item.id === actionRunId);
+  if (!run) throw new Error('ActionRun not found');
+
+  const workItemId = await readAssignedWorkItemId(instanceId, normalizedWorkItemPath);
+  const updated: AiActionRun = {
+    ...run,
+    workItemRequired: true,
+    workItemPath: normalizedWorkItemPath,
+    workItemId: workItemId || run.workItemId,
+    workItemUnassignedReason: undefined,
+  };
+  await upsertAiActionRun(instanceId, updated);
+  return updated;
 }
 
 export function buildAiActionRunMarkdown(run: AiActionRun, artifacts: ArtifactMeta[] = []): string {
@@ -152,6 +179,17 @@ async function mirrorTerminalAiActionRunToRepository(instanceId: string, run: Ai
   const nextIndex = existingIndex.includes(runPath) ? existingIndex : `${existingIndex.trimEnd()}\n${indexEntry}\n`;
   await repositoryApi.writeText(binding.repoPath, indexPath, nextIndex);
   await appendActionRunExecutionRecordToWorkItem(repositoryApi, binding, run, runPath);
+}
+
+async function readAssignedWorkItemId(instanceId: string, workItemPath: string): Promise<string | undefined> {
+  const binding = await loadRepositoryBinding(instanceId);
+  if (!binding || binding.status !== 'repo_ready' || binding.location !== 'desktop-local') return undefined;
+
+  const repository = typeof window !== 'undefined' ? window.electronAPI?.repository : undefined;
+  if (!repository?.readText) return undefined;
+
+  const markdown = await repository.readText(binding.repoPath, workItemPath);
+  return extractWorkbenchMatterId(markdown);
 }
 
 async function appendActionRunExecutionRecordToWorkItem(

@@ -288,6 +288,7 @@ HTML 产物是特色能力：
 
 - `AiActionRun` 已支持可选 `workItemId` / `workItemPath`，并在创建时默认记录 `workItemRequired: true`；没有事项路径时会写入 `workItemUnassignedReason: pending_work_item_assignment`，让未归属不是沉默缺失。
 - ActionRun 仓库摘要会写入 `workItemRequired`、`workItemUnassignedReason`、`workItemId` / `workItemPath`，让 `runs/action-runs/*.md` 保留归属要求和归属线索。
+- `assignAiActionRunToWorkItem` 已提供已有无事项 ActionRun 的补归属能力：用户在 ActionCenter 选择已有 `work/active` / `work/someday` / `work/completed` 事项后，Desktop 会读取事项 frontmatter `id`、更新本地 ActionRun、清除 `workItemUnassignedReason`、重写仓库 run 摘要，并回填事项 `## 执行记录` 和 `## 收尾动作`；该流程保留原 ActionRun 执行时间，不把补归属时间写成执行时间。
 - 当终态 ActionRun 带有安全的 `workItemPath` 且仓库绑定就绪时，Desktop 会读取对应 `work/` 下的事项 Markdown，向 `## 执行记录` 追加包含时间、类型、状态、`runs/action-runs/<id>.md` 链接和结果摘要的一条记录，并向 `## 收尾动作` 追加更新事项状态、沉淀成果、更新知识库和写入复盘的检查清单。
 - Workbench 快照会解析工作事项里的 `## 收尾动作`，Dashboard “待确认”会显示未勾选收尾动作，让 ActionRun 结束后的后续判断进入每日推进面板。
 - Dashboard 会把未完成收尾动作分类为 `tail-action:status`、`tail-action:output`、`tail-action:knowledge` 或 `tail-action:review`，分别导向 Workbench 状态处理、Artifacts、Knowledge 或 Workbench 复盘后续。
@@ -295,13 +296,13 @@ HTML 产物是特色能力：
 - Workbench tasks 视图已接收 `tailAction=status` 上下文，并显示“状态收尾动作”卡片；用户可显式选择 `active`、`blocked`、`done` 或 `paused`，Desktop 会更新来源事项 Markdown 的 `status` 并只勾选匹配的状态尾动作。状态更新本身不自动移动事项文件；当来源事项已经是 `done` 且路径位于 `work/active/*.md` 时，用户可在同一卡片显式点击“归档完成事项”，Desktop 会通过安全 repository move 把它移到 `work/completed/*.md`，并拒绝非 done 状态、非 `work/active/` 路径或目标已存在的移动。该归档入口不自动判断完成，不沉淀成果，不更新知识库，也不写复盘。
 - Workbench 复盘视图已接收 `tailAction=review` 上下文，并显示“复盘收尾动作”卡片；卡片保留来源事项 `workItemPath`、建议目标 `reviews/weekly/` 和复盘写入命令线索 `desktop.artifacts.execution.review.write`，可打开复盘目录，也可创建 `reviews/weekly/YYYY-MM-DD-work-*-tail-action-*-review.md` 事项复盘草稿。草稿记录来源事项、尾动作 ID、创建时间和核对清单，创建时不会自动确认复盘或勾选尾动作；用户显式确认该草稿后，Desktop 会把草稿改为 `status: confirmed`、写入 `reviewedAt`，并只勾选匹配来源尾动作。
 - Dashboard 会读取 Workbench Snapshot 中的 `runs/action-runs/index.md`；已归属事项的终态 ActionRun 如果没有被索引，会作为 `action-run:unarchived` 待确认展示，并跳转到 `/workbench?view=actions` 让用户回到执行记录视图检查。
-- Dashboard 会把没有 `workItemPath` 的终态 ActionRun 作为 `action-run:unassigned` 待确认展示，并把 `workItemUnassignedReason` 展示在详情里，跳转到 `/workbench?view=actions`；这是对“每次 AI 执行应归属事项”的协议化诊断，不自动创建事项或改写运行记录。
+- Dashboard 会把没有 `workItemPath` 的终态 ActionRun 作为 `action-run:unassigned` 待确认展示，并把 `workItemUnassignedReason` 展示在详情里，跳转到 `/workbench?view=actions`；这是对“每次 AI 执行应归属事项”的协议化诊断，不自动创建事项或猜测归属。进入 ActionCenter 后，用户可显式选择已有事项完成补归属。
 - Dashboard 会把已完成、有 `workItemPath`、有 `resultSummary` 但没有 `artifactIds` 的 ActionRun 作为 `action-run:output-unpreserved` 待确认展示；如果同事项已有未完成成果尾动作则不重复提示，如果运行索引可用则要求该 run 已经归档。点击会进入 Artifacts 的 `tailAction=output` 成果沉淀入口，并携带 `tailActionId=action-run-output:<runId>` 和 `workItemPath`；这只是沉淀提示，不自动创建 Artifact 或 Repository output，但用户显式保存产物后会把成果关联回来源事项。
 - Dashboard 会把计划元数据中显式声明的 `dependsOn` / `dependencies` / `requires` / `relatedWork` / `依赖事项` / `关联事项` / `前置事项` 解析为跨事项依赖，并把仍未完成的依赖作为 `plan:cross-work-risk` 卡住项展示；已在 `completedWork`、`completedPlans`、`work/completed/` 或 `plans/completed/` 中出现的依赖会从风险详情中过滤。未完成依赖如果 14 天没有更新会标记“停滞 N 天”，未完成的活跃计划依赖如果没有显式负责人元数据会标记“负责人未知”。这只是显式元数据诊断，不从计划正文推断风险，也不自动改写计划。
 - 用户可在 Dashboard 将单条收尾动作标记完成；Desktop 会读取来源事项 Markdown，只把对应 `## 收尾动作` 行写回为 `[x]`，不自动执行更新状态、沉淀成果、更新知识库或写入复盘。成果类尾动作可在 Artifacts 显式保存产物后写入 `## 关联成果` 并勾选匹配行；知识类尾动作可在 Knowledge 完成知识更新或确认无需写入后显式勾选匹配行；状态类尾动作可在 Workbench 显式更新 `status` 后勾选匹配行；复盘类尾动作也可在 Workbench 明确确认复盘草稿后勾选匹配行，但这些都不触发其他尾动作。
 - 回写只允许发生在当前绑定仓库的 `work/` 下 Markdown，且同一个 run 路径已存在时不会重复追加。
 - Workbench 预览 `work/active/`、`work/completed/`、`work/someday/` 下的事项 Markdown 时，已提供“生成成果”入口；该入口复用 Artifact AI 创建抽屉，创建 `artifact_create` ActionRun 时写入 `sourcePage: workbench`、当前 `workItemPath`，并在事项 frontmatter 有 `id` 时写入 `workItemId`。
-- 这只是硬连接早期切片：全局 UI 侧事项选择器、已有无事项运行的补归属流程、事项计划，以及知识更新后的复盘建议和结构化上下文带入仍未完成。
+- 这只是硬连接早期切片：新 ActionRun 创建前的全局事项选择/创建体验、事项计划，以及知识更新后的复盘建议和结构化上下文带入仍未完成。
 
 验收：
 

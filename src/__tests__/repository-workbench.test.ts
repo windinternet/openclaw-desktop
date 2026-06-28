@@ -1045,6 +1045,23 @@ describe('repository workbench', () => {
     expect(source).toContain("navigate('/actions')");
   });
 
+  it('wires ActionCenter unassigned ActionRun backfill to repository work items', () => {
+    const page = readFileSync('src/pages/ActionCenterPage.tsx', 'utf8');
+    const zh = readFileSync('src/locales/zh.json', 'utf8');
+    const en = readFileSync('src/locales/en.json', 'utf8');
+
+    expect(page).toContain('assignAiActionRunToWorkItem');
+    expect(page).toContain('loadRepositoryBinding');
+    expect(page).toContain('loadWorkbenchSnapshot');
+    expect(page).toContain('selectedAssignmentPath');
+    expect(page).toContain('selectedRun.workItemRequired && !selectedRun.workItemPath');
+    expect(page).toContain("t('actions.assignWorkItem')");
+    expect(page).toContain("t('actions.fieldWorkItem')");
+    expect(page).toContain("t('actions.fieldWorkItemUnassignedReason')");
+    expect(zh).toContain('"assignWorkItem": "关联事项"');
+    expect(en).toContain('"assignWorkItem": "Assign Work Item"');
+  });
+
   it('renders semantic Workbench sections and keeps default fallback components', () => {
     const panel = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
     const kanban = readFileSync('src/components/RepositoryWorkbenchKanban.tsx', 'utf8');
