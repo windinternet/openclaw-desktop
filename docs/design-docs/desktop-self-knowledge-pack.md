@@ -113,7 +113,7 @@ Skill 应包含：
 - ActionRun 文件型 `<artifact>` header 可以携带 `filePath / fileName / fileSize / mimeType / externalFormat / contentSummary / reuseKind / importFile`；`importFile: true` 表示允许导入本地文件，仓库绑定就绪时会镜像到 `outputs/files/`。
 - 可复用资产、模板、工具、脚本和工作流应通过 `reuseKind: asset / template / tool / script / workflow` 标记；该字段用于分类和追踪，不代表可以绕过审批直接执行。
 - 既有产物可用稳定引用 `artifact://<artifactId>` 继续复用；Gateway 可调用 `desktop.artifacts.describe` 获取标题、类型、摘要、预览卡片、预览计划、来源、仓库 output / preview 和文件或 URL 线索。
-- 不知道具体 `artifactId` 时，Gateway 应先调用 `desktop.artifacts.search`，用 `query / type / externalFormat / reuseKind / sourceType / status / limit` 查找已有产物；返回项包含 `artifact://` URI、价值摘要、预览卡片、预览计划、来源、仓库 output / preview、文件或 URL 线索和可复用 Markdown 引用。搜索不打开文件、不执行命令、不授予权限。
+- 不知道具体 `artifactId` 时，Gateway 应先调用 `desktop.artifacts.search`，用 `query / type / externalFormat / reuseKind / sourceType / status / limit` 查找已有产物；搜索索引会把 `reuseKind` 映射为普通中文可复用资产查询词，例如“可复用的脚本 / 可复用的模板 / 可复用的工具 / 可复用的工作流”。返回项包含 `artifact://` URI、价值摘要、预览卡片、预览计划、来源、仓库 output / preview、文件或 URL 线索和可复用 Markdown 引用。搜索不打开文件、不执行命令、不授予权限。
 - 复用既有产物后，Gateway、ActionRun 或 MCP 工具应调用 `desktop.artifacts.reuse.record` 写入 `context / status / purpose / resultSummary / sourceId / sourceName / usedAt`；这是复用事实和审计记录，不执行脚本、不打开文件、不授予额外权限。
 - 执行型复用产物（`tool / script / workflow`）交给外部 runner 前，应先调用 `desktop.artifacts.execution.prepare` 写入 `approval_required` 执行意图并取得 pending approval 载荷；这是审批锚点，不执行命令、不授予执行权限。
 - 执行型复用产物（`tool / script / workflow`）有审批、运行或结果需要归档时，Gateway、ActionRun 或 MCP 工具应调用 `desktop.artifacts.execution.record` 写入 `status`、审批信息、runner、命令文本、结果摘要、输出 Artifact 和 Repository output 线索；这是执行事实记录，不执行命令、不授予执行权限。

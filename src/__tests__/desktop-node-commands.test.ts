@@ -632,6 +632,55 @@ describe('desktop node commands', () => {
     expect(result.results[0].reference).not.toContain('data:image/png;base64');
   });
 
+  it('finds reusable assets through ordinary Chinese category queries', async () => {
+    mockedArtifactPersistence.list.mockResolvedValue([
+      {
+        id: 'art_deploy',
+        title: '发布检查',
+        icon: '💻',
+        type: 'code',
+        source: { type: 'manual' },
+        tags: [],
+        currentVersion: 1,
+        status: 'draft',
+        createdAt: 1,
+        updatedAt: 20,
+        contentSummary: '发布前检查命令',
+        reuseKind: 'script',
+      },
+      {
+        id: 'art_template',
+        title: '复盘模版',
+        icon: '📄',
+        type: 'document',
+        source: { type: 'manual' },
+        tags: [],
+        currentVersion: 1,
+        status: 'draft',
+        createdAt: 1,
+        updatedAt: 10,
+        contentSummary: '会议复盘结构',
+        reuseKind: 'template',
+      },
+    ]);
+
+    await expect(
+      handleDesktopNodeCommand('desktop.artifacts.search', {
+        query: '可复用的脚本',
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      count: 1,
+      results: [
+        expect.objectContaining({
+          id: 'art_deploy',
+          title: '发布检查',
+          reuseKind: 'script',
+        }),
+      ],
+    });
+  });
+
   it('inspects file artifacts into durable metadata and mirrors the updated output', async () => {
     mockedArtifactPersistence.loadMeta.mockResolvedValue({
       id: 'art_file',

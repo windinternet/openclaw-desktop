@@ -336,9 +336,10 @@ HTML 产物是特色能力：
 当前代码事实：
 
 - Artifact 已可通过 `reuseKind: asset / template / tool / script / workflow` 标记可复用资产，并在 Artifact metadata、Repository output markdown、`outputs/index.md`、搜索/描述和 `artifact://` 引用中保留分类。
+- Artifact 搜索索引会把 `reuseKind` 映射为普通中文可复用资产查询词；Artifacts 页面搜索和 `desktop.artifacts.search` 均可用“可复用的脚本 / 可复用的模板 / 可复用的工具 / 可复用的工作流”找到对应资产。
 - 执行型复用资产（`tool / script / workflow`）已有 `desktop.artifacts.execution.prepare` 和 `desktop.artifacts.execution.record` 审批/运行事实记录，不直接执行命令、不绕过审批。
 - Dashboard 最近产物和本周新增成果会把带 `reuseKind` 的 Artifact 与 Repository output 标为“可复用资产”，并在详情中展示复用分类、最近执行状态或待审批边界。
-- 这仍是第一片可观测入口；完整 Repository 资产目录、资产权限面板、运行后复盘线索和更细的搜索/筛选工作流仍需继续补齐。
+- 这仍是第一片可观测入口；完整 Repository 资产目录、资产权限面板、运行后复盘线索和更细的筛选/处理工作流仍需继续补齐。
 
 验收：
 

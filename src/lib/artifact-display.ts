@@ -1,4 +1,4 @@
-import type { ArtifactExternalFormat, ArtifactMeta } from './artifact-types';
+import type { ArtifactExternalFormat, ArtifactMeta, ArtifactReuseKind } from './artifact-types';
 import { formatArtifactPdfFacts } from './artifact-content-facts';
 import { buildArtifactValueHealth } from './artifact-value-health';
 import { buildArtifactValueSummary, inferArtifactExternalFormat } from './artifact-value-summary';
@@ -36,6 +36,14 @@ const GENERIC_VALUE_SUMMARIES = new Set([
   'File',
   'Unknown',
 ]);
+
+const REUSABLE_ASSET_SEARCH_ALIASES: Record<ArtifactReuseKind, string[]> = {
+  asset: ['资产', '通用资产', '可复用资产', '可复用的资产', 'reusable asset'],
+  template: ['模板', '模版', '可复用模板', '可复用的模板', 'reusable template'],
+  tool: ['工具', '可复用工具', '可复用的工具', 'reusable tool'],
+  script: ['脚本', '可复用脚本', '可复用的脚本', 'reusable script'],
+  workflow: ['工作流', '流程', '可复用工作流', '可复用的工作流', 'reusable workflow'],
+};
 
 export function buildArtifactOutputDescription(artifact: ArtifactMeta): string {
   const inferredSummary = meaningfulSummary(buildArtifactValueSummary(artifact));
@@ -83,6 +91,7 @@ export function buildArtifactSearchText(artifact: ArtifactMeta): string {
     artifact.externalFormat,
     artifact.contentSummary,
     artifact.reuseKind,
+    ...buildReusableAssetSearchAliases(artifact.reuseKind),
     artifact.repositoryOutputPath,
     artifact.repositoryPreviewPath,
     artifact.fileName,
@@ -171,6 +180,11 @@ export function buildArtifactSearchText(artifact: ArtifactMeta): string {
   return dedupe(fields.filter((field): field is string => Boolean(field?.trim())))
     .join('\n')
     .toLowerCase();
+}
+
+function buildReusableAssetSearchAliases(reuseKind?: ArtifactReuseKind): string[] {
+  if (!reuseKind) return [];
+  return ['可复用资产', '可复用', ...REUSABLE_ASSET_SEARCH_ALIASES[reuseKind]];
 }
 
 export function buildArtifactPreviewCard(artifact: ArtifactMeta): ArtifactPreviewCard {

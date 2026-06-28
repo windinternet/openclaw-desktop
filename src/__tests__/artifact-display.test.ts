@@ -73,6 +73,20 @@ describe('artifact display helpers', () => {
     expect(text).toContain('add-native-preview');
   });
 
+  it('makes reusable asset categories searchable in ordinary Chinese', () => {
+    const text = buildArtifactSearchText(
+      createArtifact({
+        title: '部署检查',
+        description: '发布前检查命令',
+        reuseKind: 'script',
+      }),
+    );
+
+    expect(text).toContain('可复用资产');
+    expect(text).toContain('可复用的脚本');
+    expect(text).toContain('脚本');
+  });
+
   it('makes PDF content facts searchable even when the summary is terse', () => {
     const text = buildArtifactSearchText(
       createArtifact({
