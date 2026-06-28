@@ -286,6 +286,8 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('desktop.repository.assets.execution.record');
     expect(skillContent).toContain('runs/assets/');
     expect(skillContent).toContain('runs/assets/index.md');
+    expect(skillContent).toContain("appends the asset execution to that matter's `## 执行记录` section");
+    expect(skillContent).toContain('`## 收尾动作` checklist items for status, output, knowledge, and review follow-up');
     expect(skillContent).toContain('lastRun');
     expect(skillContent).toContain('Repository-relative `path`');
     expect(skillContent).toContain('post-run review clue when available');

@@ -673,7 +673,6 @@ describe('repository outputs', () => {
           '',
         ].join('\n');
       }
-      if (relativePath === 'runs/assets/index.md') return '# Asset Runs\n';
       return '';
     });
     vi.stubGlobal('window', {
@@ -754,6 +753,25 @@ describe('repository outputs', () => {
           '',
         ].join('\n');
       }
+      if (relativePath === 'runs/assets/index.md') return '# Asset Runs\n';
+      if (relativePath === 'work/active/release.md') {
+        return [
+          '---',
+          'id: work-release',
+          'status: active',
+          '---',
+          '# 发布准备',
+          '',
+          '## 执行记录',
+          '',
+          '- 暂无',
+          '',
+          '## 收尾动作',
+          '',
+          '- 暂无',
+          '',
+        ].join('\n');
+      }
       return '';
     });
     vi.stubGlobal('window', {
@@ -827,6 +845,17 @@ describe('repository outputs', () => {
     expect(runIndexWrite).toContain('  - workItem: work/active/release.md');
     expect(runIndexWrite).toContain('  - review: pending, write reviews/weekly/ entry');
     expect(runIndexWrite).toContain('  - boundary: recordOnly, desktopExecutes=false, grantsPermission=false');
+
+    const workItemWrite = writeText.mock.calls.find((call) => call[1] === 'work/active/release.md')?.[2] as string;
+    expect(workItemWrite).toContain(
+      '- 2026-06-29T01:02:03.000Z · asset:script · succeeded · [runs/assets/20260629-010203-tools-release-check-sh.md](../../runs/assets/20260629-010203-tools-release-check-sh.md) · 发布检查通过',
+    );
+    expect(workItemWrite).toContain(
+      '- [ ] 根据 [runs/assets/20260629-010203-tools-release-check-sh.md](../../runs/assets/20260629-010203-tools-release-check-sh.md) 更新事项状态。',
+    );
+    expect(workItemWrite).toContain('- [ ] 判断是否需要把本次执行结果沉淀为成果，并关联到事项。');
+    expect(workItemWrite).toContain('- [ ] 判断是否需要更新知识库。');
+    expect(workItemWrite).toContain('- [ ] 判断是否需要写入复盘。');
   });
 
   it('writes file artifacts into the repository files output bucket', async () => {

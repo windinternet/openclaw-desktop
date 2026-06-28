@@ -1600,7 +1600,7 @@ HTML 的独特优势：
 - 执行记录会写入 `runs/assets/YYYYMMDD-HHmmss-<assetId>.md`，frontmatter 和正文都保留资产 id、资产路径、复用分类、状态、runner、命令、结果摘要、关联输出、关联事项和只记录/不执行/不授权边界。
 - `outputs/assets/index.md` 会同步刷新 `execution: <n> events, last <status>`、`lastRun`，并在终态 `succeeded / failed / cancelled` 时写入 `review: pending, write reviews/weekly/ entry` 和 `reviewResult`。
 - `desktop.repository.assets.search` 现在也能通过 `lastRun` 检索到最近执行记录线索。
-- 该能力以当前代码事实为准：Desktop 只记录仓库资产执行事实，不执行资产、不授予权限、不自动写复盘、不更新事项状态、不沉淀成果、不更新知识库。
+- 该能力以当前代码事实为准：Desktop 只记录仓库资产执行事实，不执行资产、不授予权限；当传入安全 `workItemPath` 时会回写事项执行记录和收尾动作，但不自动写复盘、不更新事项状态、不沉淀成果、不更新知识库。
 
 仍未完成的 P0 后续：
 
@@ -1614,8 +1614,24 @@ HTML 的独特优势：
 - `desktop.repository.assets.execution.record` 的返回值新增 `runIndexPath: runs/assets/index.md`，让 Gateway 明确知道运行索引入口。
 - `runs/assets/index.md` 条目会记录资产标题、资产 id、复用分类、执行状态、资产路径、runPath、执行时间、runner、命令、结果摘要、输出 Artifact、Repository output、关联事项、复盘线索和只记录/不执行/不授权边界。
 - 已存在同一 `runPath` 的索引条目会被替换，不会重复追加。
-- 该能力以当前代码事实为准：这只是仓库运行记录索引，不执行资产、不授予权限、不自动写复盘、不更新事项、不沉淀成果、不更新知识库。
+- 该能力以当前代码事实为准：这只是仓库运行记录索引，不执行资产、不授予权限；当传入安全 `workItemPath` 时会回写事项执行记录和收尾动作，但不自动写复盘、不更新事项状态、不沉淀成果、不更新知识库。
 
 仍未完成的 P0 后续：
 
 - 仍需要资产权限面板、资产运行记录 UI、运行后成果/知识/复盘联动，以及把 `runs/assets/index.md` 纳入 Dashboard/Workbench 的更自然观测入口。
+
+### 10.80 2026-06-29 当前实施记录：Repository 资产执行事项回写
+
+围绕“可复用资产运行也必须回到事项闭环”的 P0 缺口，当前继续把仓库本地资产执行记录接入工作事项：
+
+- `recordRepositoryAssetExecution` 在写入 `runs/assets/`、维护 `runs/assets/index.md`、刷新 `outputs/assets/index.md` 后，如果收到当前绑定仓库 `work/` 下安全的 `workItemPath`，会读取对应事项 Markdown。
+- 事项页会在 `## 执行记录` 中追加一条资产执行记录，包含执行时间、`asset:<reuseKind>`、状态、`runs/assets/...` 相对链接和结果摘要。
+- 事项页会在 `## 收尾动作` 中追加四条后续检查：根据本次资产运行更新事项状态、判断是否沉淀成果、判断是否更新知识库、判断是否写入复盘。
+- 同一事项中已经包含同一个 `runPath` 时会跳过回写，避免重复追加。
+- `workItemPath` 为空、不在 `work/` 下、不是 Markdown、包含 `..` 或 `.git` 等不安全路径时会被忽略，不写事项。
+- 该能力以当前代码事实为准：Desktop 仍只记录资产执行事实，不执行资产、不授予权限、不自动更新事项状态、不自动保存成果、不自动写 Wiki/index/log、不自动写复盘，也不会移动事项文件。
+
+仍未完成的 P0 后续：
+
+- 仍需要在 UI 中显式展示资产运行索引和事项回写结果，把 `runs/assets/index.md` 纳入 Dashboard / Workbench 观测。
+- 仍需要资产权限面板、运行后成果沉淀入口、知识更新入口、资产执行复盘入口，以及与“开始一件事”金线的更自然衔接。

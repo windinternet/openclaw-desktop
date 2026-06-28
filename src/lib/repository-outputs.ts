@@ -446,6 +446,12 @@ export async function recordRepositoryAssetExecution(
       reviewSuggested,
     }),
   );
+  await appendRepositoryAssetExecutionToWorkItem(repository, params.binding, {
+    asset,
+    params,
+    runPath,
+    executedAt,
+  });
 
   return {
     indexPath,
@@ -800,6 +806,101 @@ function upsertRepositoryAssetExecutionIndexEntry(existingIndex: string, runPath
   return (
     [...lines.slice(0, entryStart), ...indexEntry.split('\n'), ...lines.slice(entryEnd)].join('\n').trimEnd() + '\n'
   );
+}
+
+async function appendRepositoryAssetExecutionToWorkItem(
+  repository: {
+    readText: (repoPath: string, relativePath: string) => Promise<string>;
+    writeText: (repoPath: string, relativePath: string, content: string) => Promise<void>;
+  },
+  binding: RepositoryBinding,
+  execution: {
+    asset: RepositoryAssetSearchResult;
+    params: RecordRepositoryAssetExecutionParams;
+    runPath: string;
+    executedAt: Date;
+  },
+): Promise<void> {
+  const workItemPath = normalizeRepositoryAssetWorkItemPath(execution.params.workItemPath, binding.paths.work);
+  if (!workItemPath) return;
+
+  const existing = await readRepositoryTextOrEmpty(repository, binding.repoPath, workItemPath);
+  if (!existing.trim() || existing.includes(execution.runPath)) return;
+
+  const runLink = buildRepositoryAssetExecutionWorkItemLink(workItemPath, execution.runPath);
+  let next = appendRepositoryAssetExecutionRecordMarkdown(
+    existing,
+    buildRepositoryAssetExecutionRecordLine(execution, runLink),
+  );
+  next = appendRepositoryAssetExecutionTailActionMarkdown(next, buildRepositoryAssetExecutionTailActionLines(runLink));
+  if (next !== existing) await repository.writeText(binding.repoPath, workItemPath, next);
+}
+
+function normalizeRepositoryAssetWorkItemPath(value: string | undefined, workRoot: string): string | null {
+  if (!value) return null;
+  const path = value.trim().replace(/\\/g, '/').replace(/^\/+/, '');
+  const root = workRoot.trim().replace(/^\/+|\/+$/g, '');
+  if (!path || !root || !path.endsWith('.md') || path.includes('..') || path.includes('.git') || root.includes('..')) {
+    return null;
+  }
+  return path.startsWith(`${root}/`) ? path : null;
+}
+
+function buildRepositoryAssetExecutionWorkItemLink(workItemPath: string, runPath: string): string {
+  return `[${runPath}](${buildRepositoryAssetIndexLink(runPath, workItemPath)})`;
+}
+
+function buildRepositoryAssetExecutionRecordLine(
+  execution: {
+    asset: RepositoryAssetSearchResult;
+    params: RecordRepositoryAssetExecutionParams;
+    runPath: string;
+    executedAt: Date;
+  },
+  runLink: string,
+): string {
+  const summary = formatRepositoryAssetExecutionOneLine(
+    execution.params.resultSummary || execution.params.command || execution.asset.title,
+  );
+  return `- ${execution.executedAt.toISOString()} · asset:${execution.asset.reuseKind} · ${
+    execution.params.status
+  } · ${runLink} · ${summary}`;
+}
+
+function buildRepositoryAssetExecutionTailActionLines(runLink: string): string[] {
+  return [
+    `- [ ] 根据 ${runLink} 更新事项状态。`,
+    '- [ ] 判断是否需要把本次执行结果沉淀为成果，并关联到事项。',
+    '- [ ] 判断是否需要更新知识库。',
+    '- [ ] 判断是否需要写入复盘。',
+  ];
+}
+
+function appendRepositoryAssetExecutionRecordMarkdown(markdown: string, recordLine: string): string {
+  return appendRepositorySectionListItems(markdown, '## 执行记录', [recordLine]);
+}
+
+function appendRepositoryAssetExecutionTailActionMarkdown(markdown: string, tailActionLines: string[]): string {
+  return appendRepositorySectionListItems(markdown, '## 收尾动作', tailActionLines);
+}
+
+function appendRepositorySectionListItems(markdown: string, heading: string, items: string[]): string {
+  const lines = markdown.split('\n');
+  const headerIndex = lines.findIndex((line) => line.trim() === heading);
+  if (headerIndex === -1) return `${markdown.trimEnd()}\n\n${heading}\n\n${items.join('\n')}\n`;
+
+  let insertIndex = headerIndex + 1;
+  while (insertIndex < lines.length && lines[insertIndex].trim() === '') insertIndex += 1;
+  while (insertIndex < lines.length && lines[insertIndex].trim() === '- 暂无') {
+    lines.splice(insertIndex, 1);
+    while (insertIndex < lines.length && lines[insertIndex].trim() === '') lines.splice(insertIndex, 1);
+  }
+  lines.splice(insertIndex, 0, ...items);
+  return `${lines.join('\n').trimEnd()}\n`;
+}
+
+function formatRepositoryAssetExecutionOneLine(value: string): string {
+  return value.replace(/\s+/g, ' ').trim() || '(empty)';
 }
 
 function parseRepositoryAssetExecutionCount(value: string | undefined): number {

@@ -77,11 +77,14 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('Repository 资产搜索入口');
     expect(source).toContain('Repository 资产执行记录入口');
     expect(source).toContain('Repository 资产运行索引入口');
+    expect(source).toContain('Repository 资产执行事项回写');
     expect(source).toContain('desktop.repository.assets.record');
     expect(source).toContain('desktop.repository.assets.search');
     expect(source).toContain('desktop.repository.assets.execution.record');
     expect(source).toContain('runs/assets/');
     expect(source).toContain('runs/assets/index.md');
+    expect(source).toContain('事项页会在 `## 执行记录` 中追加一条资产执行记录');
+    expect(source).toContain('事项页会在 `## 收尾动作` 中追加四条后续检查');
     expect(source).toContain('repository:extractKnowledgeFileText');
     expect(source).toContain('artifact-execution-review-command');
     expect(source).toContain('ActionRun 成果沉淀后的 Dashboard 去重');
@@ -170,6 +173,8 @@ describe('product goal P0 traceability', () => {
     expect(plans).toContain('Artifact 详情页已能显示执行边界');
     expect(plans).toContain('Desktop 只记录审批与执行事实，不执行资产、不授予权限');
     expect(plans).toContain('`desktop.artifacts.execution.prepare` / `desktop.artifacts.execution.record`');
+    expect(plans).toContain('传入当前仓库 `work/` 下安全 `workItemPath` 时');
+    expect(plans).toContain('回写来源事项 `## 执行记录`');
     expect(plans).toContain('PDF / Word / Excel / PowerPoint best-effort 文本抽取导入');
     expect(plans).toContain('计划执行成果候选提取');
     expect(plans).toContain('shouldOfferPlanExecutionOutputPreservation');
@@ -238,6 +243,8 @@ describe('product goal P0 traceability', () => {
     expect(roadmap).toContain('Artifact 详情页已显示“执行边界”面板');
     expect(roadmap).toContain('`desktop.artifacts.execution.prepare` / `desktop.artifacts.execution.record`');
     expect(roadmap).toContain('不执行资产、不授予权限');
+    expect(roadmap).toContain('把本次资产执行追加到事项 `## 执行记录`');
+    expect(roadmap).toContain('`## 收尾动作` 中更新状态、沉淀成果、更新知识库和写入复盘');
     expect(roadmap).toContain('PDF / Word / Excel / PowerPoint best-effort 文本抽取导入');
     expect(roadmap).toContain('计划执行成果候选提取');
     expect(roadmap).toContain('shouldOfferPlanExecutionOutputPreservation');
@@ -355,6 +362,8 @@ describe('product goal P0 traceability', () => {
     expect(skillContent).toContain('desktop.repository.assets.execution.record');
     expect(skillContent).toContain('runs/assets/');
     expect(skillContent).toContain('runs/assets/index.md');
+    expect(skillContent).toContain("appends the asset execution to that matter's `## 执行记录` section");
+    expect(skillContent).toContain('`## 收尾动作` checklist items for status, output, knowledge, and review follow-up');
     expect(skillContent).toContain('post-run review clues');
     expect(skillContent).toContain('desktop.artifacts.execution.review.write');
   });
