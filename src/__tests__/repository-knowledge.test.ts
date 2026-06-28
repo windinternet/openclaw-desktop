@@ -4,6 +4,7 @@ import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
 import {
   buildKnowledgeHealthReview,
   buildKnowledgeFileSourceImport,
+  buildKnowledgeFolderSourceImport,
   buildKnowledgeTextSourceImport,
   buildKnowledgeUrlSourceImport,
   buildKnowledgeRepositoryMappingPrompt,
@@ -12,6 +13,7 @@ import {
   extractMarkdownLinks,
   findBacklinks,
   importKnowledgeFileSource,
+  importKnowledgeFolderSource,
   writeKnowledgeHealthReview,
   importKnowledgeTextSource,
   importKnowledgeUrlSource,
@@ -193,6 +195,72 @@ describe('repository knowledge', () => {
     );
 
     expect(written.path).toBe('sources/imported/2026-06-28-060708-meeting-notes.md');
+    expect(writeText).toHaveBeenCalledWith('/repo', written.path, written.markdown);
+  });
+
+  it('builds and writes folder-imported text files with relative path metadata', async () => {
+    const now = new Date('2026-06-28T08:09:10.000Z');
+    const imported = buildKnowledgeFolderSourceImport({
+      fileName: 'notes.md',
+      relativePath: 'project-a/meetings/notes.md',
+      mimeType: 'text/markdown',
+      body: '# 周会记录\n\n行动项',
+      now,
+      sourceRoot: 'sources',
+    });
+
+    expect(imported).toEqual({
+      title: 'notes',
+      path: 'sources/imported/2026-06-28-080910-project-a-meetings-notes-md.md',
+      markdown: [
+        '---',
+        'title: "notes"',
+        'source: desktop-folder',
+        'fileName: "notes.md"',
+        'relativePath: "project-a/meetings/notes.md"',
+        'mimeType: "text/markdown"',
+        'importedAt: 2026-06-28T08:09:10.000Z',
+        '---',
+        '',
+        '# notes',
+        '',
+        '## 原始文件',
+        '',
+        '- notes.md',
+        '- project-a/meetings/notes.md',
+        '- text/markdown',
+        '',
+        '## 原始内容',
+        '',
+        '# 周会记录',
+        '',
+        '行动项',
+        '',
+      ].join('\n'),
+    });
+
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { writeText },
+      },
+    });
+
+    const written = await importKnowledgeFolderSource(
+      {
+        ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+        status: 'repo_ready',
+      },
+      {
+        fileName: 'notes.md',
+        relativePath: 'project-a/meetings/notes.md',
+        mimeType: 'text/markdown',
+        body: '# 周会记录\n\n行动项',
+        now,
+      },
+    );
+
+    expect(written.path).toBe('sources/imported/2026-06-28-080910-project-a-meetings-notes-md.md');
     expect(writeText).toHaveBeenCalledWith('/repo', written.path, written.markdown);
   });
 

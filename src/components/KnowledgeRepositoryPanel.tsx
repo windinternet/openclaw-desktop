@@ -29,6 +29,7 @@ import type {
 import {
   buildKnowledgeRewritePrompt,
   importKnowledgeFileSource,
+  importKnowledgeFolderSource,
   importKnowledgeTextSource,
   importKnowledgeUrlSource,
   loadKnowledgeDocumentHistory,
@@ -67,6 +68,7 @@ export default function KnowledgeRepositoryPanel({
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const agents = useStore((s) => s.agents);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
   const [snapshot, setSnapshot] = useState<KnowledgeSnapshot | null>(null);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<RepositorySearchResult[]>([]);
@@ -205,7 +207,7 @@ export default function KnowledgeRepositoryPanel({
     }
   };
 
-  const handleImportFiles = async (files: FileList | File[] | null) => {
+  const handleImportFiles = async (files: FileList | File[] | null, mode: 'files' | 'folder' = 'files') => {
     const selectedFiles = Array.from(files ?? []).filter(isKnowledgeTextFile);
     if (selectedFiles.length === 0) return;
 
@@ -215,23 +217,43 @@ export default function KnowledgeRepositoryPanel({
       let lastImportedPath: string | undefined;
       for (const file of selectedFiles) {
         const body = await file.text();
-        const imported = await importKnowledgeFileSource(binding, {
-          fileName: file.name,
-          mimeType: file.type || undefined,
-          body,
-        });
+        const imported =
+          mode === 'folder'
+            ? await importKnowledgeFolderSource(binding, {
+                fileName: file.name,
+                relativePath: getKnowledgeFolderRelativePath(file),
+                mimeType: file.type || undefined,
+                body,
+              })
+            : await importKnowledgeFileSource(binding, {
+                fileName: file.name,
+                mimeType: file.type || undefined,
+                body,
+              });
         lastImportedPath = imported.path;
       }
       const nextSnapshot = await loadKnowledgeSnapshot(binding);
       setSnapshot(nextSnapshot);
       setActiveSection('digest');
       if (lastImportedPath) await openDocument(lastImportedPath);
-      Toast.success(t('knowledge.importFileDone', { count: selectedFiles.length }));
+      Toast.success(
+        t(mode === 'folder' ? 'knowledge.importFolderDone' : 'knowledge.importFileDone', {
+          count: selectedFiles.length,
+        }),
+      );
     } catch (err) {
-      Toast.error(err instanceof Error ? err.message : t('knowledge.importFileFailed'));
+      Toast.error(
+        err instanceof Error
+          ? err.message
+          : t(mode === 'folder' ? 'knowledge.importFolderFailed' : 'knowledge.importFileFailed'),
+      );
     } finally {
       setImportLoading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (mode === 'folder') {
+        if (folderInputRef.current) folderInputRef.current.value = '';
+      } else if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -867,11 +889,23 @@ export default function KnowledgeRepositoryPanel({
               style={{ display: 'none' }}
               onChange={(event) => void handleImportFiles(event.currentTarget.files)}
             />
+            <input
+              ref={folderInputRef}
+              type="file"
+              accept=".md,.markdown,.txt,text/markdown,text/plain"
+              multiple
+              style={{ display: 'none' }}
+              onChange={(event) => void handleImportFiles(event.currentTarget.files, 'folder')}
+              {...{ webkitdirectory: '', directory: '' }}
+            />
             <Button icon={<IconPlus />} onClick={() => setShowImportText(true)}>
               {t('knowledge.importTextSource')}
             </Button>
             <Button icon={<IconUpload />} loading={importLoading} onClick={() => fileInputRef.current?.click()}>
               {t('knowledge.importFileSource')}
+            </Button>
+            <Button icon={<IconUpload />} loading={importLoading} onClick={() => folderInputRef.current?.click()}>
+              {t('knowledge.importFolderSource')}
             </Button>
             <Button icon={<IconLink />} onClick={() => setShowImportUrl(true)}>
               {t('knowledge.importUrlSource')}
@@ -1130,4 +1164,9 @@ function isKnowledgeTextFile(file: File): boolean {
   return (
     lowerType.startsWith('text/') || KNOWLEDGE_TEXT_FILE_EXTENSIONS.some((extension) => lowerName.endsWith(extension))
   );
+}
+
+function getKnowledgeFolderRelativePath(file: File): string {
+  const folderFile = file as File & { webkitRelativePath?: string };
+  return folderFile.webkitRelativePath || file.name;
 }

@@ -255,6 +255,10 @@ export interface KnowledgeFileSourceImportInput {
   sourceRoot?: string;
 }
 
+export interface KnowledgeFolderSourceImportInput extends KnowledgeFileSourceImportInput {
+  relativePath: string;
+}
+
 export function buildKnowledgeTextSourceImport(input: KnowledgeTextSourceImportInput): KnowledgeTextSourceImport {
   const body = normalizeSourceBody(input.body);
   const title = normalizeSourceTitle(input.title, body);
@@ -348,6 +352,43 @@ export function buildKnowledgeFileSourceImport(input: KnowledgeFileSourceImportI
   return { title, path, markdown };
 }
 
+export function buildKnowledgeFolderSourceImport(input: KnowledgeFolderSourceImportInput): KnowledgeTextSourceImport {
+  const body = normalizeSourceBody(input.body);
+  const title = normalizeSourceFileTitle(input.fileName, body);
+  const relativePath = normalizeFolderRelativePath(input.relativePath);
+  const now = input.now ?? new Date();
+  const date = now.toISOString().slice(0, 10);
+  const time = now.toISOString().slice(11, 19).replace(/:/g, '');
+  const sourceRoot = normalizeSourceRoot(input.sourceRoot ?? 'sources');
+  const mimeType = input.mimeType?.trim();
+  const path = `${sourceRoot}/imported/${date}-${time}-${slugifyKnowledgeTitle(relativePath)}.md`;
+  const markdown = [
+    '---',
+    `title: ${JSON.stringify(title)}`,
+    'source: desktop-folder',
+    `fileName: ${JSON.stringify(input.fileName)}`,
+    `relativePath: ${JSON.stringify(relativePath)}`,
+    ...(mimeType ? [`mimeType: ${JSON.stringify(mimeType)}`] : []),
+    `importedAt: ${now.toISOString()}`,
+    '---',
+    '',
+    `# ${title}`,
+    '',
+    '## 原始文件',
+    '',
+    `- ${input.fileName}`,
+    `- ${relativePath}`,
+    ...(mimeType ? [`- ${mimeType}`] : []),
+    '',
+    '## 原始内容',
+    '',
+    body,
+    '',
+  ].join('\n');
+
+  return { title, path, markdown };
+}
+
 export async function importKnowledgeTextSource(
   binding: RepositoryBinding,
   input: Omit<KnowledgeTextSourceImportInput, 'sourceRoot'>,
@@ -377,6 +418,18 @@ export async function importKnowledgeFileSource(
   input: Omit<KnowledgeFileSourceImportInput, 'sourceRoot'>,
 ): Promise<KnowledgeTextSourceImport> {
   const imported = buildKnowledgeFileSourceImport({
+    ...input,
+    sourceRoot: binding.knowledge.sourceRoot,
+  });
+  await getKnowledgeWriteApi().writeText(binding.repoPath, imported.path, imported.markdown);
+  return imported;
+}
+
+export async function importKnowledgeFolderSource(
+  binding: RepositoryBinding,
+  input: Omit<KnowledgeFolderSourceImportInput, 'sourceRoot'>,
+): Promise<KnowledgeTextSourceImport> {
+  const imported = buildKnowledgeFolderSourceImport({
     ...input,
     sourceRoot: binding.knowledge.sourceRoot,
   });
@@ -874,6 +927,14 @@ function normalizeSourceRoot(value: string): string {
   const root = value.trim().replace(/^\/+|\/+$/g, '');
   if (!root || root.includes('..')) throw new Error('Unsafe knowledge source root');
   return root;
+}
+
+function normalizeFolderRelativePath(value: string): string {
+  const rawSegments = value.replace(/\\/g, '/').replace(/^\/+/, '').split('/');
+  if (rawSegments.some((segment) => segment === '..')) throw new Error('Unsafe folder import path');
+  const path = normalizePathSegments(rawSegments.join('/'));
+  if (!path) throw new Error('Folder import relative path is required');
+  return path;
 }
 
 function escapeMarkdownTableCell(value: string): string {

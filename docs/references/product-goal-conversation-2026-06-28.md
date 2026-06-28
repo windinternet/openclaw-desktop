@@ -530,7 +530,6 @@ HTML 的独特优势：
 
 仍未完成的 P0 后续：
 
-- 选择文件夹导入仍待补齐。
 - Office / PDF / 图片 / 音视频 / 二进制文件内容导入仍待单独设计解析、安全、失败回退和来源元数据边界。
 - “AI 先提出消化计划，批准后写入 `wiki/`、更新 `wiki/index.md` 和 `wiki/log.md`”仍需更完整的 UI 承接。
 
@@ -546,4 +545,19 @@ HTML 的独特优势：
 仍未完成的 P0 后续：
 
 - 健康检查仍不自动修复索引、Wiki 或资料来源。
-- 长期未复盘项目、相互矛盾记录、文件夹导入和 Office/PDF/二进制内容导入仍待继续补齐。
+- 长期未复盘项目、相互矛盾记录和 Office/PDF/二进制内容导入仍待继续补齐。
+
+### 10.16 2026-06-28 当前实施记录：Knowledge 导入文件夹入口
+
+围绕截图中“导入中心支持选择文件夹”的 P0 内容，当前继续落地一段代码事实：
+
+- Knowledge 页面新增“导入文件夹”入口。
+- 用户可以选择本地目录，Desktop 会读取目录中浏览器可访问的 Markdown / TXT / text MIME 文件。
+- 每个文件会写入当前绑定仓库的 `sources/imported/YYYY-MM-DD-HHmmss-*.md`。
+- 生成的 Markdown frontmatter 会标记 `source: desktop-folder`、原始 `fileName`、相对 `relativePath`、可用的 `mimeType` 和 `importedAt`。
+- 导入成功后，Knowledge 会刷新 Snapshot、切到“未消化资料”视图，并打开最后一个导入的资料源。
+
+仍未完成的 P0 后续：
+
+- Office / PDF / 图片 / 音视频 / 二进制文件内容导入仍待单独设计解析、安全、失败回退和来源元数据边界。
+- “AI 先提出消化计划，批准后写入 `wiki/`、更新 `wiki/index.md` 和 `wiki/log.md`”仍需更完整的 UI 承接。
