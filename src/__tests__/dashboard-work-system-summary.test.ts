@@ -323,6 +323,64 @@ describe('dashboard work system summary', () => {
     ]);
   });
 
+  it('surfaces repository asset run review clues from the run index', () => {
+    const now = Date.parse('2026-06-29T12:00:00.000Z');
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [],
+      workbench: {
+        activeWork: [],
+        activePlans: [],
+        planMetadata: [],
+        tailActions: [],
+        reviews: [],
+        runsMarkdown: [
+          '# Asset Runs',
+          '',
+          '- [发布检查脚本](assets/20260629-010203-tools-release-check-sh.md) (`tools-release-check-sh`, script, succeeded)',
+          '  - assetPath: tools/release-check.sh',
+          '  - runPath: runs/assets/20260629-010203-tools-release-check-sh.md',
+          '  - executedAt: 2026-06-29T01:02:03.000Z',
+          '  - runner: Gateway Agent',
+          '  - result: 发布检查通过',
+          '  - output: outputs/reports/release-check.md',
+          '  - workItem: work/active/release.md',
+          '  - review: pending, write reviews/weekly/ entry',
+          '  - boundary: recordOnly, desktopExecutes=false, grantsPermission=false',
+        ].join('\n'),
+      },
+      now,
+      limit: 8,
+    });
+
+    expect(summary.pendingConfirmations).toEqual([
+      expect.objectContaining({
+        id: 'asset-run-review:runs/assets/20260629-010203-tools-release-check-sh.md',
+        kind: 'output',
+        title: '发布检查脚本',
+        target: '/workbench?view=reviews',
+        path: 'runs/assets/20260629-010203-tools-release-check-sh.md',
+        detail: '资产运行待复盘 · script · 发布检查通过',
+        status: 'asset-run:review-pending',
+      }),
+    ]);
+    expect(summary.recentOutputs).toEqual([
+      expect.objectContaining({
+        id: 'asset-run-output:runs/assets/20260629-010203-tools-release-check-sh.md',
+        kind: 'output',
+        title: '发布检查脚本',
+        target: '/workbench?view=outputs',
+        path: 'outputs/reports/release-check.md',
+        detail: '资产运行 · script · succeeded · 发布检查通过',
+        status: 'asset-run:succeeded',
+      }),
+    ]);
+    expect(summary.weeklyOutputs.map((item) => item.id)).toEqual([
+      'asset-run-output:runs/assets/20260629-010203-tools-release-check-sh.md',
+    ]);
+  });
+
   it('surfaces terminal ActionRun summaries as output clues without duplicating known artifacts', () => {
     const now = Date.parse('2026-06-28T12:00:00.000Z');
     const summary = buildDashboardWorkSystemSummary({

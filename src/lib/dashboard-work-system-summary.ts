@@ -281,6 +281,38 @@ export function buildDashboardWorkSystemSummary(
         detail: ['复盘成果', output.sourceTitle, output.summary].filter(Boolean).join(' · '),
       },
     }));
+  const repositoryAssetRunItems = parseRepositoryAssetRunIndex(params.workbench?.runsMarkdown ?? '');
+  const repositoryAssetRunOutputItems = repositoryAssetRunItems
+    .filter((run) => run.result || run.outputPath || run.outputArtifactId)
+    .filter((run) => !run.outputPath || !knownOutputPaths.has(run.outputPath))
+    .filter((run) => !run.outputArtifactId || !artifactIds.has(run.outputArtifactId))
+    .map((run) => ({
+      run,
+      item: {
+        id: `asset-run-output:${run.runPath}`,
+        kind: 'output' as const,
+        title: run.title,
+        target: run.outputArtifactId
+          ? `/artifacts/${encodeURIComponent(run.outputArtifactId)}`
+          : '/workbench?view=outputs',
+        updatedAt: run.executedAt,
+        path: run.outputPath ?? run.runPath,
+        detail: ['资产运行', run.reuseKind, run.status, run.result].filter(Boolean).join(' · '),
+        status: `asset-run:${run.status}`,
+      },
+    }));
+  const pendingAssetRunReviewItems = repositoryAssetRunItems
+    .filter((run) => run.reviewPending)
+    .map((run) => ({
+      id: `asset-run-review:${run.runPath}`,
+      kind: 'output' as const,
+      title: run.title,
+      target: '/workbench?view=reviews',
+      updatedAt: run.executedAt,
+      path: run.runPath,
+      detail: ['资产运行待复盘', run.reuseKind, run.result].filter(Boolean).join(' · '),
+      status: 'asset-run:review-pending',
+    }));
   const knownOutputArtifactIds = new Set([
     ...artifactIds,
     ...repositoryOutputItems.map(({ output }) => output.artifactId).filter((id): id is string => Boolean(id)),
@@ -337,6 +369,7 @@ export function buildDashboardWorkSystemSummary(
     ...artifactOutputItems.map(({ item }) => item),
     ...repositoryOutputItems.map(({ item }) => item),
     ...reviewOutputItems.map(({ item }) => item),
+    ...repositoryAssetRunOutputItems.map(({ item }) => item),
     ...actionRunOutputItems.map(({ item }) => item),
   ];
   const weeklyOutputItems = [
@@ -345,6 +378,7 @@ export function buildDashboardWorkSystemSummary(
       .filter(({ output }) => (output.createdAt ?? output.updatedAt ?? 0) >= weekStart)
       .map(({ item }) => item),
     ...reviewOutputItems.filter(({ output }) => output.updatedAt >= weekStart).map(({ item }) => item),
+    ...repositoryAssetRunOutputItems.filter(({ run }) => (run.executedAt ?? 0) >= weekStart).map(({ item }) => item),
     ...actionRunOutputItems.filter(({ run }) => run.updatedAt >= weekStart).map(({ item }) => item),
   ];
   const knowledgeHealthItems = (params.knowledge?.health?.issues ?? []).map((issue) => ({
@@ -369,6 +403,7 @@ export function buildDashboardWorkSystemSummary(
     ...unassignedActionRunItems,
     ...unarchivedActionRunItems,
     ...unpreservedActionRunOutputItems,
+    ...pendingAssetRunReviewItems,
   ]).slice(0, limit);
   const stuckItems = sortItems([...failedRunItems, ...blockedPlanItems, ...crossWorkRiskPlanItems]).slice(0, limit);
   const recentOutputs = sortItems(recentOutputItems).slice(0, limit);
@@ -415,6 +450,20 @@ interface ReviewOutputClue {
   summary?: string;
 }
 
+interface RepositoryAssetRunIndexItem {
+  title: string;
+  assetId?: string;
+  reuseKind?: string;
+  status: string;
+  runPath: string;
+  executedAt?: number;
+  result?: string;
+  outputArtifactId?: string;
+  outputPath?: string;
+  workItemPath?: string;
+  reviewPending: boolean;
+}
+
 function parseRepositoryOutputIndex(markdown: string): RepositoryOutputIndexItem[] {
   const items: RepositoryOutputIndexItem[] = [];
   let current: (RepositoryOutputIndexItem & { metadata: Record<string, string> }) | null = null;
@@ -458,6 +507,73 @@ function parseRepositoryOutputIndex(markdown: string): RepositoryOutputIndexItem
 
   pushCurrent();
   return items;
+}
+
+function parseRepositoryAssetRunIndex(markdown: string): RepositoryAssetRunIndexItem[] {
+  const items: RepositoryAssetRunIndexItem[] = [];
+  let current: {
+    title: string;
+    href: string;
+    assetId?: string;
+    reuseKind?: string;
+    status?: string;
+    metadata: Record<string, string>;
+  } | null = null;
+
+  const pushCurrent = () => {
+    if (!current) return;
+    const runPath = current.metadata.runPath || normalizeRepositoryAssetRunHref(current.href);
+    if (!runPath || !runPath.startsWith('runs/assets/')) return;
+    const status = current.status || 'unknown';
+    items.push({
+      title: current.title,
+      assetId: current.assetId,
+      reuseKind: current.reuseKind,
+      status,
+      runPath,
+      executedAt: parseTimestamp(current.metadata.executedAt),
+      result: current.metadata.result,
+      outputArtifactId: parseArtifactUri(current.metadata.outputArtifact),
+      outputPath: current.metadata.output,
+      workItemPath: current.metadata.workItem,
+      reviewPending: /\bpending\b/i.test(current.metadata.review ?? ''),
+    });
+  };
+
+  for (const line of markdown.split('\n')) {
+    const runMatch = line.match(/^- \[([^\]]+)]\(([^)]+)\)\s+\(`([^`]+)`,\s*([^,]+),\s*([^)]+)\)/);
+    if (runMatch) {
+      pushCurrent();
+      current = {
+        title: runMatch[1].trim(),
+        href: runMatch[2].trim(),
+        assetId: runMatch[3].trim(),
+        reuseKind: runMatch[4].trim(),
+        status: runMatch[5].trim(),
+        metadata: {},
+      };
+      continue;
+    }
+
+    const metadataMatch = line.match(/^\s+-\s+([^:]+):\s*(.*)$/);
+    if (current && metadataMatch) {
+      current.metadata[metadataMatch[1].trim()] = metadataMatch[2].trim();
+    }
+  }
+
+  pushCurrent();
+  return items;
+}
+
+function normalizeRepositoryAssetRunHref(href: string): string | undefined {
+  const trimmed = href.trim().replace(/^\/+/, '');
+  if (trimmed.startsWith('runs/assets/')) return trimmed;
+  if (trimmed.startsWith('assets/')) return `runs/${trimmed}`;
+  return undefined;
+}
+
+function parseArtifactUri(value?: string): string | undefined {
+  return value?.match(/^artifact:\/\/(.+)$/)?.[1];
 }
 
 function formatArtifactOutputDetail(artifact: ArtifactMeta): string {

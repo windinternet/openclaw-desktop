@@ -1618,7 +1618,7 @@ HTML 的独特优势：
 
 仍未完成的 P0 后续：
 
-- 仍需要资产权限面板、资产运行记录 UI、运行后成果/知识/复盘联动，以及把 `runs/assets/index.md` 纳入 Dashboard/Workbench 的更自然观测入口。
+- 仍需要资产权限面板、资产运行记录 UI、运行后成果/知识/复盘联动；`runs/assets/index.md` 纳入 Dashboard/Workbench 观测入口的第一片已在 10.81 补入。
 
 ### 10.80 2026-06-29 当前实施记录：Repository 资产执行事项回写
 
@@ -1633,5 +1633,20 @@ HTML 的独特优势：
 
 仍未完成的 P0 后续：
 
-- 仍需要在 UI 中显式展示资产运行索引和事项回写结果，把 `runs/assets/index.md` 纳入 Dashboard / Workbench 观测。
+- `runs/assets/index.md` 纳入 Dashboard / Workbench 观测的第一片已在 10.81 补入；仍需要在 UI 中更显式展示资产运行详情和事项回写结果。
 - 仍需要资产权限面板、运行后成果沉淀入口、知识更新入口、资产执行复盘入口，以及与“开始一件事”金线的更自然衔接。
+
+### 10.81 2026-06-29 当前实施记录：Repository 资产运行 Dashboard/Workbench 观测入口
+
+围绕“资产运行记录必须可被日常推进面板看到”的 P0 缺口，当前把 `runs/assets/index.md` 接入 Workbench Snapshot 和 Dashboard 摘要：
+
+- `loadWorkbenchSnapshot` 现在除了读取 `runs/index.md` 和 `runs/action-runs/index.md`，也读取 `runs/assets/index.md`，并合并进 `runsMarkdown`。
+- Dashboard 会解析 `runs/assets/index.md` 中的资产运行条目，读取资产标题、复用分类、执行状态、runPath、executedAt、result、output Artifact、Repository output、关联事项和复盘线索。
+- 带 result、output Artifact 或 Repository output 的资产运行会进入最近成果；`executedAt` 位于当前 UTC 周的资产运行会进入本周新增成果。
+- 如果资产运行指向的 Artifact id 或 Repository output path 已经由 Artifacts/Repository outputs 表示，Dashboard 不重复显示。
+- `review: pending` 的资产运行会进入待确认，状态为 `asset-run:review-pending`，目标打开 Workbench reviews。
+- 该能力以当前代码事实为准：Dashboard 只观察和路由，不写复盘、不执行资产、不授予权限、不更新事项状态、不自动沉淀成果、不更新知识库。
+
+仍未完成的 P0 后续：
+
+- 仍需要更明确的资产运行详情 UI、资产权限面板、从资产运行直接进入成果沉淀/知识更新/执行复盘的显式入口，以及与“开始一件事”金线的更自然衔接。

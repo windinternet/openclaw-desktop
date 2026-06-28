@@ -45,6 +45,8 @@ describe('repository workbench', () => {
       if (relativePath === 'runs/index.md') return '# Runs';
       if (relativePath === 'runs/action-runs/index.md')
         return '# Action Runs\n\n- [artifact_create](runs/action-runs/action-42.md) - done';
+      if (relativePath === 'runs/assets/index.md')
+        return '# Asset Runs\n\n- [发布检查脚本](assets/20260629-010203-tools-release-check-sh.md) (`tools-release-check-sh`, script, succeeded)';
       if (relativePath === 'outputs/index.md') return '# Outputs';
       if (relativePath === 'reviews/weekly/2026-W26.md')
         return [
@@ -117,7 +119,17 @@ describe('repository workbench', () => {
       },
     ]);
     expect(snapshot.runsMarkdown).toBe(
-      '# Runs\n\n# Action Runs\n\n- [artifact_create](runs/action-runs/action-42.md) - done',
+      [
+        '# Runs',
+        '',
+        '# Action Runs',
+        '',
+        '- [artifact_create](runs/action-runs/action-42.md) - done',
+        '',
+        '# Asset Runs',
+        '',
+        '- [发布检查脚本](assets/20260629-010203-tools-release-check-sh.md) (`tools-release-check-sh`, script, succeeded)',
+      ].join('\n'),
     );
     expect(snapshot.outputsMarkdown).toBe('# Outputs');
     expect(snapshot.reviews).toHaveLength(1);

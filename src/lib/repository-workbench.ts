@@ -175,6 +175,7 @@ export async function loadWorkbenchSnapshot(binding: RepositoryBinding): Promise
     completedPlans,
     runsIndexMarkdown,
     actionRunsIndexMarkdown,
+    assetRunsIndexMarkdown,
     outputsMarkdown,
     reviews,
   ] = await Promise.all([
@@ -186,10 +187,13 @@ export async function loadWorkbenchSnapshot(binding: RepositoryBinding): Promise
     repository.listMarkdown(binding.repoPath, `${binding.paths.plans}/completed`),
     repository.readText(binding.repoPath, `${binding.paths.runs}/index.md`),
     repository.readText(binding.repoPath, `${binding.paths.runs}/action-runs/index.md`),
+    repository.readText(binding.repoPath, `${binding.paths.runs}/assets/index.md`),
     repository.readText(binding.repoPath, `${binding.paths.outputs}/index.md`),
     repository.listMarkdown(binding.repoPath, binding.paths.reviews),
   ]);
-  const runsMarkdown = [runsIndexMarkdown, actionRunsIndexMarkdown].filter((part) => part.trim()).join('\n\n');
+  const runsMarkdown = [runsIndexMarkdown, actionRunsIndexMarkdown, assetRunsIndexMarkdown]
+    .filter((part) => part.trim())
+    .join('\n\n');
 
   const [planMetadata, tailActions, reviewDocuments] = await Promise.all([
     Promise.all(
