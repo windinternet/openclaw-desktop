@@ -77,8 +77,9 @@ describe('desktop self-knowledge helpers', () => {
       'Dashboard first surfaces a work-system summary before Gateway infrastructure details',
     );
     expect(skillContent).toContain(
-      'todayContinue, pendingConfirmations, stuckItems, recentOutputs, and knowledgeUpdates',
+      'todayContinue, pendingConfirmations, stuckItems, recentOutputs, weeklyOutputs, and knowledgeUpdates',
     );
+    expect(skillContent).toContain('Artifact outputs created during the current UTC week');
     expect(skillContent).toContain('Knowledge health issues');
     expect(skillContent).toContain('orphan sources, stale index entries, broken knowledge links');
     expect(skillContent).toContain('undigested sources queue');

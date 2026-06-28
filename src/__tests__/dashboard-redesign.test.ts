@@ -65,6 +65,8 @@ describe('dashboard redesign', () => {
     expect(dashboard).toContain("t('dashboard.stuckItems')");
     expect(dashboard).toContain("t('dashboard.knowledgeUpdates')");
     expect(dashboard).toContain("t('dashboard.recentOutputs')");
+    expect(dashboard).toContain("t('dashboard.weeklyOutputs')");
+    expect(dashboard).toContain("t('dashboard.noWeeklyOutputs')");
     expect(dashboard.indexOf('{renderWorkSystemSection()}')).toBeLessThan(
       dashboard.indexOf('{renderGatewayStatusSection()}'),
     );
@@ -74,12 +76,16 @@ describe('dashboard redesign', () => {
     expect(getByPath(zh, 'dashboard.stuckItems')).toBeTruthy();
     expect(getByPath(zh, 'dashboard.knowledgeUpdates')).toBeTruthy();
     expect(getByPath(zh, 'dashboard.recentOutputs')).toBeTruthy();
+    expect(getByPath(zh, 'dashboard.weeklyOutputs')).toBeTruthy();
+    expect(getByPath(zh, 'dashboard.noWeeklyOutputs')).toBeTruthy();
     expect(getByPath(en, 'dashboard.workSystem')).toBeTruthy();
     expect(getByPath(en, 'dashboard.todayContinue')).toBeTruthy();
     expect(getByPath(en, 'dashboard.pendingConfirmations')).toBeTruthy();
     expect(getByPath(en, 'dashboard.stuckItems')).toBeTruthy();
     expect(getByPath(en, 'dashboard.knowledgeUpdates')).toBeTruthy();
     expect(getByPath(en, 'dashboard.recentOutputs')).toBeTruthy();
+    expect(getByPath(en, 'dashboard.weeklyOutputs')).toBeTruthy();
+    expect(getByPath(en, 'dashboard.noWeeklyOutputs')).toBeTruthy();
   });
 
   it('lets Dashboard pending tail actions be completed back into the work item', () => {

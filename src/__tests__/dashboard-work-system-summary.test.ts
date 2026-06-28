@@ -165,8 +165,48 @@ describe('dashboard work system summary', () => {
       pendingConfirmations: 4,
       stuckItems: 1,
       recentOutputs: 1,
+      weeklyOutputs: 0,
       knowledgeUpdates: 1,
     });
+  });
+
+  it('surfaces outputs created this week as a dedicated dashboard lane', () => {
+    const now = Date.parse('2026-06-28T12:00:00.000Z');
+    const weeklyCreatedAt = Date.parse('2026-06-27T08:00:00.000Z');
+    const oldCreatedAt = Date.parse('2026-06-10T08:00:00.000Z');
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [
+        createArtifact({
+          id: 'art_weekly',
+          title: '本周新增成果',
+          createdAt: weeklyCreatedAt,
+          updatedAt: weeklyCreatedAt,
+          repositoryOutputPath: 'outputs/reports/weekly.md',
+        }),
+        createArtifact({
+          id: 'art_old',
+          title: '旧成果',
+          createdAt: oldCreatedAt,
+          updatedAt: Date.parse('2026-06-27T07:00:00.000Z'),
+          repositoryOutputPath: 'outputs/reports/old.md',
+        }),
+      ],
+      now,
+    });
+
+    expect(summary.weeklyOutputs).toEqual([
+      expect.objectContaining({
+        id: 'art_weekly',
+        kind: 'artifact',
+        title: '本周新增成果',
+        target: '/artifacts/art_weekly',
+        detail: 'outputs/reports/weekly.md',
+      }),
+    ]);
+    expect(summary.counts.weeklyOutputs).toBe(1);
+    expect(summary.recentOutputs.map((item) => item.id)).toEqual(['art_weekly', 'art_old']);
   });
 
   it('surfaces knowledge health issues as first-class dashboard knowledge updates', () => {

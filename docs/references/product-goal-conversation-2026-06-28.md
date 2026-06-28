@@ -590,3 +590,17 @@ HTML 的独特优势：
 
 - 当前不做模型语义推断式自动矛盾发现；AI 需要先把发现的冲突明确写成标记，Desktop 才会把它纳入只读健康检查。
 - 健康检查仍不自动改写 Wiki、索引或日志；修复必须通过 Knowledge ActionRun 或 repository tools 走审批。
+
+### 10.19 2026-06-28 当前实施记录：Dashboard 本周新增成果
+
+围绕截图中“Dashboard 显示真实推进状态”和“本周新增成果”的 P0 内容，当前继续落地一段代码事实：
+
+- Dashboard work-system summary 新增 `weeklyOutputs`，与 `recentOutputs` 分开暴露。
+- `weeklyOutputs` 从 Artifact outputs 中筛选当前 UTC 周创建的产物，用于回答“这周新沉淀了什么有价值成果”。
+- Dashboard 首屏新增“本周新增成果”lane，并补齐中英文标题和空状态文案。
+- Desktop 自我知识包和操作手册已同步该事实，Gateway 聊到 Desktop 自身工作系统状态时，应能区分最近成果、本周新增成果和知识动态。
+
+仍未完成的 P0 后续：
+
+- 更完整的工作状态诊断仍需继续补齐，例如跨事项风险、计划阻塞原因、未归档运行记录和成果沉淀缺口。
+- `weeklyOutputs` 当前来源是 Artifacts；后续可继续并入 Repository outputs、ActionRun 摘要和事项复盘中的价值成果线索。

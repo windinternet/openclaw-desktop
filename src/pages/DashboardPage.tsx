@@ -624,6 +624,12 @@ export default function DashboardPage() {
           workSystemSummary.counts.recentOutputs,
         )}
         {renderWorkSystemLane(
+          t('dashboard.weeklyOutputs'),
+          workSystemSummary.weeklyOutputs,
+          t('dashboard.noWeeklyOutputs'),
+          workSystemSummary.counts.weeklyOutputs,
+        )}
+        {renderWorkSystemLane(
           t('dashboard.knowledgeUpdates'),
           workSystemSummary.knowledgeUpdates,
           t('dashboard.noKnowledgeUpdates'),

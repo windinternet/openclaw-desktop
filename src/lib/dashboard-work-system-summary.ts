@@ -22,12 +22,14 @@ export interface DashboardWorkSystemSummary {
   pendingConfirmations: DashboardWorkSystemSummaryItem[];
   stuckItems: DashboardWorkSystemSummaryItem[];
   recentOutputs: DashboardWorkSystemSummaryItem[];
+  weeklyOutputs: DashboardWorkSystemSummaryItem[];
   knowledgeUpdates: DashboardWorkSystemSummaryItem[];
   counts: {
     todayContinue: number;
     pendingConfirmations: number;
     stuckItems: number;
     recentOutputs: number;
+    weeklyOutputs: number;
     knowledgeUpdates: number;
   };
 }
@@ -39,12 +41,15 @@ export interface BuildDashboardWorkSystemSummaryParams {
   workbench?: Pick<WorkbenchSnapshot, 'activeWork' | 'activePlans' | 'planMetadata' | 'reviews' | 'tailActions'> | null;
   knowledge?: { recentFiles: RepositoryMarkdownFile[]; health?: KnowledgeHealthReport } | null;
   limit?: number;
+  now?: number | Date;
 }
 
 export function buildDashboardWorkSystemSummary(
   params: BuildDashboardWorkSystemSummaryParams,
 ): DashboardWorkSystemSummary {
   const limit = params.limit ?? 4;
+  const now = typeof params.now === 'number' ? params.now : (params.now ?? new Date()).getTime();
+  const weekStart = startOfUtcWeek(now);
   const activeWorkItems = (params.workbench?.activeWork ?? []).map((file) => markdownItem(file, 'work', '/workbench'));
   const activeSessionItems = params.sessions
     .filter((session) => session.status === 'active')
@@ -131,15 +136,22 @@ export function buildDashboardWorkSystemSummary(
       };
     });
 
-  const recentOutputItems = params.artifacts.map((artifact) => ({
-    id: artifact.id,
-    kind: 'artifact' as const,
-    title: artifact.title,
-    target: `/artifacts/${encodeURIComponent(artifact.id)}`,
-    updatedAt: artifact.updatedAt,
-    detail: artifact.repositoryOutputPath ?? artifact.contentSummary ?? artifact.type,
-    status: artifact.status,
+  const outputItems = params.artifacts.map((artifact) => ({
+    artifact,
+    item: {
+      id: artifact.id,
+      kind: 'artifact' as const,
+      title: artifact.title,
+      target: `/artifacts/${encodeURIComponent(artifact.id)}`,
+      updatedAt: artifact.updatedAt,
+      detail: artifact.repositoryOutputPath ?? artifact.contentSummary ?? artifact.type,
+      status: artifact.status,
+    },
   }));
+  const recentOutputItems = outputItems.map(({ item }) => item);
+  const weeklyOutputItems = outputItems
+    .filter(({ artifact }) => artifact.createdAt >= weekStart)
+    .map(({ item }) => item);
   const knowledgeHealthItems = (params.knowledge?.health?.issues ?? []).map((issue) => ({
     id: issue.id,
     kind: 'knowledge' as const,
@@ -161,6 +173,7 @@ export function buildDashboardWorkSystemSummary(
   );
   const stuckItems = sortItems([...failedRunItems, ...blockedPlanItems]).slice(0, limit);
   const recentOutputs = sortItems(recentOutputItems).slice(0, limit);
+  const weeklyOutputs = sortItems(weeklyOutputItems).slice(0, limit);
   const knowledgeUpdates = sortItems([...knowledgeHealthItems, ...knowledgeItems]).slice(0, limit);
 
   return {
@@ -168,15 +181,26 @@ export function buildDashboardWorkSystemSummary(
     pendingConfirmations,
     stuckItems,
     recentOutputs,
+    weeklyOutputs,
     knowledgeUpdates,
     counts: {
       todayContinue: todayContinue.length,
       pendingConfirmations: pendingConfirmations.length,
       stuckItems: stuckItems.length,
       recentOutputs: recentOutputs.length,
+      weeklyOutputs: weeklyOutputs.length,
       knowledgeUpdates: knowledgeUpdates.length,
     },
   };
+}
+
+function startOfUtcWeek(timestamp: number): number {
+  const date = new Date(timestamp);
+  const day = date.getUTCDay();
+  const daysFromMonday = day === 0 ? 6 : day - 1;
+  const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  start.setUTCDate(start.getUTCDate() - daysFromMonday);
+  return start.getTime();
 }
 
 function markdownItem(
