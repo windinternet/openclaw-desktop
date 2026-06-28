@@ -1533,3 +1533,17 @@ HTML 的独特优势：
 仍未完成的 P0 后续：
 
 - 仍需要更完整的成果保存表单、真正 Wiki 写入后的复盘建议/确认状态、复盘确认后的后续联动，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
+
+### 10.74 2026-06-29 当前实施记录：Artifact 可执行资产执行边界面板
+
+围绕“可复用资产一等对象需要权限、审批边界、运行记录和复盘线索”的 P0 缺口，当前继续把执行边界从 Gateway 搜索/描述和 Repository 镜像推进到用户可见的 Artifact 详情页：
+
+- 新增 `artifact-execution-boundary` 纯函数模块，统一判断只有 `tool / script / workflow` 属于可执行复用资产。
+- 可执行复用 Artifact 即使还没有终态执行记录，也会生成执行边界摘要：`requiresApprovalBeforeRun: true`、`recordOnly: true`、`desktopExecutes: false`、`grantsPermission: false`，以及 `desktop.artifacts.execution.prepare` / `desktop.artifacts.execution.record` 命令线索。
+- Artifact 详情页在复用分类附近显示“执行边界”面板，展示“执行前需审批”、最近审批/执行事实、`recordOnly` 硬边界和 prepare/record 命令。
+- 这让普通用户不用理解底层协议，也能看到工具、脚本、工作流不是“点了就跑”的附件，而是需要审批、只记录事实、交给外部 runner 显式处理的可复用资产。
+- 该能力以当前代码事实为准：Desktop 只记录审批与执行事实，不执行资产、不授予权限；外部 runner 仍需用户显式审批。它不自动写复盘、不更新事项状态、不沉淀成果、不更新知识库、不勾选事项尾动作。
+
+仍未完成的 P0 后续：
+
+- 仍需要更完整的 Repository 资产目录协议、手动仓库资产导入、运行后成果/知识/复盘联动，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。

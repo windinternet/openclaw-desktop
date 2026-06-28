@@ -301,6 +301,13 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('writes a `reviews/weekly/` Markdown review');
     expect(skillContent).toContain('Artifact detail can show a Write execution review entry');
     expect(skillContent).toContain('copy the same JSON command');
+    expect(skillContent).toContain('Artifact detail surfaces an Execution boundary panel');
+    expect(skillContent).toContain(
+      'shows `desktop.artifacts.execution.prepare` and `desktop.artifacts.execution.record`',
+    );
+    expect(skillContent).toContain(
+      'Desktop only records approval and execution facts; it does not execute the Artifact or grant permission',
+    );
     expect(skillContent).toContain(
       'does not execute the Artifact, grant execution permission, write the review automatically, or update the work item',
     );

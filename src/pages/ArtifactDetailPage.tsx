@@ -14,6 +14,11 @@ import {
   buildArtifactExecutionReviewWriteCommand,
   formatArtifactExecutionReviewWriteCommand,
 } from '../lib/artifact-execution-review-command';
+import {
+  ARTIFACT_EXECUTION_PREPARE_COMMAND,
+  ARTIFACT_EXECUTION_RECORD_COMMAND,
+  buildArtifactExecutionBoundary,
+} from '../lib/artifact-execution-boundary';
 import { loadRepositoryBinding } from '../lib/agentic-repository-store';
 
 const { Text, Title } = Typography;
@@ -105,6 +110,7 @@ export default function ArtifactDetailPage() {
   const valueHealth = buildArtifactValueHealth(meta);
   const enrichmentEvents = meta.enrichmentEvents ?? [];
   const lastEnrichmentEvent = enrichmentEvents[enrichmentEvents.length - 1];
+  const executionBoundary = buildArtifactExecutionBoundary(meta);
   const executionReviewCommand = buildArtifactExecutionReviewWriteCommand(meta, { repoPath: reviewCommandRepoPath });
   const executionReviewCommandText = executionReviewCommand
     ? formatArtifactExecutionReviewWriteCommand(executionReviewCommand)
@@ -475,6 +481,71 @@ export default function ArtifactDetailPage() {
                   <Tag size="small" color="violet" type="light">
                     {meta.reuseKind}
                   </Tag>
+                </div>
+              )}
+              {executionBoundary && (
+                <div
+                  style={{
+                    padding: 10,
+                    borderRadius: 6,
+                    border: '1px solid var(--semi-color-border)',
+                    background: 'var(--semi-color-fill-0)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <Text strong>{t('artifact.executionBoundary')}</Text>
+                    <Tag size="small" color="orange" type="light">
+                      {t('artifact.executionRequiresApproval')}
+                    </Tag>
+                    <Tag size="small" color="grey" type="light">
+                      recordOnly
+                    </Tag>
+                  </div>
+                  <Text type="secondary" size="small">
+                    {t('artifact.executionBoundaryHint')}
+                  </Text>
+                  {executionBoundary.latestExecution && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <Text size="small" type="secondary">
+                        {executionBoundary.latestExecution.status}
+                        {executionBoundary.latestExecution.approvalTitle
+                          ? ` · ${executionBoundary.latestExecution.approvalTitle}`
+                          : ''}
+                        {executionBoundary.latestExecution.approvalRisk
+                          ? ` · ${executionBoundary.latestExecution.approvalRisk}`
+                          : ''}
+                        {executionBoundary.latestExecution.runner
+                          ? ` · ${executionBoundary.latestExecution.runner}`
+                          : ''}
+                      </Text>
+                      {executionBoundary.latestExecution.approvalReason && (
+                        <Text size="small" type="tertiary">
+                          {executionBoundary.latestExecution.approvalReason}
+                        </Text>
+                      )}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div>
+                      <Text type="tertiary" size="small">
+                        {t('artifact.executionPrepareCommand')}:
+                      </Text>
+                      <Text code copyable style={{ wordBreak: 'break-all' }}>
+                        {ARTIFACT_EXECUTION_PREPARE_COMMAND}
+                      </Text>
+                    </div>
+                    <div>
+                      <Text type="tertiary" size="small">
+                        {t('artifact.executionRecordCommand')}:
+                      </Text>
+                      <Text code copyable style={{ wordBreak: 'break-all' }}>
+                        {ARTIFACT_EXECUTION_RECORD_COMMAND}
+                      </Text>
+                    </div>
+                  </div>
                 </div>
               )}
               {meta.tags.length > 0 && (

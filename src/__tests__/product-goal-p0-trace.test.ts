@@ -156,6 +156,9 @@ describe('product goal P0 traceability', () => {
     expect(plans).toContain('AI 创建保存表单已支持保存前编辑文件/链接细节');
     expect(plans).toContain('Artifact 详情页已能在 `tool / script / workflow` 最近执行');
     expect(plans).toContain('复制 `desktop.artifacts.execution.review.write` JSON 命令');
+    expect(plans).toContain('Artifact 详情页已能显示执行边界');
+    expect(plans).toContain('Desktop 只记录审批与执行事实，不执行资产、不授予权限');
+    expect(plans).toContain('`desktop.artifacts.execution.prepare` / `desktop.artifacts.execution.record`');
     expect(plans).toContain('计划执行成果候选提取');
     expect(plans).toContain('shouldOfferPlanExecutionOutputPreservation');
     expect(plans).toContain('extractActionRunOutputCandidates');
@@ -220,6 +223,9 @@ describe('product goal P0 traceability', () => {
     expect(roadmap).toContain('AI 创建保存表单已支持保存前文件/链接细节编辑');
     expect(roadmap).toContain('Artifact 详情页已在执行记录下暴露“写执行复盘”入口');
     expect(roadmap).toContain('复制 `desktop.artifacts.execution.review.write` JSON 命令');
+    expect(roadmap).toContain('Artifact 详情页已显示“执行边界”面板');
+    expect(roadmap).toContain('`desktop.artifacts.execution.prepare` / `desktop.artifacts.execution.record`');
+    expect(roadmap).toContain('不执行资产、不授予权限');
     expect(roadmap).toContain('计划执行成果候选提取');
     expect(roadmap).toContain('shouldOfferPlanExecutionOutputPreservation');
     expect(roadmap).toContain('extractActionRunOutputCandidates');

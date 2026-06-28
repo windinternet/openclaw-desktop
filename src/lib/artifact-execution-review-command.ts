@@ -1,14 +1,9 @@
-import type {
-  ArtifactExecutionEvent,
-  ArtifactExecutionStatus,
-  ArtifactMeta,
-  ArtifactReuseKind,
-} from './artifact-types';
+import type { ArtifactExecutionEvent, ArtifactExecutionStatus, ArtifactMeta } from './artifact-types';
+import { isExecutableArtifactReuseKind } from './artifact-execution-boundary';
 
 export const ARTIFACT_EXECUTION_REVIEW_WRITE_COMMAND = 'desktop.artifacts.execution.review.write';
 export const ARTIFACT_EXECUTION_REVIEW_REPO_PATH_PLACEHOLDER = '<绑定仓库绝对路径>';
 
-const EXECUTABLE_REUSE_KINDS = new Set<ArtifactReuseKind>(['tool', 'script', 'workflow']);
 const REVIEWABLE_EXECUTION_STATUSES = new Set<ArtifactExecutionStatus>(['succeeded', 'failed', 'cancelled']);
 
 export interface ArtifactExecutionReviewWriteCommand {
@@ -42,7 +37,7 @@ export interface BuildArtifactExecutionReviewWriteCommandOptions {
 }
 
 export function shouldOfferArtifactExecutionReviewCommand(artifact: ArtifactMeta): boolean {
-  if (!artifact.reuseKind || !EXECUTABLE_REUSE_KINDS.has(artifact.reuseKind)) return false;
+  if (!isExecutableArtifactReuseKind(artifact.reuseKind)) return false;
   const latestExecution = getLatestArtifactExecutionEvent(artifact);
   return latestExecution ? REVIEWABLE_EXECUTION_STATUSES.has(latestExecution.status) : false;
 }
