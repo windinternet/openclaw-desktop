@@ -1373,7 +1373,24 @@ HTML 的独特优势：
 
 仍未完成的 P0 后续：
 
-- 仍需要更完整的成果保存表单、真正 Wiki 写入后的复盘建议/确认状态、复盘确认后的后续联动，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
+- 仍需要更完整的保存表单编辑、多候选选择、真正 Wiki 写入后的复盘建议/确认状态、复盘确认后的后续联动，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
+
+### 10.67 2026-06-29 当前实施记录：AI 产物创建保存表单结构化 Artifact 块
+
+围绕“产物不止工具脚本，HTML、文档、表格、演示、链接都可以是有价值成果”的 P0 边界，当前继续补齐 AI 创建产物后的保存入口：
+
+- 新增 `artifact-ai-create-preview`，把 AI 产物创建保存表单的解析逻辑从组件内抽出为可测试 helper。
+- `artifact-ai-create-preview` 会优先解析 `lastAssistantResponse` 中的 rich `<artifact>` blocks；当没有 `<artifact>` 时，才兼容旧版 `ai-action` JSON。
+- 保存预览会保留 Artifact 标题、类型、描述、标签、HTML 正文、URL、命令、文件路径、文件名、文件大小、MIME、`externalFormat`、`contentSummary`、`reuseKind` 和 `importFile`。
+- `buildArtifactAICreateGenerateParams` 会把上述预览事实带入 `generateArtifact`，并在来源 ActionRun 存在时写入 `source: { type: "action_run", id: <runId>, name: "AI 魔法创建" }`。
+- `ArtifactAICreateDrawer` 已改为使用该 helper；用户显式保存后仍沿用现有 Artifact 保存、ActionRun `artifactIds` 回填和 `notifyActionRunsChanged` 观察刷新。
+- `artifact-create.md` 提示词已要求富产物优先输出 `<artifact>` 块；HTML 类型必须提供完整、自包含 HTML 正文，并鼓励写入 `externalFormat`、`contentSummary`、`reuseKind`、文件元数据和 `importFile`。
+- 这补齐的是“AI 创建保存表单已支持 `<artifact>`”的第一片，让 HTML、文档、表格、演示、链接等成果不会只退化成工具/脚本线索。
+- 该能力仍以当前代码事实为准：不会自动创建 Artifact 或 Repository output，不会自动读取任意本地文件，不会执行资产，不会授予权限，不会写 Wiki/index/log，不会写复盘，不会更新事项状态，不会移动事项文件。
+
+仍未完成的 P0 后续：
+
+- 仍需要更完整的多候选选择和保存前编辑体验、真正 Wiki 写入后的复盘建议/确认状态、复盘确认后的后续联动，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
 
 ### 10.66 2026-06-29 当前实施记录：ActionRun 成果保存后状态刷新
 

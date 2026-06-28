@@ -6,22 +6,17 @@ import { useStore } from '../lib';
 import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway } from '../lib/ai-action-center';
 import { buildArtifactCreatePrompt } from '../lib/ai-action-prompts';
 import { upsertAiActionRun } from '../lib/ai-action-run-store';
+import {
+  buildArtifactAICreateGenerateParams,
+  parseArtifactAICreatePreview,
+  type ArtifactAICreatePreview,
+} from '../lib/artifact-ai-create-preview';
 import { useWorkbenchWorkItemOptions } from '../lib/workbench-work-items';
 import { ActionRunWorkItemPicker } from './ActionRunWorkItemPicker';
 import type { AiActionRun } from '../lib/types';
-import type { ArtifactMeta, ArtifactType } from '../lib/artifact-types';
+import type { ArtifactMeta } from '../lib/artifact-types';
 
 const { Text, Paragraph } = Typography;
-
-interface ParsedArtifactResult {
-  title: string;
-  type: string;
-  description?: string;
-  tags?: string[];
-  url?: string;
-  command?: string;
-  fileName?: string;
-}
 
 interface Props {
   visible: boolean;
@@ -62,7 +57,7 @@ export function ArtifactAICreateDrawer({
     enabled: visible && !workItemPath,
   });
   const [generating, setGenerating] = useState(false);
-  const [preview, setPreview] = useState<ParsedArtifactResult | null>(null);
+  const [preview, setPreview] = useState<ArtifactAICreatePreview | null>(null);
   const [previewRun, setPreviewRun] = useState<AiActionRun | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isGeneratingRef = useRef(false);
@@ -70,25 +65,6 @@ export function ArtifactAICreateDrawer({
   useEffect(() => {
     if (visible && initialInput !== undefined) setInput(initialInput);
   }, [initialInput, visible]);
-
-  const isValidType = (t: string): boolean =>
-    [
-      'report',
-      'dashboard',
-      'analysis',
-      'checklist',
-      'code',
-      'document',
-      'slide',
-      'form',
-      'other',
-      'link',
-      'app',
-      'file',
-      'audio',
-      'image',
-      'video',
-    ].includes(t);
 
   const handleGenerate = useCallback(async () => {
     if (!input.trim() || isGeneratingRef.current) return;
@@ -141,27 +117,7 @@ export function ArtifactAICreateDrawer({
       }
 
       if (latestRun.status === 'done' && latestRun.lastAssistantResponse) {
-        const blocks = Array.from(latestRun.lastAssistantResponse.matchAll(/```ai-action\s*([\s\S]*?)```/gi));
-        let parsed: ParsedArtifactResult | null = null;
-        for (let idx = blocks.length - 1; idx >= 0; idx--) {
-          try {
-            const obj = JSON.parse(blocks[idx][1].trim());
-            if (obj.result && obj.result.title && isValidType(obj.result.type)) {
-              parsed = {
-                title: obj.result.title,
-                type: obj.result.type,
-                description: obj.result.description,
-                tags: Array.isArray(obj.result.tags) ? obj.result.tags : undefined,
-                url: obj.result.url,
-                command: obj.result.command,
-                fileName: obj.result.fileName,
-              };
-              break;
-            }
-          } catch {
-            /* skip invalid JSON */
-          }
-        }
+        const parsed = parseArtifactAICreatePreview(latestRun.lastAssistantResponse);
         if (parsed) {
           setPreview(parsed);
           setPreviewRun(latestRun);
@@ -194,18 +150,7 @@ export function ArtifactAICreateDrawer({
   const handleSave = useCallback(async () => {
     if (!preview) return;
     try {
-      const { getDefaultIcon } = await import('../lib/artifact-service');
-      const artifact = await generateArtifact({
-        title: preview.title,
-        type: preview.type as ArtifactType,
-        description: preview.description,
-        tags: preview.tags,
-        icon: getDefaultIcon(preview.type as ArtifactType),
-        url: preview.url,
-        command: preview.command,
-        fileName: preview.fileName,
-        source: { type: 'action_run', id: previewRun?.id, name: 'AI 魔法创建' },
-      });
+      const artifact = await generateArtifact(buildArtifactAICreateGenerateParams(preview, previewRun?.id));
       if (currentInstanceId && previewRun) {
         await upsertAiActionRun(currentInstanceId, {
           ...previewRun,
@@ -338,6 +283,35 @@ export function ArtifactAICreateDrawer({
               {preview.fileName && (
                 <Text type="tertiary" size="small">
                   {preview.fileName}
+                </Text>
+              )}
+              {preview.filePath && (
+                <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }}>
+                  {preview.filePath}
+                </Text>
+              )}
+              {(preview.externalFormat || preview.reuseKind || preview.html) && (
+                <Space spacing={4}>
+                  {preview.externalFormat && (
+                    <Tag size="small" color="cyan" type="light">
+                      {preview.externalFormat}
+                    </Tag>
+                  )}
+                  {preview.reuseKind && (
+                    <Tag size="small" color="violet" type="light">
+                      {preview.reuseKind}
+                    </Tag>
+                  )}
+                  {preview.html && (
+                    <Tag size="small" color="green" type="light">
+                      HTML
+                    </Tag>
+                  )}
+                </Space>
+              )}
+              {preview.contentSummary && (
+                <Text type="tertiary" size="small">
+                  {preview.contentSummary}
                 </Text>
               )}
               {preview.tags && preview.tags.length > 0 && (

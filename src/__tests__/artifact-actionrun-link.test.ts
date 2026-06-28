@@ -5,13 +5,25 @@ describe('artifact ActionRun linkage', () => {
   it('saves AI-created artifacts as ActionRun outputs and records artifact ids on the run', () => {
     const source = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
     const store = readFileSync('src/lib/ai-action-run-store.ts', 'utf8');
+    const preview = readFileSync('src/lib/artifact-ai-create-preview.ts', 'utf8');
 
-    expect(source).toContain("source: { type: 'action_run'");
+    expect(source).toContain('buildArtifactAICreateGenerateParams(preview, previewRun?.id)');
+    expect(preview).toContain("source: { type: 'action_run'");
     expect(source).toContain('artifactIds');
     expect(source).toContain('upsertAiActionRun(currentInstanceId');
     expect(store).toContain('parseArtifactsFromText');
     expect(store).toContain('saveArtifactFromChat(parsed,');
     expect(store).toContain('artifactIds');
+  });
+
+  it('asks artifact creation ActionRuns to emit rich artifact blocks when needed', () => {
+    const prompt = readFileSync('src/prompts/ai-actions/artifact-create.md', 'utf8');
+
+    expect(prompt).toContain('<artifact>');
+    expect(prompt).toContain('externalFormat');
+    expect(prompt).toContain('contentSummary');
+    expect(prompt).toContain('reuseKind');
+    expect(prompt).toContain('HTML 类型必须提供完整、自包含的 HTML 正文');
   });
 
   it('notifies ActionRun observers after saving an AI-created artifact output', () => {
