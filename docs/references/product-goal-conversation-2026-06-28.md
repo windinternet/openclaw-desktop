@@ -1103,4 +1103,21 @@ HTML 的独特优势：
 
 - 仍需要把“选择已有事项 / 即时创建事项”提升为所有新 ActionRun 入口的全局体验。
 - 仍需要“开始一件事”专题里的计划、执行、产物、知识更新和复盘金线。
-- 仍需要给 Knowledge、Teams、RepositoryGate 等入口补同等即时创建能力，或抽出统一的新 ActionRun 发起前事项面板。
+- 仍需要抽出统一的新 ActionRun 发起前事项面板，避免各入口长期分散维护相似 UI。
+
+### 10.48 2026-06-28 当前实施记录：Knowledge/Teams/RepositoryGate 发起前即时创建事项
+
+围绕“所有新 ActionRun 创建前的全局事项选择/创建体验”的 P0 缺口，当前继续把上一条能力扩展到更多非聊天入口：
+
+- Knowledge 普通“消化资料 / 自动改写 / 刷新索引日志”入口，在没有 Dashboard 尾动作来源事项时，除了选择已有事项，也可以输入新事项标题并显式创建 `work/active` 事项；随后 `knowledge_rewrite` ActionRun 会携带新事项 `workItemPath` 和 frontmatter `id`。
+- Teams 自然语言编排和快速创建 Gateway Agent 两个入口，除了选择已有事项，也可以输入新事项标题并显式创建 `work/active` 事项；随后 `agent_team_compose` 或 `gateway_agent_create` ActionRun 会携带新事项上下文。
+- RepositoryGate 的知识库语义映射和工作台语义映射入口，在当前绑定仓库 ready 时，除了选择已有事项，也可以输入新事项标题并显式创建 `work/active` 事项；随后 `knowledge_repository_map` 或 `workbench_repository_map` ActionRun 会携带新事项上下文。
+- 三个入口都复用共享 `createWorkbenchWorkItemOption`，新事项仍标记 `source: desktop-action-run`，保留唯一 ID、目标、验收标准、执行记录、关联成果和复盘占位。
+- 如果用户跳过选择和创建，运行仍会按 `workItemRequired: true` / `workItemUnassignedReason: pending_work_item_assignment` 进入未归属诊断。
+- 这些能力只服务用户显式创建，不自动猜测事项归属，不绕过 Repository Context 或审批，不自动生成计划，不自动沉淀成果，不自动更新知识库或写复盘。
+
+仍未完成的 P0 后续：
+
+- 仍需要把“选择已有事项 / 即时创建事项”抽成所有新 ActionRun 发起前的统一面板，而不是让每个入口自己维护相似 UI。
+- 仍需要“开始一件事”专题里的计划、执行、产物、知识更新和复盘金线。
+- 仍需要让新事项创建后的后续计划生成、执行记录观测和尾动作建议更自然地串起来。

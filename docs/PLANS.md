@@ -45,9 +45,10 @@
 
 - **Artifacts 普通魔法创建发起前事项选择**：Artifacts 页面普通“AI 魔法创建”入口在没有外部来源事项时，已读取当前绑定 Repository 的 Workbench Snapshot，从 `work/active`、`work/someday` 和 `work/completed` 列出已有事项；用户可在发起 `artifact_create` ActionRun 前选择关联事项，Desktop 会把事项 `workItemPath` 和 frontmatter `id` 写入运行记录。用户跳过选择时，运行仍按 `workItemRequired: true` 与 `workItemUnassignedReason: pending_work_item_assignment` 进入未归属诊断，不自动猜测归属。
 - **Artifacts 普通魔法创建发起前即时创建事项**：同一入口在没有合适事项时，也可输入新事项标题并显式创建 `work/active/YYYY-MM-DD-HHmmss-*.md`；新事项使用 `source: desktop-action-run`，保留唯一 ID、目标、验收标准、执行记录、关联成果和复盘占位，创建后自动作为本次 `artifact_create` ActionRun 的 `workItemPath` / `workItemId`。该能力只服务用户显式创建，不自动猜测事项、不绕过 Repository Context、不替代后续计划/执行/产物/复盘金线；后续仍需把选择/创建模式提升为所有新 ActionRun 的全局体验。
-- **Knowledge 普通自动改写发起前事项选择**：事项候选加载已抽为共享 `useWorkbenchWorkItemOptions` / `loadWorkbenchWorkItemOptions` 能力；Knowledge 页面普通“消化资料 / 自动改写 / 刷新索引日志”入口在没有 Dashboard 尾动作来源事项时，也会列出当前 Repository 的已有事项，用户可在发起 `knowledge_rewrite` ActionRun 前选择关联事项，并写入 `workItemPath` 与 frontmatter `id`。Dashboard 知识尾动作仍以来源 URL 中的 `workItemPath` 为准。
-- **Teams 自然语言编排发起前事项选择**：Teams 页面自然语言编排和快速创建 Gateway Agent 两个非聊天式 AI 入口已复用共享事项选择器；用户可在发起 `agent_team_compose` 或 `gateway_agent_create` ActionRun 前选择已有事项，Desktop 会写入 `workItemPath` 与 frontmatter `id`。用户跳过选择时，运行仍进入未归属诊断；该入口不自动创建事项、不猜测归属、不替代 Repository Context 或审批。
-- **Repository 语义映射发起前事项选择**：RepositoryGate 的知识库语义映射和工作台语义映射入口也已复用共享事项选择器；用户可在发起 `knowledge_repository_map` 或 `workbench_repository_map` ActionRun 前选择已有事项，Desktop 会写入 `workItemPath` 与 frontmatter `id`。该入口仍只做结构识别和映射保存，不自动创建事项、不猜测归属、不替代 Repository Context 或审批。后续仍需补发起前即时创建事项，并继续把该模式收敛为所有新 ActionRun 的全局体验。
+- **Knowledge 普通自动改写发起前事项选择/创建**：事项候选加载和即时创建已抽为共享 `useWorkbenchWorkItemOptions` / `loadWorkbenchWorkItemOptions` / `createWorkbenchWorkItemOption` 能力；Knowledge 页面普通“消化资料 / 自动改写 / 刷新索引日志”入口在没有 Dashboard 尾动作来源事项时，会列出当前 Repository 的已有事项，也可输入新事项标题并显式创建 `work/active` 事项，随后在 `knowledge_rewrite` ActionRun 中写入 `workItemPath` 与 frontmatter `id`。Dashboard 知识尾动作仍以来源 URL 中的 `workItemPath` 为准。
+- **Teams 自然语言编排发起前事项选择/创建**：Teams 页面自然语言编排和快速创建 Gateway Agent 两个非聊天式 AI 入口已复用共享事项选择/创建能力；用户可在发起 `agent_team_compose` 或 `gateway_agent_create` ActionRun 前选择已有事项，或显式创建新事项，Desktop 会写入 `workItemPath` 与 frontmatter `id`。用户跳过选择和创建时，运行仍进入未归属诊断；该入口不猜测归属、不替代 Repository Context 或审批。
+- **Repository 语义映射发起前事项选择/创建**：RepositoryGate 的知识库语义映射和工作台语义映射入口也已复用共享事项选择/创建能力；用户可在发起 `knowledge_repository_map` 或 `workbench_repository_map` ActionRun 前选择已有事项，或在当前绑定仓库 ready 时显式创建新事项，Desktop 会写入 `workItemPath` 与 frontmatter `id`。该入口仍只做结构识别和映射保存，不猜测归属、不替代 Repository Context 或审批。
+- **Knowledge/Teams/RepositoryGate 发起前即时创建事项**：这三个非聊天 ActionRun 入口现已与 Artifacts 一样具备“没有合适事项时新建并关联”的显式路径。剩余 P0 缺口不再是单入口能不能创建事项，而是需要把选择/创建收敛为所有新 ActionRun 的统一发起前体验，并继续推进计划、执行、产物、知识更新和复盘金线。
 
 ## 已完成计划
 

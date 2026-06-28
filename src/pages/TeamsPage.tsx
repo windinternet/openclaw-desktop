@@ -240,6 +240,7 @@ export default function TeamsPage({ embedded = false, onHeaderActionsChange }: E
   const [composerModalVisible, setComposerModalVisible] = useState(false);
   const [quickModalVisible, setQuickModalVisible] = useState(false);
   const [actionSubmitting, setActionSubmitting] = useState(false);
+  const [newTeamWorkItemTitle, setNewTeamWorkItemTitle] = useState('');
   const [quickDraft, setQuickDraft] = useState<QuickAgentDraft>({
     displayName: '',
     role: '',
@@ -275,6 +276,8 @@ export default function TeamsPage({ embedded = false, onHeaderActionsChange }: E
     (profile) => profile.bindingStatus === 'failed',
   ).length;
   const {
+    createWorkItem: createTeamWorkItem,
+    creating: creatingTeamWorkItem,
     loading: teamWorkItemLoading,
     options: teamWorkItemOptions,
     selectedPath: selectedTeamWorkItemPath,
@@ -566,26 +569,58 @@ export default function TeamsPage({ embedded = false, onHeaderActionsChange }: E
     t,
   ]);
 
+  const handleCreateTeamWorkItem = useCallback(async () => {
+    const title = newTeamWorkItemTitle.trim();
+    if (!title || actionSubmitting || creatingTeamWorkItem) return;
+
+    try {
+      await createTeamWorkItem(title);
+      setNewTeamWorkItemTitle('');
+      Toast.success(t('teams.actionNewWorkItemSuccess'));
+    } catch (error) {
+      Toast.error(error instanceof Error ? error.message : String(error));
+    }
+  }, [actionSubmitting, createTeamWorkItem, creatingTeamWorkItem, newTeamWorkItemTitle, t]);
+
   const renderActionWorkItemPicker = () =>
-    teamWorkItemOptions.length > 0 ? (
+    currentInstanceId ? (
       <div style={{ display: 'grid', gap: 6 }}>
         <Text type="tertiary" size="small">
           {t('teams.actionWorkItemDesc')}
         </Text>
-        <Select
-          value={selectedTeamWorkItemPath}
-          placeholder={t('teams.actionWorkItemPlaceholder')}
-          onChange={(value) => setSelectedTeamWorkItemPath(String(value))}
-          loading={teamWorkItemLoading}
-          disabled={actionSubmitting}
-          style={{ width: '100%' }}
-        >
-          {teamWorkItemOptions.map((item) => (
-            <Select.Option key={item.path} value={item.path}>
-              {item.name} · {item.path}
-            </Select.Option>
-          ))}
-        </Select>
+        {teamWorkItemOptions.length > 0 ? (
+          <Select
+            value={selectedTeamWorkItemPath}
+            placeholder={t('teams.actionWorkItemPlaceholder')}
+            onChange={(value) => setSelectedTeamWorkItemPath(String(value))}
+            loading={teamWorkItemLoading}
+            disabled={actionSubmitting || creatingTeamWorkItem}
+            style={{ width: '100%' }}
+          >
+            {teamWorkItemOptions.map((item) => (
+              <Select.Option key={item.path} value={item.path}>
+                {item.name} · {item.path}
+              </Select.Option>
+            ))}
+          </Select>
+        ) : null}
+        <Space spacing={8} align="center">
+          <Input
+            value={newTeamWorkItemTitle}
+            placeholder={t('teams.actionNewWorkItemPlaceholder')}
+            onChange={setNewTeamWorkItemTitle}
+            disabled={actionSubmitting || creatingTeamWorkItem}
+            style={{ flex: 1 }}
+          />
+          <Button
+            icon={<IconPlus />}
+            loading={creatingTeamWorkItem}
+            disabled={!newTeamWorkItemTitle.trim() || actionSubmitting || creatingTeamWorkItem}
+            onClick={() => void handleCreateTeamWorkItem()}
+          >
+            {t('teams.actionNewWorkItem')}
+          </Button>
+        </Space>
       </div>
     ) : null;
 

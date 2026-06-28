@@ -106,9 +106,12 @@ export default function KnowledgeRepositoryPanel({
   const [importUrl, setImportUrl] = useState('');
   const [importUrlTitle, setImportUrlTitle] = useState('');
   const [importUrlNote, setImportUrlNote] = useState('');
+  const [newKnowledgeWorkItemTitle, setNewKnowledgeWorkItemTitle] = useState('');
   const [error, setError] = useState<string | null>(null);
   const knowledgeTailActionContext = tailActionContext?.kind === 'knowledge' ? tailActionContext : null;
   const {
+    createWorkItem: createKnowledgeWorkItem,
+    creating: creatingKnowledgeWorkItem,
     options: workItemOptions,
     selectedPath: selectedKnowledgeWorkItemPath,
     setSelectedPath: setSelectedKnowledgeWorkItemPath,
@@ -322,6 +325,19 @@ export default function KnowledgeRepositoryPanel({
       Toast.error(err instanceof Error ? err.message : t('knowledge.healthReviewFailed'));
     } finally {
       setHealthReviewLoading(false);
+    }
+  };
+
+  const handleCreateKnowledgeWorkItem = async () => {
+    const title = newKnowledgeWorkItemTitle.trim();
+    if (!title || rewriteLoading || creatingKnowledgeWorkItem) return;
+
+    try {
+      await createKnowledgeWorkItem(title);
+      setNewKnowledgeWorkItemTitle('');
+      Toast.success(t('knowledge.rewriteNewWorkItemSuccess'));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -1018,25 +1034,48 @@ export default function KnowledgeRepositoryPanel({
             <Tag color="green">{t('knowledge.wikiCount', { count: snapshot?.wiki.length ?? 0 })}</Tag>
           </Space>
           <Space wrap>
-            {!knowledgeTailActionContext && workItemOptions.length > 0 ? (
+            {!knowledgeTailActionContext ? (
               <div style={{ minWidth: 280, maxWidth: 360 }}>
                 <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 4 }}>
                   {t('knowledge.rewriteWorkItemDesc')}
                 </Text>
-                <Select
-                  size="small"
-                  value={selectedKnowledgeWorkItemPath}
-                  placeholder={t('knowledge.rewriteWorkItemPlaceholder')}
-                  onChange={(value) => setSelectedKnowledgeWorkItemPath(String(value))}
-                  disabled={rewriteLoading}
-                  style={{ width: '100%' }}
-                >
-                  {workItemOptions.map((item) => (
-                    <Select.Option key={item.path} value={item.path}>
-                      {item.name} · {item.path}
-                    </Select.Option>
-                  ))}
-                </Select>
+                <Space vertical align="start" spacing={6} style={{ width: '100%' }}>
+                  {workItemOptions.length > 0 ? (
+                    <Select
+                      size="small"
+                      value={selectedKnowledgeWorkItemPath}
+                      placeholder={t('knowledge.rewriteWorkItemPlaceholder')}
+                      onChange={(value) => setSelectedKnowledgeWorkItemPath(String(value))}
+                      disabled={rewriteLoading || creatingKnowledgeWorkItem}
+                      style={{ width: '100%' }}
+                    >
+                      {workItemOptions.map((item) => (
+                        <Select.Option key={item.path} value={item.path}>
+                          {item.name} · {item.path}
+                        </Select.Option>
+                      ))}
+                    </Select>
+                  ) : null}
+                  <Space spacing={6} align="center" style={{ width: '100%' }}>
+                    <Input
+                      size="small"
+                      value={newKnowledgeWorkItemTitle}
+                      placeholder={t('knowledge.rewriteNewWorkItemPlaceholder')}
+                      onChange={setNewKnowledgeWorkItemTitle}
+                      disabled={rewriteLoading || creatingKnowledgeWorkItem}
+                      style={{ flex: 1 }}
+                    />
+                    <Button
+                      size="small"
+                      icon={<IconPlus />}
+                      loading={creatingKnowledgeWorkItem}
+                      disabled={!newKnowledgeWorkItemTitle.trim() || rewriteLoading || creatingKnowledgeWorkItem}
+                      onClick={() => void handleCreateKnowledgeWorkItem()}
+                    >
+                      {t('knowledge.rewriteNewWorkItem')}
+                    </Button>
+                  </Space>
+                </Space>
               </div>
             ) : null}
             <input

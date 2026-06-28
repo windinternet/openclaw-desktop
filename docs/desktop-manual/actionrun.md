@@ -60,11 +60,11 @@ Workbench 预览工作事项 Markdown 时，用户可以从该事项直接发起
 
 Artifacts 普通“AI 魔法创建”入口在没有外部来源事项时，会加载当前绑定 Repository 的 Workbench Snapshot，从 `work/active`、`work/someday` 和 `work/completed` 列出已有事项。用户可以在发起前选择关联事项；Desktop 会读取事项 frontmatter `id`，创建 `artifact_create` ActionRun 时写入 `workItemPath` 和 `workItemId`。如果没有合适事项，用户也可以在同一入口输入标题并显式创建 `work/active/YYYY-MM-DD-HHmmss-*.md`，新事项会标记 `source: desktop-action-run`，并自动作为本次 `artifact_create` ActionRun 的事项上下文。如果用户跳过选择和创建，运行仍会按 `workItemRequired: true` 和 `workItemUnassignedReason: pending_work_item_assignment` 进入未归属诊断；该入口不会自动猜测归属或绕过 Repository Context。
 
-Knowledge 普通“消化资料 / 自动改写 / 刷新索引日志”入口在没有 Dashboard 尾动作来源事项时，也会加载同一批 Workbench 事项候选。用户可以在发起 `knowledge_rewrite` ActionRun 前选择关联事项；Desktop 会写入 `workItemPath` 和 `workItemId`。Dashboard 知识尾动作入口已有来源 `workItemPath` 时，仍以该来源事项为准，不用普通选择器覆盖。
+Knowledge 普通“消化资料 / 自动改写 / 刷新索引日志”入口在没有 Dashboard 尾动作来源事项时，也会加载同一批 Workbench 事项候选。用户可以在发起 `knowledge_rewrite` ActionRun 前选择关联事项，也可以输入标题显式创建新的 `work/active` 事项；Desktop 会写入 `workItemPath` 和 `workItemId`。Dashboard 知识尾动作入口已有来源 `workItemPath` 时，仍以该来源事项为准，不用普通选择器覆盖。
 
-Teams 页面自然语言编排和快速创建 Gateway Agent 也属于非聊天式 AI 操作入口。用户可以在发起 `agent_team_compose` 或 `gateway_agent_create` ActionRun 前选择已有事项；Desktop 会写入 `workItemPath` 和 `workItemId`。如果用户跳过选择，运行仍会进入 `workItemRequired` / `workItemUnassignedReason` 诊断；该入口不会自动创建事项、猜测归属或绕过 Repository Context 与审批。
+Teams 页面自然语言编排和快速创建 Gateway Agent 也属于非聊天式 AI 操作入口。用户可以在发起 `agent_team_compose` 或 `gateway_agent_create` ActionRun 前选择已有事项，也可以输入标题显式创建新的 `work/active` 事项；Desktop 会写入 `workItemPath` 和 `workItemId`。如果用户跳过选择和创建，运行仍会进入 `workItemRequired` / `workItemUnassignedReason` 诊断；该入口不会猜测归属或绕过 Repository Context 与审批。
 
-RepositoryGate 的知识库语义映射和工作台语义映射也属于非聊天式 AI 操作入口。用户可以在发起 `knowledge_repository_map` 或 `workbench_repository_map` ActionRun 前选择已有事项；Desktop 会写入 `workItemPath` 和 `workItemId`。该入口只负责只读结构识别和用户确认后的映射保存，不会自动创建事项、猜测归属、改写仓库内容或绕过 Repository Context 与审批。
+RepositoryGate 的知识库语义映射和工作台语义映射也属于非聊天式 AI 操作入口。用户可以在发起 `knowledge_repository_map` 或 `workbench_repository_map` ActionRun 前选择已有事项，也可以在当前绑定仓库 ready 时输入标题显式创建新的 `work/active` 事项；Desktop 会写入 `workItemPath` 和 `workItemId`。该入口只负责只读结构识别和用户确认后的映射保存，不会猜测归属、改写仓库内容或绕过 Repository Context 与审批。
 
 当终态 ActionRun 的 `lastAssistantResponse` 包含 `<artifact>` 块时，Desktop 会自动把这些块保存为 `source: action_run` 的 Artifact，并把保存后的 Artifact id 回写到 ActionRun。
 
