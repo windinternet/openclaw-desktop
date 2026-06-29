@@ -108,6 +108,8 @@ const ARTIFACT_REUSE_KIND_OPTIONS: { value: ArtifactReuseKind; label: string }[]
 ];
 
 const editLabelStyle = { marginBottom: 4, fontSize: 13, fontWeight: 500, color: 'var(--semi-color-text-0)' } as const;
+const AI_CREATE_HTML_PREVIEW_CSP =
+  "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data: blob:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
 
 function parseEditedFileSize(value: string): number | undefined {
   const trimmed = value.trim();
@@ -118,6 +120,24 @@ function parseEditedFileSize(value: string): number | undefined {
 
 function htmlAuditSeverityColor(severity: ArtifactHtmlAuditSeverity): 'orange' | 'red' {
   return severity === 'danger' ? 'red' : 'orange';
+}
+
+function buildAICreateHtmlPreviewSrcDoc(html: string): string {
+  const cspMeta = `<meta http-equiv="Content-Security-Policy" content="${AI_CREATE_HTML_PREVIEW_CSP}">`;
+  if (/<head(?:\s[^>]*)?>/i.test(html)) {
+    return html.replace(/<head(?:\s[^>]*)?>/i, (match) => `${match}\n${cspMeta}`);
+  }
+  if (/<html(?:\s[^>]*)?>/i.test(html)) {
+    return html.replace(/<html(?:\s[^>]*)?>/i, (match) => `${match}\n<head>${cspMeta}</head>`);
+  }
+
+  const trimmed = html.trimStart();
+  const leadingWhitespace = html.slice(0, html.length - trimmed.length);
+  const doctypeMatch = trimmed.match(/^<!doctype[^>]*>/i);
+  if (doctypeMatch) {
+    return `${leadingWhitespace}${doctypeMatch[0]}\n${cspMeta}\n${trimmed.slice(doctypeMatch[0].length).trimStart()}`;
+  }
+  return `${cspMeta}\n${html}`;
 }
 
 interface Props {
@@ -199,6 +219,10 @@ export function ArtifactAICreateDrawer({
   const selectedPreviewHtmlAudit = useMemo(() => {
     if (!canEditHtmlBody) return null;
     return auditArtifactHtml(previewHtml ?? '');
+  }, [canEditHtmlBody, previewHtml]);
+  const selectedPreviewHtmlSrcDoc = useMemo(() => {
+    if (!canEditHtmlBody) return '';
+    return buildAICreateHtmlPreviewSrcDoc(previewHtml ?? '');
   }, [canEditHtmlBody, previewHtml]);
 
   useEffect(() => {
@@ -596,6 +620,45 @@ export function ArtifactAICreateDrawer({
                           {t('artifact.aiCreateHtmlAuditClean')}
                         </Text>
                       )}
+                    </div>
+                  )}
+                  {selectedPreviewHtmlSrcDoc && (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        padding: 10,
+                        border: '1px solid var(--semi-color-border)',
+                        borderRadius: 8,
+                        background: 'var(--semi-color-fill-0)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 8,
+                      }}
+                    >
+                      <Space align="center" wrap spacing={4}>
+                        <Text strong size="small">
+                          {t('artifact.aiCreateHtmlPreviewTitle')}
+                        </Text>
+                        <Tag size="small" color="blue" type="light">
+                          sandbox
+                        </Tag>
+                      </Space>
+                      <Text type="tertiary" size="small">
+                        {t('artifact.aiCreateHtmlPreviewHint')}
+                      </Text>
+                      <iframe
+                        title={t('artifact.aiCreateHtmlPreviewTitle')}
+                        srcDoc={selectedPreviewHtmlSrcDoc}
+                        sandbox="allow-scripts"
+                        referrerPolicy="no-referrer"
+                        style={{
+                          width: '100%',
+                          height: 260,
+                          border: '1px solid var(--semi-color-border)',
+                          borderRadius: 6,
+                          background: '#fff',
+                        }}
+                      />
                     </div>
                   )}
                 </div>

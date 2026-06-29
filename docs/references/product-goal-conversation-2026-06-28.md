@@ -1696,3 +1696,16 @@ HTML 的独特优势：
 仍未完成的 P0 后续：
 
 - 仍需要更完整的 HTML 真实预览、文件/Office/媒体类原生预览或缩略图、更强的保存后处理，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
+
+### 10.85 2026-06-29 当前实施记录：AI 产物创建保存前 HTML 可视预览
+
+围绕“HTML 产物的优势是可视性与交互性，普通用户保存前应该能看到它长什么样”的 P0 体验缺口，当前继续把 AI 创建保存表单从文本校正推进到受限可视预览：
+
+- AI 创建保存表单已支持保存前 HTML 可视预览；当 selected candidate 可编辑 HTML 正文时，`ArtifactAICreateDrawer` 会把当前 HTML 草稿渲染到一个受限 iframe。
+- `buildAICreateHtmlPreviewSrcDoc` 会向 HTML 草稿注入 `Content-Security-Policy`，只允许内联样式/脚本和 data/blob 媒体；iframe 使用 `sandbox="allow-scripts"` 与 `referrerPolicy="no-referrer"`。
+- 该预览跟随用户编辑后的 HTML 草稿变化；用户可以先看可视效果，再显式保存为 Artifact。
+- 该能力以当前代码事实为准：它只帮助用户保存前观察 HTML 可视效果，不读取本地文件，不授予 Desktop Bridge 权限，不允许外部网络连接，不自动修复 HTML，不阻止用户显式保存，不自动批量创建 Artifact，不自动写 Repository output，不写 Wiki/index/log，不写复盘，不更新事项状态，不移动事项文件。
+
+仍未完成的 P0 后续：
+
+- 仍需要文件/Office/媒体类原生预览或缩略图、更强的保存后处理，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。

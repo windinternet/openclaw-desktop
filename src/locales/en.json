@@ -1001,6 +1001,8 @@
     "aiCreateHtmlAuditTitle": "Pre-save HTML audit",
     "aiCreateHtmlAuditHint": "Checks the current HTML draft for external dependencies, network calls, and Bridge permission clues only. It does not auto-fix, execute, or grant permissions.",
     "aiCreateHtmlAuditClean": "No external dependency or approval-required capability clues found.",
+    "aiCreateHtmlPreviewTitle": "Pre-save HTML preview",
+    "aiCreateHtmlPreviewHint": "Renders the current HTML draft in a restricted iframe. It allows inline styles/scripts and data/blob media only, without Bridge, local file, or external network permissions.",
     "aiCreateExternalDetails": "Format, reuse, and file/link details",
     "aiCreateExternalDetailsHint": "These fields only affect Artifact metadata when you explicitly save. Editing them does not read local files, open links, execute commands, or grant permissions.",
     "aiCreateUrl": "Link URL",

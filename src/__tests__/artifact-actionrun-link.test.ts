@@ -109,6 +109,26 @@ describe('artifact ActionRun linkage', () => {
     expect(en.artifact.aiCreateHtmlAuditHint).toBeTruthy();
   });
 
+  it('renders a sandboxed HTML preview before saving an AI-created HTML candidate', () => {
+    const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
+    const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
+    const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
+
+    expect(drawer).toContain('function buildAICreateHtmlPreviewSrcDoc');
+    expect(drawer).toContain('Content-Security-Policy');
+    expect(drawer).toContain('const selectedPreviewHtmlSrcDoc = useMemo');
+    expect(drawer).toContain('buildAICreateHtmlPreviewSrcDoc(previewHtml ??');
+    expect(drawer).toContain("t('artifact.aiCreateHtmlPreviewTitle')");
+    expect(drawer).toContain("t('artifact.aiCreateHtmlPreviewHint')");
+    expect(drawer).toContain('srcDoc={selectedPreviewHtmlSrcDoc}');
+    expect(drawer).toContain('sandbox="allow-scripts"');
+    expect(drawer).toContain('referrerPolicy="no-referrer"');
+    expect(zh.artifact.aiCreateHtmlPreviewTitle).toBeTruthy();
+    expect(zh.artifact.aiCreateHtmlPreviewHint).toBeTruthy();
+    expect(en.artifact.aiCreateHtmlPreviewTitle).toBeTruthy();
+    expect(en.artifact.aiCreateHtmlPreviewHint).toBeTruthy();
+  });
+
   it('lets users edit selected AI-created file and link details before saving', () => {
     const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
     const preview = readFileSync('src/lib/artifact-ai-create-preview.ts', 'utf8');
