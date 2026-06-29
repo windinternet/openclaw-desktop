@@ -155,6 +155,14 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('Ordinary completed chat assistant messages with `<artifact>` blocks');
     expect(skillContent).toContain('Desktop saves every parsed Artifact');
     expect(skillContent).toContain('Repository output / preview paths');
+    expect(skillContent).toContain('Artifact write channel strategy');
+    expect(skillContent).toContain('prefer direct Desktop plugin writes when the plugin is ready');
+    expect(skillContent).toContain('fall back to `<artifact>` blocks when direct write is unavailable');
+    expect(skillContent).toContain('direct write must still respect approval boundaries');
+    expect(skillContent).toContain('Desktop Message Card Protocol');
+    expect(skillContent).toContain('authorization cards, Artifact cards, and ActionRun result cards');
+    expect(skillContent).toContain('Card actions are declarative');
+    expect(skillContent).toContain('Desktop may handle a card click by auto-sending a structured user message');
     expect(skillContent).toContain('<artifact>');
     expect(skillContent).toContain('HTML 产物');
     expect(skillContent).toContain('完整自包含');

@@ -1735,3 +1735,59 @@ HTML 的独特优势：
 仍未完成的 P0 后续：
 
 - 仍需要 PDF/Office/音视频原生渲染或缩略图、更强的保存后处理，以及把“用户一句话 -> 事项 -> 计划 -> 执行 -> 产物 -> 知识/复盘”做成更自然的端到端入口。
+
+### 10.88 2026-06-29 用户补充：Artifact 写入通道策略
+
+用户提出：关于产物写入，除了当前“对话返回 `<artifact>` 后 Desktop 解析/保存”的方式，如果插件就绪，也可以通过插件直接写入。
+
+需要沉淀的产品判断：
+
+- 插件直写比长对话返回更可靠，也更少干扰用户对话。
+- 不否定当前 `<artifact>` 对话返回方式；它应继续作为降级方案，或者作为用户可选择的另一种写入方案。
+- 后续应形成 Artifact 写入通道策略：插件直写优先、保存前预览确认、对话返回降级，并提供设置项让用户选择。
+
+建议策略：
+
+- 自动：Desktop/Gateway 插件就绪时优先通过 `desktop.artifacts.create` / `desktop.outputs.create` 等结构化命令直写 Artifact 或 Repository output；失败时降级为 `<artifact>`。
+- 总是先预览确认：即使插件可直写，也先进入 Desktop 预览/编辑/审批界面。
+- 仅使用对话返回：保留当前 `<artifact>` 结构块方案，适合插件不可用或用户偏好透明文本记录时使用。
+- 按类型设置：HTML、文件、链接、可执行资产等可以有不同默认策略。
+
+安全边界：
+
+- 直写不等于静默执行。
+- 创建普通 Artifact 可以走结构化直写；导入任意本地文件、写 Repository、执行命令、授予 Desktop Bridge 权限仍必须走审批或用户确认。
+- 直写成功后，对话里只需要返回简洁状态：Artifact id、标题、预览入口、写入结果和待确认事项；不需要把大段 HTML、文件内容或复杂 JSON 全塞回聊天。
+
+### 10.89 2026-06-29 用户补充：Desktop 消息卡片协议第一片
+
+用户提出：Desktop 在渲染 Gateway 对话内容时，可以大胆采用卡片机制；让 Gateway 知道很多输出是高度结构化的，用户可以通过可交互卡片获得更清晰内容和更好的交互体验，而不是只能看 Markdown。
+
+参考方向：
+
+- 飞书卡片文档把卡片作为 JSON 描述的消息结构，并支持展示组件、交互组件和回调通信。参考：[飞书卡片概览](https://open.feishu.cn/document/feishu-cards/feishu-card-overview)、[卡片组件概览](https://open.feishu.cn/document/feishu-cards/card-components/component-overview?lang=zh-CN)、[卡片回调通信](https://open.feishu.cn/document/feishu-cards/card-callback-communication)。
+- Desktop 不需要照搬飞书协议；要吸收的是“声明式结构 + 原生渲染 + 交互组件 + 回调”的产品模型。
+
+Desktop 消息卡片协议第一片：
+
+- 授权卡片：展示权限、风险、审批原因、批准/拒绝、查看详情和审计线索。
+- 产物卡片：展示 Artifact 标题、类型、摘要、预览、保存、打开、镜像仓库、关联事项和价值健康。
+- ActionRun 结果卡片：展示状态、摘要、审批状态、生成产物、执行记录和后续动作，例如沉淀成果、更新知识、写复盘。
+
+交互与回调设计：
+
+- 卡片 payload 应是声明式 JSON，不内嵌任意 JavaScript。
+- 卡片动作只触发 Desktop 白名单动作，不绕过审批、不绕过 Repository Context、不绕过 Artifact 安全边界。
+- 点击卡片后自动代发结构化用户消息可以作为回调机制：Desktop 把用户点击转换成一条可审计的用户确认消息，例如“批准这次写入”“保存这个产物”“打开这个 ActionRun”“发起知识更新”。
+- 这种自动代发消息不应伪装成模型输出，也不应静默执行高风险动作；它是用户确认后的 Desktop 本地回调事件。
+
+降级策略：
+
+- Desktop 支持卡片时，Gateway 应优先为授权、产物和 ActionRun 结果输出 Desktop Message Card。
+- Desktop 不支持卡片或插件不可用时，Gateway 降级为简洁 Markdown、`ai-action` 或 `<artifact>` 结构块。
+
+P0 意义：
+
+- 这不是单纯 UI 美化，而是让 Gateway 对话从单一 Markdown 输出升级为 Desktop 的结构化交互层。
+- 它能减少复杂审批、产物保存、执行结果、知识消化和复盘建议在聊天里的信息噪音。
+- 它与 Artifact 插件直写互补：插件直写负责可靠写入，消息卡片负责让用户看见状态、选择动作和触发可审计回调。

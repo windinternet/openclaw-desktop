@@ -208,6 +208,7 @@ HTML 产物是特色能力：
 
 - 任何有价值的结果都能保存为产物。
 - 产物能清楚标注来源：chat / workflow / agent_team / manual / mcp_tool / action_run。
+- Artifact 写入通道策略应优先支持插件直写：当 Desktop/Gateway 插件就绪时，通过结构化命令直接写入 Artifact 或 Repository output，降低长对话返回的不可靠性和对用户的干扰；当插件不可用、用户关闭直写或写入失败时，再降级为当前 `<artifact>` 对话返回和保存前预览确认。
 - HTML 产物可预览、可打开、可版本化、可沉淀到仓库。
 - 新产物和 `desktop.artifacts.inspect` 刷新的文件型产物会记录 `previewPlan`，把 Office/PDF/媒体等当前可用的安全预览策略、限制和下一步缺口沉淀到 Artifact 详情、Gateway 搜索和 Repository outputs。
 - Desktop 会基于 Artifact 事实计算只读 `valueHealth`，让用户和 Gateway 在搜索、描述、复用引用和 Repository outputs 中直接看到产物是 ready、usable_with_limits 还是 needs_attention，并看到 gaps 与 nextActions。
@@ -423,6 +424,34 @@ HTML 产物是特色能力：
 - 执行前能看到权限和审批边界。
 - 执行后能看到运行记录、产物和复盘线索。
 
+### P0-8 Desktop Message Card Protocol
+
+目标：让 Gateway 对话不再只是 Markdown 输出，而能在 Desktop 中渲染高度结构化、可交互、可审计的消息卡片。
+
+参考方向：
+
+- 飞书卡片的思路是以 JSON 描述卡片结构，用容器、展示组件和交互组件组合内容，并通过交互回调让用户动作回到业务系统。
+- Desktop 不需要照搬飞书协议，但应吸收“声明式 JSON + 原生渲染 + 白名单交互 + 回调更新”的产品模型。
+
+第一片范围：
+
+- 授权卡片：展示能力、风险、审批原因、批准/拒绝动作和审计线索。
+- 产物卡片：展示 Artifact 标题、类型、预览/保存/打开/镜像仓库动作、来源事项和价值健康。
+- ActionRun 结果卡片：展示状态、摘要、生成产物、审批状态和后续动作，例如沉淀成果、更新知识、写复盘。
+
+交互边界：
+
+- 卡片是声明式结构，不允许任意 JavaScript。
+- 卡片点击只触发 Desktop 白名单动作，不绕过现有审批、Repository Context 或 Artifact 安全边界。
+- 点击卡片后自动代发结构化用户消息可以作为 Desktop 本地回调机制：例如把“批准写入”“保存产物”“打开运行详情”“发起复盘”转换成一条可审计的用户确认消息，再交给 Gateway / Desktop handler 继续处理。
+- 如果当前 Desktop 版本不支持卡片渲染，Gateway 应降级为简洁 Markdown、`ai-action` 或 `<artifact>` 结构块。
+
+验收：
+
+- Gateway Skill 明确建议授权、产物和 ActionRun 结果优先使用 Desktop Message Card Protocol。
+- Desktop 渲染器至少能识别并展示三类卡片的只读状态。
+- 至少一个卡片动作能通过自动代发结构化用户消息完成可审计回调。
+
 ## 4. P1 / P2 推进方向
 
 ### P1 技能流程可视化
@@ -471,6 +500,9 @@ HTML 产物是特色能力：
 
 7. **可复用资产一等对象**
    - 让工具、脚本、模板、工作流具备来源、版本、权限、审批边界和运行记录。
+
+8. **Desktop 消息卡片协议**
+   - 让授权、产物和 ActionRun 结果从 Markdown 升级为结构化、可交互、可审计的 Desktop 卡片。
 
 ## 6. 设计约束
 
