@@ -136,6 +136,8 @@ OpenClaw Desktop
 
 目标：让普通用户第一天进入的是“我的 AI 工作系统”，而不是“Gateway 控制台”。
 
+独立推进文档：`docs/exec-plans/active/p0-onboarding-golden-path.md`。开箱金线已从产物系统收口中单独拆出，允许新会话按当前代码事实并行推进。
+
 范围：
 
 - 首屏叙事从连接控制台转向创建工作系统。

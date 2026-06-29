@@ -11,6 +11,7 @@ describe('product goal P0 traceability', () => {
     const plans = readText('docs/PLANS.md');
     const roadmap = readText('docs/design-docs/product-goal-roadmap.md');
     const source = readText('docs/references/product-goal-conversation-2026-06-28.md');
+    const onboardingGoldenPath = readText('docs/exec-plans/active/p0-onboarding-golden-path.md');
     const skillContent = buildDesktopSelfKnowledgeSkillContent();
 
     const p0Scopes = [
@@ -108,6 +109,20 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('生成计划 / 生成成果');
     expect(plans).toContain('开箱第一事项直接进入事项预览');
     expect(roadmap).toContain('/workbench?view=tasks&workItemPath=<matter>');
+    expect(plans).toContain('docs/exec-plans/active/p0-onboarding-golden-path.md');
+    expect(roadmap).toContain('docs/exec-plans/active/p0-onboarding-golden-path.md');
+    expect(onboardingGoldenPath).toContain('开箱金线独立推进设计与实施文档');
+    expect(onboardingGoldenPath).toContain('Gateway 是基础设施，不是用户目标');
+    expect(onboardingGoldenPath).toContain(
+      '打开应用 -> 选择语言/主题 -> 自动发现或安装 Gateway -> 创建本地工作仓库 -> 输入第一件事 -> 进入工作台',
+    );
+    expect(onboardingGoldenPath).toContain('当前代码事实');
+    expect(onboardingGoldenPath).toContain('并行新会话启动提示');
+    expect(onboardingGoldenPath).toContain('不以产物系统为主线');
+    expect(onboardingGoldenPath).toContain('Phase 1');
+    expect(onboardingGoldenPath).toContain('Phase 2');
+    expect(onboardingGoldenPath).toContain('Phase 3');
+    expect(onboardingGoldenPath).toContain('验收命令');
     expect(source).toContain('artifact-execution-review-command');
     expect(source).toContain('ActionRun 成果沉淀后的 Dashboard 去重');
     expect(source).toContain('notifyActionRunsChanged');
