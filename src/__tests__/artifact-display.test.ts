@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ArtifactMeta } from '../lib/artifact-types';
 import {
   buildArtifactDisplayLine,
+  buildArtifactNativePreviewPanel,
   buildArtifactOutputDescription,
   buildArtifactPreviewCard,
   buildArtifactSearchText,
@@ -237,5 +238,36 @@ describe('artifact display helpers', () => {
         primaryAction: 'open_file',
       }),
     );
+  });
+
+  it('builds a native detail preview panel only for image artifacts with safe thumbnails', () => {
+    expect(
+      buildArtifactNativePreviewPanel(
+        createArtifact({
+          type: 'image',
+          externalFormat: 'image',
+          fileName: 'cover.png',
+          contentSummary: 'Image · cover.png · 2 KB',
+          thumbnail: 'data:image/png;base64,iVBORw0KGgo=',
+        }),
+      ),
+    ).toEqual({
+      kind: 'image_thumbnail',
+      title: '图片预览',
+      imageUrl: 'data:image/png;base64,iVBORw0KGgo=',
+      alt: 'cover.png',
+      summary: 'Image · cover.png · 2 KB',
+      safetyNote: '使用导入副本生成的只读缩略图预览，不打开原始文件，也不会执行任何内容。',
+    });
+
+    expect(
+      buildArtifactNativePreviewPanel(
+        createArtifact({
+          externalFormat: 'pdf',
+          fileName: 'brief.pdf',
+          contentSummary: 'PDF · brief.pdf · 4 KB',
+        }),
+      ),
+    ).toBeUndefined();
   });
 });

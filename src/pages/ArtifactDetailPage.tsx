@@ -7,7 +7,7 @@ import { useStore } from '../lib';
 import type { ArtifactEnrichmentStatus, ArtifactMeta } from '../lib/artifact-types';
 import { buildArtifactReuseReference } from '../lib/artifact-reference';
 import { buildArtifactVersionHistory } from '../lib/artifact-version-history';
-import { buildArtifactPreviewCard } from '../lib/artifact-display';
+import { buildArtifactNativePreviewPanel, buildArtifactPreviewCard } from '../lib/artifact-display';
 import { buildArtifactValueHealth, type ArtifactValueHealthStatus } from '../lib/artifact-value-health';
 import {
   ARTIFACT_EXECUTION_REVIEW_WRITE_COMMAND,
@@ -107,6 +107,7 @@ export default function ArtifactDetailPage() {
   };
   const versions = buildArtifactVersionHistory(meta).slice().reverse();
   const previewCard = buildArtifactPreviewCard(meta);
+  const nativePreviewPanel = buildArtifactNativePreviewPanel(meta);
   const valueHealth = buildArtifactValueHealth(meta);
   const enrichmentEvents = meta.enrichmentEvents ?? [];
   const lastEnrichmentEvent = enrichmentEvents[enrichmentEvents.length - 1];
@@ -365,6 +366,54 @@ export default function ArtifactDetailPage() {
                   )}
                 </div>
               </div>
+              {nativePreviewPanel && (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                    padding: 12,
+                    borderRadius: 6,
+                    border: '1px solid var(--semi-color-border)',
+                    background: 'var(--semi-color-fill-0)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                    <Text strong>{nativePreviewPanel.title}</Text>
+                    <Tag size="small" type="light">
+                      {previewCard.formatLabel}
+                    </Tag>
+                  </div>
+                  <div
+                    style={{
+                      height: 260,
+                      minHeight: 180,
+                      borderRadius: 6,
+                      border: '1px solid var(--semi-color-border)',
+                      background: 'var(--semi-color-bg-0)',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <img
+                      src={nativePreviewPanel.imageUrl}
+                      alt={nativePreviewPanel.alt}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        display: 'block',
+                      }}
+                    />
+                  </div>
+                  <Text type="secondary">{nativePreviewPanel.summary}</Text>
+                  <Text type="tertiary" size="small">
+                    {nativePreviewPanel.safetyNote}
+                  </Text>
+                </div>
+              )}
               {meta.fileInspection && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <div>

@@ -273,6 +273,7 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('does not replace `contentExtract`, parse legacy binary Office document bodies');
     expect(skillContent).toContain('desktop.artifacts.thumbnail.extract');
     expect(skillContent).toContain('Newly imported image file Artifacts can record `thumbnail`');
+    expect(skillContent).toContain('Artifact detail can render a read-only in-app image preview panel');
     expect(skillContent).toContain('record only thumbnail availability');
     expect(skillContent).toContain('must not embed the data URL');
     expect(skillContent).toContain('Desktop records `enrichmentEvents`');

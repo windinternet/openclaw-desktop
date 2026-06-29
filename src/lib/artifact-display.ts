@@ -20,6 +20,15 @@ export interface ArtifactAgentPreviewCard extends Omit<ArtifactPreviewCard, 'thu
   thumbnailAvailable?: boolean;
 }
 
+export interface ArtifactNativePreviewPanel {
+  kind: 'image_thumbnail';
+  title: string;
+  imageUrl: string;
+  alt: string;
+  summary: string;
+  safetyNote: string;
+}
+
 const GENERIC_VALUE_SUMMARIES = new Set([
   'HTML',
   'Link',
@@ -223,6 +232,21 @@ export function buildArtifactAgentPreviewCard(artifact: ArtifactMeta): ArtifactA
   return {
     ...previewCard,
     thumbnailAvailable: thumbnailUrl ? true : undefined,
+  };
+}
+
+export function buildArtifactNativePreviewPanel(artifact: ArtifactMeta): ArtifactNativePreviewPanel | undefined {
+  const previewCard = buildArtifactPreviewCard(artifact);
+  const format = inferArtifactExternalFormat(artifact);
+  if (format !== 'image' || !previewCard.thumbnailUrl) return undefined;
+
+  return {
+    kind: 'image_thumbnail',
+    title: '图片预览',
+    imageUrl: previewCard.thumbnailUrl,
+    alt: artifact.fileName ?? artifact.title,
+    summary: previewCard.summary,
+    safetyNote: '使用导入副本生成的只读缩略图预览，不打开原始文件，也不会执行任何内容。',
   };
 }
 

@@ -213,7 +213,7 @@ HTML 产物是特色能力：
 - Desktop 会基于 Artifact 事实计算只读 `valueHealth`，让用户和 Gateway 在搜索、描述、复用引用和 Repository outputs 中直接看到产物是 ready、usable_with_limits 还是 needs_attention，并看到 gaps 与 nextActions。
 - ActionRun 仓库摘要会解析已生成 Artifact meta，列出价值摘要、`valueHealth`、`previewPlan`、`reuseKind` 和 Repository output / preview 路径，让非聊天式 AI 操作的结果能被复盘和继续使用。
 - 已导入文本、代码、HTML、PDF 和 Word/Excel/PowerPoint OOXML 文件副本可自动安全抽取 `contentExtract`，其中 PDF 与 OOXML 是基于导入副本 PDF text streams 或 OOXML XML entries 的 best-effort 文本抽取；抽取事实会进入 Artifact 详情、Gateway 命令、搜索、复用引用和 Repository outputs；旧版二进制 Office/音视频内容级解析仍作为后续能力推进。
-- 已导入 Office、PDF、图片、音频、视频和普通文件副本可自动安全记录 `contentFacts`，把文件大小、sha256、文件头签名、可识别图片尺寸和 best-effort PDF 版本/页数沉淀到 Artifact 详情、Gateway 命令、搜索、复用引用和 Repository outputs；已导入图片副本可自动安全记录 `thumbnail` 并用于 Artifacts UI 真实缩略图，Repository outputs 只记录可用状态；旧版二进制 Office 正文解析和 Office/PDF/音视频原生缩略图仍作为后续能力推进。
+- 已导入 Office、PDF、图片、音频、视频和普通文件副本可自动安全记录 `contentFacts`，把文件大小、sha256、文件头签名、可识别图片尺寸和 best-effort PDF 版本/页数沉淀到 Artifact 详情、Gateway 命令、搜索、复用引用和 Repository outputs；已导入图片副本可自动安全记录 `thumbnail` 并用于 Artifacts UI 真实缩略图，Artifact 详情页图片真实预览面板会基于该缩略图渲染只读内嵌预览，Repository outputs 只记录可用状态；旧版二进制 Office 正文解析和 Office/PDF/音视频原生缩略图仍作为后续能力推进。
 - 内容抽取、文件事实抽取和缩略图生成会写入 `enrichmentEvents`，记录成功、不可用或失败的 kind / format / reason / resultSummary / error，并进入 Artifact 详情、搜索文本、Repository output markdown 和 `outputs/index.md`，让产物增强过程本身可观测、可复盘。
 
 ### P0-3 ActionRun 定位统一

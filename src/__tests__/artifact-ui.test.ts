@@ -83,8 +83,12 @@ describe('artifact UI metadata', () => {
     expect(listPage).toContain('<img');
     expect(listPage).toContain('previewCard.actionLabel');
     expect(detailPage).toContain('buildArtifactPreviewCard');
+    expect(detailPage).toContain('buildArtifactNativePreviewPanel');
+    expect(detailPage).toContain('nativePreviewPanel');
     expect(detailPage).toContain('previewCard.thumbnailUrl');
     expect(detailPage).toContain('<img');
+    expect(detailPage).toContain('nativePreviewPanel.imageUrl');
+    expect(detailPage).toContain("objectFit: 'contain'");
     expect(detailPage).toContain('previewCard.safetyNote');
     expect(detailPage).toContain('meta.reuseKind');
     expect(detailPage).toContain("t('artifact.reuseKind')");
