@@ -1944,7 +1944,11 @@ export default function WorkbenchRepositoryPanel({
                               )}
                             </Tag>
                           )}
-                          <Button size="small" type="tertiary" onClick={() => navigate('/actions')}>
+                          <Button
+                            size="small"
+                            type="tertiary"
+                            onClick={() => navigate(`/actions?runId=${encodeURIComponent(selectedPlanLatestRun.id)}`)}
+                          >
                             {t('workbench.openPlanExecutionRuns')}
                           </Button>
                           {selectedPlanCanPreserveOutput && (

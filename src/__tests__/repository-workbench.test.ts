@@ -1558,6 +1558,7 @@ describe('repository workbench', () => {
     expect(source).toContain("t('workbench.latestPlanExecution')");
     expect(source).toContain("t('workbench.openPlanExecutionRuns')");
     expect(source).toContain('`/actions?runId=${encodeURIComponent(run.id)}`');
+    expect(source).toContain('`/actions?runId=${encodeURIComponent(selectedPlanLatestRun.id)}`');
     expect(source).toContain('setActivityRuns(runs)');
     expect(source).not.toContain('setActivityRuns(runs.slice(0, 5))');
     expect(zh).toContain('"latestPlanExecution": "最近执行"');
