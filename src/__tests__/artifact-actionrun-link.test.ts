@@ -89,6 +89,26 @@ describe('artifact ActionRun linkage', () => {
     expect(en.artifact.aiCreateHtmlBody).toBeTruthy();
   });
 
+  it('surfaces an HTML audit before saving an AI-created HTML candidate', () => {
+    const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
+    const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
+    const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
+
+    expect(drawer).toContain("import { auditArtifactHtml } from '../lib/artifact-html-audit'");
+    expect(drawer).toContain('selectedPreviewHtmlAudit');
+    expect(drawer).toContain('const previewHtml = preview?.html');
+    expect(drawer).toContain('auditArtifactHtml(previewHtml ??');
+    expect(drawer).toContain("t('artifact.aiCreateHtmlAuditTitle')");
+    expect(drawer).toContain("t('artifact.aiCreateHtmlAuditHint')");
+    expect(drawer).toContain('selectedPreviewHtmlAudit.issues.slice(0, 3)');
+    expect(drawer).toContain('artifact.htmlSelfContained');
+    expect(drawer).toContain('artifact.htmlApprovalRequired');
+    expect(zh.artifact.aiCreateHtmlAuditTitle).toBeTruthy();
+    expect(zh.artifact.aiCreateHtmlAuditHint).toBeTruthy();
+    expect(en.artifact.aiCreateHtmlAuditTitle).toBeTruthy();
+    expect(en.artifact.aiCreateHtmlAuditHint).toBeTruthy();
+  });
+
   it('lets users edit selected AI-created file and link details before saving', () => {
     const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
     const preview = readFileSync('src/lib/artifact-ai-create-preview.ts', 'utf8');

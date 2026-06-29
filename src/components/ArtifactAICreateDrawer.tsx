@@ -25,10 +25,17 @@ import {
   selectArtifactAICreatePreviewsForSave,
   type ArtifactAICreatePreview,
 } from '../lib/artifact-ai-create-preview';
+import { auditArtifactHtml } from '../lib/artifact-html-audit';
 import { useWorkbenchWorkItemOptions } from '../lib/workbench-work-items';
 import { ActionRunWorkItemPicker } from './ActionRunWorkItemPicker';
 import type { AiActionRun } from '../lib/types';
-import type { ArtifactExternalFormat, ArtifactMeta, ArtifactReuseKind, ArtifactType } from '../lib/artifact-types';
+import type {
+  ArtifactExternalFormat,
+  ArtifactHtmlAuditSeverity,
+  ArtifactMeta,
+  ArtifactReuseKind,
+  ArtifactType,
+} from '../lib/artifact-types';
 
 const { Text, Paragraph } = Typography;
 
@@ -109,6 +116,10 @@ function parseEditedFileSize(value: string): number | undefined {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
+function htmlAuditSeverityColor(severity: ArtifactHtmlAuditSeverity): 'orange' | 'red' {
+  return severity === 'danger' ? 'red' : 'orange';
+}
+
 interface Props {
   visible: boolean;
   onClose: () => void;
@@ -155,6 +166,7 @@ export function ArtifactAICreateDrawer({
   const [error, setError] = useState<string | null>(null);
   const isGeneratingRef = useRef(false);
   const preview = previews[selectedPreviewIndex] ?? null;
+  const previewHtml = preview?.html;
   const selectedPreviewIndexSet = useMemo(() => new Set(selectedPreviewIndexes), [selectedPreviewIndexes]);
   const previewsToSave = useMemo(
     () => selectArtifactAICreatePreviewsForSave(previews, selectedPreviewIndexes),
@@ -184,6 +196,10 @@ export function ArtifactAICreateDrawer({
       preview.mimeType !== undefined ||
       preview.importFile !== undefined),
   );
+  const selectedPreviewHtmlAudit = useMemo(() => {
+    if (!canEditHtmlBody) return null;
+    return auditArtifactHtml(previewHtml ?? '');
+  }, [canEditHtmlBody, previewHtml]);
 
   useEffect(() => {
     if (visible && initialInput !== undefined) setInput(initialInput);
@@ -517,6 +533,71 @@ export function ArtifactAICreateDrawer({
                   <Text type="tertiary" size="small">
                     {t('artifact.aiCreateHtmlBodyHint')}
                   </Text>
+                  {selectedPreviewHtmlAudit && (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        padding: 10,
+                        border: '1px solid var(--semi-color-border)',
+                        borderRadius: 8,
+                        background: 'var(--semi-color-fill-0)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 6,
+                      }}
+                    >
+                      <Space align="center" wrap spacing={4}>
+                        <Text strong size="small">
+                          {t('artifact.aiCreateHtmlAuditTitle')}
+                        </Text>
+                        <Tag
+                          size="small"
+                          color={selectedPreviewHtmlAudit.selfContained ? 'green' : 'orange'}
+                          type="light"
+                        >
+                          {t(
+                            selectedPreviewHtmlAudit.selfContained
+                              ? 'artifact.htmlSelfContained'
+                              : 'artifact.htmlNotSelfContained',
+                          )}
+                        </Tag>
+                        {selectedPreviewHtmlAudit.requiresApproval && (
+                          <Tag size="small" color="red" type="light">
+                            {t('artifact.htmlApprovalRequired')}
+                          </Tag>
+                        )}
+                        <Tag
+                          size="small"
+                          color={selectedPreviewHtmlAudit.issues.length > 0 ? 'orange' : 'green'}
+                          type="light"
+                        >
+                          {t('artifact.htmlIssueCount', { count: selectedPreviewHtmlAudit.issues.length })}
+                        </Tag>
+                      </Space>
+                      <Text type="tertiary" size="small">
+                        {t('artifact.aiCreateHtmlAuditHint')}
+                      </Text>
+                      {selectedPreviewHtmlAudit.issues.length > 0 ? (
+                        <Space vertical align="start" spacing={4}>
+                          {selectedPreviewHtmlAudit.issues.slice(0, 3).map((issue, index) => (
+                            <Space key={`${issue.code}-${index}`} align="start" spacing={4}>
+                              <Tag size="small" color={htmlAuditSeverityColor(issue.severity)} type="light">
+                                {issue.code}
+                              </Tag>
+                              <Text type="tertiary" size="small">
+                                {issue.message}
+                                {issue.detail ? ` · ${issue.detail}` : ''}
+                              </Text>
+                            </Space>
+                          ))}
+                        </Space>
+                      ) : (
+                        <Text type="tertiary" size="small">
+                          {t('artifact.aiCreateHtmlAuditClean')}
+                        </Text>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
