@@ -84,6 +84,8 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('Artifact 写入通道策略');
     expect(source).toContain('插件直写优先');
     expect(source).toContain('Desktop 消息卡片协议第一片');
+    expect(source).toContain('问询场景');
+    expect(source).toContain('问询卡片');
     expect(source).toContain('点击卡片后自动代发结构化用户消息');
     expect(source).toContain('Artifact 执行复盘 UI 入口');
     expect(source).toContain('Knowledge PDF/Office 资料导入第一片');
@@ -204,10 +206,13 @@ describe('product goal P0 traceability', () => {
     expect(roadmap).toContain('Artifact 详情页图片真实预览面板');
     expect(plans).toContain('Artifact 写入通道策略');
     expect(plans).toContain('Desktop 消息卡片协议第一片');
+    expect(plans).toContain('问询卡片');
     expect(roadmap).toContain('Artifact 写入通道策略');
     expect(roadmap).toContain('Desktop Message Card Protocol');
+    expect(roadmap).toContain('问询卡片');
     expect(skillContent).toContain('Artifact write channel strategy');
     expect(skillContent).toContain('Desktop Message Card Protocol');
+    expect(skillContent).toContain('Inquiry cards');
     expect(plans).toContain('AI 创建保存表单已支持保存前编辑文件/链接细节');
     expect(plans).toContain('Artifact 详情页已能在 `tool / script / workflow` 最近执行');
     expect(plans).toContain('复制 `desktop.artifacts.execution.review.write` JSON 命令');

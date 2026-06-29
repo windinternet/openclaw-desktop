@@ -160,7 +160,9 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('fall back to `<artifact>` blocks when direct write is unavailable');
     expect(skillContent).toContain('direct write must still respect approval boundaries');
     expect(skillContent).toContain('Desktop Message Card Protocol');
-    expect(skillContent).toContain('authorization cards, Artifact cards, and ActionRun result cards');
+    expect(skillContent).toContain('authorization cards, inquiry cards, Artifact cards, and ActionRun result cards');
+    expect(skillContent).toContain('Inquiry cards');
+    expect(skillContent).toContain('structured question, candidate answers');
     expect(skillContent).toContain('Card actions are declarative');
     expect(skillContent).toContain('Desktop may handle a card click by auto-sending a structured user message');
     expect(skillContent).toContain('<artifact>');
