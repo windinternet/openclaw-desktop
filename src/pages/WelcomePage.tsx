@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Typography } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
 import ConnectionWizard from '../components/ConnectionWizard';
+import { WORK_SYSTEM_ONBOARDING_ROUTE } from '../lib/work-system-onboarding';
 
 const { Title, Text } = Typography;
 
@@ -33,8 +34,8 @@ export default function WelcomePage() {
 
       <ConnectionWizard
         onConnected={() => {
-          console.log('[WelcomePage] 🎯 connected → navigating to /');
-          navigate('/', { replace: true });
+          console.log('[WelcomePage] 🎯 connected → navigating to work system onboarding');
+          navigate(WORK_SYSTEM_ONBOARDING_ROUTE, { replace: true });
         }}
       />
     </div>

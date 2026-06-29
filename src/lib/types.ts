@@ -142,6 +142,18 @@ export type AiActionRunStatus =
 
 export type AiActionExecutionMode = 'isolated-session' | 'domain-thread' | 'subagent-tree' | 'local-bridge';
 
+export interface AiActionRepositoryWriteEntry {
+  path: string;
+  content: string;
+}
+
+export interface AiActionRepositoryWrite extends AiActionRepositoryWriteEntry {
+  workItemPath?: string;
+  sourcePath?: string;
+  selectedPath?: string;
+  writes?: AiActionRepositoryWriteEntry[];
+}
+
 export interface AiActionApproval {
   id: string;
   title: string;
@@ -150,6 +162,7 @@ export interface AiActionApproval {
   requestedAt: number;
   decidedAt?: number;
   reason?: string;
+  repositoryWrite?: AiActionRepositoryWrite;
 }
 
 export interface AiActionRun {
@@ -169,6 +182,11 @@ export interface AiActionRun {
   gatewayAgentId?: string;
   gatewaySessionKey?: string;
   gatewayRunId?: string;
+  workItemRequired?: boolean;
+  workItemUnassignedReason?: string;
+  workItemId?: string;
+  workItemPath?: string;
+  artifactIds?: string[];
   childSessionKeys?: string[];
   approvals?: AiActionApproval[];
   createdAt: number;

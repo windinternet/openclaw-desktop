@@ -17,6 +17,8 @@ import {
   buildAgentTeamComposePrompt,
   buildApprovalDecisionPrompt,
   buildGatewayAgentCreatePrompt,
+  buildPlanExecutePrompt,
+  buildWorkMatterPlanPrompt,
 } from '../lib/ai-action-prompts';
 import type { SessionInfo } from '../lib/types';
 
@@ -77,12 +79,32 @@ describe('AI Action Center session rules', () => {
       status: 'draft',
       executionMode: 'isolated-session',
       agentId: 'main',
+      workItemRequired: true,
+      workItemUnassignedReason: 'pending_work_item_assignment',
       gatewaySessionKey: 'agent:main:desktop-action:agent_team_compose:action-mppy1i4g-4fzyo8',
       childSessionKeys: [],
       approvals: [],
     });
 
     vi.restoreAllMocks();
+  });
+
+  it('does not mark a work-bound ActionRun as unassigned', () => {
+    const run = createAiActionRun({
+      type: 'artifact_create',
+      sourcePage: 'workbench',
+      instanceId: 'instance-1',
+      input: '生成发布报告',
+      workItemId: 'release',
+      workItemPath: 'work/active/release.md',
+    });
+
+    expect(run).toMatchObject({
+      workItemRequired: true,
+      workItemId: 'release',
+      workItemPath: 'work/active/release.md',
+    });
+    expect(run.workItemUnassignedReason).toBeUndefined();
   });
 
   it('creates an isolated Gateway session and sends the action prompt', async () => {
@@ -197,6 +219,62 @@ describe('AI Action Center session rules', () => {
       title: '创建 Agent',
       risk: 'medium',
       status: 'pending',
+    });
+  });
+
+  it('keeps structured repository write payloads on work-matter plan approvals', () => {
+    const run = createAiActionRun({
+      type: 'work_matter_plan',
+      sourcePage: 'workbench',
+      instanceId: 'instance-1',
+      input: '事项计划生成',
+      workItemPath: 'work/active/release.md',
+    });
+
+    const updated = applyAiActionAssistantResponse(
+      run,
+      `计划草案如下。
+
+\`\`\`ai-action
+{"version":1,"kind":"approval_required","summary":"写入发布计划","approval":{"title":"写入事项计划","risk":"medium","reason":"将把计划写入 plans/active/ 并关联来源事项"},"repositoryWrite":{"path":"plans/active/release-plan.md","workItemPath":"work/active/release.md","content":"# 发布计划\\n\\n来源事项: work/active/release.md\\n"}}
+\`\`\``,
+    );
+
+    expect(updated.status).toBe('awaiting_approval');
+    expect(updated.approvals?.[0].repositoryWrite).toEqual({
+      path: 'plans/active/release-plan.md',
+      workItemPath: 'work/active/release.md',
+      content: '# 发布计划\n\n来源事项: work/active/release.md',
+    });
+  });
+
+  it('keeps batch repository write payloads on knowledge rewrite approvals', () => {
+    const run = createAiActionRun({
+      type: 'knowledge_rewrite',
+      sourcePage: 'knowledge',
+      instanceId: 'instance-1',
+      input: '消化资料 sources/raw.md',
+    });
+
+    const updated = applyAiActionAssistantResponse(
+      run,
+      `准备写入知识库。
+
+\`\`\`ai-action
+{"version":1,"kind":"approval_required","summary":"消化资料并更新知识库","approval":{"title":"写入知识库 Wiki/index/log","risk":"medium","reason":"将更新 wiki 条目、索引和日志"},"repositoryWrite":{"sourcePath":"sources/raw.md","writes":[{"path":"wiki/topics/raw.md","content":"# Raw\\n\\nReusable knowledge."},{"path":"wiki/index.md","content":"# Knowledge Index\\n\\n- [Raw](topics/raw.md)"},{"path":"wiki/log.md","content":"# Knowledge Log\\n\\n- 2026-06-28: digested sources/raw.md"}]}}
+\`\`\``,
+    );
+
+    expect(updated.status).toBe('awaiting_approval');
+    expect(updated.approvals?.[0].repositoryWrite).toEqual({
+      path: 'wiki/topics/raw.md',
+      content: '# Raw\n\nReusable knowledge.',
+      sourcePath: 'sources/raw.md',
+      writes: [
+        { path: 'wiki/topics/raw.md', content: '# Raw\n\nReusable knowledge.' },
+        { path: 'wiki/index.md', content: '# Knowledge Index\n\n- [Raw](topics/raw.md)' },
+        { path: 'wiki/log.md', content: '# Knowledge Log\n\n- 2026-06-28: digested sources/raw.md' },
+      ],
     });
   });
 
@@ -419,8 +497,31 @@ describe('AI Action Center session rules', () => {
       approvalTitle: '创建 Agent',
       actionInput: '创建产品 Agent',
     });
+    const matterPlanPrompt = buildWorkMatterPlanPrompt({
+      workItemPath: 'work/active/release.md',
+      workItemContent: '# 发布事项\n\n## 目标\n\n完成桌面版发布。',
+    });
+    const planExecutePrompt = buildPlanExecutePrompt({
+      planPath: 'plans/active/release-plan.md',
+      planContent: '# 发布计划\n\n## 关键步骤\n\n1. 完成打包。',
+      workItemPath: 'work/active/release.md',
+      workItemContent: '# 发布事项\n\n## 验收标准\n\n- 可下载。',
+    });
 
-    for (const prompt of [createPrompt, composePrompt, decisionPrompt]) {
+    expect(matterPlanPrompt).toContain('work/active/release.md');
+    expect(matterPlanPrompt).toContain('plans/active/');
+    expect(matterPlanPrompt).toContain('approval_required');
+    expect(matterPlanPrompt).toContain('repositoryWrite');
+    expect(matterPlanPrompt).toContain('"workItemPath":"work/active/release.md"');
+    expect(matterPlanPrompt).toContain('关联资料');
+    expect(matterPlanPrompt).toContain('关联成果');
+    expect(planExecutePrompt).toContain('plans/active/release-plan.md');
+    expect(planExecutePrompt).toContain('work/active/release.md');
+    expect(planExecutePrompt).toContain('approval_required');
+    expect(planExecutePrompt).toContain('执行记录');
+    expect(planExecutePrompt).toContain('关联成果');
+
+    for (const prompt of [createPrompt, composePrompt, decisionPrompt, matterPlanPrompt, planExecutePrompt]) {
       expect(prompt).toContain('```ai-action');
       expect(prompt).not.toMatch(/\{\{[^}]+\}\}/);
     }

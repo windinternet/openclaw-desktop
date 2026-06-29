@@ -31,6 +31,8 @@ import {
 } from '../lib/repository-workbench-mapping';
 import { buildRepositoryContextPayload } from '../lib/repository-context';
 import { syncRepositoryContextToAgentFiles } from '../lib/repository-context-fallback';
+import { useWorkbenchWorkItemOptions } from '../lib/workbench-work-items';
+import { ActionRunWorkItemPicker } from './ActionRunWorkItemPicker';
 
 const { Text, Title } = Typography;
 
@@ -89,6 +91,20 @@ export default function RepositoryGate({
   const [mappingLoading, setMappingLoading] = useState(false);
   const [fallbackSyncing, setFallbackSyncing] = useState(false);
   const [advancedManualPath, setAdvancedManualPath] = useState(false);
+  const {
+    createWorkItem: createRepositoryWorkItem,
+    creating: creatingRepositoryWorkItem,
+    loading: repositoryWorkItemLoading,
+    options: repositoryWorkItemOptions,
+    selectedPath: selectedRepositoryWorkItemPath,
+    setSelectedPath: setSelectedRepositoryWorkItemPath,
+    selectedWorkItem: selectedRepositoryWorkItem,
+    selectedWorkItemId: selectedRepositoryWorkItemId,
+  } = useWorkbenchWorkItemOptions({
+    binding,
+    instanceId: currentInstanceId,
+    enabled: location === 'desktop-local',
+  });
 
   const inspect = useCallback(async (nextBinding: RepositoryBinding) => {
     setLoading(true);
@@ -402,6 +418,8 @@ export default function RepositoryGate({
         }));
       const tree = await repository.listTree(path, 400);
       const excerpts = await readMappingExcerpts(path, tree);
+      const resolvedWorkItemPath = selectedRepositoryWorkItem?.path;
+      const resolvedWorkItemId = selectedRepositoryWorkItemId;
       const run = createAiActionRun({
         type: 'knowledge_repository_map',
         sourcePage: 'knowledge',
@@ -409,6 +427,8 @@ export default function RepositoryGate({
         agentId: agent.id,
         executionMode: 'isolated-session',
         input: t('repositoryGate.mappingActionInput', { path }),
+        workItemId: resolvedWorkItemId,
+        workItemPath: resolvedWorkItemPath,
       });
       await upsertAiActionRun(currentInstanceId, { ...run, status: 'planning', updatedAt: Date.now() });
       const running = await executeAiActionRunWithGateway(activeClient, run, {
@@ -494,6 +514,8 @@ export default function RepositoryGate({
         }));
       const tree = await repository.listTree(path, 400);
       const structureSignals = buildWorkbenchStructureSignals(tree);
+      const resolvedWorkItemPath = selectedRepositoryWorkItem?.path;
+      const resolvedWorkItemId = selectedRepositoryWorkItemId;
       const run = createAiActionRun({
         type: 'workbench_repository_map',
         sourcePage: 'workbench',
@@ -501,6 +523,8 @@ export default function RepositoryGate({
         agentId: agent.id,
         executionMode: 'isolated-session',
         input: t('repositoryGate.workbenchMappingActionInput', { path }),
+        workItemId: resolvedWorkItemId,
+        workItemPath: resolvedWorkItemPath,
       });
       await upsertAiActionRun(currentInstanceId, { ...run, status: 'planning', updatedAt: Date.now() });
       const running = await executeAiActionRunWithGateway(activeClient, run, {
@@ -548,6 +572,27 @@ export default function RepositoryGate({
   const displayStatus = ready ? 'repo_ready' : status;
   const showDesktopActions = location === 'desktop-local';
   const canRefresh = Boolean(binding);
+  const canCreateRepositoryWorkItem = binding?.status === 'repo_ready';
+  const renderMappingWorkItemPicker = () =>
+    repositoryWorkItemOptions.length > 0 || canCreateRepositoryWorkItem ? (
+      <ActionRunWorkItemPicker
+        description={t('repositoryGate.mappingWorkItemDesc')}
+        selectPlaceholder={t('repositoryGate.mappingWorkItemPlaceholder')}
+        createLabel={t('repositoryGate.mappingNewWorkItem')}
+        createPlaceholder={t('repositoryGate.mappingNewWorkItemPlaceholder')}
+        createSuccessMessage={t('repositoryGate.mappingNewWorkItemSuccess')}
+        options={repositoryWorkItemOptions}
+        selectedPath={selectedRepositoryWorkItemPath}
+        onSelectedPathChange={setSelectedRepositoryWorkItemPath}
+        createWorkItem={createRepositoryWorkItem}
+        disabled={mappingLoading}
+        creating={creatingRepositoryWorkItem}
+        loading={repositoryWorkItemLoading}
+        showCreate={canCreateRepositoryWorkItem}
+        size="small"
+        style={{ width: 'min(100%, 420px)' }}
+      />
+    ) : null;
 
   if (!setupVisible) {
     if (ready && binding) return <>{typeof children === 'function' ? children(binding) : children}</>;
@@ -598,6 +643,7 @@ export default function RepositoryGate({
                 <Text type="tertiary" size="small">
                   {t('repositoryGate.desktopSetupDesc')}
                 </Text>
+                {renderMappingWorkItemPicker()}
                 <Space wrap>
                   <Button
                     icon={<IconFolderOpen />}

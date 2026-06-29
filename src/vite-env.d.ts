@@ -88,7 +88,14 @@ interface Window {
         directory: string,
       ) => Promise<import('./lib/repository-knowledge').RepositoryMarkdownFile[]>;
       readText?: (repoPath: string, relativePath: string) => Promise<string>;
+      extractKnowledgeFileText?: (params: { fileName: string; mimeType?: string; bytes: ArrayBuffer }) => Promise<{
+        format: import('./lib/knowledge-file-import').KnowledgeExtractedFileFormat;
+        text: string;
+        bytesRead: number;
+        truncated: boolean;
+      }>;
       writeText?: (repoPath: string, relativePath: string, content: string) => Promise<void>;
+      moveText?: (repoPath: string, fromRelativePath: string, toRelativePath: string) => Promise<void>;
       search?: (
         repoPath: string,
         query: string,
@@ -142,6 +149,41 @@ interface Window {
       getHtml: (artifactId: string, version?: number) => Promise<string | null>;
       saveMeta: (artifactId: string, meta: unknown) => Promise<void>;
       saveHtml: (artifactId: string, version: number, html: string) => Promise<void>;
+      importFile: (
+        artifactId: string,
+        sourcePath: string,
+        preferredFileName?: string,
+      ) => Promise<{
+        filePath: string;
+        fileName: string;
+        fileSize: number;
+        mimeType?: string;
+      }>;
+      readImportedText: (artifactId: string) => Promise<{
+        text: string;
+        bytesRead: number;
+        truncated: boolean;
+      }>;
+      readImportedFileFacts: (artifactId: string) => Promise<{
+        fileSize: number;
+        bytesRead: number;
+        sha256: string;
+        signatureHex: string;
+        imageDimensions?: {
+          width: number;
+          height: number;
+          kind: 'png' | 'jpeg' | 'gif' | 'webp';
+        };
+        pdfInfo?: {
+          version?: string;
+          pageCount?: number;
+        };
+      }>;
+      readImportedImageThumbnail: (artifactId: string) => Promise<{
+        dataUrl: string;
+        bytesRead: number;
+        mimeType: string;
+      }>;
       list: () => Promise<unknown[]>;
       updateIndex: (entries: unknown) => Promise<void>;
       requestAuth: (

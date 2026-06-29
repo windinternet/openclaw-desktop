@@ -1,0 +1,211 @@
+import { describe, expect, it, vi } from 'vitest';
+import type { ArtifactMeta, ArtifactSource } from '../lib/artifact-types';
+import { parseArtifactFromText, saveArtifactFromChat } from '../lib/artifact-parser';
+import { buildOutputMarkdown } from '../lib/repository-outputs';
+import { artifactService } from '../lib/artifact-service';
+
+vi.mock('../lib/artifact-service', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/artifact-service')>();
+  return {
+    ...actual,
+    artifactService: {
+      generate: vi.fn(async (params) => ({
+        id: 'art_1',
+        title: params.title,
+        icon: params.icon,
+        type: params.type,
+        source: params.source,
+        tags: params.tags,
+        currentVersion: 1,
+        status: 'draft',
+        createdAt: 1,
+        updatedAt: 1,
+      })),
+    },
+  };
+});
+
+const mockedArtifactService = vi.mocked(artifactService);
+
+describe('artifact metadata', () => {
+  it('allows ActionRun as a first-class artifact source', async () => {
+    const source: ArtifactSource = { type: 'action_run', id: 'run_1', name: 'Knowledge digest' };
+
+    const artifact = await saveArtifactFromChat(
+      {
+        title: '知识消化报告',
+        type: 'report',
+        icon: '📊',
+        tags: ['knowledge'],
+        html: '<!doctype html><html><body>ok</body></html>',
+      },
+      source.type,
+      source.id,
+      source.name,
+    );
+
+    expect(artifact.source).toEqual(source);
+    expect(mockedArtifactService.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source,
+      }),
+    );
+  });
+
+  it('serializes artifact source into repository output markdown', () => {
+    const markdown = buildOutputMarkdown(
+      {
+        id: 'art_1',
+        title: '知识消化报告',
+        icon: '📊',
+        type: 'report',
+        source: { type: 'action_run', id: 'run_1', name: 'Knowledge digest' },
+        tags: ['knowledge'],
+        currentVersion: 1,
+        status: 'draft',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      'outputs/html/art_1.html',
+    );
+
+    expect(markdown).toContain('sourceType: action_run');
+    expect(markdown).toContain('sourceId: run_1');
+    expect(markdown).toContain('sourceName: Knowledge digest');
+  });
+
+  it('serializes HTML audit summary into repository output markdown', () => {
+    const markdown = buildOutputMarkdown(
+      {
+        id: 'art_1',
+        title: '交互报告',
+        icon: '📊',
+        type: 'report',
+        source: { type: 'action_run', id: 'run_1' },
+        tags: [],
+        currentVersion: 1,
+        status: 'draft',
+        createdAt: 1,
+        updatedAt: 1,
+        htmlAudit: {
+          selfContained: false,
+          requiresApproval: true,
+          checkedAt: 1,
+          issues: [
+            {
+              code: 'bridge-shell-exec',
+              severity: 'danger',
+              message: '使用命令执行能力',
+            },
+          ],
+        },
+      },
+      'outputs/html/art_1.html',
+    );
+
+    expect(markdown).toContain('htmlSelfContained: false');
+    expect(markdown).toContain('htmlRequiresApproval: true');
+    expect(markdown).toContain('htmlIssueCount: 1');
+  });
+
+  it('serializes HTML runtime authorization records into repository output markdown', () => {
+    const artifact: ArtifactMeta = {
+      id: 'art_1',
+      title: '交互报告',
+      icon: '📊',
+      type: 'report',
+      source: { type: 'action_run', id: 'run_1' },
+      tags: [],
+      currentVersion: 1,
+      status: 'draft',
+      createdAt: 1,
+      updatedAt: 2,
+      authEvents: [
+        {
+          id: 'auth_1',
+          capability: 'readFile',
+          detail: '/Users/deepin/report.csv',
+          granted: true,
+          level: 'artifact',
+          requestedAt: 1,
+          decidedAt: 2,
+        },
+      ],
+    };
+
+    const markdown = buildOutputMarkdown(artifact);
+
+    expect(markdown).toContain('runtimeAuthCount: 1');
+    expect(markdown).toContain('runtimeAuthLastCapability: readFile');
+    expect(markdown).toContain('runtimeAuthLastGranted: true');
+    expect(markdown).toContain('runtimeAuthLastLevel: artifact');
+  });
+
+  it('serializes imported file metadata into repository output markdown', () => {
+    const markdown = buildOutputMarkdown({
+      id: 'art_file',
+      title: '路线图 PPT',
+      icon: '📎',
+      type: 'file',
+      source: { type: 'manual' },
+      tags: [],
+      currentVersion: 1,
+      status: 'draft',
+      createdAt: 1,
+      updatedAt: 1,
+      fileName: 'roadmap.pptx',
+      filePath: '/user-data/storage/artifacts/art_file/files/roadmap.pptx',
+      originalFilePath: '/Users/deepin/Documents/roadmap.pptx',
+      fileSize: 4096,
+      mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      externalFormat: 'powerpoint',
+      contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+    });
+
+    expect(markdown).toContain('fileName: roadmap.pptx');
+    expect(markdown).toContain('externalFormat: powerpoint');
+    expect(markdown).toContain('contentSummary: PowerPoint · roadmap.pptx · 4 KB');
+    expect(markdown).toContain('filePath: /user-data/storage/artifacts/art_file/files/roadmap.pptx');
+    expect(markdown).toContain('originalFilePath: /Users/deepin/Documents/roadmap.pptx');
+    expect(markdown).toContain('fileSize: 4096');
+    expect(markdown).toContain('mimeType: application/vnd.openxmlformats-officedocument.presentationml.presentation');
+  });
+
+  it('preserves reusable asset kind from artifact blocks into metadata and repository output markdown', async () => {
+    const parsed = parseArtifactFromText(`<artifact>
+{"title":"部署脚本","type":"file","reuseKind":"script","fileName":"deploy.sh","externalFormat":"code","contentSummary":"Script · deploy.sh"}
+</artifact>`);
+
+    expect(parsed?.reuseKind).toBe('script');
+
+    await saveArtifactFromChat(parsed!, 'action_run', 'run_script');
+
+    expect(mockedArtifactService.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: '部署脚本',
+        reuseKind: 'script',
+        source: { type: 'action_run', id: 'run_script', name: undefined },
+      }),
+    );
+
+    const markdown = buildOutputMarkdown({
+      id: 'art_script',
+      title: '部署脚本',
+      icon: '📎',
+      type: 'file',
+      source: { type: 'action_run', id: 'run_script' },
+      tags: [],
+      currentVersion: 1,
+      status: 'draft',
+      createdAt: 1,
+      updatedAt: 2,
+      reuseKind: 'script',
+      fileName: 'deploy.sh',
+      externalFormat: 'code',
+      contentSummary: 'Script · deploy.sh',
+    } satisfies ArtifactMeta);
+
+    expect(markdown).toContain('reuseKind: script');
+    expect(markdown).toContain('contentSummary: Script · deploy.sh');
+  });
+});

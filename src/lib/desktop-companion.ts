@@ -1,4 +1,5 @@
 import type { GatewayClient } from './gateway';
+import type { DesktopSelfKnowledgePayload } from './desktop-self-knowledge';
 import type { RepositoryContextPayload } from './repository-context';
 
 export const DESKTOP_COMPANION_PLUGIN_ID = 'openclaw-desktop-companion' as const;
@@ -49,6 +50,13 @@ export interface DesktopCompanionRepositoryContextResult {
   ok: boolean;
   status?: 'updated' | 'unchanged' | 'cleared';
   agentsMdHash?: string;
+  message?: string;
+}
+
+export interface DesktopCompanionSelfKnowledgeResult {
+  ok: boolean;
+  status?: 'updated' | 'unchanged';
+  skillContentHash?: string;
   message?: string;
 }
 
@@ -230,6 +238,13 @@ export async function setDesktopCompanionRepositoryContext(
   payload: RepositoryContextPayload,
 ): Promise<DesktopCompanionRepositoryContextResult> {
   return client.request<DesktopCompanionRepositoryContextResult>('desktopCompanion.repositoryContext.set', payload);
+}
+
+export async function setDesktopCompanionSelfKnowledge(
+  client: Pick<GatewayClient, 'request'>,
+  payload: DesktopSelfKnowledgePayload,
+): Promise<DesktopCompanionSelfKnowledgeResult> {
+  return client.request<DesktopCompanionSelfKnowledgeResult>('desktopCompanion.selfKnowledge.set', payload);
 }
 
 export async function clearDesktopCompanionRepositoryContext(

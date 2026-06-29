@@ -2,11 +2,24 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
 import {
+  buildKnowledgeHealthReview,
+  buildKnowledgeFileSourceImport,
+  buildKnowledgeFolderSourceImport,
+  buildKnowledgeTailActionRewriteInstruction,
+  buildKnowledgeTextSourceImport,
+  buildKnowledgeUrlSourceImport,
   buildKnowledgeRepositoryMappingPrompt,
   buildKnowledgeRewritePrompt,
+  applyKnowledgeRewriteApproval,
   classifyKnowledgeSearchResult,
   extractMarkdownLinks,
   findBacklinks,
+  formatKnowledgeRewriteWrittenPaths,
+  importKnowledgeFileSource,
+  importKnowledgeFolderSource,
+  writeKnowledgeHealthReview,
+  importKnowledgeTextSource,
+  importKnowledgeUrlSource,
   loadKnowledgeSnapshot,
   parseKnowledgeRepositoryMappingResponse,
   parseKnowledgeIndexEntries,
@@ -17,6 +30,299 @@ import {
 describe('repository knowledge', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('builds and writes pasted text as a source markdown file', async () => {
+    const now = new Date('2026-06-28T04:05:06.000Z');
+    const imported = buildKnowledgeTextSourceImport({
+      title: '  My Raw Idea  ',
+      body: 'Line 1\n\nLine 2',
+      now,
+      sourceRoot: 'sources',
+    });
+
+    expect(imported).toEqual({
+      title: 'My Raw Idea',
+      path: 'sources/imported/2026-06-28-040506-my-raw-idea.md',
+      markdown: [
+        '---',
+        'title: "My Raw Idea"',
+        'source: desktop-paste',
+        'importedAt: 2026-06-28T04:05:06.000Z',
+        '---',
+        '',
+        '# My Raw Idea',
+        '',
+        '## 原始内容',
+        '',
+        'Line 1',
+        '',
+        'Line 2',
+        '',
+      ].join('\n'),
+    });
+
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { writeText },
+      },
+    });
+
+    const written = await importKnowledgeTextSource(
+      {
+        ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+        status: 'repo_ready',
+      },
+      { title: 'My Raw Idea', body: 'Line 1\n\nLine 2', now },
+    );
+
+    expect(written.path).toBe('sources/imported/2026-06-28-040506-my-raw-idea.md');
+    expect(writeText).toHaveBeenCalledWith('/repo', written.path, written.markdown);
+  });
+
+  it('builds and writes clipped URLs as source markdown files', async () => {
+    const now = new Date('2026-06-28T05:06:07.000Z');
+    const imported = buildKnowledgeUrlSourceImport({
+      title: '  Useful Article  ',
+      url: 'https://example.com/articles/ai-workflows?utm=1',
+      note: 'Important excerpt',
+      now,
+      sourceRoot: 'sources',
+    });
+
+    expect(imported).toEqual({
+      title: 'Useful Article',
+      path: 'sources/imported/2026-06-28-050607-useful-article.md',
+      markdown: [
+        '---',
+        'title: "Useful Article"',
+        'source: desktop-url',
+        'url: "https://example.com/articles/ai-workflows?utm=1"',
+        'importedAt: 2026-06-28T05:06:07.000Z',
+        '---',
+        '',
+        '# Useful Article',
+        '',
+        '## 来源链接',
+        '',
+        '- https://example.com/articles/ai-workflows?utm=1',
+        '',
+        '## 摘录与备注',
+        '',
+        'Important excerpt',
+        '',
+      ].join('\n'),
+    });
+
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { writeText },
+      },
+    });
+
+    const written = await importKnowledgeUrlSource(
+      {
+        ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+        status: 'repo_ready',
+      },
+      {
+        title: 'Useful Article',
+        url: 'https://example.com/articles/ai-workflows?utm=1',
+        note: 'Important excerpt',
+        now,
+      },
+    );
+
+    expect(written.path).toBe('sources/imported/2026-06-28-050607-useful-article.md');
+    expect(writeText).toHaveBeenCalledWith('/repo', written.path, written.markdown);
+  });
+
+  it('builds and writes imported text files as source markdown files', async () => {
+    const now = new Date('2026-06-28T06:07:08.000Z');
+    const imported = buildKnowledgeFileSourceImport({
+      fileName: 'Meeting Notes.md',
+      mimeType: 'text/markdown',
+      body: '# Notes\n\nAction item',
+      now,
+      sourceRoot: 'sources',
+    });
+
+    expect(imported).toEqual({
+      title: 'Meeting Notes',
+      path: 'sources/imported/2026-06-28-060708-meeting-notes.md',
+      markdown: [
+        '---',
+        'title: "Meeting Notes"',
+        'source: desktop-file',
+        'fileName: "Meeting Notes.md"',
+        'mimeType: "text/markdown"',
+        'importedAt: 2026-06-28T06:07:08.000Z',
+        '---',
+        '',
+        '# Meeting Notes',
+        '',
+        '## 原始文件',
+        '',
+        '- Meeting Notes.md',
+        '- text/markdown',
+        '',
+        '## 原始内容',
+        '',
+        '# Notes',
+        '',
+        'Action item',
+        '',
+      ].join('\n'),
+    });
+
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { writeText },
+      },
+    });
+
+    const written = await importKnowledgeFileSource(
+      {
+        ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+        status: 'repo_ready',
+      },
+      {
+        fileName: 'Meeting Notes.md',
+        mimeType: 'text/markdown',
+        body: '# Notes\n\nAction item',
+        now,
+      },
+    );
+
+    expect(written.path).toBe('sources/imported/2026-06-28-060708-meeting-notes.md');
+    expect(writeText).toHaveBeenCalledWith('/repo', written.path, written.markdown);
+  });
+
+  it('builds imported extracted files with extraction metadata and limitations', () => {
+    const now = new Date('2026-06-28T07:08:09.000Z');
+    const imported = buildKnowledgeFileSourceImport({
+      fileName: 'Strategy Brief.pdf',
+      mimeType: 'application/pdf',
+      body: 'North star\n\nP0 import center',
+      extracted: {
+        format: 'pdf',
+        status: 'best_effort',
+        bytesRead: 4096,
+        truncated: true,
+        limitations: ['PDF/Office 文本抽取为 best-effort：会保留可读取文字，复杂版式、图片和公式可能丢失。'],
+      },
+      now,
+      sourceRoot: 'sources',
+    });
+
+    expect(imported).toEqual({
+      title: 'Strategy Brief',
+      path: 'sources/imported/2026-06-28-070809-strategy-brief.md',
+      markdown: [
+        '---',
+        'title: "Strategy Brief"',
+        'source: desktop-file',
+        'fileName: "Strategy Brief.pdf"',
+        'mimeType: "application/pdf"',
+        'extractedFormat: pdf',
+        'extractionStatus: best_effort',
+        'extractedBytesRead: 4096',
+        'extractedTruncated: true',
+        'importedAt: 2026-06-28T07:08:09.000Z',
+        '---',
+        '',
+        '# Strategy Brief',
+        '',
+        '## 原始文件',
+        '',
+        '- Strategy Brief.pdf',
+        '- application/pdf',
+        '- format: pdf',
+        '- extraction: best_effort',
+        '- bytesRead: 4096',
+        '- truncated: true',
+        '',
+        '## 抽取限制',
+        '',
+        '- PDF/Office 文本抽取为 best-effort：会保留可读取文字，复杂版式、图片和公式可能丢失。',
+        '',
+        '## 抽取文本',
+        '',
+        'North star',
+        '',
+        'P0 import center',
+        '',
+      ].join('\n'),
+    });
+  });
+
+  it('builds and writes folder-imported text files with relative path metadata', async () => {
+    const now = new Date('2026-06-28T08:09:10.000Z');
+    const imported = buildKnowledgeFolderSourceImport({
+      fileName: 'notes.md',
+      relativePath: 'project-a/meetings/notes.md',
+      mimeType: 'text/markdown',
+      body: '# 周会记录\n\n行动项',
+      now,
+      sourceRoot: 'sources',
+    });
+
+    expect(imported).toEqual({
+      title: 'notes',
+      path: 'sources/imported/2026-06-28-080910-project-a-meetings-notes-md.md',
+      markdown: [
+        '---',
+        'title: "notes"',
+        'source: desktop-folder',
+        'fileName: "notes.md"',
+        'relativePath: "project-a/meetings/notes.md"',
+        'mimeType: "text/markdown"',
+        'importedAt: 2026-06-28T08:09:10.000Z',
+        '---',
+        '',
+        '# notes',
+        '',
+        '## 原始文件',
+        '',
+        '- notes.md',
+        '- project-a/meetings/notes.md',
+        '- text/markdown',
+        '',
+        '## 原始内容',
+        '',
+        '# 周会记录',
+        '',
+        '行动项',
+        '',
+      ].join('\n'),
+    });
+
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { writeText },
+      },
+    });
+
+    const written = await importKnowledgeFolderSource(
+      {
+        ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+        status: 'repo_ready',
+      },
+      {
+        fileName: 'notes.md',
+        relativePath: 'project-a/meetings/notes.md',
+        mimeType: 'text/markdown',
+        body: '# 周会记录\n\n行动项',
+        now,
+      },
+    );
+
+    expect(written.path).toBe('sources/imported/2026-06-28-080910-project-a-meetings-notes-md.md');
+    expect(writeText).toHaveBeenCalledWith('/repo', written.path, written.markdown);
   });
 
   it('loads sources, wiki files, index, and log from a ready repository binding', async () => {
@@ -90,6 +396,284 @@ describe('repository knowledge', () => {
       { sourcePath: 'wiki/topics/agentic.md', targetPath: 'work/active/matter.md', type: 'work' },
       { sourcePath: 'wiki/topics/agentic.md', targetPath: 'outputs/reports/report.md', type: 'output' },
     ]);
+  });
+
+  it('computes knowledge health issues from repository markdown facts', async () => {
+    const listMarkdown = vi.fn(async (_repoPath: string, directory: string) => {
+      if (directory === 'sources') {
+        return [
+          { path: 'sources/raw.md', name: 'raw.md', size: 20, updatedAt: 3 },
+          { path: 'sources/indexed.md', name: 'indexed.md', size: 22, updatedAt: 2 },
+          { path: 'sources/orphan.md', name: 'orphan.md', size: 24, updatedAt: 1 },
+        ];
+      }
+      if (directory === 'wiki') {
+        return [
+          { path: 'wiki/topic.md', name: 'topic.md', size: 40, updatedAt: 5 },
+          { path: 'wiki/healthy.md', name: 'healthy.md', size: 42, updatedAt: 4 },
+        ];
+      }
+      return [];
+    });
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'wiki/index.md') {
+        return [
+          '# Knowledge Index',
+          '- [Topic](topic.md)',
+          '- [Missing](missing.md)',
+          '- [Indexed Source](../sources/indexed.md)',
+        ].join('\n');
+      }
+      if (relativePath === 'wiki/log.md') return '# Wiki Log';
+      if (relativePath === 'wiki/topic.md') return '# Topic\n\n[Broken](missing.md)';
+      if (relativePath === 'wiki/healthy.md') return '# Healthy\n\n[Raw](../sources/raw.md)';
+      return '';
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { listMarkdown, readText },
+      },
+    });
+
+    const snapshot = await loadKnowledgeSnapshot({
+      ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      status: 'repo_ready',
+    });
+    const health = (
+      snapshot as {
+        health?: {
+          issues: Array<{ kind: string; path: string; targetPath?: string; severity: string }>;
+          counts: { total: number; warning: number };
+        };
+      }
+    ).health;
+
+    expect(health?.counts.total).toBe(5);
+    expect(health?.counts.warning).toBe(5);
+    expect(health?.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'orphan_source', path: 'sources/orphan.md', severity: 'warning' }),
+        expect.objectContaining({ kind: 'unindexed_wiki', path: 'wiki/healthy.md', severity: 'warning' }),
+        expect.objectContaining({ kind: 'stale_index_entry', path: 'wiki/index.md', targetPath: 'wiki/missing.md' }),
+        expect.objectContaining({
+          kind: 'broken_knowledge_link',
+          path: 'wiki/topic.md',
+          targetPath: 'wiki/missing.md',
+        }),
+        expect.objectContaining({ kind: 'wiki_without_source_reference', path: 'wiki/topic.md' }),
+      ]),
+    );
+    expect(snapshot.undigestedSources.map((file) => file.path)).toEqual(['sources/orphan.md']);
+  });
+
+  it('flags long-unreviewed work items in knowledge health', async () => {
+    const now = new Date('2026-06-28T00:00:00.000Z');
+    const oldActive = {
+      path: 'work/active/old.md',
+      name: 'old.md',
+      size: 20,
+      updatedAt: Date.parse('2026-06-01T00:00:00.000Z'),
+    };
+    const freshActive = {
+      path: 'work/active/fresh.md',
+      name: 'fresh.md',
+      size: 20,
+      updatedAt: Date.parse('2026-06-24T00:00:00.000Z'),
+    };
+    const reviewedSomeday = {
+      path: 'work/someday/reviewed.md',
+      name: 'reviewed.md',
+      size: 20,
+      updatedAt: Date.parse('2026-05-20T00:00:00.000Z'),
+    };
+    const weeklyReview = {
+      path: 'reviews/weekly/2026-06-27.md',
+      name: '2026-06-27.md',
+      size: 20,
+      updatedAt: Date.parse('2026-06-27T00:00:00.000Z'),
+    };
+    const listMarkdown = vi.fn(async (_repoPath: string, directory: string) => {
+      if (directory === 'work/active') return [oldActive, freshActive];
+      if (directory === 'work/someday') return [reviewedSomeday];
+      if (directory === 'reviews/weekly') return [weeklyReview];
+      return [];
+    });
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'wiki/index.md') return '# Knowledge Index';
+      if (relativePath === 'wiki/log.md') return '# Wiki Log';
+      if (relativePath === weeklyReview.path) {
+        return '# 周复盘\n\n- 已复盘 [Reviewed](../../work/someday/reviewed.md)';
+      }
+      return '';
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { listMarkdown, readText },
+      },
+    });
+
+    const snapshot = await loadKnowledgeSnapshot(
+      {
+        ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+        status: 'repo_ready',
+      },
+      { now, unreviewedAfterDays: 14 },
+    );
+
+    expect(listMarkdown).toHaveBeenCalledWith('/repo', 'work/active');
+    expect(listMarkdown).toHaveBeenCalledWith('/repo', 'work/someday');
+    expect(listMarkdown).toHaveBeenCalledWith('/repo', 'reviews/weekly');
+    expect(snapshot.health.counts.total).toBe(1);
+    expect(snapshot.health.issues).toEqual([
+      expect.objectContaining({
+        id: 'long-unreviewed-work:work/active/old.md',
+        kind: 'long_unreviewed_work_item',
+        severity: 'warning',
+        title: '长期未复盘事项',
+        path: 'work/active/old.md',
+        targetPath: 'reviews/weekly/',
+      }),
+    ]);
+  });
+
+  it('flags explicitly marked contradictions in knowledge health', async () => {
+    const listMarkdown = vi.fn(async (_repoPath: string, directory: string) => {
+      if (directory === 'sources') return [{ path: 'sources/raw.md', name: 'raw.md', size: 20, updatedAt: 1 }];
+      if (directory === 'wiki') {
+        return [
+          { path: 'wiki/topic.md', name: 'topic.md', size: 80, updatedAt: 6 },
+          { path: 'wiki/legacy.md', name: 'legacy.md', size: 60, updatedAt: 5 },
+        ];
+      }
+      return [];
+    });
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'wiki/index.md') {
+        return ['# Knowledge Index', '- [Topic](topic.md)', '- [Legacy](legacy.md)', '- [Raw](../sources/raw.md)'].join(
+          '\n',
+        );
+      }
+      if (relativePath === 'wiki/log.md') return '# Wiki Log';
+      if (relativePath === 'wiki/topic.md') {
+        return '# Topic\n\n矛盾：当前说法与 [Legacy](legacy.md) 冲突，需复核。来源 [Raw](../sources/raw.md)。';
+      }
+      if (relativePath === 'wiki/legacy.md') return '# Legacy\n\n[Raw](../sources/raw.md)';
+      return '';
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { listMarkdown, readText },
+      },
+    });
+
+    const snapshot = await loadKnowledgeSnapshot({
+      ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      status: 'repo_ready',
+    });
+
+    expect(snapshot.health.counts.total).toBe(1);
+    expect(snapshot.health.issues).toEqual([
+      expect.objectContaining({
+        id: 'contradiction:wiki/topic.md:3',
+        kind: 'contradictory_knowledge_record',
+        severity: 'warning',
+        title: '相互矛盾记录',
+        path: 'wiki/topic.md',
+        targetPath: 'wiki/legacy.md',
+      }),
+    ]);
+  });
+
+  it('builds and writes weekly knowledge health reviews', async () => {
+    const now = new Date('2026-06-28T07:08:09.000Z');
+    const health = {
+      issues: [
+        {
+          id: 'orphan-source:sources/orphan.md',
+          kind: 'orphan_source' as const,
+          severity: 'warning' as const,
+          title: '孤立资料',
+          detail: '资料还没有被索引或 Wiki 引用。',
+          path: 'sources/orphan.md',
+          updatedAt: 1782620000000,
+        },
+        {
+          id: 'stale-index:wiki/index.md->wiki/missing.md',
+          kind: 'stale_index_entry' as const,
+          severity: 'warning' as const,
+          title: '索引陈旧',
+          detail: '知识索引指向不存在的文件：wiki/missing.md',
+          path: 'wiki/index.md',
+          targetPath: 'wiki/missing.md',
+        },
+      ],
+      counts: { total: 2, critical: 0, warning: 2, info: 0 },
+    };
+
+    const review = buildKnowledgeHealthReview({
+      health,
+      now,
+      reviewsRoot: 'reviews',
+    });
+
+    expect(review).toEqual({
+      path: 'reviews/weekly/2026-06-28-knowledge-health.md',
+      markdown: [
+        '---',
+        'title: "知识库健康周复盘 2026-06-28"',
+        'source: desktop-knowledge-health',
+        'generatedAt: 2026-06-28T07:08:09.000Z',
+        'issueCount: 2',
+        'criticalCount: 0',
+        'warningCount: 2',
+        'infoCount: 0',
+        '---',
+        '',
+        '# 知识库健康周复盘 2026-06-28',
+        '',
+        '## 摘要',
+        '',
+        '- 总问题：2',
+        '- 严重：0',
+        '- 警告：2',
+        '- 提醒：0',
+        '',
+        '## 问题列表',
+        '',
+        '| 严重度 | 类型 | 文件 | 目标 | 说明 |',
+        '| --- | --- | --- | --- | --- |',
+        '| warning | orphan_source | `sources/orphan.md` |  | 资料还没有被索引或 Wiki 引用。 |',
+        '| warning | stale_index_entry | `wiki/index.md` | `wiki/missing.md` | 知识索引指向不存在的文件：wiki/missing.md |',
+        '',
+        '## 建议收尾动作',
+        '',
+        '- [ ] 消化孤立资料，或把不再需要的资料标记为归档候选。',
+        '- [ ] 更新 `wiki/index.md`，移除或修正陈旧索引。',
+        '- [ ] 复查本周新增 Wiki 是否引用了原始资料源。',
+        '- [ ] 为长期未复盘事项补一条 `reviews/weekly/` 复盘，或把事项状态调整为完成/暂停。',
+        '- [ ] 复核相互矛盾记录，确认保留说法、废弃说法和需要更新的 Wiki/log。',
+        '- [ ] 必要时发起 Knowledge ActionRun，写入 Wiki、索引和日志。',
+        '',
+      ].join('\n'),
+    });
+
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { writeText },
+      },
+    });
+
+    const written = await writeKnowledgeHealthReview(
+      {
+        ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+        status: 'repo_ready',
+      },
+      { health, now },
+    );
+
+    expect(written.path).toBe('reviews/weekly/2026-06-28-knowledge-health.md');
+    expect(writeText).toHaveBeenCalledWith('/repo', written.path, written.markdown);
   });
 
   it('parses wiki index links into navigable knowledge entries', async () => {
@@ -204,6 +788,87 @@ describe('repository knowledge', () => {
     expect(readText).toHaveBeenCalledWith('/repo', 'wiki/topics/agentic.md');
   });
 
+  it('applies approved knowledge rewrite writes to wiki, index and log', async () => {
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { writeText },
+      },
+    });
+
+    const result = await applyKnowledgeRewriteApproval(
+      {
+        ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+        status: 'repo_ready',
+      },
+      {
+        actionRunId: 'run-knowledge-1',
+        repositoryWrite: {
+          path: 'wiki/topics/raw.md',
+          content: '# Raw\n\nReusable knowledge.',
+          sourcePath: 'sources/raw.md',
+          writes: [
+            { path: 'wiki/topics/raw.md', content: '# Raw\n\nReusable knowledge.' },
+            { path: 'wiki/index.md', content: '# Knowledge Index\n\n- [Raw](topics/raw.md)' },
+            { path: 'wiki/log.md', content: '# Knowledge Log\n\n- 2026-06-28: digested sources/raw.md' },
+          ],
+        },
+      },
+    );
+
+    expect(result.writtenPaths).toEqual(['wiki/topics/raw.md', 'wiki/index.md', 'wiki/log.md']);
+    expect(writeText).toHaveBeenCalledTimes(3);
+    expect(writeText).toHaveBeenNthCalledWith(1, '/repo', 'wiki/topics/raw.md', '# Raw\n\nReusable knowledge.');
+    expect(writeText).toHaveBeenNthCalledWith(
+      2,
+      '/repo',
+      'wiki/index.md',
+      '# Knowledge Index\n\n- [Raw](topics/raw.md)',
+    );
+    expect(writeText).toHaveBeenNthCalledWith(
+      3,
+      '/repo',
+      'wiki/log.md',
+      '# Knowledge Log\n\n- 2026-06-28: digested sources/raw.md',
+    );
+  });
+
+  it('formats approved knowledge rewrite written paths for ActionRun summaries', () => {
+    expect(
+      formatKnowledgeRewriteWrittenPaths(['wiki/topics/raw.md', 'wiki/index.md', 'wiki/log.md', 'wiki/topics/raw.md']),
+    ).toBe('wiki/topics/raw.md, wiki/index.md, wiki/log.md');
+  });
+
+  it('rejects approved knowledge rewrite writes outside the knowledge wiki boundary', async () => {
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { writeText },
+      },
+    });
+
+    await expect(
+      applyKnowledgeRewriteApproval(
+        {
+          ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+          status: 'repo_ready',
+        },
+        {
+          actionRunId: 'run-knowledge-1',
+          repositoryWrite: {
+            path: 'wiki/topics/raw.md',
+            content: '# Raw',
+            writes: [
+              { path: 'wiki/topics/raw.md', content: '# Raw' },
+              { path: 'work/active/side-effect.md', content: '# Side effect' },
+            ],
+          },
+        },
+      ),
+    ).rejects.toThrow('Approved knowledge writes can only update wiki files');
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
   it('builds an approval-first prompt for automatic knowledge rewriting', () => {
     const prompt = buildKnowledgeRewritePrompt({
       binding: createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
@@ -219,6 +884,37 @@ describe('repository knowledge', () => {
     expect(prompt).toContain('wiki/log.md');
     expect(prompt).toContain('approval_required');
     expect(prompt).toContain('写入或改写任何仓库文件前');
+  });
+
+  it('builds a source matter instruction for knowledge tail actions', () => {
+    const instruction = buildKnowledgeTailActionRewriteInstruction({
+      workItemPath: 'work/active/release.md',
+      tailActionId: 'work/active/release.md:tail-action:2',
+    });
+    const prompt = buildKnowledgeRewritePrompt({
+      binding: createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      intent: 'refresh-index',
+      userInstruction: instruction,
+    });
+
+    expect(instruction).toContain('work/active/release.md');
+    expect(instruction).toContain('work/active/release.md:tail-action:2');
+    expect(instruction).toContain('关联执行记录');
+    expect(instruction).toContain('no_write_needed');
+    expect(prompt).toContain('work/active/release.md');
+    expect(prompt).toContain('来源尾动作 ID');
+    expect(prompt).toContain('approval_required');
+  });
+
+  it('builds a source execution instruction for plan execution knowledge updates', () => {
+    const instruction = buildKnowledgeTailActionRewriteInstruction({
+      workItemPath: 'work/active/release.md',
+      tailActionId: 'action-run-knowledge:run-1',
+    });
+
+    expect(instruction).toContain('来源事项 work/active/release.md');
+    expect(instruction).toContain('来源执行记录 action-run-knowledge:run-1');
+    expect(instruction).toContain('no_write_needed');
   });
 
   it('builds a binding-time semantic mapping prompt for LLM Wiki repositories', () => {
@@ -370,5 +1066,16 @@ describe('repository knowledge', () => {
     expect(source).toContain("t('knowledge.gitHistory')");
     expect(source).toContain('buildKnowledgeRewritePrompt');
     expect(source).toContain('createAiActionRun({');
+  });
+
+  it('keeps approved knowledge write paths observable in Action Center summaries', () => {
+    const actionCenter = readFileSync('src/pages/ActionCenterPage.tsx', 'utf8');
+    const zh = readFileSync('src/locales/zh.json', 'utf8');
+    const en = readFileSync('src/locales/en.json', 'utf8');
+
+    expect(actionCenter).toContain('formatKnowledgeRewriteWrittenPaths(writeResult.writtenPaths)');
+    expect(actionCenter).toContain('paths:');
+    expect(zh).toContain('{{paths}}');
+    expect(en).toContain('{{paths}}');
   });
 });

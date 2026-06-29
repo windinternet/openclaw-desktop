@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Button,
   Card,
@@ -7,6 +8,7 @@ import {
   Descriptions,
   Empty,
   Modal,
+  Select,
   Space,
   Spin,
   Tag,
@@ -16,6 +18,7 @@ import {
 import { IconBolt, IconClose, IconDelete, IconRefresh, IconSend, IconTickCircle } from '@douyinfe/semi-icons';
 import { resolveAiActionApprovalWithGateway } from '../lib/ai-action-center';
 import {
+  assignAiActionRunToWorkItem,
   loadAiActionRuns,
   resyncAiActionRun,
   resumeStalledAiActionRun,
@@ -23,9 +26,13 @@ import {
   syncAiActionRunsWithGateway,
   upsertAiActionRun,
 } from '../lib/ai-action-run-store';
+import { loadRepositoryBinding } from '../lib/agentic-repository-store';
+import { applyWorkbenchMatterPlanApproval, loadWorkbenchSnapshot } from '../lib/repository-workbench';
+import { applyKnowledgeRewriteApproval, formatKnowledgeRewriteWrittenPaths } from '../lib/repository-knowledge';
 import MarkdownView from '../components/MarkdownView';
 import { useStore } from '../lib';
 import type { AiActionApproval, AiActionRun, AiActionRunStatus } from '../lib/types';
+import type { RepositoryMarkdownFile } from '../lib/repository-knowledge';
 
 const { Title, Text } = Typography;
 
@@ -83,7 +90,15 @@ const RUN_TITLE_KEYS: Record<string, string> = {
   agent_team_compose: 'actions.typeTeamCompose',
   gateway_agent_create: 'actions.typeGatewayCreate',
   desktop_bridge_register: 'actions.typeDesktopBridge',
+  work_matter_plan: 'actions.typeWorkMatterPlan',
+  plan_execute: 'actions.typePlanExecute',
 };
+
+function getActionCenterSearchRunId(search: string): string | null {
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  const runId = params.get('runId')?.trim() ?? '';
+  return runId || null;
+}
 
 interface EmbeddedPageProps {
   embedded?: boolean;
@@ -92,6 +107,8 @@ interface EmbeddedPageProps {
 
 export default function ActionCenterPage({ embedded = false, onHeaderActionsChange }: EmbeddedPageProps = {}) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const activeClient = useStore((s) => s.activeClient);
@@ -103,6 +120,10 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
   const [decisionLoadingId, setDecisionLoadingId] = useState<string | null>(null);
   const [resyncLoadingId, setResyncLoadingId] = useState<string | null>(null);
   const [resumeLoadingId, setResumeLoadingId] = useState<string | null>(null);
+  const [workItemOptions, setWorkItemOptions] = useState<RepositoryMarkdownFile[]>([]);
+  const [selectedAssignmentPath, setSelectedAssignmentPath] = useState('');
+  const [assignmentLoading, setAssignmentLoading] = useState(false);
+  const selectedSearchRunId = useMemo(() => getActionCenterSearchRunId(location.search), [location.search]);
 
   const selectedRun = useMemo(
     () => runs.find((run) => run.id === selectedRunId) ?? runs[0] ?? null,
@@ -148,6 +169,41 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
     });
   }, [actionRunsVersion, loadRuns]);
 
+  useEffect(() => {
+    if (!selectedSearchRunId) return;
+    if (!runs.some((run) => run.id === selectedSearchRunId)) return;
+    setSelectedRunId(selectedSearchRunId);
+  }, [runs, selectedSearchRunId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!currentInstanceId) {
+      setWorkItemOptions([]);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    loadRepositoryBinding(currentInstanceId)
+      .then(async (binding) => {
+        if (!binding || binding.status !== 'repo_ready') return [];
+        const snapshot = await loadWorkbenchSnapshot(binding);
+        return [...snapshot.activeWork, ...snapshot.somedayWork, ...snapshot.completedWork];
+      })
+      .then((items) => {
+        if (cancelled) return;
+        setWorkItemOptions(items);
+        setSelectedAssignmentPath((current) => (current && items.some((item) => item.path === current) ? current : ''));
+      })
+      .catch(() => {
+        if (!cancelled) setWorkItemOptions([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentInstanceId]);
+
   const clearRuns = useCallback(() => {
     if (!currentInstanceId || runs.length === 0) return;
     Modal.confirm({
@@ -173,9 +229,51 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
 
       setDecisionLoadingId(approval.id);
       try {
-        const updated = await resolveAiActionApprovalWithGateway(activeClient, selectedRun, approval.id, decision);
+        let updated = await resolveAiActionApprovalWithGateway(activeClient, selectedRun, approval.id, decision);
         await upsertAiActionRun(currentInstanceId, updated);
         setRuns((current) => current.map((run) => (run.id === updated.id ? updated : run)));
+
+        if (decision === 'approved' && selectedRun.type === 'work_matter_plan' && approval.repositoryWrite) {
+          const binding = await loadRepositoryBinding(currentInstanceId);
+          if (!binding || binding.status !== 'repo_ready') {
+            throw new Error(t('actions.workMatterPlanWriteNoRepository'));
+          }
+          const writeResult = await applyWorkbenchMatterPlanApproval(binding, {
+            actionRunId: selectedRun.id,
+            workItemPath: selectedRun.workItemPath,
+            repositoryWrite: approval.repositoryWrite,
+          });
+          updated = {
+            ...updated,
+            resultSummary: t('actions.workMatterPlanWritten', { path: writeResult.planPath }),
+            updatedAt: Date.now(),
+          };
+          await upsertAiActionRun(currentInstanceId, updated);
+          setRuns((current) => current.map((run) => (run.id === updated.id ? updated : run)));
+          navigate(`/workbench?view=plans&planPath=${encodeURIComponent(writeResult.planPath)}`);
+        }
+
+        if (decision === 'approved' && selectedRun.type === 'knowledge_rewrite' && approval.repositoryWrite) {
+          const binding = await loadRepositoryBinding(currentInstanceId);
+          if (!binding || binding.status !== 'repo_ready') {
+            throw new Error(t('actions.knowledgeRewriteWriteNoRepository'));
+          }
+          const writeResult = await applyKnowledgeRewriteApproval(binding, {
+            actionRunId: selectedRun.id,
+            repositoryWrite: approval.repositoryWrite,
+          });
+          updated = {
+            ...updated,
+            resultSummary: t('actions.knowledgeRewriteWritten', {
+              count: writeResult.writtenPaths.length,
+              paths: formatKnowledgeRewriteWrittenPaths(writeResult.writtenPaths),
+            }),
+            updatedAt: Date.now(),
+          };
+          await upsertAiActionRun(currentInstanceId, updated);
+          setRuns((current) => current.map((run) => (run.id === updated.id ? updated : run)));
+        }
+
         Toast.success(decision === 'approved' ? t('actions.approvedContinue') : t('actions.rejectedCancelled'));
       } catch (err) {
         Toast.error(err instanceof Error ? err.message : t('actions.decisionFailed'));
@@ -183,7 +281,7 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
         setDecisionLoadingId(null);
       }
     },
-    [activeClient, connectionStatus, currentInstanceId, selectedRun, t],
+    [activeClient, connectionStatus, currentInstanceId, navigate, selectedRun, t],
   );
 
   const handleResync = useCallback(
@@ -229,6 +327,22 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
     },
     [activeClient, connectionStatus, currentInstanceId, t],
   );
+
+  const handleAssignWorkItem = useCallback(async () => {
+    if (!currentInstanceId || !selectedRun || !selectedAssignmentPath) return;
+
+    setAssignmentLoading(true);
+    try {
+      const updated = await assignAiActionRunToWorkItem(currentInstanceId, selectedRun.id, selectedAssignmentPath);
+      setRuns((current) => current.map((run) => (run.id === updated.id ? updated : run)));
+      setSelectedAssignmentPath('');
+      Toast.success(t('actions.workItemAssigned'));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('actions.workItemAssignFailed'));
+    } finally {
+      setAssignmentLoading(false);
+    }
+  }, [currentInstanceId, selectedAssignmentPath, selectedRun, t]);
 
   const headerActions = useMemo(
     () => (
@@ -378,10 +492,58 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
                     { key: t('actions.fieldExecutionMode'), value: modeLabel(selectedRun.executionMode) },
                     { key: t('actions.fieldGatewaySession'), value: selectedRun.gatewaySessionKey || '—' },
                     { key: t('actions.fieldGatewayRun'), value: selectedRun.gatewayRunId || '—' },
+                    { key: t('actions.fieldWorkItem'), value: selectedRun.workItemPath || '—' },
+                    { key: t('actions.fieldWorkItemRequired'), value: selectedRun.workItemRequired ? 'true' : 'false' },
+                    {
+                      key: t('actions.fieldWorkItemUnassignedReason'),
+                      value: selectedRun.workItemUnassignedReason || '—',
+                    },
                     { key: t('actions.fieldCreatedAt'), value: formatTime(selectedRun.createdAt) },
                     { key: t('actions.fieldUpdatedAt'), value: formatTime(selectedRun.updatedAt) },
                   ]}
                 />
+
+                {selectedRun.workItemRequired && !selectedRun.workItemPath && (
+                  <div style={PANEL_STYLE}>
+                    <div style={{ padding: 14, display: 'grid', gap: 10 }}>
+                      <Space align="center" wrap>
+                        <Tag color="orange">{t('actions.workItemAssignment')}</Tag>
+                        {selectedRun.workItemUnassignedReason && (
+                          <Tag color="grey">{selectedRun.workItemUnassignedReason}</Tag>
+                        )}
+                      </Space>
+                      <Text type="tertiary" size="small">
+                        {t('actions.workItemAssignmentDesc')}
+                      </Text>
+                      <Space align="center" wrap>
+                        <Select
+                          size="small"
+                          value={selectedAssignmentPath}
+                          placeholder={t('actions.workItemPlaceholder')}
+                          onChange={(value) => setSelectedAssignmentPath(String(value))}
+                          style={{ width: 320 }}
+                          disabled={workItemOptions.length === 0}
+                        >
+                          {workItemOptions.map((item) => (
+                            <Select.Option key={item.path} value={item.path}>
+                              {item.name} · {item.path}
+                            </Select.Option>
+                          ))}
+                        </Select>
+                        <Button
+                          size="small"
+                          type="primary"
+                          icon={<IconTickCircle />}
+                          loading={assignmentLoading}
+                          disabled={!selectedAssignmentPath}
+                          onClick={() => void handleAssignWorkItem()}
+                        >
+                          {t('actions.assignWorkItem')}
+                        </Button>
+                      </Space>
+                    </div>
+                  </div>
+                )}
 
                 <div style={PANEL_STYLE}>
                   <div style={{ padding: 14 }}>

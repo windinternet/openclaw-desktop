@@ -10,10 +10,12 @@ import {
   extractDesktopCompanionApprovalRequestId,
   fetchDesktopCompanionApprovalRequest,
   reinstallDesktopCompanion,
+  setDesktopCompanionSelfKnowledge,
   setDesktopCompanionRepositoryContext,
   uninstallDesktopCompanion,
 } from '../lib/desktop-companion';
 import type { RepositoryContextPayload } from '../lib/repository-context';
+import type { DesktopSelfKnowledgePayload } from '../lib/desktop-self-knowledge';
 
 function createClient(request: GatewayClient['request']): GatewayClient {
   return {
@@ -233,6 +235,29 @@ describe('desktop companion detection', () => {
     await expect(setDesktopCompanionRepositoryContext(client, payload)).resolves.toEqual(result);
 
     expect(request).toHaveBeenCalledWith('desktopCompanion.repositoryContext.set', payload);
+  });
+
+  it('sets Desktop self-knowledge through the companion RPC', async () => {
+    const payload: DesktopSelfKnowledgePayload = {
+      version: 1,
+      skillName: 'openclaw-desktop-operator',
+      skillPath: 'skills/openclaw-desktop-operator/SKILL.md',
+      skillContent: '# OpenClaw Desktop Operator\n',
+      skillContentHash: 'fnv1a-12345678',
+      updatedAt: 1710000000000,
+    };
+    const result = {
+      ok: true,
+      status: 'updated' as const,
+      skillContentHash: payload.skillContentHash,
+      message: 'Desktop self-knowledge updated',
+    };
+    const request = vi.fn(async () => result);
+    const client = createClient(request as GatewayClient['request']);
+
+    await expect(setDesktopCompanionSelfKnowledge(client, payload)).resolves.toEqual(result);
+
+    expect(request).toHaveBeenCalledWith('desktopCompanion.selfKnowledge.set', payload);
   });
 
   it('clears repository context through the companion RPC', async () => {

@@ -17,6 +17,9 @@ export default defineConfig({
           args.reload()
         },
       },
+      {
+        entry: 'electron/artifact-preload.ts',
+      },
     ]),
     renderer(),
   ],

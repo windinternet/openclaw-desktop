@@ -1,4 +1,4 @@
-import type { AiActionExecutionMode, AiActionRun, ChatSendResult, SessionInfo } from './types';
+import type { AiActionExecutionMode, AiActionRepositoryWrite, AiActionRun, ChatSendResult, SessionInfo } from './types';
 import { buildApprovalDecisionPrompt } from './ai-action-prompts';
 import { extractSessionMessageText } from './session-content';
 import { parseModelJsonObjects } from './model-json';
@@ -17,6 +17,7 @@ export interface AiActionAssistantResponse {
     risk: 'low' | 'medium' | 'high';
     reason: string;
   };
+  repositoryWrite?: AiActionRepositoryWrite;
   result?: {
     agentId?: string;
   };
@@ -78,11 +79,21 @@ export function createAiActionRun(options: {
   agentId?: string;
   input: string;
   executionMode?: AiActionExecutionMode;
+  workItemRequired?: boolean;
+  workItemUnassignedReason?: string;
+  workItemId?: string;
+  workItemPath?: string;
 }): AiActionRun {
   const timestamp = now();
   const id = generateActionRunId();
   const agentId = options.agentId || 'main';
   const executionMode = options.executionMode || 'isolated-session';
+  const workItemPath = options.workItemPath?.trim() || undefined;
+  const workItemRequired = options.workItemRequired ?? true;
+  const workItemUnassignedReason =
+    workItemRequired && !workItemPath
+      ? options.workItemUnassignedReason?.trim() || 'pending_work_item_assignment'
+      : undefined;
   const gatewaySessionKey =
     executionMode === 'domain-thread'
       ? undefined
@@ -97,9 +108,13 @@ export function createAiActionRun(options: {
     status: 'draft',
     executionMode,
     input: options.input,
+    workItemId: options.workItemId,
+    workItemPath,
     gatewaySessionKey,
     childSessionKeys: [],
     approvals: [],
+    workItemRequired,
+    workItemUnassignedReason,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -134,6 +149,38 @@ function normalizeRisk(value: unknown): 'low' | 'medium' | 'high' {
   return value === 'high' || value === 'low' ? value : 'medium';
 }
 
+function normalizeRepositoryWriteEntry(value: unknown): { path: string; content: string } | undefined {
+  if (!isRecord(value)) return undefined;
+  const path = typeof value.path === 'string' ? value.path.trim() : '';
+  const content = typeof value.content === 'string' ? value.content.trim() : '';
+  if (!path || !content) return undefined;
+  return { path, content };
+}
+
+function normalizeRepositoryWrite(value: unknown): AiActionRepositoryWrite | undefined {
+  if (!isRecord(value)) return undefined;
+  const singleWrite = normalizeRepositoryWriteEntry(value);
+  const writes = Array.isArray(value.writes)
+    ? value.writes
+        .map(normalizeRepositoryWriteEntry)
+        .filter((entry): entry is { path: string; content: string } => Boolean(entry))
+    : [];
+  const firstWrite = singleWrite ?? writes[0];
+  if (!firstWrite) return undefined;
+
+  const workItemPath = typeof value.workItemPath === 'string' ? value.workItemPath.trim() : '';
+  const sourcePath = typeof value.sourcePath === 'string' ? value.sourcePath.trim() : '';
+  const selectedPath = typeof value.selectedPath === 'string' ? value.selectedPath.trim() : '';
+  return {
+    path: firstWrite.path,
+    content: firstWrite.content,
+    workItemPath: workItemPath || undefined,
+    sourcePath: sourcePath || undefined,
+    selectedPath: selectedPath || undefined,
+    writes: writes.length > 0 ? writes : undefined,
+  };
+}
+
 function normalizeStructuredResponse(value: unknown): AiActionAssistantResponse | null {
   if (!isRecord(value)) return null;
   const rawKind = value.kind;
@@ -156,6 +203,7 @@ function normalizeStructuredResponse(value: unknown): AiActionAssistantResponse 
         risk: normalizeRisk(value.approval.risk),
         reason,
       },
+      repositoryWrite: normalizeRepositoryWrite(value.repositoryWrite),
     };
   }
 
@@ -226,6 +274,7 @@ export function applyAiActionAssistantResponse(run: AiActionRun, text: string): 
       status: 'pending' as const,
       requestedAt: timestamp,
       reason: response.approval.reason,
+      repositoryWrite: response.repositoryWrite,
     };
     return {
       ...run,

@@ -46,8 +46,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     listTree: (repoPath: string, maxEntries?: number) => ipcRenderer.invoke('repository:listTree', repoPath, maxEntries),
     listMarkdown: (repoPath: string, directory: string) => ipcRenderer.invoke('repository:listMarkdown', repoPath, directory),
     readText: (repoPath: string, relativePath: string) => ipcRenderer.invoke('repository:readText', repoPath, relativePath),
+    extractKnowledgeFileText: (params: { fileName: string; mimeType?: string; bytes: ArrayBuffer }) =>
+      ipcRenderer.invoke('repository:extractKnowledgeFileText', params),
     writeText: (repoPath: string, relativePath: string, content: string) =>
       ipcRenderer.invoke('repository:writeText', repoPath, relativePath, content),
+    moveText: (repoPath: string, fromRelativePath: string, toRelativePath: string) =>
+      ipcRenderer.invoke('repository:moveText', repoPath, fromRelativePath, toRelativePath),
     search: (repoPath: string, query: string, directories: string[]) =>
       ipcRenderer.invoke('repository:search', repoPath, query, directories),
     gitStatus: (repoPath: string) => ipcRenderer.invoke('repository:gitStatus', repoPath),
@@ -80,6 +84,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getHtml: (artifactId: string, version?: number) => ipcRenderer.invoke('artifact:getHtml', artifactId, version),
     saveMeta: (artifactId: string, meta: unknown) => ipcRenderer.invoke('artifact:saveMeta', artifactId, meta),
     saveHtml: (artifactId: string, version: number, html: string) => ipcRenderer.invoke('artifact:saveHtml', artifactId, version, html),
+    importFile: (artifactId: string, sourcePath: string, preferredFileName?: string) => ipcRenderer.invoke('artifact:importFile', artifactId, sourcePath, preferredFileName),
+    readImportedText: (artifactId: string) => ipcRenderer.invoke('artifact:readImportedText', artifactId),
+    readImportedFileFacts: (artifactId: string) => ipcRenderer.invoke('artifact:readImportedFileFacts', artifactId),
+    readImportedImageThumbnail: (artifactId: string) => ipcRenderer.invoke('artifact:readImportedImageThumbnail', artifactId),
     list: () => ipcRenderer.invoke('artifact:list'),
     updateIndex: (entries: unknown) => ipcRenderer.invoke('artifact:updateIndex', entries),
     requestAuth: (artifactId: string, capability: string, detail: string) => ipcRenderer.invoke('artifact:requestAuth', artifactId, capability, detail),

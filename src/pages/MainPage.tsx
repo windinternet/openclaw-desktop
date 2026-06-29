@@ -133,6 +133,7 @@ export default function MainPage() {
 
         if (info.status === 'ready') {
           void useStore.getState().syncRepositoryContextForInstance(currentId);
+          void useStore.getState().syncDesktopSelfKnowledgeForInstance(currentId);
           return;
         }
         if (info.status === 'missing' || info.status === 'disabled') {

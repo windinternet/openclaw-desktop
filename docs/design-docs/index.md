@@ -8,6 +8,9 @@
 | 文档 | 状态 | 说明 |
 |------|------|------|
 | `core-beliefs.md` | ✅ 活跃 | 核心理念与设计原则 |
+| `product-goal-roadmap.md` | ✅ 活跃 | 终极目标推进路线、P0/P1/P2 优先级与关键边界 |
+| `desktop-self-knowledge-pack.md` | ✅ 第一版完成，持续打磨 | Desktop 操作手册与 Gateway Skill 注入设计，区分 Repository Context 边界 |
+| `artifact-system.md` | 🔄 P0 持续收口 | Artifacts 作为价值沉淀层，HTML 富交互产物作为特色能力 |
 | `startup-flow.md` | ✅ 活跃 | 启动流程与实例连接 |
 | `local-instance-storage.md` | ✅ 活跃 | 响应式内存层 + Electron 文件后端的实例级本地存储 |
 | `agentic-repository-workbench.md` | ✅ 第一版完成，持续打磨 | 绑定 Git 仓库的 Agentic Workbench、知识库与事项推进体系 |

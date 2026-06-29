@@ -9,6 +9,7 @@ import { applyTheme } from '../lib/theme';
 import { useStore } from '../lib';
 import i18n from '../i18n';
 import ConnectionWizard from '../components/ConnectionWizard';
+import { WORK_SYSTEM_ONBOARDING_ROUTE } from '../lib/work-system-onboarding';
 
 const { Title, Text } = Typography;
 
@@ -54,7 +55,7 @@ export default function SetupPage() {
     const { instances } = useStore.getState();
     console.log('[SetupPage] 🎯 Finish clicked, instances:', instances.length);
     if (instances.length > 0) {
-      navigate('/', { replace: true });
+      navigate(WORK_SYSTEM_ONBOARDING_ROUTE, { replace: true });
     } else {
       navigate('/welcome', { replace: true });
     }
@@ -312,7 +313,7 @@ export default function SetupPage() {
               <ConnectionWizard
                 onConnected={() => {
                   useSettingsStore.getState().markInitialized();
-                  navigate('/', { replace: true });
+                  navigate(WORK_SYSTEM_ONBOARDING_ROUTE, { replace: true });
                 }}
               />
             </div>

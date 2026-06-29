@@ -1,5 +1,9 @@
 import type { RepositoryBinding, SemanticSlot } from './agentic-repository';
+import type { ArtifactMeta } from './artifact-types';
 import type { RepositoryMarkdownFile } from './repository-knowledge';
+import type { AiActionRepositoryWrite } from './types';
+
+const WORKBENCH_MATTER_STATUSES = new Set(['active', 'blocked', 'done', 'paused']);
 
 export interface WorkbenchSemanticSection {
   key: string;
@@ -13,6 +17,13 @@ export interface WorkbenchSemanticSection {
 }
 
 export interface WorkbenchSemanticDocument {
+  path: string;
+  title: string;
+  content: string;
+  file: RepositoryMarkdownFile;
+}
+
+export interface WorkbenchReviewDocument {
   path: string;
   title: string;
   content: string;
@@ -42,6 +53,95 @@ export interface WorkbenchTaskGroup {
   items: WorkbenchTaskItem[];
 }
 
+export interface WorkbenchTailAction {
+  id: string;
+  text: string;
+  sourcePath: string;
+  completed: boolean;
+  updatedAt: number;
+}
+
+export interface WorkbenchReviewDraftInput {
+  workItemPath: string;
+  tailActionId?: string;
+  relatedKnowledgeRunIds?: string[];
+  relatedKnowledgeRuns?: WorkbenchReviewDraftKnowledgeRun[];
+  createdAt?: Date;
+}
+
+export interface WorkbenchAssetRunReviewDraftInput {
+  assetRunPath: string;
+  workItemPath?: string;
+  reviewSummary?: string;
+  reuseDecision?: string;
+  nextActions?: string[];
+  reviewer?: string;
+  createdAt?: Date;
+}
+
+export interface WorkbenchReviewDraftKnowledgeRun {
+  id: string;
+  status: string;
+  resultSummary?: string;
+  error?: string;
+}
+
+export interface WorkbenchReviewDraftResult {
+  path: string;
+  content: string;
+}
+
+export interface WorkbenchReviewConfirmInput {
+  reviewPath: string;
+  workItemPath: string;
+  tailActionId: string;
+  reviewedAt?: Date;
+}
+
+export interface WorkbenchAssetRunReviewConfirmInput {
+  reviewPath: string;
+  assetRunPath: string;
+  reviewedAt?: Date;
+}
+
+export interface WorkbenchMatterStatusUpdateInput {
+  workItemPath: string;
+  tailActionId: string;
+  status: string;
+}
+
+export interface WorkbenchMatterArchiveInput {
+  workItemPath: string;
+}
+
+export interface WorkbenchMatterArchiveResult {
+  archived: boolean;
+  archivedPath?: string;
+}
+
+export interface WorkbenchKnowledgeTailActionConfirmInput {
+  workItemPath: string;
+  tailActionId: string;
+}
+
+export interface WorkbenchOutputPreservationInput {
+  workItemPath: string;
+  tailActionId?: string;
+  artifact: Pick<ArtifactMeta, 'id' | 'title' | 'type' | 'repositoryOutputPath' | 'repositoryPreviewPath'>;
+}
+
+export interface WorkbenchMatterPlanApprovalInput {
+  actionRunId: string;
+  workItemPath?: string;
+  repositoryWrite: AiActionRepositoryWrite;
+  approvedAt?: Date;
+}
+
+export interface WorkbenchMatterPlanApprovalResult {
+  planPath: string;
+  workItemPath: string;
+}
+
 export interface WorkbenchSnapshot {
   inboxMarkdown: string;
   activeWork: RepositoryMarkdownFile[];
@@ -52,17 +152,23 @@ export interface WorkbenchSnapshot {
   runsMarkdown: string;
   outputsMarkdown: string;
   reviews: RepositoryMarkdownFile[];
+  reviewDocuments?: WorkbenchReviewDocument[];
   planMetadata: RepositoryPlanMetadata[];
   reviewGroups: RepositoryReviewGroup[];
   semanticSections: WorkbenchSemanticSection[];
   projects: WorkbenchProject[];
   taskGroups: WorkbenchTaskGroup[];
+  tailActions: WorkbenchTailAction[];
 }
 
 export interface RepositoryPlanMetadata {
   path: string;
   status?: string;
   approval?: string;
+  blockedReason?: string;
+  blockerOwner?: string;
+  workItemPath?: string;
+  dependencies?: string[];
 }
 
 export interface RepositoryReviewGroup {
@@ -83,7 +189,9 @@ export async function loadWorkbenchSnapshot(binding: RepositoryBinding): Promise
     somedayWork,
     activePlans,
     completedPlans,
-    runsMarkdown,
+    runsIndexMarkdown,
+    actionRunsIndexMarkdown,
+    assetRunsIndexMarkdown,
     outputsMarkdown,
     reviews,
   ] = await Promise.all([
@@ -94,15 +202,24 @@ export async function loadWorkbenchSnapshot(binding: RepositoryBinding): Promise
     repository.listMarkdown(binding.repoPath, `${binding.paths.plans}/active`),
     repository.listMarkdown(binding.repoPath, `${binding.paths.plans}/completed`),
     repository.readText(binding.repoPath, `${binding.paths.runs}/index.md`),
+    repository.readText(binding.repoPath, `${binding.paths.runs}/action-runs/index.md`),
+    repository.readText(binding.repoPath, `${binding.paths.runs}/assets/index.md`),
     repository.readText(binding.repoPath, `${binding.paths.outputs}/index.md`),
     repository.listMarkdown(binding.repoPath, binding.paths.reviews),
   ]);
+  const runsMarkdown = [runsIndexMarkdown, actionRunsIndexMarkdown, assetRunsIndexMarkdown]
+    .filter((part) => part.trim())
+    .join('\n\n');
 
-  const planMetadata = await Promise.all(
-    [...activePlans, ...completedPlans].map(async (file) =>
-      parsePlanMetadata(file.path, await repository.readText(binding.repoPath, file.path)),
+  const [planMetadata, tailActions, reviewDocuments] = await Promise.all([
+    Promise.all(
+      [...activePlans, ...completedPlans].map(async (file) =>
+        parsePlanMetadata(file.path, await repository.readText(binding.repoPath, file.path)),
+      ),
     ),
-  );
+    loadWorkbenchTailActions(binding, [...activeWork, ...completedWork, ...somedayWork]),
+    loadWorkbenchReviewDocuments(binding, reviews),
+  ]);
 
   return {
     inboxMarkdown,
@@ -114,18 +231,29 @@ export async function loadWorkbenchSnapshot(binding: RepositoryBinding): Promise
     runsMarkdown,
     outputsMarkdown,
     reviews,
-    planMetadata: planMetadata.filter((item) => item.status || item.approval),
+    reviewDocuments,
+    planMetadata: planMetadata.filter(
+      (item) => item.status || item.approval || item.blockerOwner || item.workItemPath || item.dependencies?.length,
+    ),
     reviewGroups: groupReviewsByFolder(reviews),
     semanticSections: [],
     projects: [],
     taskGroups: [],
+    tailActions,
   };
 }
 
 async function loadSemanticWorkbenchSnapshot(binding: RepositoryBinding): Promise<WorkbenchSnapshot> {
   const semanticSections = await loadSemanticSections(binding);
   const sectionByKey = new Map(semanticSections.map((section) => [section.key, section]));
-  const reviews = semanticSections.find((section) => section.key === 'reviews')?.files ?? [];
+  const reviewSection = semanticSections.find((section) => section.key === 'reviews');
+  const reviews = reviewSection?.files ?? [];
+  const reviewDocuments = reviewSection?.documents ?? [];
+  const tailActions = semanticSections.flatMap((section) =>
+    section.documents.flatMap((document) =>
+      parseWorkbenchTailActions(document.path, document.content, document.file.updatedAt),
+    ),
+  );
   return {
     inboxMarkdown: sectionByKey.get('inbox')?.markdown ?? '',
     activeWork: sectionByKey.get('current')?.files ?? [],
@@ -136,6 +264,7 @@ async function loadSemanticWorkbenchSnapshot(binding: RepositoryBinding): Promis
     runsMarkdown: sectionByKey.get('runs')?.markdown ?? '',
     outputsMarkdown: sectionByKey.get('outputs')?.markdown ?? '',
     reviews,
+    reviewDocuments,
     planMetadata: [],
     reviewGroups: groupReviewsByFolder(reviews),
     semanticSections,
@@ -145,6 +274,7 @@ async function loadSemanticWorkbenchSnapshot(binding: RepositoryBinding): Promis
       deriveTaskGroup('next', sectionByKey.get('next')),
       deriveTaskGroup('done', sectionByKey.get('done')),
     ].filter((group): group is WorkbenchTaskGroup => Boolean(group)),
+    tailActions,
   };
 }
 
@@ -221,17 +351,1006 @@ export async function readWorkbenchMarkdown(binding: RepositoryBinding, relative
   return getWorkbenchTextApi().readText(binding.repoPath, relativePath);
 }
 
+export async function completeWorkbenchTailAction(
+  binding: RepositoryBinding,
+  action: Pick<WorkbenchTailAction, 'id' | 'text' | 'sourcePath'>,
+): Promise<boolean> {
+  const sourcePath = normalizeWritableWorkbenchMarkdownPath(action.sourcePath);
+  const actionIndex = parseTailActionIndex(action.id);
+  if (!sourcePath || actionIndex === null) return false;
+
+  const repository = getWorkbenchWriteApi();
+  const markdown = await repository.readText(binding.repoPath, sourcePath);
+  const next = markWorkbenchTailActionCompleted(markdown, actionIndex, action.text);
+  if (!next || next === markdown) return false;
+
+  await repository.writeText(binding.repoPath, sourcePath, next);
+  return true;
+}
+
+export async function updateWorkbenchMatterStatusFromTailAction(
+  binding: RepositoryBinding,
+  input: WorkbenchMatterStatusUpdateInput,
+): Promise<boolean> {
+  const workItemPath = normalizeWritableWorkbenchMarkdownPath(input.workItemPath);
+  const actionIndex = parseTailActionIndex(input.tailActionId);
+  const status = normalizeWorkbenchMatterStatus(input.status);
+  if (!workItemPath || !workItemPath.startsWith('work/') || actionIndex === null || !status) return false;
+
+  const repository = getWorkbenchWriteApi();
+  const markdown = await repository.readText(binding.repoPath, workItemPath);
+  const tailAction = parseWorkbenchTailActions(workItemPath, markdown).find(
+    (action) => action.id === input.tailActionId,
+  );
+  if (!tailAction || tailAction.completed) return false;
+
+  const statusUpdated = markWorkbenchMatterStatus(markdown, status);
+  if (!statusUpdated) return false;
+
+  const next = markWorkbenchTailActionCompleted(statusUpdated, actionIndex, tailAction.text);
+  if (!next || next === markdown) return false;
+
+  await repository.writeText(binding.repoPath, workItemPath, next);
+  return true;
+}
+
+export async function archiveCompletedWorkbenchMatter(
+  binding: RepositoryBinding,
+  input: WorkbenchMatterArchiveInput,
+): Promise<WorkbenchMatterArchiveResult> {
+  const workItemPath = normalizeWritableWorkbenchMarkdownPath(input.workItemPath);
+  if (!workItemPath || !workItemPath.startsWith('work/active/')) return { archived: false };
+
+  const repository = getWorkbenchMoveApi();
+  const markdown = await repository.readText(binding.repoPath, workItemPath);
+  if (!isWorkbenchMatterDone(markdown)) return { archived: false };
+
+  const archivedPath = workItemPath.replace(/^work\/active\//, 'work/completed/');
+  if (archivedPath === workItemPath) return { archived: false };
+
+  await repository.moveText(binding.repoPath, workItemPath, archivedPath);
+  return { archived: true, archivedPath };
+}
+
+export async function confirmWorkbenchKnowledgeTailAction(
+  binding: RepositoryBinding,
+  input: WorkbenchKnowledgeTailActionConfirmInput,
+): Promise<boolean> {
+  const workItemPath = normalizeWritableWorkbenchMarkdownPath(input.workItemPath);
+  const actionIndex = parseTailActionIndex(input.tailActionId);
+  if (!workItemPath || !workItemPath.startsWith('work/') || actionIndex === null) return false;
+
+  const repository = getWorkbenchWriteApi();
+  const markdown = await repository.readText(binding.repoPath, workItemPath);
+  const tailAction = parseWorkbenchTailActions(workItemPath, markdown).find(
+    (action) => action.id === input.tailActionId,
+  );
+  if (!tailAction || tailAction.completed || !isKnowledgeTailActionText(tailAction.text)) return false;
+
+  const next = markWorkbenchTailActionCompleted(markdown, actionIndex, tailAction.text);
+  if (!next || next === markdown) return false;
+
+  await repository.writeText(binding.repoPath, workItemPath, next);
+  return true;
+}
+
+export async function preserveWorkbenchOutputFromTailAction(
+  binding: RepositoryBinding,
+  input: WorkbenchOutputPreservationInput,
+): Promise<boolean> {
+  const workItemPath = normalizeWritableWorkbenchMarkdownPath(input.workItemPath);
+  if (!workItemPath || !workItemPath.startsWith('work/')) return false;
+
+  const tailActionIndex = input.tailActionId ? parseTailActionIndex(input.tailActionId) : null;
+  const mustCompleteTailAction = Boolean(input.tailActionId?.includes(':tail-action:'));
+  if (mustCompleteTailAction && tailActionIndex === null) return false;
+
+  const repository = getWorkbenchWriteApi();
+  const markdown = await repository.readText(binding.repoPath, workItemPath);
+  let tailAction: WorkbenchTailAction | undefined;
+  if (tailActionIndex !== null) {
+    tailAction = parseWorkbenchTailActions(workItemPath, markdown).find((action) => action.id === input.tailActionId);
+    if (!tailAction || tailAction.completed) return false;
+  }
+
+  let next = appendWorkbenchMatterOutput(markdown, workItemPath, input.artifact);
+  if (tailAction && tailActionIndex !== null) {
+    const completed = markWorkbenchTailActionCompleted(next, tailActionIndex, tailAction.text);
+    if (!completed) return false;
+    next = completed;
+  }
+  if (next === markdown) return false;
+
+  await repository.writeText(binding.repoPath, workItemPath, next);
+  return true;
+}
+
+export async function applyWorkbenchMatterPlanApproval(
+  binding: RepositoryBinding,
+  input: WorkbenchMatterPlanApprovalInput,
+): Promise<WorkbenchMatterPlanApprovalResult> {
+  const planPath = normalizeWritableWorkbenchMarkdownPath(input.repositoryWrite.path);
+  const plansActiveRoot = normalizeWorkbenchRoot(`${binding.paths.plans}/active`);
+  if (!planPath || !isPathWithinRoot(planPath, plansActiveRoot)) {
+    throw new Error(`Approved work-matter plans can only be written under ${plansActiveRoot}/`);
+  }
+
+  const writeWorkItemPath = input.repositoryWrite.workItemPath?.trim();
+  const expectedWorkItemPath = input.workItemPath?.trim();
+  if (writeWorkItemPath && expectedWorkItemPath && writeWorkItemPath !== expectedWorkItemPath) {
+    throw new Error('Approved work-matter plan source does not match the ActionRun work item');
+  }
+
+  const workItemPath = normalizeWritableWorkbenchMarkdownPath(writeWorkItemPath || expectedWorkItemPath || '');
+  const workRoot = normalizeWorkbenchRoot(binding.paths.work);
+  if (!workItemPath || !isPathWithinRoot(workItemPath, workRoot)) {
+    throw new Error(`Approved work-matter plans must be linked to a work item under ${workRoot}/`);
+  }
+
+  const rawPlanContent = input.repositoryWrite.content.trim();
+  if (!rawPlanContent) throw new Error('Approved work-matter plan content is empty');
+
+  const repository = getWorkbenchWriteApi();
+  const existingPlan = await repository.readText(binding.repoPath, planPath);
+  const planContent = addWorkbenchPlanApprovalMetadata(rawPlanContent, {
+    actionRunId: input.actionRunId,
+    workItemPath,
+    approvedAt: input.approvedAt ?? new Date(),
+  });
+  if (existingPlan.trim() && existingPlan.trim() !== planContent.trim()) {
+    throw new Error(`Approved work-matter plan target already exists: ${planPath}`);
+  }
+
+  const workMarkdown = await repository.readText(binding.repoPath, workItemPath);
+  const nextWorkMarkdown = appendWorkbenchMatterPlan(
+    workMarkdown,
+    workItemPath,
+    planPath,
+    planContent,
+    input.actionRunId,
+  );
+
+  await repository.writeText(binding.repoPath, planPath, planContent);
+  if (nextWorkMarkdown !== workMarkdown) {
+    await repository.writeText(binding.repoPath, workItemPath, nextWorkMarkdown);
+  }
+
+  return { planPath, workItemPath };
+}
+
+export async function writeWorkbenchReviewDraft(
+  binding: RepositoryBinding,
+  input: WorkbenchReviewDraftInput,
+): Promise<WorkbenchReviewDraftResult> {
+  const workItemPath = normalizeWritableWorkbenchMarkdownPath(input.workItemPath);
+  if (!workItemPath || !workItemPath.startsWith('work/')) {
+    throw new Error('Review draft source must be a work item markdown path');
+  }
+
+  const createdAt = input.createdAt ?? new Date();
+  const date = createdAt.toISOString().slice(0, 10);
+  const workSlug = slugifyPathSegment(workItemPath.replace(/\.md$/i, '').split('/').pop() ?? 'work-item');
+  const tailSlug = buildWorkbenchReviewDraftSourceSlug(input.tailActionId);
+  const path = `reviews/weekly/${date}-work-${workSlug}-${tailSlug}-review.md`;
+  const content = buildWorkbenchReviewDraftMarkdown({
+    workItemPath,
+    tailActionId: input.tailActionId,
+    relatedKnowledgeRunIds: input.relatedKnowledgeRunIds,
+    relatedKnowledgeRuns: input.relatedKnowledgeRuns,
+    createdAt,
+  });
+
+  const repository = getWorkbenchWriteApi();
+  const markdown = await repository.readText(binding.repoPath, workItemPath);
+  const nextMarkdown = appendWorkbenchMatterReviewDraft(markdown, {
+    workItemPath,
+    reviewPath: path,
+    tailActionId: input.tailActionId,
+    createdAt,
+  });
+
+  await repository.writeText(binding.repoPath, path, content);
+  if (nextMarkdown !== markdown) {
+    await repository.writeText(binding.repoPath, workItemPath, nextMarkdown);
+  }
+  return { path, content };
+}
+
+export async function writeWorkbenchAssetRunReviewDraft(
+  binding: RepositoryBinding,
+  input: WorkbenchAssetRunReviewDraftInput,
+): Promise<WorkbenchReviewDraftResult> {
+  const assetRunPath = normalizeWritableWorkbenchMarkdownPath(input.assetRunPath);
+  if (!assetRunPath || !assetRunPath.startsWith('runs/assets/')) {
+    throw new Error('Asset execution review source must be a runs/assets markdown path');
+  }
+
+  const repository = getWorkbenchWriteApi();
+  const runMarkdown = await repository.readText(binding.repoPath, assetRunPath);
+  const runFacts = parseWorkbenchAssetRunReviewFacts(assetRunPath, runMarkdown);
+  const createdAt = input.createdAt ?? new Date();
+  const date = createdAt.toISOString().slice(0, 10);
+  const assetSlug = slugifyPathSegment(runFacts.assetId || assetRunPath.split('/').pop()?.replace(/\.md$/i, '') || '');
+  const path = `reviews/weekly/${date}-asset-run-${assetSlug}-review.md`;
+  const workItemPath = normalizeWorkbenchReviewWorkItemPath(input.workItemPath ?? runFacts.workItemPath);
+  const content = buildWorkbenchAssetRunReviewDraftMarkdown({
+    ...runFacts,
+    assetRunPath,
+    workItemPath,
+    reviewSummary: input.reviewSummary,
+    reuseDecision: input.reuseDecision,
+    nextActions: input.nextActions,
+    reviewer: input.reviewer,
+    createdAt,
+  });
+
+  await repository.writeText(binding.repoPath, path, content);
+
+  if (workItemPath) {
+    const markdown = await repository.readText(binding.repoPath, workItemPath);
+    const nextMarkdown = appendWorkbenchMatterReviewDraft(markdown, {
+      workItemPath,
+      reviewPath: path,
+      sourceLabel: '来源资产运行',
+      sourceId: assetRunPath,
+      linkLabel: '资产运行复盘草稿',
+      createdAt,
+    });
+    if (nextMarkdown !== markdown) {
+      await repository.writeText(binding.repoPath, workItemPath, nextMarkdown);
+    }
+  }
+
+  return { path, content };
+}
+
+export async function confirmWorkbenchReviewDraft(
+  binding: RepositoryBinding,
+  input: WorkbenchReviewConfirmInput,
+): Promise<boolean> {
+  const reviewPath = normalizeWritableWorkbenchMarkdownPath(input.reviewPath);
+  const workItemPath = normalizeWritableWorkbenchMarkdownPath(input.workItemPath);
+  const tailActionIndex = parseTailActionIndex(input.tailActionId);
+  if (!reviewPath || !reviewPath.startsWith('reviews/') || !workItemPath || !workItemPath.startsWith('work/')) {
+    return false;
+  }
+
+  const repository = getWorkbenchWriteApi();
+  if (isActionRunReviewTailActionId(input.tailActionId)) {
+    const reviewMarkdown = await repository.readText(binding.repoPath, reviewPath);
+    if (!/^status:\s*draft\s*$/m.test(reviewMarkdown)) return false;
+    if (readWorkbenchFrontmatterValue(reviewMarkdown, 'source') !== 'desktop-workbench-review-source-execution') {
+      return false;
+    }
+    if (readWorkbenchFrontmatterValue(reviewMarkdown, 'workItemPath') !== workItemPath) return false;
+    if (readWorkbenchFrontmatterValue(reviewMarkdown, 'tailActionId') !== input.tailActionId) return false;
+    if (readWorkbenchFrontmatterValue(reviewMarkdown, 'sourceExecutionId') !== input.tailActionId) return false;
+
+    const nextReview = markWorkbenchReviewDraftConfirmed(reviewMarkdown, input.reviewedAt ?? new Date());
+    if (!nextReview || nextReview === reviewMarkdown) return false;
+
+    await repository.writeText(binding.repoPath, reviewPath, nextReview);
+    return true;
+  }
+
+  if (tailActionIndex === null) return false;
+
+  const [reviewMarkdown, workMarkdown] = await Promise.all([
+    repository.readText(binding.repoPath, reviewPath),
+    repository.readText(binding.repoPath, workItemPath),
+  ]);
+  if (!/^status:\s*draft\s*$/m.test(reviewMarkdown)) return false;
+  if (readWorkbenchFrontmatterValue(reviewMarkdown, 'source') !== 'desktop-workbench-review-tail-action') return false;
+  if (readWorkbenchFrontmatterValue(reviewMarkdown, 'workItemPath') !== workItemPath) return false;
+  if (readWorkbenchFrontmatterValue(reviewMarkdown, 'tailActionId') !== input.tailActionId) return false;
+
+  const tailAction = parseWorkbenchTailActions(workItemPath, workMarkdown).find(
+    (action) => action.id === input.tailActionId,
+  );
+  if (!tailAction || tailAction.completed) return false;
+
+  const nextReview = markWorkbenchReviewDraftConfirmed(reviewMarkdown, input.reviewedAt ?? new Date());
+  const nextWork = markWorkbenchTailActionCompleted(workMarkdown, tailActionIndex, tailAction.text);
+  if (!nextReview || !nextWork || nextWork === workMarkdown) return false;
+
+  await repository.writeText(binding.repoPath, reviewPath, nextReview);
+  await repository.writeText(binding.repoPath, workItemPath, nextWork);
+  return true;
+}
+
+export async function confirmWorkbenchAssetRunReviewDraft(
+  binding: RepositoryBinding,
+  input: WorkbenchAssetRunReviewConfirmInput,
+): Promise<boolean> {
+  const reviewPath = normalizeWritableWorkbenchMarkdownPath(input.reviewPath);
+  const assetRunPath = normalizeWritableWorkbenchMarkdownPath(input.assetRunPath);
+  if (!reviewPath || !reviewPath.startsWith('reviews/') || !assetRunPath || !assetRunPath.startsWith('runs/assets/')) {
+    return false;
+  }
+
+  const repository = getWorkbenchWriteApi();
+  const reviewMarkdown = await repository.readText(binding.repoPath, reviewPath);
+  if (!/^status:\s*draft\s*$/m.test(reviewMarkdown)) return false;
+  if (readWorkbenchFrontmatterValue(reviewMarkdown, 'source') !== 'desktop-repository-asset-execution-review') {
+    return false;
+  }
+  if (readWorkbenchFrontmatterValue(reviewMarkdown, 'assetRunPath') !== assetRunPath) return false;
+
+  const nextReview = markWorkbenchReviewDraftConfirmed(reviewMarkdown, input.reviewedAt ?? new Date());
+  if (!nextReview || nextReview === reviewMarkdown) return false;
+
+  await repository.writeText(binding.repoPath, reviewPath, nextReview);
+  return true;
+}
+
 export function parsePlanMetadata(path: string, markdown: string): RepositoryPlanMetadata {
   const metadata: RepositoryPlanMetadata = { path };
   for (const line of markdown.split('\n').slice(0, 24)) {
-    const match = /^([A-Za-z][\w-]*):\s*(.+)$/.exec(line.trim());
+    const match = /^([^:：]+)[：:]\s*(.+)$/.exec(line.trim());
     if (!match) continue;
-    const key = match[1].toLowerCase();
+    const key = normalizePlanMetadataKey(match[1]);
     const value = match[2].trim();
     if (key === 'status') metadata.status = value;
     if (key === 'approval') metadata.approval = value;
+    if (key === 'blockedreason') metadata.blockedReason = value;
+    if (key === 'blockerowner') metadata.blockerOwner = value;
+    if (key === 'workitempath') metadata.workItemPath = value;
+    if (key === 'dependencies') {
+      metadata.dependencies = [...(metadata.dependencies ?? []), ...parseDependencyReferences(value)];
+    }
   }
   return metadata;
+}
+
+function normalizePlanMetadataKey(value: string): string {
+  const key = value
+    .trim()
+    .replace(/^-\s+/, '')
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '');
+  if (key === '状态') return 'status';
+  if (key === '审批') return 'approval';
+  if (['blockedreason', 'blockreason', 'blocker', 'blockedby', '阻塞原因', '卡住原因', '阻塞', '卡住'].includes(key)) {
+    return 'blockedreason';
+  }
+  if (['blockerowner', 'owner', '负责人', '责任人'].includes(key)) return 'blockerowner';
+  if (['workitempath', 'workpath', 'sourceworkitem', 'sourceworkitempath', '事项路径', '来源事项'].includes(key)) {
+    return 'workitempath';
+  }
+  if (
+    [
+      'dependson',
+      'dependencies',
+      'dependency',
+      'requires',
+      'relatedwork',
+      'workdependencies',
+      '依赖',
+      '依赖事项',
+      '关联事项',
+      '前置事项',
+    ].includes(key)
+  ) {
+    return 'dependencies';
+  }
+  return key;
+}
+
+function parseDependencyReferences(value: string): string[] {
+  return value
+    .split(/[,，;；]/)
+    .map((part) => extractMarkdownLinkHref(part) ?? part)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function extractMarkdownLinkHref(value: string): string | undefined {
+  return /\[[^\]]+]\(([^)]+)\)/.exec(value)?.[1]?.trim();
+}
+
+async function loadWorkbenchTailActions(
+  binding: RepositoryBinding,
+  workFiles: RepositoryMarkdownFile[],
+): Promise<WorkbenchTailAction[]> {
+  const repository = getWorkbenchReadApi();
+  const groups = await Promise.all(
+    workFiles.map(async (file) =>
+      parseWorkbenchTailActions(file.path, await repository.readText(binding.repoPath, file.path), file.updatedAt),
+    ),
+  );
+  return groups.flat();
+}
+
+export function parseWorkbenchTailActions(sourcePath: string, markdown: string, updatedAt = 0): WorkbenchTailAction[] {
+  const lines = markdown.split(/\r?\n/);
+  const headerIndex = lines.findIndex((line) => line.trim() === '## 收尾动作');
+  if (headerIndex === -1) return [];
+
+  const actions: WorkbenchTailAction[] = [];
+  for (const line of lines.slice(headerIndex + 1)) {
+    const trimmed = line.trim();
+    if (/^#{1,6}\s+/.test(trimmed)) break;
+    const match = /^-\s+\[([ xX])\]\s+(.+)$/.exec(trimmed);
+    if (!match) continue;
+    const text = match[2]?.trim();
+    if (!text || text.startsWith('暂无')) continue;
+    actions.push({
+      id: `${sourcePath}:tail-action:${actions.length}`,
+      text,
+      sourcePath,
+      completed: match[1]?.toLowerCase() === 'x',
+      updatedAt,
+    });
+  }
+  return actions;
+}
+
+async function loadWorkbenchReviewDocuments(
+  binding: RepositoryBinding,
+  reviews: RepositoryMarkdownFile[],
+): Promise<WorkbenchReviewDocument[]> {
+  const repository = getWorkbenchReadApi();
+  return Promise.all(
+    reviews.map(async (file) => {
+      const content = await repository.readText(binding.repoPath, file.path);
+      return {
+        path: file.path,
+        title: extractTitle(content) || file.name,
+        content,
+        file,
+      };
+    }),
+  );
+}
+
+function markWorkbenchTailActionCompleted(markdown: string, actionIndex: number, expectedText: string): string | null {
+  const lines = markdown.split(/\r?\n/);
+  const headerIndex = lines.findIndex((line) => line.trim() === '## 收尾动作');
+  if (headerIndex === -1) return null;
+
+  let currentIndex = 0;
+  for (let index = headerIndex + 1; index < lines.length; index += 1) {
+    const trimmed = lines[index].trim();
+    if (/^#{1,6}\s+/.test(trimmed)) break;
+    const match = /^(\s*-\s+\[)([ xX])(\]\s+)(.+)$/.exec(lines[index]);
+    if (!match) continue;
+
+    if (currentIndex === actionIndex) {
+      const text = match[4]?.trim();
+      if (text !== expectedText.trim() || match[2]?.toLowerCase() === 'x') return null;
+      lines[index] = `${match[1]}x${match[3]}${match[4]}`;
+      return lines.join('\n');
+    }
+    currentIndex += 1;
+  }
+  return null;
+}
+
+function markWorkbenchMatterStatus(markdown: string, status: string): string | null {
+  const lines = markdown.split(/\r?\n/);
+  if (lines[0]?.trim() === '---') {
+    const endIndex = lines.findIndex((line, index) => index > 0 && line.trim() === '---');
+    if (endIndex === -1) return null;
+    const statusIndex = lines.findIndex((line, index) => index > 0 && index < endIndex && /^status:\s*/.test(line));
+    if (statusIndex === -1) lines.splice(endIndex, 0, `status: ${status}`);
+    else lines[statusIndex] = `status: ${status}`;
+    return lines.join('\n');
+  }
+
+  const statusIndex = lines.findIndex((line) => /^状态[：:]\s*/.test(line.trim()));
+  if (statusIndex !== -1) {
+    const indent = lines[statusIndex].match(/^\s*/)?.[0] ?? '';
+    lines[statusIndex] = `${indent}状态：${status}`;
+    return lines.join('\n');
+  }
+
+  return ['---', `status: ${status}`, '---', '', markdown].join('\n');
+}
+
+function appendWorkbenchMatterOutput(
+  markdown: string,
+  workItemPath: string,
+  artifact: WorkbenchOutputPreservationInput['artifact'],
+): string {
+  const artifactReference = artifact.repositoryOutputPath ?? `artifact://${artifact.id}`;
+  if (markdown.includes(`artifact://${artifact.id}`) || markdown.includes(artifactReference)) return markdown;
+
+  const outputLine = buildWorkbenchMatterOutputLine(workItemPath, artifact, artifactReference);
+  const lines = markdown.split(/\r?\n/);
+  const headerIndex = lines.findIndex((line) => line.trim() === '## 关联成果');
+  if (headerIndex === -1) return `${markdown.trimEnd()}\n\n## 关联成果\n\n${outputLine.join('\n')}\n`;
+
+  let insertIndex = headerIndex + 1;
+  while (insertIndex < lines.length && lines[insertIndex].trim() === '') insertIndex += 1;
+  while (insertIndex < lines.length && lines[insertIndex].trim() === '- 暂无') {
+    lines.splice(insertIndex, 1);
+    while (insertIndex < lines.length && lines[insertIndex].trim() === '') lines.splice(insertIndex, 1);
+  }
+  const insertLines = [...outputLine];
+  if (/^#{1,6}\s+/.test(lines[insertIndex]?.trim() ?? '')) insertLines.push('');
+  lines.splice(insertIndex, 0, ...insertLines);
+  return lines.join('\n').trimEnd();
+}
+
+function buildWorkbenchMatterOutputLine(
+  workItemPath: string,
+  artifact: WorkbenchOutputPreservationInput['artifact'],
+  artifactReference: string,
+): string[] {
+  const href = artifact.repositoryOutputPath
+    ? relativeWorkbenchMarkdownLink(workItemPath, artifact.repositoryOutputPath)
+    : artifactReference;
+  const lines = [`- [${escapeMarkdownLinkText(artifact.title)}](${href}) (\`${artifact.id}\`, ${artifact.type})`];
+  if (artifact.repositoryPreviewPath) lines.push(`  - preview: ${artifact.repositoryPreviewPath}`);
+  return lines;
+}
+
+function appendWorkbenchMatterReviewDraft(
+  markdown: string,
+  input: {
+    workItemPath: string;
+    reviewPath: string;
+    tailActionId?: string;
+    sourceLabel?: string;
+    sourceId?: string;
+    linkLabel?: string;
+    createdAt: Date;
+  },
+): string {
+  const href = relativeWorkbenchMarkdownLink(input.workItemPath, input.reviewPath);
+  if (markdown.includes(input.reviewPath) || markdown.includes(href)) return markdown;
+
+  const sourceLabel =
+    input.sourceLabel ?? (isActionRunReviewTailActionId(input.tailActionId) ? '来源执行记录' : '来源尾动作');
+  const sourceId = input.sourceId ?? input.tailActionId;
+  const sourceSuffix = sourceId ? ` - ${sourceLabel}: \`${sourceId}\`` : '';
+  const linkLabel = input.linkLabel ?? '复盘草稿';
+  const reviewLine = `- [${input.createdAt.toISOString().slice(0, 10)} ${linkLabel}](${href})${sourceSuffix}`;
+  const lines = markdown.split(/\r?\n/);
+  const headerIndex = lines.findIndex((line) => line.trim() === '## 复盘');
+  if (headerIndex === -1) return `${markdown.trimEnd()}\n\n## 复盘\n\n${reviewLine}\n`;
+
+  let insertIndex = headerIndex + 1;
+  while (insertIndex < lines.length && lines[insertIndex].trim() === '') insertIndex += 1;
+  while (insertIndex < lines.length && lines[insertIndex].trim() === '- 暂无') {
+    lines.splice(insertIndex, 1);
+    while (insertIndex < lines.length && lines[insertIndex].trim() === '') lines.splice(insertIndex, 1);
+  }
+  const insertLines = [reviewLine];
+  if (/^#{1,6}\s+/.test(lines[insertIndex]?.trim() ?? '')) insertLines.push('');
+  lines.splice(insertIndex, 0, ...insertLines);
+  return lines.join('\n').trimEnd();
+}
+
+function appendWorkbenchMatterPlan(
+  markdown: string,
+  workItemPath: string,
+  planPath: string,
+  planContent: string,
+  actionRunId: string,
+): string {
+  const href = relativeWorkbenchMarkdownLink(workItemPath, planPath);
+  if (markdown.includes(planPath) || markdown.includes(href)) return markdown;
+
+  const title = extractTitle(planContent) || planPath.split('/').pop()?.replace(/\.md$/i, '') || '事项计划';
+  const planLine = `- [${escapeMarkdownLinkText(title)}](${href}) - action: \`${actionRunId}\``;
+  const lines = markdown.split(/\r?\n/);
+  const headerIndex = lines.findIndex((line) => line.trim() === '## 关联计划');
+  if (headerIndex === -1) return `${markdown.trimEnd()}\n\n## 关联计划\n\n${planLine}\n`;
+
+  let insertIndex = headerIndex + 1;
+  while (insertIndex < lines.length && lines[insertIndex].trim() === '') insertIndex += 1;
+  while (insertIndex < lines.length && lines[insertIndex].trim() === '- 暂无') {
+    lines.splice(insertIndex, 1);
+    while (insertIndex < lines.length && lines[insertIndex].trim() === '') lines.splice(insertIndex, 1);
+  }
+  const insertLines = [planLine];
+  if (/^#{1,6}\s+/.test(lines[insertIndex]?.trim() ?? '')) insertLines.push('');
+  lines.splice(insertIndex, 0, ...insertLines);
+  return lines.join('\n').trimEnd();
+}
+
+function addWorkbenchPlanApprovalMetadata(
+  markdown: string,
+  input: { actionRunId: string; workItemPath: string; approvedAt: Date },
+): string {
+  const fields = {
+    source: 'work_matter_plan',
+    workItemPath: input.workItemPath,
+    actionRunId: input.actionRunId,
+    approval: 'approved',
+    approvedAt: input.approvedAt.toISOString(),
+  };
+  return upsertMarkdownFrontmatter(markdown.trim(), fields);
+}
+
+function upsertMarkdownFrontmatter(markdown: string, fields: Record<string, string>): string {
+  const lines = markdown.split(/\r?\n/);
+  const fieldEntries = Object.entries(fields);
+  if (lines[0]?.trim() === '---') {
+    const endIndex = lines.findIndex((line, index) => index > 0 && line.trim() === '---');
+    if (endIndex > 0) {
+      const frontmatter = lines.slice(1, endIndex);
+      for (const [key, value] of fieldEntries) {
+        const existingIndex = frontmatter.findIndex((line) => new RegExp(`^${escapeRegExp(key)}\\s*:`).test(line));
+        if (existingIndex === -1) frontmatter.push(`${key}: ${value}`);
+        else frontmatter[existingIndex] = `${key}: ${value}`;
+      }
+      return ['---', ...frontmatter, '---', ...lines.slice(endIndex + 1)].join('\n').trimEnd();
+    }
+  }
+
+  return ['---', ...fieldEntries.map(([key, value]) => `${key}: ${value}`), '---', '', markdown].join('\n').trimEnd();
+}
+
+function normalizeWorkbenchRoot(value: string): string {
+  return value.trim().replace(/^\/+|\/+$/g, '');
+}
+
+function isPathWithinRoot(path: string, root: string): boolean {
+  return Boolean(path && root && path === root) || path.startsWith(`${root}/`);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function parseTailActionIndex(id: string): number | null {
+  const match = /:tail-action:(\d+)$/.exec(id);
+  if (!match) return null;
+  return Number.parseInt(match[1], 10);
+}
+
+function normalizeWorkbenchMatterStatus(value: string): string | null {
+  const status = value.trim();
+  if (!WORKBENCH_MATTER_STATUSES.has(status)) return null;
+  return status;
+}
+
+function isWorkbenchMatterDone(markdown: string): boolean {
+  const frontmatterStatus = readWorkbenchFrontmatterValue(markdown, 'status')?.toLowerCase();
+  if (frontmatterStatus === 'done') return true;
+  return /^状态[：:]\s*(done|已完成|完成)\s*$/im.test(markdown);
+}
+
+function isKnowledgeTailActionText(text: string): boolean {
+  return /知识库|知识|wiki|knowledge/i.test(text);
+}
+
+function relativeWorkbenchMarkdownLink(fromPath: string, toPath: string): string {
+  const from = fromPath.split('/').slice(0, -1);
+  const to = toPath.split('/');
+  let common = 0;
+  while (common < from.length && common < to.length && from[common] === to[common]) common += 1;
+  return [...Array(from.length - common).fill('..'), ...to.slice(common)].join('/');
+}
+
+function escapeMarkdownLinkText(value: string): string {
+  return value.replace(/[[\]]/g, '');
+}
+
+function normalizeWritableWorkbenchMarkdownPath(value: string): string | null {
+  const path = value.trim().replace(/^\/+/, '');
+  const segments = path.split('/');
+  if (!path.endsWith('.md') || segments.some((segment) => !segment || segment === '.' || segment === '..')) {
+    return null;
+  }
+  return path;
+}
+
+function slugifyPathSegment(value: string): string {
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return slug || 'work-item';
+}
+
+function isActionRunReviewTailActionId(value?: string): value is string {
+  return Boolean(value?.startsWith('action-run-review:'));
+}
+
+function buildWorkbenchReviewDraftSourceSlug(tailActionId?: string): string {
+  if (!tailActionId) return 'tail-action';
+  if (isActionRunReviewTailActionId(tailActionId)) return slugifyPathSegment(tailActionId);
+  const tailActionIndex = parseTailActionIndex(tailActionId);
+  return tailActionIndex === null ? 'tail-action' : `tail-action-${tailActionIndex}`;
+}
+
+function buildWorkbenchReviewDraftMarkdown(input: {
+  workItemPath: string;
+  tailActionId?: string;
+  relatedKnowledgeRunIds?: string[];
+  relatedKnowledgeRuns?: WorkbenchReviewDraftKnowledgeRun[];
+  createdAt: Date;
+}): string {
+  const sourceExecutionId = isActionRunReviewTailActionId(input.tailActionId) ? input.tailActionId : undefined;
+  const relatedKnowledgeRuns = dedupeRelatedKnowledgeRuns(input.relatedKnowledgeRuns);
+  const relatedKnowledgeRunIds = dedupeRelatedRunIds([
+    ...(input.relatedKnowledgeRunIds ?? []),
+    ...relatedKnowledgeRuns.map((run) => run.id),
+  ]);
+  const relatedKnowledgeWritePathLines = buildRelatedKnowledgeWritePathLines(relatedKnowledgeRuns);
+  return [
+    '---',
+    sourceExecutionId
+      ? 'source: desktop-workbench-review-source-execution'
+      : 'source: desktop-workbench-review-tail-action',
+    `workItemPath: ${input.workItemPath}`,
+    input.tailActionId ? `tailActionId: ${input.tailActionId}` : undefined,
+    sourceExecutionId ? `sourceExecutionId: ${sourceExecutionId}` : undefined,
+    relatedKnowledgeRunIds.length ? `relatedKnowledgeRunIds: ${relatedKnowledgeRunIds.join(', ')}` : undefined,
+    `createdAt: ${input.createdAt.toISOString()}`,
+    'status: draft',
+    '---',
+    '',
+    `# ${input.workItemPath.split('/').pop()?.replace(/\.md$/i, '') ?? '工作事项'} 复盘草稿`,
+    '',
+    `来源事项: \`${input.workItemPath}\``,
+    sourceExecutionId
+      ? `来源执行记录: \`${sourceExecutionId}\``
+      : input.tailActionId
+        ? `来源尾动作: \`${input.tailActionId}\``
+        : undefined,
+    relatedKnowledgeRunIds.length
+      ? `相关知识更新 ActionRun: ${relatedKnowledgeRunIds.map((id) => `\`${id}\``).join(', ')}`
+      : undefined,
+    relatedKnowledgeRuns.length ? '' : undefined,
+    relatedKnowledgeRuns.length ? '## 相关知识更新' : undefined,
+    relatedKnowledgeRuns.length ? '' : undefined,
+    relatedKnowledgeRuns.length ? '| ActionRun | 状态 | 摘要 |' : undefined,
+    relatedKnowledgeRuns.length ? '| --- | --- | --- |' : undefined,
+    ...relatedKnowledgeRuns.map(
+      (run) =>
+        `| \`${run.id}\` | ${formatReviewTableCell(run.status)} | ${formatReviewTableCell(run.resultSummary ?? run.error ?? '暂无摘要')} |`,
+    ),
+    relatedKnowledgeWritePathLines.length ? '' : undefined,
+    ...relatedKnowledgeWritePathLines,
+    '',
+    '## 核对清单',
+    '',
+    '- [ ] 核对来源事项目标、验收标准和当前状态。',
+    '- [ ] 核对关联执行记录、运行摘要和错误信息。',
+    '- [ ] 核对已经沉淀的成果、产物或 Repository output。',
+    '- [ ] 判断是否需要更新知识库、计划或后续事项。',
+    relatedKnowledgeRunIds.length
+      ? '- [ ] 核对相关知识更新 ActionRun 是否已写入 Wiki/index/log 或确认无需写入。'
+      : undefined,
+    '- [ ] 判断是否需要把该尾动作标记完成。',
+    '',
+    '## 复盘正文',
+    '',
+    '- 背景：',
+    '- 本次推进：',
+    '- 产生的成果：',
+    '- 风险和遗留问题：',
+    '- 下一步：',
+    '',
+  ]
+    .filter((line): line is string => line !== undefined)
+    .join('\n');
+}
+
+interface WorkbenchAssetRunReviewFacts {
+  assetRunPath: string;
+  title: string;
+  assetId?: string;
+  assetPath?: string;
+  assetReuseKind?: string;
+  status?: string;
+  runner?: string;
+  command?: string;
+  repositoryOutputPath?: string;
+  outputArtifactId?: string;
+  workItemPath?: string;
+  executedAt?: string;
+  resultSummary?: string;
+}
+
+function parseWorkbenchAssetRunReviewFacts(
+  assetRunPath: string,
+  markdown: string,
+): Omit<WorkbenchAssetRunReviewFacts, 'assetRunPath'> {
+  if (readWorkbenchFrontmatterValue(markdown, 'source') !== 'desktop-repository-asset-execution') {
+    throw new Error('Asset execution review source must be a desktop repository asset execution record');
+  }
+
+  const title = extractWorkbenchAssetRunTitle(markdown);
+  return {
+    title: title || readWorkbenchFrontmatterValue(markdown, 'assetId') || assetRunPath,
+    assetId: readWorkbenchFrontmatterValue(markdown, 'assetId') ?? undefined,
+    assetPath: readWorkbenchFrontmatterValue(markdown, 'assetPath') ?? undefined,
+    assetReuseKind: readWorkbenchFrontmatterValue(markdown, 'assetReuseKind') ?? undefined,
+    status: readWorkbenchFrontmatterValue(markdown, 'status') ?? undefined,
+    runner: readWorkbenchFrontmatterValue(markdown, 'runner') ?? undefined,
+    command: readWorkbenchFrontmatterValue(markdown, 'command') ?? undefined,
+    repositoryOutputPath: readWorkbenchFrontmatterValue(markdown, 'repositoryOutputPath') ?? undefined,
+    outputArtifactId: readWorkbenchFrontmatterValue(markdown, 'outputArtifactId') ?? undefined,
+    workItemPath: readWorkbenchFrontmatterValue(markdown, 'workItemPath') ?? undefined,
+    executedAt: readWorkbenchFrontmatterValue(markdown, 'executedAt') ?? undefined,
+    resultSummary: extractWorkbenchAssetRunResultSummary(markdown),
+  };
+}
+
+function buildWorkbenchAssetRunReviewDraftMarkdown(
+  input: WorkbenchAssetRunReviewFacts & {
+    workItemPath?: string;
+    reviewSummary?: string;
+    reuseDecision?: string;
+    nextActions?: string[];
+    reviewer?: string;
+    createdAt: Date;
+  },
+): string {
+  const nextActions = input.nextActions?.filter((action) => action.trim().length > 0) ?? [];
+  return [
+    '---',
+    `title: ${JSON.stringify(`仓库资产执行复盘 ${input.createdAt.toISOString().slice(0, 10)} - ${input.title}`)}`,
+    'source: desktop-repository-asset-execution-review',
+    `assetRunPath: ${input.assetRunPath}`,
+    input.assetId ? `assetId: ${input.assetId}` : undefined,
+    input.assetPath ? `assetPath: ${input.assetPath}` : undefined,
+    input.assetReuseKind ? `assetReuseKind: ${input.assetReuseKind}` : undefined,
+    input.status ? `executionStatus: ${input.status}` : undefined,
+    input.repositoryOutputPath ? `repositoryOutputPath: ${input.repositoryOutputPath}` : undefined,
+    input.outputArtifactId ? `outputArtifactId: ${input.outputArtifactId}` : undefined,
+    input.workItemPath ? `workItemPath: ${input.workItemPath}` : undefined,
+    input.reviewer ? `reviewer: ${input.reviewer}` : undefined,
+    `createdAt: ${input.createdAt.toISOString()}`,
+    'status: draft',
+    'recordOnly: true',
+    'desktopExecutes: false',
+    'grantsPermission: false',
+    '---',
+    '',
+    `# 仓库资产执行复盘：${input.title}`,
+    '',
+    `来源运行: \`${input.assetRunPath}\``,
+    input.workItemPath ? `关联事项: \`${input.workItemPath}\`` : undefined,
+    '',
+    '## 执行事实',
+    '',
+    input.assetId ? `- 资产：${input.assetId}` : undefined,
+    input.assetPath ? `- 路径：${input.assetPath}` : undefined,
+    input.assetReuseKind ? `- 类型：${input.assetReuseKind}` : undefined,
+    input.status ? `- 状态：${input.status}` : undefined,
+    input.executedAt ? `- 执行时间：${input.executedAt}` : undefined,
+    input.runner ? `- 运行器：${input.runner}` : undefined,
+    input.command ? `- 命令：\`${input.command}\`` : undefined,
+    input.resultSummary ? `- 执行结果：${input.resultSummary}` : undefined,
+    input.outputArtifactId ? `- 输出产物：artifact://${input.outputArtifactId}` : undefined,
+    input.repositoryOutputPath ? `- 仓库输出：${input.repositoryOutputPath}` : undefined,
+    '',
+    '## 核对清单',
+    '',
+    '- [ ] 判断本次运行结果是否应该沉淀为成果或关联到既有成果。',
+    '- [ ] 判断该资产是否继续复用、需要改进、还是暂停使用。',
+    '- [ ] 判断是否需要更新来源事项状态、知识库、计划或后续事项。',
+    '- [ ] 确认 Desktop 只写入复盘记录，不执行资产、不授予权限。',
+    '',
+    '## 复盘正文',
+    '',
+    `- 本次推进：${input.reviewSummary ?? ''}`,
+    `- 复用判断：${input.reuseDecision ?? ''}`,
+    '- 产生的成果：',
+    '- 风险和遗留问题：',
+    '- 下一步：',
+    ...nextActions.map((action) => `  - ${action}`),
+    '',
+    '## 边界',
+    '',
+    '- Desktop 只写入复盘记录，不执行资产、不授予权限。',
+    '- 后续状态更新、成果沉淀、知识库更新仍需要用户显式确认。',
+    '',
+  ]
+    .filter((line): line is string => line !== undefined)
+    .join('\n');
+}
+
+function normalizeWorkbenchReviewWorkItemPath(value?: string): string | undefined {
+  if (!value) return undefined;
+  const workItemPath = normalizeWritableWorkbenchMarkdownPath(value);
+  return workItemPath?.startsWith('work/') ? workItemPath : undefined;
+}
+
+function extractWorkbenchAssetRunTitle(markdown: string): string {
+  const headingTitle = /^#\s+仓库资产执行[：:]\s*(.+)$/m.exec(markdown)?.[1]?.trim();
+  if (headingTitle) return headingTitle;
+  const frontmatterTitle = readWorkbenchFrontmatterValue(markdown, 'title') ?? '';
+  return frontmatterTitle.replace(/^仓库资产执行\s*[-：:]\s*/, '').trim();
+}
+
+function extractWorkbenchAssetRunResultSummary(markdown: string): string | undefined {
+  return /^-\s*执行结果[：:]\s*(.+)$/m.exec(markdown)?.[1]?.trim();
+}
+
+function dedupeRelatedRunIds(values?: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values ?? []) {
+    const trimmed = value.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    result.push(trimmed);
+  }
+  return result;
+}
+
+function dedupeRelatedKnowledgeRuns(values?: WorkbenchReviewDraftKnowledgeRun[]): WorkbenchReviewDraftKnowledgeRun[] {
+  const seen = new Set<string>();
+  const result: WorkbenchReviewDraftKnowledgeRun[] = [];
+  for (const value of values ?? []) {
+    const id = value.id.trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    result.push({ ...value, id });
+  }
+  return result;
+}
+
+function buildRelatedKnowledgeWritePathLines(values: WorkbenchReviewDraftKnowledgeRun[]): string[] {
+  return values.flatMap((run) => {
+    if (run.status !== 'done') return [];
+    const paths = extractKnowledgeWritePaths(run.resultSummary);
+    if (paths.length === 0) return [];
+    return [`- \`${run.id}\` 写入路径: ${paths.map((path) => `\`${path}\``).join(', ')}`];
+  });
+}
+
+function extractKnowledgeWritePaths(value?: string): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  const matches = value?.match(/wiki\/[^\s`"'，,、。；;）)\]}]+\.md/g) ?? [];
+  for (const match of matches) {
+    const path = normalizeWritableWorkbenchMarkdownPath(match);
+    if (!path?.startsWith('wiki/') || seen.has(path)) continue;
+    seen.add(path);
+    result.push(path);
+  }
+  return result;
+}
+
+function formatReviewTableCell(value: string): string {
+  return value.replace(/\r?\n/g, ' ').replace(/\|/g, '\\|').trim();
+}
+
+function markWorkbenchReviewDraftConfirmed(markdown: string, reviewedAt: Date): string | null {
+  if (!/^---\n/.test(markdown)) return null;
+  const lines = markdown.split(/\r?\n/);
+  const endIndex = lines.findIndex((line, index) => index > 0 && line.trim() === '---');
+  if (endIndex === -1) return null;
+
+  let statusUpdated = false;
+  let reviewedAtIndex = -1;
+  for (let index = 1; index < endIndex; index += 1) {
+    if (/^status:\s*/.test(lines[index])) {
+      if (!/^status:\s*draft\s*$/.test(lines[index])) return null;
+      lines[index] = 'status: confirmed';
+      statusUpdated = true;
+    }
+    if (/^reviewedAt:\s*/.test(lines[index])) reviewedAtIndex = index;
+  }
+  if (!statusUpdated) return null;
+
+  const reviewedAtLine = `reviewedAt: ${reviewedAt.toISOString()}`;
+  if (reviewedAtIndex === -1) lines.splice(endIndex, 0, reviewedAtLine);
+  else lines[reviewedAtIndex] = reviewedAtLine;
+  return lines.join('\n');
+}
+
+function readWorkbenchFrontmatterValue(markdown: string, key: string): string | null {
+  if (!/^---\n/.test(markdown)) return null;
+  const lines = markdown.split(/\r?\n/);
+  const endIndex = lines.findIndex((line, index) => index > 0 && line.trim() === '---');
+  if (endIndex === -1) return null;
+
+  const prefix = `${key}:`;
+  const line = lines.slice(1, endIndex).find((item) => item.startsWith(prefix));
+  if (!line) return null;
+
+  const value = line.slice(prefix.length).trim();
+  return value.replace(/^["'](.+)["']$/, '$1');
 }
 
 export function deriveProjects(section?: WorkbenchSemanticSection): WorkbenchProject[] {
@@ -354,5 +1473,27 @@ function getWorkbenchTextApi() {
   }
   return {
     readText: repository.readText,
+  };
+}
+
+function getWorkbenchWriteApi() {
+  const repository = (globalThis as { window?: Window }).window?.electronAPI?.repository;
+  if (!repository?.readText || !repository.writeText) {
+    throw new Error('electronAPI.repository workbench write methods not available');
+  }
+  return {
+    readText: repository.readText,
+    writeText: repository.writeText,
+  };
+}
+
+function getWorkbenchMoveApi() {
+  const repository = (globalThis as { window?: Window }).window?.electronAPI?.repository;
+  if (!repository?.readText || !repository.moveText) {
+    throw new Error('electronAPI.repository workbench move methods not available');
+  }
+  return {
+    readText: repository.readText,
+    moveText: repository.moveText,
   };
 }

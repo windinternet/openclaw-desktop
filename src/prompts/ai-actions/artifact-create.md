@@ -24,12 +24,36 @@
 
 ## 输出要求
 
-请分析用户意图，输出 ai-action JSON。要求：
+请分析用户意图。优先输出可直接保存为 Artifact 的 `<artifact>` 块；只有简单链接、命令或仅有元数据的文件线索，也可以继续输出兼容的 ai-action JSON。
+
+### 首选：Artifact 块
+
+当产物包含 HTML 内容、可视化、交互界面、文档正文、仪表盘、报告、检查清单、表格视图、流程面板，或需要保留 `externalFormat` / `contentSummary` / `reuseKind` / 文件元数据时，必须输出：
+
+```text
+<artifact>
+{"title":"...","type":"dashboard","description":"...","tags":["..."],"externalFormat":"html","contentSummary":"HTML · ...","reuseKind":"workflow"}
+<!doctype html><html>...</html>
+</artifact>
+```
+
+要求：
+
+- HTML 类型必须提供完整、自包含的 HTML 正文，放在 JSON header 后、`</artifact>` 前。
+- HTML 正文应该可直接预览，不依赖外部脚本、外部样式或远程图片。
+- 文件/图片/音频/视频可只提供 JSON header，并包含 `filePath`、`fileName`、`mimeType`、`externalFormat`、`contentSummary`、`importFile` 等已知字段。
+- 如果一次生成多个有价值产物，请连续输出多个 `<artifact>` 块，每个块只描述一个可单独保存的产物。
+- `reuseKind` 仅在确实可复用时填写，可选值：asset、template、tool、script、workflow。
+- tags 必须是字符串数组。
+
+### 兼容：ai-action JSON
+
+简单链接、命令或没有正文的轻量元数据可以输出 ai-action JSON。要求：
 
 - 如果是链接：type 设为 "link"，提取 url、title、description、tags
 - 如果是命令：type 设为 "app"，提取 command、title、description、tags
 - 如果是文件/图片/音频/视频：type 设为对应类型，提取 fileName、title、description、tags
-- 如果是 HTML 内容：type 设为 report/document 等合适类型，提取 title、description、tags
+- 如果是 HTML 内容：不要只输出 ai-action；必须使用 `<artifact>` 并提供 HTML 正文
 - 如果用户没指定标题，从内容中自动推断一个合理的标题
 - 如果用户没指定标签，从主题中自动推断 1-3 个标签
 - tags 必须是字符串数组

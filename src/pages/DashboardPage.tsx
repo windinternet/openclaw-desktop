@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Badge, Button, Tag, Toast, Typography } from '@douyinfe/semi-ui';
+import { Badge, Button, Input, Tag, Toast, Typography } from '@douyinfe/semi-ui';
 import {
   IconAppCenter,
   IconBolt,
@@ -10,8 +10,9 @@ import {
   IconRefresh,
   IconSearch,
   IconServer,
+  IconTickCircle,
 } from '@douyinfe/semi-icons';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useStore, type AiActionRun, type SessionInfo } from '../lib';
 import {
@@ -22,16 +23,29 @@ import {
 } from '../components/charts/DashboardVisualCharts';
 import UsageTrendChart from '../components/charts/UsageTrendChart';
 import type { ArtifactMeta } from '../lib/artifact-types';
+import { buildArtifactDisplayLine } from '../lib/artifact-display';
 import { loadAiActionRuns } from '../lib/ai-action-run-store';
+import type { RepositoryBinding } from '../lib/agentic-repository';
 import { loadRepositoryBinding } from '../lib/agentic-repository-store';
 import { normalizeDashboardGatewaySummary } from '../lib/dashboard-gateway-summary';
+import {
+  buildDashboardWorkSystemSummary,
+  type DashboardWorkSystemSummaryItem,
+} from '../lib/dashboard-work-system-summary';
 import { fetchGatewayUsageDashboard, type GatewayUsageDashboard } from '../lib/gateway-usage';
 import {
   loadKnowledgeSnapshot,
   type KnowledgeSnapshot,
   type RepositoryMarkdownFile,
 } from '../lib/repository-knowledge';
-import { loadWorkbenchSnapshot, type WorkbenchSnapshot } from '../lib/repository-workbench';
+import {
+  completeWorkbenchTailAction,
+  loadWorkbenchSnapshot,
+  type WorkbenchSnapshot,
+} from '../lib/repository-workbench';
+import RepositoryGate from '../components/RepositoryGate';
+import { isWorkSystemOnboardingSearch, WORK_SYSTEM_ONBOARDING_ANCHOR } from '../lib/work-system-onboarding';
+import { createFirstWorkbenchMatter } from '../lib/workbench-first-matter';
 
 const { Title, Text } = Typography;
 
@@ -101,16 +115,40 @@ function fileTitle(file: RepositoryMarkdownFile): string {
   return file.name || file.path.split('/').pop() || file.path;
 }
 
+function workSystemIcon(kind: DashboardWorkSystemSummaryItem['kind']): ReactNode {
+  switch (kind) {
+    case 'session':
+      return <IconComment />;
+    case 'work':
+    case 'plan':
+      return <IconBranch />;
+    case 'artifact':
+    case 'output':
+      return <IconFile />;
+    case 'knowledge':
+      return <IconSearch />;
+    case 'action_run':
+    default:
+      return <IconBolt />;
+  }
+}
+
+function formatOptionalMeta(parts: Array<string | undefined>): string | undefined {
+  const value = parts.filter((part): part is string => Boolean(part && part.trim().length > 0)).join(' · ');
+  return value || undefined;
+}
+
 interface SectionProps {
+  id?: string;
   title: string;
   description?: string;
   action?: ReactNode;
   children: ReactNode;
 }
 
-function DashboardSection({ title, description, action, children }: SectionProps) {
+function DashboardSection({ id, title, description, action, children }: SectionProps) {
   return (
-    <section className="dashboard-section">
+    <section id={id} className="dashboard-section">
       <div className="dashboard-section-header">
         <div>
           <Title heading={5} style={{ margin: 0 }}>
@@ -153,56 +191,62 @@ function AssetRow({
   title,
   meta,
   tag,
+  action,
   onClick,
 }: {
   icon: ReactNode;
   title: string;
   meta?: string;
   tag?: ReactNode;
+  action?: ReactNode;
   onClick?: () => void;
 }) {
   return (
-    <button type="button" className="dashboard-asset-row" onClick={onClick}>
-      <span className="dashboard-asset-icon">{icon}</span>
-      <span className="dashboard-asset-main">
-        <span
-          className="dashboard-asset-title"
-          title={title}
-          style={{
-            display: 'block',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            fontWeight: 600,
-          }}
-        >
-          {title}
-        </span>
-        {meta ? (
+    <div className="dashboard-asset-row">
+      <button type="button" className="dashboard-asset-row-main" onClick={onClick}>
+        <span className="dashboard-asset-icon">{icon}</span>
+        <span className="dashboard-asset-main">
           <span
-            className="dashboard-asset-meta"
-            title={meta}
+            className="dashboard-asset-title"
+            title={title}
             style={{
               display: 'block',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
-              color: 'var(--semi-color-text-2)',
-              fontSize: 12,
+              fontWeight: 600,
             }}
           >
-            {meta}
+            {title}
           </span>
-        ) : null}
-      </span>
-      {tag}
-    </button>
+          {meta ? (
+            <span
+              className="dashboard-asset-meta"
+              title={meta}
+              style={{
+                display: 'block',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                color: 'var(--semi-color-text-2)',
+                fontSize: 12,
+              }}
+            >
+              {meta}
+            </span>
+          ) : null}
+        </span>
+        {tag}
+      </button>
+      {action ? <span className="dashboard-asset-action">{action}</span> : null}
+    </div>
   );
 }
 
 export default function DashboardPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const agents = useStore((s) => s.agents);
@@ -221,11 +265,17 @@ export default function DashboardPage() {
   const [knowledgeSnapshot, setKnowledgeSnapshot] = useState<KnowledgeSnapshot | null>(null);
   const [actionRuns, setActionRuns] = useState<AiActionRun[]>([]);
   const [usageDashboard, setUsageDashboard] = useState<GatewayUsageDashboard | null>(null);
+  const [repositoryBinding, setRepositoryBinding] = useState<RepositoryBinding | null>(null);
   const [repositoryUnavailable, setRepositoryUnavailable] = useState(false);
+  const [repositorySetupNeeded, setRepositorySetupNeeded] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [firstMatterDraft, setFirstMatterDraft] = useState('');
+  const [firstMatterCreating, setFirstMatterCreating] = useState(false);
+  const [completingTailActionId, setCompletingTailActionId] = useState('');
 
   const isLoading = connectionStatus === 'connecting';
   const isConnected = connectionStatus === 'connected';
+  const onboardingRequested = isWorkSystemOnboardingSearch(location.search);
 
   useEffect(() => {
     void fetchArtifacts().catch(() => undefined);
@@ -256,7 +306,9 @@ export default function DashboardPage() {
     setWorkbenchSnapshot(null);
     setKnowledgeSnapshot(null);
     setActionRuns([]);
+    setRepositoryBinding(null);
     setRepositoryUnavailable(false);
+    setRepositorySetupNeeded(false);
 
     if (!currentInstanceId) {
       setRepositoryUnavailable(true);
@@ -269,9 +321,14 @@ export default function DashboardPage() {
 
       const binding = await loadRepositoryBinding(currentInstanceId).catch(() => null);
       if (!binding) {
-        if (!cancelled) setRepositoryUnavailable(true);
+        if (!cancelled) {
+          setRepositoryUnavailable(true);
+          setRepositorySetupNeeded(true);
+        }
         return;
       }
+
+      if (!cancelled) setRepositoryBinding(binding);
 
       const [workbenchResult, knowledgeResult] = await Promise.allSettled([
         loadWorkbenchSnapshot(binding),
@@ -281,6 +338,7 @@ export default function DashboardPage() {
       if (cancelled) return;
       if (workbenchResult.status === 'fulfilled') setWorkbenchSnapshot(workbenchResult.value);
       if (knowledgeResult.status === 'fulfilled') setKnowledgeSnapshot(knowledgeResult.value);
+      setRepositorySetupNeeded(false);
       setRepositoryUnavailable(workbenchResult.status === 'rejected' || knowledgeResult.status === 'rejected');
     })();
 
@@ -288,6 +346,13 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, [currentInstanceId, actionRunsVersion, refreshTick]);
+
+  useEffect(() => {
+    if (!onboardingRequested || !repositorySetupNeeded) return;
+    window.requestAnimationFrame(() => {
+      document.getElementById(WORK_SYSTEM_ONBOARDING_ANCHOR)?.scrollIntoView({ block: 'start' });
+    });
+  }, [onboardingRequested, repositorySetupNeeded]);
 
   const recentSessions = useMemo(
     () => [...sessions].sort((a, b) => getSessionTime(b) - getSessionTime(a)).slice(0, 5),
@@ -316,6 +381,17 @@ export default function DashboardPage() {
   const knowledgeFiles = useMemo(() => knowledgeSnapshot?.recentFiles ?? [], [knowledgeSnapshot]);
 
   const recentKnowledge = useMemo(() => knowledgeFiles.slice(0, 5), [knowledgeFiles]);
+  const workSystemSummary = useMemo(
+    () =>
+      buildDashboardWorkSystemSummary({
+        sessions,
+        actionRuns,
+        artifacts,
+        workbench: workbenchSnapshot,
+        knowledge: knowledgeSnapshot,
+      }),
+    [actionRuns, artifacts, knowledgeSnapshot, sessions, workbenchSnapshot],
+  );
   const gatewaySummary = useMemo(
     () => normalizeDashboardGatewaySummary({ health, gatewayStatus, agents }),
     [agents, gatewayStatus, health],
@@ -404,6 +480,248 @@ export default function DashboardPage() {
     await fetchArtifacts().catch(() => undefined);
     setRefreshTick((value) => value + 1);
     Toast.success(t('dashboard.refreshed'));
+  };
+
+  const handleCreateFirstMatter = async (binding: RepositoryBinding) => {
+    const title = firstMatterDraft.trim();
+    if (!title) {
+      Toast.warning(t('dashboard.firstMatterRequired'));
+      return;
+    }
+
+    setFirstMatterCreating(true);
+    try {
+      const matter = await createFirstWorkbenchMatter(binding, title);
+      setFirstMatterDraft('');
+      setRefreshTick((value) => value + 1);
+      Toast.success(t('dashboard.firstMatterCreated'));
+      navigate(`/workbench?view=tasks&workItemPath=${encodeURIComponent(matter.path)}`);
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('dashboard.firstMatterCreateFailed'));
+    } finally {
+      setFirstMatterCreating(false);
+    }
+  };
+
+  const handleCompleteTailAction = async (item: DashboardWorkSystemSummaryItem) => {
+    if (!repositoryBinding || !item.status?.startsWith('tail-action') || !item.path) {
+      Toast.warning(t('dashboard.tailActionCompleteUnavailable'));
+      return;
+    }
+
+    setCompletingTailActionId(item.id);
+    try {
+      const completed = await completeWorkbenchTailAction(repositoryBinding, {
+        id: item.id,
+        text: item.title,
+        sourcePath: item.path,
+      });
+      if (!completed) {
+        Toast.warning(t('dashboard.tailActionAlreadyResolved'));
+        return;
+      }
+      setRefreshTick((value) => value + 1);
+      Toast.success(t('dashboard.tailActionCompleted'));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('dashboard.tailActionCompleteFailed'));
+    } finally {
+      setCompletingTailActionId('');
+    }
+  };
+
+  const renderWorkSystemItem = (item: DashboardWorkSystemSummaryItem) => (
+    <AssetRow
+      key={item.id}
+      icon={workSystemIcon(item.kind)}
+      title={item.title}
+      meta={formatOptionalMeta([item.detail, item.updatedAt ? formatDate(item.updatedAt) : undefined])}
+      tag={
+        item.status ? (
+          <Tag size="small" color={getStatusTagColor(item.status)}>
+            {item.status}
+          </Tag>
+        ) : undefined
+      }
+      action={
+        item.status?.startsWith('tail-action') && item.path ? (
+          <Button
+            aria-label={t('dashboard.completeTailAction')}
+            icon={<IconTickCircle />}
+            size="small"
+            theme="borderless"
+            loading={completingTailActionId === item.id}
+            onClick={(event) => {
+              event.stopPropagation();
+              void handleCompleteTailAction(item);
+            }}
+          />
+        ) : undefined
+      }
+      onClick={() => navigate(item.target)}
+    />
+  );
+
+  const renderWorkSystemLane = (
+    title: string,
+    items: DashboardWorkSystemSummaryItem[],
+    emptyText: string,
+    count: number,
+  ) => (
+    <div className="dashboard-asset-column">
+      <div className="dashboard-usage-panel-title">
+        <Text style={{ fontWeight: 700 }}>{title}</Text>
+        <Tag size="small" color={count > 0 ? 'blue' : 'grey'}>
+          {count}
+        </Tag>
+      </div>
+      {items.length > 0 ? (
+        items.map(renderWorkSystemItem)
+      ) : (
+        <Text type="tertiary" size="small">
+          {emptyText}
+        </Text>
+      )}
+    </div>
+  );
+
+  const renderWorkSystemSection = () => (
+    <DashboardSection
+      title={t('dashboard.workSystem')}
+      description={t('dashboard.workSystemDesc')}
+      action={
+        <div className="dashboard-section-actions">
+          <Button size="small" theme="borderless" onClick={() => navigate('/new-session')}>
+            {t('dashboard.startFirstThing')}
+          </Button>
+          <Button size="small" theme="borderless" onClick={() => navigate('/workbench')}>
+            {t('dashboard.viewWorkbench')}
+          </Button>
+        </div>
+      }
+    >
+      <div className="dashboard-work-system-grid">
+        {renderWorkSystemLane(
+          t('dashboard.todayContinue'),
+          workSystemSummary.todayContinue,
+          t('dashboard.noTodayContinue'),
+          workSystemSummary.counts.todayContinue,
+        )}
+        {renderWorkSystemLane(
+          t('dashboard.pendingConfirmations'),
+          workSystemSummary.pendingConfirmations,
+          t('dashboard.noPendingConfirmations'),
+          workSystemSummary.counts.pendingConfirmations,
+        )}
+        {renderWorkSystemLane(
+          t('dashboard.stuckItems'),
+          workSystemSummary.stuckItems,
+          t('dashboard.noStuckItems'),
+          workSystemSummary.counts.stuckItems,
+        )}
+        {renderWorkSystemLane(
+          t('dashboard.recentOutputs'),
+          workSystemSummary.recentOutputs,
+          t('dashboard.noRecentOutputs'),
+          workSystemSummary.counts.recentOutputs,
+        )}
+        {renderWorkSystemLane(
+          t('dashboard.weeklyOutputs'),
+          workSystemSummary.weeklyOutputs,
+          t('dashboard.noWeeklyOutputs'),
+          workSystemSummary.counts.weeklyOutputs,
+        )}
+        {renderWorkSystemLane(
+          t('dashboard.knowledgeUpdates'),
+          workSystemSummary.knowledgeUpdates,
+          t('dashboard.noKnowledgeUpdates'),
+          workSystemSummary.counts.knowledgeUpdates,
+        )}
+      </div>
+    </DashboardSection>
+  );
+
+  const renderWorkSystemOnboarding = () => {
+    if (!repositorySetupNeeded || (!isConnected && !onboardingRequested)) return null;
+
+    return (
+      <DashboardSection
+        id={WORK_SYSTEM_ONBOARDING_ANCHOR}
+        title={t('dashboard.onboardingTitle')}
+        description={t('dashboard.onboardingDesc')}
+      >
+        <div className="dashboard-onboarding-steps">
+          <div className="dashboard-onboarding-step dashboard-onboarding-step-done">
+            <span className="dashboard-onboarding-step-icon">
+              <IconTickCircle />
+            </span>
+            <span>
+              <Text strong>{t('dashboard.onboardingGatewayDone')}</Text>
+              <Text type="tertiary" size="small">
+                {t('dashboard.onboardingGatewayDoneDesc')}
+              </Text>
+            </span>
+          </div>
+          <div className="dashboard-onboarding-step dashboard-onboarding-step-active">
+            <span className="dashboard-onboarding-step-icon">
+              <IconBranch />
+            </span>
+            <span>
+              <Text strong>{t('dashboard.onboardingRepositoryNext')}</Text>
+              <Text type="tertiary" size="small">
+                {t('dashboard.onboardingRepositoryNextDesc')}
+              </Text>
+            </span>
+          </div>
+          <div className="dashboard-onboarding-step">
+            <span className="dashboard-onboarding-step-icon">
+              <IconBolt />
+            </span>
+            <span>
+              <Text strong>{t('dashboard.onboardingFirstThingNext')}</Text>
+              <Text type="tertiary" size="small">
+                {t('dashboard.onboardingFirstThingNextDesc')}
+              </Text>
+            </span>
+          </div>
+        </div>
+        <div className="dashboard-onboarding-repository">
+          <RepositoryGate area="workbench">
+            {(binding) => (
+              <div className="dashboard-onboarding-ready">
+                <div>
+                  <Text strong>{t('dashboard.onboardingRepositoryReady')}</Text>
+                  <Text type="tertiary" size="small">
+                    {t('dashboard.onboardingRepositoryReadyDesc')}
+                  </Text>
+                </div>
+                <div className="dashboard-first-matter-form">
+                  <Input
+                    value={firstMatterDraft}
+                    placeholder={t('dashboard.firstMatterPlaceholder')}
+                    onChange={setFirstMatterDraft}
+                    onEnterPress={() => {
+                      void handleCreateFirstMatter(binding);
+                    }}
+                    disabled={firstMatterCreating}
+                  />
+                  <Button
+                    theme="solid"
+                    type="primary"
+                    loading={firstMatterCreating}
+                    disabled={!firstMatterDraft.trim()}
+                    onClick={() => {
+                      void handleCreateFirstMatter(binding);
+                    }}
+                  >
+                    {t('dashboard.createFirstMatter')}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </RepositoryGate>
+        </div>
+      </DashboardSection>
+    );
   };
 
   const renderGatewayStatusSection = () => (
@@ -683,7 +1001,7 @@ export default function DashboardPage() {
                 key={artifact.id}
                 icon={<span aria-hidden="true">{artifact.icon}</span>}
                 title={artifact.title}
-                meta={`${artifact.type} · ${formatDate(artifact.updatedAt)}`}
+                meta={buildArtifactDisplayLine(artifact, formatDate(artifact.updatedAt))}
                 tag={
                   <Tag
                     size="small"
@@ -748,6 +1066,8 @@ export default function DashboardPage() {
           <Button icon={<IconRefresh />} theme="borderless" onClick={handleRefresh} loading={isLoading} />
         </div>
 
+        {renderWorkSystemSection()}
+        {renderWorkSystemOnboarding()}
         {renderGatewayStatusSection()}
         {renderUsageSection()}
         {renderRecentAssetsSection()}

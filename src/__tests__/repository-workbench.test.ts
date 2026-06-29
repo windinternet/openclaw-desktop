@@ -2,10 +2,20 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
 import {
+  applyWorkbenchMatterPlanApproval,
+  archiveCompletedWorkbenchMatter,
+  confirmWorkbenchAssetRunReviewDraft,
+  confirmWorkbenchKnowledgeTailAction,
+  confirmWorkbenchReviewDraft,
+  completeWorkbenchTailAction,
   groupReviewsByFolder,
   loadWorkbenchSnapshot,
   parsePlanMetadata,
+  preserveWorkbenchOutputFromTailAction,
   readWorkbenchMarkdown,
+  updateWorkbenchMatterStatusFromTailAction,
+  writeWorkbenchAssetRunReviewDraft,
+  writeWorkbenchReviewDraft,
 } from '../lib/repository-workbench';
 
 describe('repository workbench', () => {
@@ -22,7 +32,10 @@ describe('repository workbench', () => {
       if (directory === 'work/someday')
         return [{ path: 'work/someday/later.md', name: 'later.md', size: 12, updatedAt: 3 }];
       if (directory === 'plans/active')
-        return [{ path: 'plans/active/plan.md', name: 'plan.md', size: 20, updatedAt: 2 }];
+        return [
+          { path: 'plans/active/plan.md', name: 'plan.md', size: 20, updatedAt: 2 },
+          { path: 'plans/active/owner-only.md', name: 'owner-only.md', size: 18, updatedAt: 5 },
+        ];
       if (directory === 'plans/completed')
         return [{ path: 'plans/completed/plan-done.md', name: 'plan-done.md', size: 21, updatedAt: 4 }];
       if (directory === 'reviews')
@@ -32,8 +45,34 @@ describe('repository workbench', () => {
     const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
       if (relativePath === 'work/inbox.md') return '# Inbox';
       if (relativePath === 'runs/index.md') return '# Runs';
+      if (relativePath === 'runs/action-runs/index.md')
+        return '# Action Runs\n\n- [artifact_create](runs/action-runs/action-42.md) - done';
+      if (relativePath === 'runs/assets/index.md')
+        return '# Asset Runs\n\n- [发布检查脚本](assets/20260629-010203-tools-release-check-sh.md) (`tools-release-check-sh`, script, succeeded)';
       if (relativePath === 'outputs/index.md') return '# Outputs';
+      if (relativePath === 'reviews/weekly/2026-W26.md')
+        return [
+          '# 第 26 周复盘',
+          '',
+          '## 成果',
+          '',
+          '- [交互报告](../../outputs/reports/report.md)：让进展可视化',
+        ].join('\n');
+      if (relativePath === 'work/active/project.md')
+        return [
+          '# 发布推进',
+          '',
+          '## 收尾动作',
+          '',
+          '- [ ] 根据 [runs/action-runs/action-42.md](../../runs/action-runs/action-42.md) 更新事项状态。',
+          '- [x] 判断是否需要写入复盘。',
+          '',
+          '## 复盘',
+          '',
+          '- [ ] 这里不是收尾动作。',
+        ].join('\n');
       if (relativePath === 'plans/active/plan.md') return 'status: approved\napproval: user-approved\n# Plan';
+      if (relativePath === 'plans/active/owner-only.md') return 'owner: @api\n# Owner Only';
       if (relativePath === 'plans/completed/plan-done.md') return 'status: done\n# Plan Done';
       return '';
     });
@@ -52,11 +91,28 @@ describe('repository workbench', () => {
     expect(snapshot.activeWork).toHaveLength(1);
     expect(snapshot.completedWork).toHaveLength(1);
     expect(snapshot.somedayWork).toHaveLength(1);
-    expect(snapshot.activePlans).toHaveLength(1);
+    expect(snapshot.activePlans).toHaveLength(2);
     expect(snapshot.completedPlans).toHaveLength(1);
     expect(snapshot.planMetadata).toEqual([
       { path: 'plans/active/plan.md', status: 'approved', approval: 'user-approved' },
+      { path: 'plans/active/owner-only.md', blockerOwner: '@api' },
       { path: 'plans/completed/plan-done.md', status: 'done' },
+    ]);
+    expect(snapshot.tailActions).toEqual([
+      {
+        id: 'work/active/project.md:tail-action:0',
+        text: '根据 [runs/action-runs/action-42.md](../../runs/action-runs/action-42.md) 更新事项状态。',
+        sourcePath: 'work/active/project.md',
+        completed: false,
+        updatedAt: 1,
+      },
+      {
+        id: 'work/active/project.md:tail-action:1',
+        text: '判断是否需要写入复盘。',
+        sourcePath: 'work/active/project.md',
+        completed: true,
+        updatedAt: 1,
+      },
     ]);
     expect(snapshot.reviewGroups).toEqual([
       {
@@ -64,9 +120,29 @@ describe('repository workbench', () => {
         files: [{ path: 'reviews/weekly/2026-W26.md', name: '2026-W26.md', size: 30, updatedAt: 3 }],
       },
     ]);
-    expect(snapshot.runsMarkdown).toBe('# Runs');
+    expect(snapshot.runsMarkdown).toBe(
+      [
+        '# Runs',
+        '',
+        '# Action Runs',
+        '',
+        '- [artifact_create](runs/action-runs/action-42.md) - done',
+        '',
+        '# Asset Runs',
+        '',
+        '- [发布检查脚本](assets/20260629-010203-tools-release-check-sh.md) (`tools-release-check-sh`, script, succeeded)',
+      ].join('\n'),
+    );
     expect(snapshot.outputsMarkdown).toBe('# Outputs');
     expect(snapshot.reviews).toHaveLength(1);
+    expect(snapshot.reviewDocuments).toEqual([
+      {
+        path: 'reviews/weekly/2026-W26.md',
+        title: '第 26 周复盘',
+        content: '# 第 26 周复盘\n\n## 成果\n\n- [交互报告](../../outputs/reports/report.md)：让进展可视化',
+        file: { path: 'reviews/weekly/2026-W26.md', name: '2026-W26.md', size: 30, updatedAt: 3 },
+      },
+    ]);
   });
 
   it('loads semantic workbench slots when binding has a workbench mapping', async () => {
@@ -152,7 +228,7 @@ describe('repository workbench', () => {
     const listMarkdown = vi.fn(async (_repoPath: string, directory: string) =>
       directory === 'reviews' ? [reviewFile] : [],
     );
-    const readText = vi.fn(async () => '');
+    const readText = vi.fn(async () => '# 第 26 周复盘\n\n## 成果\n\n- [发布报告](../outputs/report.md)');
     vi.stubGlobal('window', {
       electronAPI: {
         repository: { listMarkdown, readText },
@@ -181,6 +257,14 @@ describe('repository workbench', () => {
       {
         group: 'weekly',
         files: [reviewFile],
+      },
+    ]);
+    expect(snapshot.reviewDocuments).toEqual([
+      {
+        path: 'reviews/weekly/2026-W26.md',
+        title: '第 26 周复盘',
+        content: '# 第 26 周复盘\n\n## 成果\n\n- [发布报告](../outputs/report.md)',
+        file: reviewFile,
       },
     ]);
   });
@@ -349,6 +433,44 @@ describe('repository workbench', () => {
       status: 'awaiting-review',
       approval: 'required',
     });
+    expect(
+      parsePlanMetadata(
+        'plans/active/blocked.md',
+        ['status: blocked', 'blockedReason: 等待设计确认关键验收标准', 'blockerOwner: @owner', '# Blocked'].join('\n'),
+      ),
+    ).toEqual({
+      path: 'plans/active/blocked.md',
+      status: 'blocked',
+      blockedReason: '等待设计确认关键验收标准',
+      blockerOwner: '@owner',
+    });
+    expect(
+      parsePlanMetadata(
+        'plans/active/cn-blocked.md',
+        ['状态: 卡住', '阻塞原因: 依赖 Gateway 协议确认', '# 卡住计划'].join('\n'),
+      ),
+    ).toEqual({
+      path: 'plans/active/cn-blocked.md',
+      status: '卡住',
+      blockedReason: '依赖 Gateway 协议确认',
+    });
+    expect(
+      parsePlanMetadata(
+        'plans/active/cross-work.md',
+        [
+          'status: active',
+          'workItemPath: work/active/release.md',
+          'dependsOn: work/active/design.md, [API 计划](plans/active/api.md)',
+          '关联事项: work/active/release.md；work/someday/legal.md',
+          '# 跨事项计划',
+        ].join('\n'),
+      ),
+    ).toEqual({
+      path: 'plans/active/cross-work.md',
+      status: 'active',
+      workItemPath: 'work/active/release.md',
+      dependencies: ['work/active/design.md', 'plans/active/api.md', 'work/active/release.md', 'work/someday/legal.md'],
+    });
 
     expect(
       groupReviewsByFolder([
@@ -362,6 +484,977 @@ describe('repository workbench', () => {
       },
       { group: 'weekly', files: [{ path: 'reviews/weekly/2026-W26.md', name: '2026-W26.md', size: 10, updatedAt: 1 }] },
     ]);
+  });
+
+  it('marks a selected tail action as completed in the repository markdown', async () => {
+    const readText = vi.fn(async () =>
+      [
+        '# 发布推进',
+        '',
+        '## 收尾动作',
+        '',
+        '- [ ] 根据 ActionRun 更新事项状态。',
+        '- [ ] 判断是否需要写入复盘。',
+        '',
+        '## 复盘',
+        '',
+        '- [ ] 这里不是收尾动作。',
+      ].join('\n'),
+    );
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const completed = await completeWorkbenchTailAction(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        id: 'work/active/release.md:tail-action:1',
+        text: '判断是否需要写入复盘。',
+        sourcePath: 'work/active/release.md',
+      },
+    );
+
+    expect(completed).toBe(true);
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'work/active/release.md',
+      [
+        '# 发布推进',
+        '',
+        '## 收尾动作',
+        '',
+        '- [ ] 根据 ActionRun 更新事项状态。',
+        '- [x] 判断是否需要写入复盘。',
+        '',
+        '## 复盘',
+        '',
+        '- [ ] 这里不是收尾动作。',
+      ].join('\n'),
+    );
+  });
+
+  it('writes a review draft for a Dashboard review tail action without checking off the source matter', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'work/active/release.md') {
+        return ['# 发布推进', '', '## 复盘', '', '- 暂无', '', '## 收尾动作', '', '- [ ] 判断是否需要写入复盘。'].join(
+          '\n',
+        );
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const draft = await writeWorkbenchReviewDraft(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'work/active/release.md:tail-action:1',
+        createdAt: new Date('2026-06-28T10:00:00.000Z'),
+      },
+    );
+
+    expect(draft.path).toBe('reviews/weekly/2026-06-28-work-release-tail-action-1-review.md');
+    expect(draft.content).toContain('source: desktop-workbench-review-tail-action');
+    expect(draft.content).toContain('workItemPath: work/active/release.md');
+    expect(draft.content).toContain('tailActionId: work/active/release.md:tail-action:1');
+    expect(draft.content).toContain('## 核对清单');
+    expect(draft.content).toContain('- [ ] 核对来源事项目标、验收标准和当前状态。');
+    expect(draft.content).toContain('- [ ] 判断是否需要把该尾动作标记完成。');
+    expect(writeText).toHaveBeenCalledTimes(2);
+    expect(writeText).toHaveBeenCalledWith('/repo', draft.path, draft.content);
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'work/active/release.md',
+      [
+        '# 发布推进',
+        '',
+        '## 复盘',
+        '',
+        '- [2026-06-28 复盘草稿](../../reviews/weekly/2026-06-28-work-release-tail-action-1-review.md) - 来源尾动作: `work/active/release.md:tail-action:1`',
+        '',
+        '## 收尾动作',
+        '',
+        '- [ ] 判断是否需要写入复盘。',
+      ].join('\n'),
+    );
+  });
+
+  it('writes a review draft for a plan execution source record without pretending it is a checklist tail action', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'work/active/release.md') {
+        return ['# 发布推进', '', '## 复盘', '', '- 暂无', '', '## 收尾动作', '', '- [ ] 判断是否需要写入复盘。'].join(
+          '\n',
+        );
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const draft = await writeWorkbenchReviewDraft(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'action-run-review:run-1',
+        createdAt: new Date('2026-06-28T10:00:00.000Z'),
+      },
+    );
+
+    expect(draft.path).toBe('reviews/weekly/2026-06-28-work-release-action-run-review-run-1-review.md');
+    expect(draft.content).toContain('source: desktop-workbench-review-source-execution');
+    expect(draft.content).toContain('workItemPath: work/active/release.md');
+    expect(draft.content).toContain('tailActionId: action-run-review:run-1');
+    expect(draft.content).toContain('sourceExecutionId: action-run-review:run-1');
+    expect(draft.content).toContain('来源执行记录: `action-run-review:run-1`');
+    expect(draft.content).not.toContain('来源尾动作: `action-run-review:run-1`');
+    expect(writeText).toHaveBeenCalledWith('/repo', draft.path, draft.content);
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'work/active/release.md',
+      [
+        '# 发布推进',
+        '',
+        '## 复盘',
+        '',
+        '- [2026-06-28 复盘草稿](../../reviews/weekly/2026-06-28-work-release-action-run-review-run-1-review.md) - 来源执行记录: `action-run-review:run-1`',
+        '',
+        '## 收尾动作',
+        '',
+        '- [ ] 判断是否需要写入复盘。',
+      ].join('\n'),
+    );
+  });
+
+  it('writes related knowledge ActionRuns into a plan execution review draft', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'work/active/release.md') {
+        return ['# 发布推进', '', '## 复盘', '', '- 暂无'].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const input = {
+      workItemPath: 'work/active/release.md',
+      tailActionId: 'action-run-review:run-1',
+      relatedKnowledgeRunIds: ['run-knowledge'],
+      createdAt: new Date('2026-06-28T10:00:00.000Z'),
+    };
+    const draft = await writeWorkbenchReviewDraft(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      input,
+    );
+
+    expect(draft.content).toContain('relatedKnowledgeRunIds: run-knowledge');
+    expect(draft.content).toContain('相关知识更新 ActionRun: `run-knowledge`');
+    expect(draft.content).toContain('- [ ] 核对相关知识更新 ActionRun 是否已写入 Wiki/index/log 或确认无需写入。');
+  });
+
+  it('writes related knowledge ActionRun status and summaries into a plan execution review draft', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'work/active/release.md') {
+        return ['# 发布推进', '', '## 复盘', '', '- 暂无'].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const draft = await writeWorkbenchReviewDraft(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'action-run-review:run-1',
+        relatedKnowledgeRuns: [
+          {
+            id: 'run-knowledge-done',
+            status: 'done',
+            resultSummary: '已写入知识库文件：3 个（wiki/release.md, wiki/index.md, wiki/log.md）',
+          },
+          {
+            id: 'run-knowledge-no-write',
+            status: 'done',
+            resultSummary: 'no_write_needed：现有知识库已经覆盖。',
+          },
+        ],
+        createdAt: new Date('2026-06-28T10:00:00.000Z'),
+      },
+    );
+
+    expect(draft.content).toContain('relatedKnowledgeRunIds: run-knowledge-done, run-knowledge-no-write');
+    expect(draft.content).toContain('## 相关知识更新');
+    expect(draft.content).toContain(
+      '| `run-knowledge-done` | done | 已写入知识库文件：3 个（wiki/release.md, wiki/index.md, wiki/log.md） |',
+    );
+    expect(draft.content).toContain('| `run-knowledge-no-write` | done | no_write_needed：现有知识库已经覆盖。 |');
+    expect(draft.content).toContain(
+      '- `run-knowledge-done` 写入路径: `wiki/release.md`, `wiki/index.md`, `wiki/log.md`',
+    );
+  });
+
+  it('writes a review draft for a repository asset execution run and links it to the work item', async () => {
+    const runPath = 'runs/assets/20260629-010203-tools-release-check-sh.md';
+    const reviewPath = 'reviews/weekly/2026-06-29-asset-run-tools-release-check-sh-review.md';
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === runPath) {
+        return [
+          '---',
+          'title: "仓库资产执行 - 发布检查脚本"',
+          'source: desktop-repository-asset-execution',
+          'assetId: tools-release-check-sh',
+          'assetPath: tools/release-check.sh',
+          'assetReuseKind: script',
+          'status: succeeded',
+          'runner: Gateway Agent',
+          'command: bash tools/release-check.sh',
+          'repositoryOutputPath: outputs/reports/release-check.md',
+          'workItemPath: work/active/release.md',
+          `runPath: ${runPath}`,
+          'executedAt: 2026-06-29T01:02:03.000Z',
+          'recordOnly: true',
+          'desktopExecutes: false',
+          'grantsPermission: false',
+          '---',
+          '',
+          '# 仓库资产执行：发布检查脚本',
+          '',
+          '## 摘要',
+          '',
+          '- 执行结果：发布检查通过',
+        ].join('\n');
+      }
+      if (relativePath === 'work/active/release.md') {
+        return ['# 发布推进', '', '## 复盘', '', '- 暂无'].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const draft = await writeWorkbenchAssetRunReviewDraft(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        assetRunPath: runPath,
+        createdAt: new Date('2026-06-29T08:00:00.000Z'),
+      },
+    );
+
+    expect(draft.path).toBe(reviewPath);
+    expect(draft.content).toContain('source: desktop-repository-asset-execution-review');
+    expect(draft.content).toContain(`assetRunPath: ${runPath}`);
+    expect(draft.content).toContain('assetId: tools-release-check-sh');
+    expect(draft.content).toContain('assetReuseKind: script');
+    expect(draft.content).toContain('executionStatus: succeeded');
+    expect(draft.content).toContain('repositoryOutputPath: outputs/reports/release-check.md');
+    expect(draft.content).toContain('workItemPath: work/active/release.md');
+    expect(draft.content).toContain('# 仓库资产执行复盘：发布检查脚本');
+    expect(draft.content).toContain('- 执行结果：发布检查通过');
+    expect(draft.content).toContain('- [ ] 判断本次运行结果是否应该沉淀为成果或关联到既有成果。');
+    expect(draft.content).toContain('- Desktop 只写入复盘记录，不执行资产、不授予权限。');
+    expect(writeText).toHaveBeenCalledWith('/repo', reviewPath, draft.content);
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'work/active/release.md',
+      [
+        '# 发布推进',
+        '',
+        '## 复盘',
+        '',
+        `- [2026-06-29 资产运行复盘草稿](../../${reviewPath}) - 来源资产运行: \`${runPath}\``,
+      ].join('\n'),
+    );
+  });
+
+  it('confirms a repository asset execution review draft without completing a source tail action', async () => {
+    const runPath = 'runs/assets/20260629-010203-tools-release-check-sh.md';
+    const reviewPath = 'reviews/weekly/2026-06-29-asset-run-tools-release-check-sh-review.md';
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === reviewPath) {
+        return [
+          '---',
+          'source: desktop-repository-asset-execution-review',
+          `assetRunPath: ${runPath}`,
+          'assetId: tools-release-check-sh',
+          'assetReuseKind: script',
+          'executionStatus: succeeded',
+          'workItemPath: work/active/release.md',
+          'createdAt: 2026-06-29T08:00:00.000Z',
+          'status: draft',
+          'recordOnly: true',
+          'desktopExecutes: false',
+          'grantsPermission: false',
+          '---',
+          '',
+          '# 仓库资产执行复盘：发布检查脚本',
+          '',
+          '## 复盘正文',
+          '',
+          '- 本次推进：发布检查通过。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const confirmed = await confirmWorkbenchAssetRunReviewDraft(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        reviewPath,
+        assetRunPath: runPath,
+        reviewedAt: new Date('2026-06-29T09:00:00.000Z'),
+      },
+    );
+
+    expect(confirmed).toBe(true);
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(writeText).toHaveBeenCalledWith('/repo', reviewPath, expect.stringContaining('status: confirmed'));
+    const reviewWrite = (writeText.mock.calls[0] as unknown as [string, string, string])[2];
+    expect(reviewWrite).toContain('reviewedAt: 2026-06-29T09:00:00.000Z');
+    expect(reviewWrite).toContain(`assetRunPath: ${runPath}`);
+    expect(reviewWrite).not.toContain('status: draft');
+  });
+
+  it('confirms a review draft and completes the matching source tail action', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'reviews/weekly/2026-06-28-work-release-tail-action-1-review.md') {
+        return [
+          '---',
+          'source: desktop-workbench-review-tail-action',
+          'workItemPath: work/active/release.md',
+          'tailActionId: work/active/release.md:tail-action:1',
+          'createdAt: 2026-06-28T10:00:00.000Z',
+          'status: draft',
+          '---',
+          '',
+          '# release 复盘草稿',
+          '',
+          '## 复盘正文',
+          '',
+          '- 本次推进：已经完成验证。',
+        ].join('\n');
+      }
+      if (relativePath === 'work/active/release.md') {
+        return [
+          '# 发布推进',
+          '',
+          '## 收尾动作',
+          '',
+          '- [ ] 根据 ActionRun 更新事项状态。',
+          '- [ ] 判断是否需要写入复盘。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const confirmed = await confirmWorkbenchReviewDraft(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        reviewPath: 'reviews/weekly/2026-06-28-work-release-tail-action-1-review.md',
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'work/active/release.md:tail-action:1',
+        reviewedAt: new Date('2026-06-28T11:00:00.000Z'),
+      },
+    );
+
+    expect(confirmed).toBe(true);
+    expect(writeText).toHaveBeenCalledTimes(2);
+    const reviewWrite = writeText.mock.calls[0] as unknown as [string, string, string];
+    expect(reviewWrite).toEqual([
+      '/repo',
+      'reviews/weekly/2026-06-28-work-release-tail-action-1-review.md',
+      expect.stringContaining('status: confirmed'),
+    ]);
+    expect(reviewWrite[2]).toContain('reviewedAt: 2026-06-28T11:00:00.000Z');
+    expect(reviewWrite[2]).not.toContain('status: draft');
+    expect(writeText.mock.calls[1]).toEqual([
+      '/repo',
+      'work/active/release.md',
+      ['# 发布推进', '', '## 收尾动作', '', '- [ ] 根据 ActionRun 更新事项状态。', '- [x] 判断是否需要写入复盘。'].join(
+        '\n',
+      ),
+    ]);
+  });
+
+  it('confirms a plan execution review draft without completing a source tail action', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'reviews/weekly/2026-06-28-work-release-action-run-review-run-1-review.md') {
+        return [
+          '---',
+          'source: desktop-workbench-review-source-execution',
+          'workItemPath: work/active/release.md',
+          'tailActionId: action-run-review:run-1',
+          'sourceExecutionId: action-run-review:run-1',
+          'createdAt: 2026-06-28T10:00:00.000Z',
+          'status: draft',
+          '---',
+          '',
+          '# release 复盘草稿',
+          '',
+          '## 复盘正文',
+          '',
+          '- 本次推进：计划执行完成，知识更新已核对。',
+        ].join('\n');
+      }
+      if (relativePath === 'work/active/release.md') {
+        return [
+          '# 发布推进',
+          '',
+          '## 收尾动作',
+          '',
+          '- [ ] 根据 ActionRun 更新事项状态。',
+          '- [ ] 判断是否需要写入复盘。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const confirmed = await confirmWorkbenchReviewDraft(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        reviewPath: 'reviews/weekly/2026-06-28-work-release-action-run-review-run-1-review.md',
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'action-run-review:run-1',
+        reviewedAt: new Date('2026-06-28T11:00:00.000Z'),
+      },
+    );
+
+    expect(confirmed).toBe(true);
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(writeText.mock.calls[0]).toEqual([
+      '/repo',
+      'reviews/weekly/2026-06-28-work-release-action-run-review-run-1-review.md',
+      expect.stringContaining('status: confirmed'),
+    ]);
+    expect((writeText.mock.calls[0] as unknown as [string, string, string])[2]).toContain(
+      'reviewedAt: 2026-06-28T11:00:00.000Z',
+    );
+  });
+
+  it('updates a work item status and completes the matching status tail action', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'work/active/release.md') {
+        return [
+          '---',
+          'id: release',
+          'status: active',
+          'source: desktop-onboarding',
+          '---',
+          '',
+          '# 发布推进',
+          '',
+          '## 收尾动作',
+          '',
+          '- [ ] 根据 ActionRun 更新事项状态。',
+          '- [ ] 判断是否需要写入复盘。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const updated = await updateWorkbenchMatterStatusFromTailAction(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'work/active/release.md:tail-action:0',
+        status: 'blocked',
+      },
+    );
+
+    expect(updated).toBe(true);
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(writeText.mock.calls[0]).toEqual([
+      '/repo',
+      'work/active/release.md',
+      [
+        '---',
+        'id: release',
+        'status: blocked',
+        'source: desktop-onboarding',
+        '---',
+        '',
+        '# 发布推进',
+        '',
+        '## 收尾动作',
+        '',
+        '- [x] 根据 ActionRun 更新事项状态。',
+        '- [ ] 判断是否需要写入复盘。',
+      ].join('\n'),
+    ]);
+  });
+
+  it('refuses unknown work item status values from status tail actions', async () => {
+    const readText = vi.fn(async () =>
+      [
+        '---',
+        'id: release',
+        'status: active',
+        '---',
+        '',
+        '## 收尾动作',
+        '',
+        '- [ ] 根据 ActionRun 更新事项状态。',
+      ].join('\n'),
+    );
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const updated = await updateWorkbenchMatterStatusFromTailAction(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'work/active/release.md:tail-action:0',
+        status: 'finished',
+      },
+    );
+
+    expect(updated).toBe(false);
+    expect(readText).not.toHaveBeenCalled();
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it('archives a done active work item into completed work through an explicit move', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'work/active/release.md') {
+        return [
+          '---',
+          'id: release',
+          'status: done',
+          '---',
+          '',
+          '# 发布推进',
+          '',
+          '## 执行记录',
+          '',
+          '- 已完成验收。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const moveText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, moveText },
+      },
+    });
+
+    const archived = await archiveCompletedWorkbenchMatter(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      { workItemPath: 'work/active/release.md' },
+    );
+
+    expect(archived).toEqual({ archived: true, archivedPath: 'work/completed/release.md' });
+    expect(moveText).toHaveBeenCalledWith('/repo', 'work/active/release.md', 'work/completed/release.md');
+  });
+
+  it('refuses to archive active work items before the status is done', async () => {
+    const readText = vi.fn(async () => ['---', 'status: active', '---', '', '# 发布推进'].join('\n'));
+    const moveText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, moveText },
+      },
+    });
+
+    const archived = await archiveCompletedWorkbenchMatter(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      { workItemPath: 'work/active/release.md' },
+    );
+
+    expect(archived).toEqual({ archived: false });
+    expect(moveText).not.toHaveBeenCalled();
+  });
+
+  it('links a preserved artifact to the work item and completes the matching output tail action', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'work/active/release.md') {
+        return [
+          '---',
+          'id: release',
+          'status: active',
+          '---',
+          '',
+          '# 发布推进',
+          '',
+          '## 关联成果',
+          '',
+          '- 暂无',
+          '',
+          '## 收尾动作',
+          '',
+          '- [ ] 根据 ActionRun 更新事项状态。',
+          '- [ ] 判断是否需要把本次执行结果沉淀为成果，并关联到事项。',
+          '- [ ] 判断是否需要更新知识库。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const updated = await preserveWorkbenchOutputFromTailAction(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'work/active/release.md:tail-action:1',
+        artifact: {
+          id: 'art_1',
+          title: '发布报告',
+          type: 'report',
+          repositoryOutputPath: 'outputs/reports/art_1.md',
+          repositoryPreviewPath: 'outputs/html/art_1.html',
+        },
+      },
+    );
+
+    expect(updated).toBe(true);
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'work/active/release.md',
+      [
+        '---',
+        'id: release',
+        'status: active',
+        '---',
+        '',
+        '# 发布推进',
+        '',
+        '## 关联成果',
+        '',
+        '- [发布报告](../../outputs/reports/art_1.md) (`art_1`, report)',
+        '  - preview: outputs/html/art_1.html',
+        '',
+        '## 收尾动作',
+        '',
+        '- [ ] 根据 ActionRun 更新事项状态。',
+        '- [x] 判断是否需要把本次执行结果沉淀为成果，并关联到事项。',
+        '- [ ] 判断是否需要更新知识库。',
+      ].join('\n'),
+    );
+  });
+
+  it('confirms a knowledge tail action without changing other work state', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'work/active/release.md') {
+        return [
+          '---',
+          'id: release',
+          'status: active',
+          '---',
+          '',
+          '# 发布推进',
+          '',
+          '## 收尾动作',
+          '',
+          '- [ ] 根据 ActionRun 更新事项状态。',
+          '- [ ] 判断是否需要更新知识库。',
+          '- [ ] 判断是否需要写入复盘。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const confirmed = await confirmWorkbenchKnowledgeTailAction(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'work/active/release.md:tail-action:1',
+      },
+    );
+
+    expect(confirmed).toBe(true);
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      'work/active/release.md',
+      [
+        '---',
+        'id: release',
+        'status: active',
+        '---',
+        '',
+        '# 发布推进',
+        '',
+        '## 收尾动作',
+        '',
+        '- [ ] 根据 ActionRun 更新事项状态。',
+        '- [x] 判断是否需要更新知识库。',
+        '- [ ] 判断是否需要写入复盘。',
+      ].join('\n'),
+    );
+  });
+
+  it('refuses to confirm a non-knowledge tail action through the knowledge path', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'work/active/release.md') {
+        return [
+          '# 发布推进',
+          '',
+          '## 收尾动作',
+          '',
+          '- [ ] 根据 ActionRun 更新事项状态。',
+          '- [ ] 判断是否需要把本次执行结果沉淀为成果，并关联到事项。',
+          '- [ ] 判断是否需要更新知识库。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const confirmed = await confirmWorkbenchKnowledgeTailAction(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'work/active/release.md:tail-action:0',
+      },
+    );
+
+    expect(confirmed).toBe(false);
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it('records an output-preservation diagnostic artifact without requiring a checklist tail action id', async () => {
+    const readText = vi.fn(async () =>
+      ['# 发布推进', '', '## 执行记录', '', '- 已生成发布报告', '', '## 关联成果', '', '- 暂无'].join('\n'),
+    );
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const updated = await preserveWorkbenchOutputFromTailAction(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'action-run-output:run_1',
+        artifact: {
+          id: 'art_1',
+          title: '发布报告',
+          type: 'report',
+        },
+      },
+    );
+
+    expect(updated).toBe(true);
+    expect(writeText.mock.calls[0]).toEqual([
+      '/repo',
+      'work/active/release.md',
+      [
+        '# 发布推进',
+        '',
+        '## 执行记录',
+        '',
+        '- 已生成发布报告',
+        '',
+        '## 关联成果',
+        '',
+        '- [发布报告](artifact://art_1) (`art_1`, report)',
+      ].join('\n'),
+    ]);
+  });
+
+  it('refuses to confirm a review draft that belongs to another tail action', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'reviews/weekly/2026-06-28-work-release-tail-action-1-review.md') {
+        return [
+          '---',
+          'source: desktop-workbench-review-tail-action',
+          'workItemPath: work/active/other.md',
+          'tailActionId: work/active/other.md:tail-action:1',
+          'createdAt: 2026-06-28T10:00:00.000Z',
+          'status: draft',
+          '---',
+          '',
+          '# other 复盘草稿',
+        ].join('\n');
+      }
+      if (relativePath === 'work/active/release.md') {
+        return [
+          '# 发布推进',
+          '',
+          '## 收尾动作',
+          '',
+          '- [ ] 根据 ActionRun 更新事项状态。',
+          '- [ ] 判断是否需要写入复盘。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const confirmed = await confirmWorkbenchReviewDraft(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        reviewPath: 'reviews/weekly/2026-06-28-work-release-tail-action-1-review.md',
+        workItemPath: 'work/active/release.md',
+        tailActionId: 'work/active/release.md:tail-action:1',
+        reviewedAt: new Date('2026-06-28T11:00:00.000Z'),
+      },
+    );
+
+    expect(confirmed).toBe(false);
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it('writes an approved work-matter plan and links it back to the source matter', async () => {
+    const writes: Array<{ path: string; content: string }> = [];
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'work/active/release.md') {
+        return [
+          '---',
+          'id: release',
+          'status: active',
+          '---',
+          '',
+          '# 发布事项',
+          '',
+          '## 关联计划',
+          '',
+          '- 暂无',
+          '',
+          '## 执行记录',
+          '',
+          '- 暂无',
+        ].join('\n');
+      }
+      if (relativePath === 'plans/active/release-plan.md') return '';
+      return '';
+    });
+    const writeText = vi.fn(async (_repoPath: string, relativePath: string, content: string) => {
+      writes.push({ path: relativePath, content });
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const result = await applyWorkbenchMatterPlanApproval(
+      createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      {
+        actionRunId: 'action-plan-1',
+        workItemPath: 'work/active/release.md',
+        repositoryWrite: {
+          path: 'plans/active/release-plan.md',
+          workItemPath: 'work/active/release.md',
+          content: '# 发布计划\n\n## 验收标准\n\n- 完成桌面版发布。',
+        },
+        approvedAt: new Date('2026-06-28T12:00:00.000Z'),
+      },
+    );
+
+    expect(result).toEqual({
+      planPath: 'plans/active/release-plan.md',
+      workItemPath: 'work/active/release.md',
+    });
+    expect(writes[0]).toMatchObject({ path: 'plans/active/release-plan.md' });
+    expect(writes[0].content).toContain('source: work_matter_plan');
+    expect(writes[0].content).toContain('workItemPath: work/active/release.md');
+    expect(writes[0].content).toContain('actionRunId: action-plan-1');
+    expect(writes[0].content).toContain('approval: approved');
+    expect(writes[0].content).toContain('# 发布计划');
+    expect(writes[1]).toMatchObject({ path: 'work/active/release.md' });
+    expect(writes[1].content).toContain('- [发布计划](../../plans/active/release-plan.md)');
+    expect(writes[1].content).toContain('action: `action-plan-1`');
+    expect(writes[1].content).not.toContain('## 关联计划\n\n- 暂无');
+  });
+
+  it('rejects approved work-matter plan writes outside plans/active', async () => {
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: {
+          readText: vi.fn(async () => ''),
+          writeText: vi.fn(),
+        },
+      },
+    });
+
+    await expect(
+      applyWorkbenchMatterPlanApproval(
+        createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+        {
+          actionRunId: 'action-plan-1',
+          workItemPath: 'work/active/release.md',
+          repositoryWrite: {
+            path: 'plans/completed/release-plan.md',
+            workItemPath: 'work/active/release.md',
+            content: '# 发布计划',
+          },
+        },
+      ),
+    ).rejects.toThrow('plans/active');
   });
 
   it('reads selected workbench markdown for inline preview', async () => {
@@ -399,6 +1492,197 @@ describe('repository workbench', () => {
     expect(source).toContain("navigate('/actions')");
   });
 
+  it('lets a work matter start a plan-generation ActionRun before execution', () => {
+    const source = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
+    const actionCenterPage = readFileSync('src/pages/ActionCenterPage.tsx', 'utf8');
+    const promptSource = readFileSync('src/lib/ai-action-prompts.ts', 'utf8');
+    const zh = readFileSync('src/locales/zh.json', 'utf8');
+    const en = readFileSync('src/locales/en.json', 'utf8');
+
+    expect(source).toContain('buildWorkMatterPlanPrompt');
+    expect(source).toContain("type: 'work_matter_plan'");
+    expect(source).toContain("sourcePage: 'workbench'");
+    expect(actionCenterPage).toContain('applyWorkbenchMatterPlanApproval');
+    expect(actionCenterPage).toContain('approval.repositoryWrite');
+    expect(actionCenterPage).toContain('encodeURIComponent(writeResult.planPath)');
+    expect(actionCenterPage).toContain('`/workbench?view=plans&planPath=${encodeURIComponent(writeResult.planPath)}`');
+    expect(source).toContain('initialPlanPath');
+    expect(source).toContain('openedInitialPlanPath');
+    expect(source).toContain('setSelectedPreviewPath(initialPlanPath)');
+    expect(source).toContain('workItemId: selectedWorkItemId');
+    expect(source).toContain('workItemPath: selectedWorkItemPath');
+    expect(source).toContain("t('workbench.generatePlanForMatter')");
+    expect(source).toContain("t('workbench.generatePlanActionTitle')");
+    expect(source).toContain('`/actions?runId=${encodeURIComponent(latestRun.id)}`');
+    expect(actionCenterPage).toContain('getActionCenterSearchRunId');
+    expect(actionCenterPage).toContain('selectedSearchRunId');
+    expect(actionCenterPage).toContain('setSelectedRunId(selectedSearchRunId)');
+    expect(promptSource).toContain('workMatterPlanTemplate');
+    expect(promptSource).toContain('buildWorkMatterPlanPrompt');
+    expect(actionCenterPage).toContain("work_matter_plan: 'actions.typeWorkMatterPlan'");
+    expect(zh).toContain('"generatePlanForMatter": "生成计划"');
+    expect(zh).toContain('"typeWorkMatterPlan": "事项计划生成"');
+    expect(en).toContain('"generatePlanForMatter": "Generate Plan"');
+    expect(en).toContain('"typeWorkMatterPlan": "Matter Plan Generation"');
+  });
+
+  it('lets an active plan start an execution ActionRun with plan and work context', () => {
+    const source = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
+    const promptSource = readFileSync('src/lib/ai-action-prompts.ts', 'utf8');
+    const zh = readFileSync('src/locales/zh.json', 'utf8');
+    const en = readFileSync('src/locales/en.json', 'utf8');
+
+    expect(source).toContain('buildPlanExecutePrompt');
+    expect(source).toContain("type: 'plan_execute'");
+    expect(source).toContain("sourcePage: 'workbench'");
+    expect(source).toContain('planPath: selectedPlanPath');
+    expect(source).toContain('safeSelectedPlanWorkItemPath');
+    expect(source).toContain('isWorkbenchMatterPath(selectedPlanMetadata.workItemPath)');
+    expect(source).toContain('workItemPath: safeSelectedPlanWorkItemPath');
+    expect(source).toContain("t('workbench.executePlanForMatter')");
+    expect(source).toContain("t('workbench.executePlanActionTitle')");
+    expect(source).toContain('`/actions?runId=${encodeURIComponent(latestRun.id)}`');
+    expect(promptSource).toContain('planExecuteTemplate');
+    expect(promptSource).toContain('buildPlanExecutePrompt');
+    expect(zh).toContain('"executePlanForMatter": "执行计划"');
+    expect(en).toContain('"executePlanForMatter": "Execute Plan"');
+  });
+
+  it('surfaces the latest plan execution state in Workbench plans without mutating plans', () => {
+    const source = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
+    const zh = readFileSync('src/locales/zh.json', 'utf8');
+    const en = readFileSync('src/locales/en.json', 'utf8');
+
+    expect(source).toContain('findLatestPlanExecutionRun');
+    expect(source).toContain('renderPlanExecutionState');
+    expect(source).toContain("t('workbench.latestPlanExecution')");
+    expect(source).toContain("t('workbench.openPlanExecutionRuns')");
+    expect(source).toContain('`/actions?runId=${encodeURIComponent(run.id)}`');
+    expect(source).toContain('`/actions?runId=${encodeURIComponent(selectedPlanLatestRun.id)}`');
+    expect(source).toContain('setActivityRuns(runs)');
+    expect(source).not.toContain('setActivityRuns(runs.slice(0, 5))');
+    expect(zh).toContain('"latestPlanExecution": "最近执行"');
+    expect(en).toContain('"latestPlanExecution": "Latest execution"');
+  });
+
+  it('lets completed plan execution preserve output through the existing Artifacts tail-action route', () => {
+    const source = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
+    const zh = readFileSync('src/locales/zh.json', 'utf8');
+    const en = readFileSync('src/locales/en.json', 'utf8');
+
+    expect(source).toContain('shouldOfferPlanExecutionOutputPreservation');
+    expect(source).toContain('getPlanExecutionPostReviewActionSuggestion');
+    expect(source).toContain('selectedPlanOutputSuggestion');
+    expect(source).toContain('selectedPlanReviewState');
+    expect(source).toContain('buildDashboardTailActionTarget');
+    expect(source).toContain("kind: 'output'");
+    expect(source).toContain('`action-run-output:${selectedPlanLatestRun.id}`');
+    expect(source).toContain('workItemPath: selectedPlanLatestRun.workItemPath');
+    expect(source).toContain('selectedPlanOutputSuggestion.labelKey');
+    expect(zh).toContain('"preservePlanExecutionOutput": "沉淀成果"');
+    expect(zh).toContain('"preserveReviewedPlanExecutionOutput": "复盘后沉淀成果"');
+    expect(zh).toContain('"preserveReviewedPlanExecutionOutputHint": "复盘已确认，仍需显式保存成果后才会写回来源事项"');
+    expect(en).toContain('"preservePlanExecutionOutput": "Preserve Output"');
+    expect(en).toContain('"preserveReviewedPlanExecutionOutput": "Preserve Reviewed Output"');
+    expect(en).toContain(
+      '"preserveReviewedPlanExecutionOutputHint": "Review is confirmed; explicitly save the output before Desktop links it back to the source matter"',
+    );
+  });
+
+  it('lets completed plan execution start knowledge update through the existing Knowledge tail-action route', () => {
+    const source = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
+    const zh = readFileSync('src/locales/zh.json', 'utf8');
+    const en = readFileSync('src/locales/en.json', 'utf8');
+
+    expect(source).toContain('shouldOfferPlanExecutionKnowledgeUpdate');
+    expect(source).toContain('getPlanExecutionPostReviewActionSuggestion');
+    expect(source).toContain('selectedPlanKnowledgeSuggestion');
+    expect(source).toContain('selectedPlanReviewState');
+    expect(source).toContain('actionRuns: activityRuns');
+    expect(source).toContain('buildDashboardTailActionTarget');
+    expect(source).toContain("kind: 'knowledge'");
+    expect(source).toContain('`action-run-knowledge:${selectedPlanLatestRun.id}`');
+    expect(source).toContain('workItemPath: selectedPlanLatestRun.workItemPath');
+    expect(source).toContain('selectedPlanKnowledgeSuggestion.labelKey');
+    expect(zh).toContain('"updatePlanExecutionKnowledge": "更新知识"');
+    expect(zh).toContain('"updateReviewedPlanExecutionKnowledge": "复盘后更新知识"');
+    expect(zh).toContain('"updateReviewedPlanExecutionKnowledgeHint": "复盘已确认，仍需显式发起知识更新并审批写入"');
+    expect(en).toContain('"updatePlanExecutionKnowledge": "Update Knowledge"');
+    expect(en).toContain('"updateReviewedPlanExecutionKnowledge": "Update Reviewed Knowledge"');
+    expect(en).toContain(
+      '"updateReviewedPlanExecutionKnowledgeHint": "Review is confirmed; explicitly start the knowledge update and approve any repository write"',
+    );
+  });
+
+  it('lets completed plan execution start a review draft through the existing Workbench review route', () => {
+    const source = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
+    const planExecution = readFileSync('src/lib/workbench-plan-execution.ts', 'utf8');
+    const zh = readFileSync('src/locales/zh.json', 'utf8');
+    const en = readFileSync('src/locales/en.json', 'utf8');
+
+    expect(source).toContain('shouldOfferPlanExecutionReview');
+    expect(source).toContain('findPlanExecutionKnowledgeUpdateState');
+    expect(source).toContain('getPlanExecutionKnowledgeReviewSuggestion');
+    expect(source).toContain('selectedPlanKnowledgeUpdateState');
+    expect(source).toContain('selectedPlanReviewSuggestion');
+    expect(source).toContain('findPlanExecutionReviewState');
+    expect(source).toContain('selectedPlanReviewState');
+    expect(source).toContain('workbench.planExecutionKnowledgeNoWrite');
+    expect(source).toContain('workbench.planExecutionKnowledgeAwaitingApproval');
+    expect(source).toContain('workbench.planExecutionReviewDraft');
+    expect(source).toContain('workbench.planExecutionReviewConfirmed');
+    expect(source).toContain('reviewDocuments: snapshot?.reviewDocuments');
+    expect(source).toContain('relatedKnowledgeRunIds');
+    expect(source).toContain('relatedKnowledgeRuns');
+    expect(source).toContain('selectedPlanRelatedKnowledgeRunIds');
+    expect(planExecution).toContain('workbench.writePlanExecutionReviewWithKnowledge');
+    expect(planExecution).toContain('workbench.writePlanExecutionReviewWithKnowledgeHint');
+    expect(planExecution).toContain('workbench.writePlanExecutionReviewAfterKnowledgeWrite');
+    expect(planExecution).toContain('workbench.writePlanExecutionReviewAfterKnowledgeNoWrite');
+    expect(source).toContain('buildDashboardTailActionTarget');
+    expect(source).toContain("kind: 'review'");
+    expect(source).toContain('`action-run-review:${selectedPlanLatestRun.id}`');
+    expect(source).toContain('workItemPath: selectedPlanLatestRun.workItemPath');
+    expect(planExecution).toContain("'workbench.writePlanExecutionReview'");
+    expect(zh).toContain('"writePlanExecutionReview": "写复盘"');
+    expect(zh).toContain('"writePlanExecutionReviewWithKnowledge": "复盘知识更新"');
+    expect(zh).toContain('"writePlanExecutionReviewWithKnowledgeHint": "复盘草稿会带入同源知识更新记录"');
+    expect(zh).toContain('"writePlanExecutionReviewAfterKnowledgeWrite": "复盘知识写入"');
+    expect(zh).toContain('"writePlanExecutionReviewAfterKnowledgeNoWrite": "复盘无需写入"');
+    expect(zh).toContain('"planExecutionKnowledgeNoWrite": "知识无需写入"');
+    expect(zh).toContain('"planExecutionKnowledgeAwaitingApproval": "知识待审批"');
+    expect(zh).toContain('"planExecutionReviewDraft": "复盘草稿"');
+    expect(zh).toContain('"planExecutionReviewConfirmed": "已复盘"');
+    expect(en).toContain('"writePlanExecutionReview": "Write Review"');
+    expect(en).toContain('"writePlanExecutionReviewWithKnowledge": "Review Knowledge Update"');
+    expect(en).toContain(
+      '"writePlanExecutionReviewWithKnowledgeHint": "The review draft will include source-bound knowledge updates"',
+    );
+    expect(en).toContain('"writePlanExecutionReviewAfterKnowledgeWrite": "Review Knowledge Write"');
+    expect(en).toContain('"writePlanExecutionReviewAfterKnowledgeNoWrite": "Review No-Write Decision"');
+    expect(en).toContain('"planExecutionKnowledgeNoWrite": "Knowledge No Write"');
+    expect(en).toContain('"planExecutionKnowledgeAwaitingApproval": "Knowledge Approval"');
+    expect(en).toContain('"planExecutionReviewDraft": "Review Draft"');
+    expect(en).toContain('"planExecutionReviewConfirmed": "Review Confirmed"');
+  });
+
+  it('wires ActionCenter unassigned ActionRun backfill to repository work items', () => {
+    const page = readFileSync('src/pages/ActionCenterPage.tsx', 'utf8');
+    const zh = readFileSync('src/locales/zh.json', 'utf8');
+    const en = readFileSync('src/locales/en.json', 'utf8');
+
+    expect(page).toContain('assignAiActionRunToWorkItem');
+    expect(page).toContain('loadRepositoryBinding');
+    expect(page).toContain('loadWorkbenchSnapshot');
+    expect(page).toContain('selectedAssignmentPath');
+    expect(page).toContain('selectedRun.workItemRequired && !selectedRun.workItemPath');
+    expect(page).toContain("t('actions.assignWorkItem')");
+    expect(page).toContain("t('actions.fieldWorkItem')");
+    expect(page).toContain("t('actions.fieldWorkItemUnassignedReason')");
+    expect(zh).toContain('"assignWorkItem": "关联事项"');
+    expect(en).toContain('"assignWorkItem": "Assign Work Item"');
+  });
+
   it('renders semantic Workbench sections and keeps default fallback components', () => {
     const panel = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
     const kanban = readFileSync('src/components/RepositoryWorkbenchKanban.tsx', 'utf8');
@@ -407,6 +1691,8 @@ describe('repository workbench', () => {
     expect(panel).toContain('renderDashboardView');
     expect(panel).toContain('renderTasksView');
     expect(panel).toContain('renderOutputsView');
+    expect(panel).toContain('buildArtifactOutputDescription(artifact)');
+    expect(panel).toContain('typeKey: artifact.reuseKind ?? artifact.externalFormat ?? artifact.type');
     expect(panel).toContain('snapshot?.semanticSections');
     expect(panel).toContain('section.confidence');
     expect(panel).toContain('section.reason');

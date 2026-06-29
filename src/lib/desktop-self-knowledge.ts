@@ -1,0 +1,356 @@
+export const DESKTOP_SELF_KNOWLEDGE_SKILL_NAME = 'openclaw-desktop-operator';
+export const DESKTOP_SELF_KNOWLEDGE_SKILL_PATH = 'skills/openclaw-desktop-operator/SKILL.md';
+
+export const OPENCLAW_DESKTOP_SELF_KNOWLEDGE_START = '<!-- OPENCLAW_DESKTOP_SELF_KNOWLEDGE:BEGIN -->';
+export const OPENCLAW_DESKTOP_SELF_KNOWLEDGE_END = '<!-- OPENCLAW_DESKTOP_SELF_KNOWLEDGE:END -->';
+
+const OPENCLAW_DESKTOP_SELF_KNOWLEDGE_HEADER = 'System-managed Desktop self-knowledge for OpenClaw Desktop.';
+
+export interface DesktopSelfKnowledgePayload {
+  version: 1;
+  skillName: typeof DESKTOP_SELF_KNOWLEDGE_SKILL_NAME;
+  skillPath: typeof DESKTOP_SELF_KNOWLEDGE_SKILL_PATH;
+  skillContent: string;
+  skillContentHash: string;
+  updatedAt: number;
+}
+
+export function hashDesktopSelfKnowledgeText(text: string): string {
+  let hash = 0x811c9dc5;
+  for (const byte of new TextEncoder().encode(text)) {
+    hash ^= byte;
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `fnv1a-${(hash >>> 0).toString(16).padStart(8, '0')}`;
+}
+
+export function buildDesktopSelfKnowledgeSkillContent(): string {
+  return [
+    '# OpenClaw Desktop Operator',
+    '',
+    'Use this skill when the user asks about OpenClaw Desktop itself, asks Desktop to manage knowledge or daily work, requests an Artifact, or wants to use Desktop abilities from a normal Gateway chat.',
+    '',
+    '## Product North Star',
+    '',
+    'OpenClaw Desktop 的终极目标原话必须保留:',
+    '',
+    '> “在保持自由的情况下，给大家（普通人）带来更加产品化、易用的小龙虾产品（桌面版）。它不被任何第三方商业生态所绑定，并且再给大家带来了一种使用最佳实践：以软件工程（工程方法论）的方式，AI驱动长期可成长的知识库以及日常事务推进、跟踪、观测系统/方法，并且沉淀可复用的产物、工具、脚本等（仓库） 这是我的终极目标”',
+    '',
+    'Do not replace this quote with a polished summary. Use summaries only as execution notes.',
+    '',
+    '## Screenshot-confirmed P0 baseline',
+    '',
+    'Do not demote these scopes to P1/P2. They were explicitly re-confirmed from the 2026-06-28 product review screenshot as P0 planning and acceptance boundaries:',
+    '',
+    '- Opening experience and work-system golden path: Gateway remains visible, but it is infrastructure; the user goal is creating and using a local AI work system. The golden path is open app -> choose language/theme -> discover or install Gateway -> create local work repository -> enter the first matter -> open Workbench.',
+    '- Dashboard real progress state: answer todayContinue, pending confirmations, stuck items, recent outputs, knowledge updates, and weekly outputs before infrastructure status.',
+    '- Repository initialization and ordinary-language UI: guide users to create the local work repository after Gateway connection and prefer terms like 资料, 知识, 事项, 计划, 执行记录, 成果, 复盘.',
+    '- Knowledge import, digest, and health: original sources enter `sources/`, undigested sources can become Wiki through approved ActionRuns, and health checks must surface orphan sources, stale indexes, broken links, missing source references, long-unreviewed items, and contradictions.',
+    '- Work matter loop: each matter needs a stable id; ActionRuns should belong to a matter; terminal runs should write execution records and tail actions for status, output, knowledge, and review follow-up.',
+    '- Start-one-thing loop: user sentence -> matter -> plan -> execution -> Artifact/output -> knowledge/review remains P0 even though it is handled as a dedicated topic.',
+    '- First-class reusable assets: tools, scripts, templates, workflows, prompts, and checklists need source, version, permission, approval boundary, run history, linked inputs, linked outputs, and review clues.',
+    '',
+    '## Boundaries',
+    '',
+    '- Desktop Self-Knowledge explains what OpenClaw Desktop can do and how Gateway should route user intent to Desktop capabilities.',
+    '- Repository Context explains the current bound repository, repo path, repository AGENTS.md, writing rules, and current work boundary.',
+    '- When a task touches current repository content, paths, writing rules, project goals, or work boundaries, 必须以 Repository Context 和仓库 `AGENTS.md` 为准.',
+    '- Do not invent repository paths or write files before the required Desktop/Gateway approval path is satisfied.',
+    '',
+    '## ActionRun',
+    '',
+    'ActionRun 是 OpenClaw Desktop 在普通聊天之外调用大模型的通用操作单元. It is not owned by Workbench; Workbench is only one possible source.',
+    '',
+    'Use ActionRun when:',
+    '',
+    '- The user uses Desktop UI natural language to do something outside a normal chat.',
+    '- Desktop needs a model to plan, execute, summarize, or produce structured results.',
+    '- The operation needs explicit approval, such as repository writes, local file writes, local command execution, Artifact generation, or Desktop Bridge calls.',
+    '',
+    'When serving an ActionRun, report important state through an `ai-action` JSON block when the host expects structured status. High-risk or write operations must move through an approval state first. If a completed ActionRun response contains `<artifact>` blocks, Desktop saves them as `source: action_run`, records their Artifact ids on the run, and can mirror the run summary with Artifact titles, types, Artifact references, value summaries, valueHealth status/gaps/next actions, previewPlan clues, enrichment status, reuseKind, and Repository output / preview paths.',
+    '',
+    "An ActionRun defaults to `workItemRequired: true`; if no `workItemPath` is attached, Desktop records `workItemUnassignedReason: pending_work_item_assignment` so missing assignment is observable. An ActionRun can carry `workItemId` and `workItemPath` when it belongs to a work matter. Workbench matter preview can prefill both values by reading the matter frontmatter id and current `work/` path before starting an Artifact creation ActionRun. Standalone Artifacts AI creation can also list existing `work/active`, `work/someday`, and `work/completed` matters from the bound Repository Workbench Snapshot, let the user choose one before starting the `artifact_create` ActionRun, and attach both `workItemPath` and the matter frontmatter id as `workItemId`; when no existing matter fits, the same UI can create a new `work/active` matter before starting `artifact_create`, mark it `source: desktop-action-run`, select it, and attach its `workItemPath` / frontmatter id. If the user skips selection and creation, the run remains observable through `workItemRequired` / `workItemUnassignedReason`; Desktop does not guess a work matter. When a terminal ActionRun has a safe `workItemPath` under the bound Repository `work/` root, Desktop mirrors the run to `runs/action-runs/`, appends an execution record back to that matter's `## 执行记录` section, and adds a `## 收尾动作` checklist for updating matter status, preserving outputs, updating knowledge, and writing a review. If a terminal work-item ActionRun is missing from the repository run index, Dashboard surfaces it as an `action-run:unarchived` pending confirmation that opens `/workbench?view=actions`; this is an observation only and does not auto-write the repository. If a terminal ActionRun has no `workItemPath` while the workbench context is available, Dashboard surfaces it as an `action-run:unassigned` pending confirmation that opens `/workbench?view=actions` and includes `workItemUnassignedReason`; ActionCenter can let the user choose an existing work item to backfill assignment, which writes `workItemPath` / `workItemId`, clears `workItemUnassignedReason`, rewrites the repository run summary, and backfills that matter's execution record and tail actions. This remains an explicit user action and does not auto-create or guess a work matter. If a completed work-item ActionRun has `resultSummary` but no Artifact ids, no existing Artifact with `source.type=action_run` and `source.id=<runId>`, is already represented in the repository run index when that index is available, and no unfinished output tail action already covers the same matter, Dashboard surfaces it as an `action-run:output-unpreserved` pending confirmation that opens Artifacts with `tailAction=output`, `tailActionId=action-run-output:<runId>`, and `workItemPath`; this is a preservation prompt only and does not auto-create an Artifact or Repository output by itself. Workbench parses these tail actions, and unfinished `## 收尾动作` checklist items surface as Dashboard pending confirmations. Dashboard classifies tail actions as `tail-action:status`, `tail-action:output`, `tail-action:knowledge`, or `tail-action:review`, and routes them to Workbench status handling, Artifacts, Knowledge, or Workbench review follow-up. Status tail actions can update the source matter `status` and check off only the matching status tail action; this does not automatically move the matter file, preserve outputs, update knowledge, write a review, or infer whether the matter is done. After the source matter is `done`, the user can explicitly archive a `work/active/*.md` matter into `work/completed/*.md`; this move is separate from status update and does not preserve outputs, update knowledge, or write a review. After the user explicitly saves an Artifact from an output tail action, Desktop can link it back to `## 关联成果` on the source matter, record the Artifact id on the source ActionRun when the save came from an ActionRun preview, call `notifyActionRunsChanged`, and Dashboard and Workbench reload local ActionRun observers; it checks off only the matching output tail action when the URL carried a checklist tail action id. This does not update matter status, update knowledge, write a review, execute assets, or grant permissions. Knowledge tail actions open Knowledge with the source matter preserved and can start a `knowledge_rewrite` ActionRun carrying `workItemPath` and `tailActionId`; the prompt requires reading the source matter, related execution records, related outputs, and existing knowledge before proposing writes or outputting `no_write_needed`. A write approval should carry `repositoryWrite.writes`; after the user approves it, Action Center uses `applyKnowledgeRewriteApproval` to write only Wiki entries, `wiki/index.md`, and `wiki/log.md` inside the bound knowledge boundary, rejecting `sources/`, `work/`, `plans/`, and other out-of-bound paths; the ActionRun result summary records the written path list for execution records and review checks. This still does not check off the knowledge tail action by itself. After the user explicitly confirms that knowledge was updated or no write is needed, Desktop can check off only the matching source knowledge tail action; this explicit confirmation does not write Wiki/index/log, update matter status, preserve outputs, or write a review. Review tail actions open Workbench reviews with a review tail action card that preserves `workItemPath`, points to `reviews/weekly/`, exposes `desktop.artifacts.execution.review.write`, and can create a draft work-item review in `reviews/weekly/`; Desktop links that draft back to the source matter `## 复盘`; the draft is a starting point for user review and does not check off the tail action by itself. When the user explicitly confirms the draft, Desktop can confirm that draft, mark it as `status: confirmed`, add `reviewedAt`, and check off only the matching source tail action; this still does not update matter status, preserve outputs, update knowledge, execute assets, write an Artifact execution review, or grant permissions. Dashboard tail action targets carry `tailAction`, `tailActionId`, and `workItemPath` query context so the target page can preserve the source matter. Artifacts opens the AI Artifact creation flow with the source work item attached for output-preservation tail actions; output-preservation tail actions prefill the Artifact creation prompt with the source matter and a preservation intent so the user is not dropped into a blank prompt. Knowledge opens its maintenance context for knowledge tail actions and can start the source-bound Knowledge ActionRun; Workbench opens status context for matter status tail actions and the review tail action card for review tail actions. Dashboard can mark a pending tail action complete and write it back to the source matter Markdown. This only checks off the action; it does not perform the underlying status update, Artifact preservation, knowledge update, confirmed review, or completed-matter archive by itself. This creates the first hard link between Workbench matters and non-chat AI execution; broader UI-side matter picker or creation flow before starting new ActionRuns and richer tail-action handling still need explicit product flows.",
+    '',
+    'Shared `useWorkbenchWorkItemOptions` / `loadWorkbenchWorkItemOptions` / `createWorkbenchWorkItemOption` loads existing work matters from `work/active`, `work/someday`, and `work/completed`, extracts each matter frontmatter id, and can explicitly create a new `work/active` matter when the user enters a title. Ordinary Knowledge rewrite entry points such as digest source, rewrite selected document, and refresh index/log can let the user choose or create a work matter before starting `knowledge_rewrite`, then attach `workItemPath` and `workItemId` to the ActionRun. Dashboard knowledge tail actions still use the source `workItemPath` and `tailActionId` from the route context. These pickers provide assignment context only; they do not guess assignment, write Wiki, check off tail actions, or bypass approval.',
+    '',
+    'Teams natural-language compose and quick Agent creation entry points also use the shared work matter picker before starting `agent_team_compose` or `gateway_agent_create`. When the user chooses or explicitly creates a matter, Desktop attaches `workItemPath` and the matter frontmatter id as `workItemId`; if the user skips selection and creation, the run remains observable through the unassigned ActionRun diagnostics. This does not guess assignment, replace Repository Context, or bypass approval.',
+    '',
+    'RepositoryGate semantic mapping entry points also use the shared work matter picker before starting `knowledge_repository_map` or `workbench_repository_map`. When a matter is selected or explicitly created from a ready bound repository, Desktop attaches `workItemPath` and `workItemId`; the mapping ActionRun still only performs read-only structure recognition and user-confirmed mapping persistence. It must not guess assignment, rewrite repository content, replace Repository Context, or bypass approval.',
+    '',
+    'Knowledge, Teams, and RepositoryGate entry points can also create a new `work/active` matter before starting their non-chat ActionRuns, then select it and attach its `workItemPath` / frontmatter id. This extends the same explicit create-and-attach behavior from Artifacts, but it is still not a unified global ActionRun launch panel and does not generate plans, preserve outputs, update knowledge, or write reviews by itself.',
+    '',
+    '`ActionRunWorkItemPicker` now provides the shared pre-run matter picker for ordinary Artifacts, Knowledge, Teams, and RepositoryGate non-chat ActionRun entry points. It centralizes choosing an existing matter, creating a new matter, auto-selecting the created matter, and showing success/error feedback. It only handles assignment UI; `useWorkbenchWorkItemOptions`, `loadWorkbenchWorkItemOptions`, and `createWorkbenchWorkItemOption` still provide the repository-backed matter list and explicit creation, while each entry point still owns ActionRun creation, prompts, approvals, and repository writes. It is not a complete global ActionRun launch protocol and must not be treated as automatic planning, output preservation, knowledge update, or review writing.',
+    '',
+    'Workbench matter preview can also start a `work_matter_plan` ActionRun before execution. Desktop attaches the source `workItemPath` and frontmatter id, uses the `work-matter-plan.md` prompt through `buildWorkMatterPlanPrompt`, and asks the Agent to read the matter goal, status, acceptance criteria, linked sources, linked plans, run records, and linked outputs before proposing a plan. Any write to `plans/active/` must return `approval_required` with `repositoryWrite.path/content/workItemPath`. After Action Center approval, Desktop uses `applyWorkbenchMatterPlanApproval` to verify the target stays under `plans/active/`, verify the source matter stays under `work/`, write the plan Markdown, and link it back to the source matter `## 关联计划`. After the approved write, Action Center opens `/workbench?view=plans&planPath=<plan>` and Workbench only accepts `plans/active/*.md` plan paths for that auto-preview, so the user lands on the active plan and can explicitly choose Execute Plan. This entry point does not automatically execute the plan, preserve outputs, update knowledge, write reviews, or move matter files.',
+    '',
+    'When Workbench starts `work_matter_plan` or `plan_execute`, or opens the latest plan execution from the active plan list, Desktop can navigate to `/actions?runId=<run>`; Action Center reads that `runId` from the URL and selects the matching ActionRun after the run list loads. This is detail routing only. It does not approve pending actions, resume runs, preserve outputs, update knowledge, write reviews, check off tail actions, or move matter files.',
+    '',
+    'Workbench active plan preview can start a `plan_execute` ActionRun. Desktop attaches `planPath`, the plan markdown, and, when plan metadata includes a safe `work/(active|completed|someday)/*.md` `workItemPath`, the source work matter content and frontmatter id. The ActionRun uses `plan-execute.md` through `buildPlanExecutePrompt`; side-effecting execution must still return `approval_required`. Terminal `plan_execute` runs reuse the existing ActionRun repository summary, source matter `## 执行记录`, and `## 收尾动作` flow when a work item is attached. Invalid or out-of-bound plan work item paths are not attached and remain observable through unassigned ActionRun diagnostics. Workbench uses `findLatestPlanExecutionRun` to associate `plan_execute` runs back to active plans by the input `planPath` line, then shows the latest plan execution status, summary clue, and Action Center entry from the active plan list and selected plan preview. When the latest completed plan execution has `resultSummary`, a safe `workItemPath`, and no Artifact ids, `shouldOfferPlanExecutionOutputPreservation` lets the selected plan preview show Preserve Output; that opens Artifacts with `tailAction=output`, `tailActionId=action-run-output:<runId>`, and `workItemPath`, and the Artifact prompt preserves the source matter plus the `action-run-output:<runId>` execution record. Artifacts loads the source ActionRun when possible and uses `buildArtifactOutputPreservationPrompt` plus `extractActionRunOutputCandidates` to include the result summary, `lastAssistantResponse`, parsed `<artifact>` blocks through `parseArtifactsFromText`, and explicit output candidates such as files, links, HTML, documents, spreadsheets, or slide decks in the AI creation prompt. `ArtifactAICreateDrawer` uses `artifact-ai-create-preview` / `parseArtifactAICreatePreviews` to parse rich `<artifact>` blocks before legacy `ai-action` blocks, keep multiple Artifact candidates visible, default to the latest candidate, let the user include one or more candidates in the explicit save, edit title, type, description, tags, content summary, external format, reuse kind, URL, command, file path, file name, file size, MIME type, and import-file intent before saving, plus edit the HTML body for HTML candidates, run `normalizeArtifactAICreatePreviewDraft` before generating params, preserve HTML body exactly, trim file/link metadata strings, and carry `html`, `externalFormat`, `contentSummary`, `reuseKind`, file metadata, URLs, and `source.type=action_run` into the user-visible save preview and Artifact generate params. For multiple selected candidates, Desktop saves them one by one, merges all new Artifact ids back into the source ActionRun, calls `onSaved` for each Artifact, then calls `notifyActionRunsChanged`. This is prompt and save-preview context only; it does not auto-create an Artifact or Repository output, read local files while editing, open links, execute commands, write knowledge, write reviews, update matter status, edit source ActionRun records beyond explicit Artifact id linkage, auto-fix HTML, or grant permissions. After the user explicitly saves Artifact output, Desktop records the Artifact id on the source ActionRun, calls `notifyActionRunsChanged`, and Dashboard and Workbench reload local ActionRun observers so the output-preservation prompts can disappear without waiting for a later Gateway event. When the latest completed plan execution has `resultSummary` and a safe `workItemPath`, `shouldOfferPlanExecutionKnowledgeUpdate` lets the selected plan preview show Update Knowledge; that opens Knowledge with `tailAction=knowledge`, `tailActionId=action-run-knowledge:<runId>`, and `workItemPath`, and the Knowledge prompt preserves the source matter plus the `action-run-knowledge:<runId>` source execution record. Because `action-run-knowledge:<runId>` is not a checklist tail action id, Knowledge can start a source-bound `knowledge_rewrite` ActionRun but must not show or check off the confirmation path for matching source knowledge tail actions. When the latest completed plan execution has `resultSummary` and a safe `workItemPath`, `shouldOfferPlanExecutionReview` lets the selected plan preview show Write Review; that opens Workbench reviews with `tailAction=review`, `tailActionId=action-run-review:<runId>`, and `workItemPath`, and the review draft records `action-run-review:<runId>` as a source execution record and links the draft back to the source matter `## 复盘`. Because `action-run-review:<runId>` is not a checklist tail action id, Workbench can create a `reviews/weekly/` draft and can show Confirm Plan Execution Review through `confirmReviewSourceDraft`; confirmation validates `source: desktop-workbench-review-source-execution`, `workItemPath`, `tailActionId`, and `sourceExecutionId`, then marks only the review document as `status: confirmed`, adds `reviewedAt`, and shows `reviewSourceDraftConfirmed`. It does not check off a matter tail action for `action-run-review:<runId>`. These entry points do not automatically preserve outputs, write Wiki/index/log, check off matter checklist tail actions, confirm reviews without an explicit user action, mark plans done, or move matter files; the user must explicitly save an Artifact / Repository output, approve a Knowledge write plan, or review and confirm the draft.',
+    '',
+    'Workbench plan execution follow-up buttons also observe existing downstream facts. If the same work matter already has a non-failed, non-cancelled `knowledge_rewrite` ActionRun whose input mentions `action-run-knowledge:<runId>`, the selected plan preview should not show another Update Knowledge button for that `plan_execute` run. If a loaded review document has matching `workItemPath` and `sourceExecutionId` or `tailActionId` equal to `action-run-review:<runId>`, the selected plan preview should not show another Write Review button for that run. This only deduplicates follow-up entry points; it does not write Wiki/index/log, confirm reviews, check off matter tail actions, update matter status, preserve outputs, or move matter files.',
+    '',
+    'Workbench also uses `findPlanExecutionKnowledgeUpdateState` to surface the latest same-matter, source-bound `knowledge_rewrite` ActionRun in the selected plan preview. It matches `action-run-knowledge:<runId>` and shows read-only labels such as Knowledge Running, Knowledge Approval, Knowledge Updated, Knowledge No Write, Knowledge Failed, or Knowledge Cancelled. Knowledge No Write is only shown when the ActionRun response or summary explicitly carries `no_write_needed` / no-write wording. This is status expression only; it does not prove arbitrary Wiki content changed, write Wiki/index/log, confirm reviews, check off matter tail actions, update matter status, preserve outputs, or move matter files.',
+    '',
+    'Workbench also uses `findPlanExecutionReviewState` to surface existing source-bound review documents in the selected plan preview as Review Draft or Review Confirmed. It matches the same source work matter plus `sourceExecutionId` or `tailActionId` equal to `action-run-review:<runId>`, prefers confirmed reviews over drafts, and shows state only; it does not confirm reviews, check off tail actions, update matter status, write Wiki/index/log, preserve outputs, or move matter files.',
+    '',
+    '`getPlanExecutionPostReviewActionSuggestion` makes follow-up buttons clearer after a source-bound plan execution review is confirmed. If the same `plan_execute` run still offers output preservation, the button can read Preserve Reviewed Output and explain that the user must explicitly save the output before Desktop links it back to the source matter. If the same run still offers knowledge update, the button can read Update Reviewed Knowledge and explain that the user must explicitly start the knowledge update and approve any repository write. This is wording and routing context only; it does not save outputs, start knowledge updates, write Wiki/index/log, check off tail actions, update matter status, execute assets, grant permissions, or move files.',
+    '',
+    'When the selected plan already has same-matter, non-failed, non-cancelled knowledge follow-ups, Workbench can label the review entry as Review Knowledge Update through `writePlanExecutionReviewWithKnowledge` and keep the normal `action-run-review:<runId>` route. This only makes the next review step clearer; the review draft carries context later through `relatedKnowledgeRunIds`, and Desktop still does not write Wiki/index/log, confirm the review, or check off matter tail actions.',
+    '',
+    '`getPlanExecutionKnowledgeReviewSuggestion` refines that review entry once the latest same-matter, source-bound `knowledge_rewrite` status is known. If `findPlanExecutionKnowledgeUpdateState` reports Knowledge Updated, the button can read Review Knowledge Write and its hint asks the review draft to check Wiki, index, and log results. If the state is Knowledge No Write, the button can read Review No-Write Decision and its hint asks the review draft to record the no-write decision and follow-up risks. Running or approval-pending knowledge updates still use Review Knowledge Update. This is suggestion copy only; Desktop still does not write Wiki/index/log, create or confirm a review, check off matter tail actions, update matter status, preserve outputs, or move files.',
+    '',
+    'When Workbench creates a review draft for `action-run-review:<runId>`, it can carry same-matter, non-failed, non-cancelled `knowledge_rewrite` follow-ups whose input mentions `action-run-knowledge:<runId>` into the draft as `relatedKnowledgeRunIds`, a related ActionRun line, a `## 相关知识更新` table with status and result/error summary, write-path checklist lines for completed Wiki/index/log writes, and a checklist item to verify whether Wiki/index/log was updated or no write was needed. This is review context only; it does not write knowledge, confirm the review, or check off matter tail actions.',
+    '',
+    '## Artifacts',
+    '',
+    'Artifacts are OpenClaw Desktop P0 value objects. Any valuable result can become an Artifact when it can be saved, previewed, reused, delivered, or tracked.',
+    '',
+    'Artifact forms include reports, dashboards, analyses, checklists, code, documents, slides, forms, links, apps, files, audio, images, videos, Word, Excel, PPT, HTML, tools, scripts, templates, and workflows.',
+    '',
+    'Ordinary completed chat assistant messages with `<artifact>` blocks are scanned by Desktop. Desktop saves every parsed Artifact as `source: chat`, and when the current repository binding is ready it mirrors the Artifact markdown and HTML preview into Repository `outputs/`.',
+    '',
+    'Artifact write channel strategy: prefer direct Desktop plugin writes when the plugin is ready, because structured `desktop.artifacts.create` / `desktop.outputs.create` calls are more reliable than long conversational returns and create less user-facing noise. If direct write succeeds, the chat response should be a short status with the Artifact id, title, preview/open target, and any pending approval or review clue. If the plugin is unavailable, disabled by user settings, version-incompatible, or the direct write fails, fall back to `<artifact>` blocks when direct write is unavailable. Users should be able to choose automatic direct-write with fallback, preview-first confirmation, or conversation-only fallback as a product setting; direct write must still respect approval boundaries: importing arbitrary local files, writing Repository outputs, executing commands, or granting Desktop Bridge permissions must remain explicit and auditable.',
+    '',
+    'File-like Artifacts may carry `filePath` or `url`. Local file Artifacts can be imported into Artifact storage; imported copies keep `originalFilePath` for traceability and open through the system file handler. URL-backed media or file Artifacts open through the external URL handler. Word, Excel, PPT, PDF, links, apps, and other external results should carry `externalFormat` and `contentSummary` so they remain searchable, reusable, and understandable even before native in-app preview exists. Desktop also builds an Artifact preview card with a format label, thumbnail label, summary, location, primary action, and safety note; `desktop.artifacts.search`, `desktop.artifacts.describe`, Artifacts UI, and Repository output markdown expose this preview card. Gateway-facing search/describe preview cards expose `thumbnailAvailable` but must not return image data URLs.',
+    '',
+    'Desktop also records `previewPlan` as a safe preview strategy for every new Artifact and when `desktop.artifacts.inspect` refreshes file-like metadata. The plan names the strategy, surface, primary action, safety note, current limitations, and next preview steps. It does not parse Office/PDF/media contents, render Office/PDF/media native previews, execute commands, or grant permissions.',
+    '',
+    'Desktop computes `valueHealth` from existing Artifact facts for search/describe, Artifact UI, `artifact://` references, and Repository outputs. It classifies an Artifact as `ready`, `usable_with_limits`, or `needs_attention`, and exposes strengths, gaps, and next actions. This is a read-only product readiness summary; it does not execute next actions, open files, grant permissions, or replace the underlying facts.',
+    '',
+    'Artifacts keep version history. New Artifacts start as v1, HTML appends create new versions, and `desktop.artifacts.describe` plus Repository output markdown expose the version count and latest version metadata. This is audit history, not a full diff or restore system.',
+    '',
+    'When an ActionRun produces a file-like Artifact block, its JSON header may include `filePath`, `fileName`, `fileSize`, `mimeType`, `externalFormat`, `contentSummary`, `reuseKind`, and `importFile`. Use `importFile: true` only when the ActionRun is allowed to import that local file. The AI create save form can show a pre-save preview strategy card for the selected Artifact candidate by reusing the same preview-card logic that saved Artifacts use: format label, thumbnail label, summary, location, primary post-save action, and safety note. This preview strategy card is read-only and does not open files, open links, execute commands, read local files, grant permissions, write Repository outputs, update knowledge, or write reviews. If a repository binding is ready, Desktop mirrors the resulting file Artifact metadata into `outputs/files/` and links it from the ActionRun summary.',
+    '',
+    'For file-like, Office, PDF, media, link, app, or command Artifacts, Gateway can call `desktop.artifacts.inspect` with `artifactId` and optional `repoPath`. This records file inspection facts only plus a refreshed `previewPlan`: format, source kind, open behavior, preview status, safe preview strategy, summary, paths, and current limitations. It does not read file contents, render Office files, execute commands, or grant permissions.',
+    '',
+    'Newly imported text/code/HTML/PDF and Word/Excel/PowerPoint OOXML file Artifacts automatically record `contentExtract` when Desktop can safely read the imported Artifact storage copy. Gateway can also call `desktop.artifacts.content.extract` with `artifactId` and optional `repoPath` to refresh the same facts later. This reads only imported text/code/HTML/PDF and Word/Excel/PowerPoint OOXML Artifact copies already stored under Desktop Artifact storage, records `contentExtract` facts (bytes read, text length, truncation, and snippet), and can mirror the updated Repository output. PDF and OOXML extraction are best-effort text extraction from PDF text streams or OOXML XML entries and may be partial; this capability does not read arbitrary local paths, parse legacy binary Office/audio/video files, render native previews, execute commands, or grant permissions.',
+    '',
+    'Newly imported non-text file Artifacts such as Office, PDF, image, audio, video, generic file, or unknown formats can record `contentFacts` when Desktop can safely read the imported Artifact storage copy. Gateway can call `desktop.artifacts.content.facts.extract` with `artifactId` and optional `repoPath` to refresh these facts later. This records file size, bytes hashed, sha256, signature hex, image dimensions, and best-effort PDF version/page count when available; it does not replace `contentExtract`, parse legacy binary Office document bodies, render Office/PDF/media native thumbnails, read arbitrary local paths, execute commands, or grant permissions.',
+    '',
+    'Newly imported image file Artifacts can record `thumbnail` when Desktop can safely read the imported Artifact storage copy and the image is within the thumbnail size limit. Gateway can call `desktop.artifacts.thumbnail.extract` with `artifactId` and optional `repoPath` to refresh the thumbnail later. Artifacts UI can display the data URL thumbnail, and Artifact detail can render a read-only in-app image preview panel from that stored thumbnail. Repository output markdown, `artifact://` references, and Gateway-facing search/describe results record only thumbnail availability and must not embed the data URL. This reads only imported image Artifact copies, does not read arbitrary local paths, does not open the original file for preview, does not generate Office/PDF/audio/video native thumbnails, execute commands, or grant permissions.',
+    '',
+    'Desktop records `enrichmentEvents` for content extraction, file fact extraction, and thumbnail generation attempts. These events preserve the kind, status (`succeeded`, `unavailable`, or `failed`), format, reason, result summary, or error so users and Gateway can observe why an Artifact became more useful or why an enrichment step still needs follow-up. Artifact detail, search text, Repository output markdown, and `outputs/index.md` expose these audit clues. The events do not retry extraction, open files, render native previews, execute commands, or grant permissions.',
+    '',
+    'When an Artifact should be reusable, set `reuseKind` to `asset`, `template`, `tool`, `script`, or `workflow`. Desktop preserves this in Artifact metadata, Repository output markdown, Repository `outputs/assets/index.md`, `artifact://` references, Desktop node descriptions, Workbench outputs grouping, and the Artifacts page reuse-kind filter. This is classification and traceability; permissions and execution still require explicit Desktop capabilities and approval.',
+    '',
+    'When a reusable asset already exists inside the bound Repository rather than Artifact storage, Gateway can call `desktop.repository.assets.record` with `repoPath`, `title`, Repository-relative `path`, `reuseKind`, and optional `source`, `version`, `summary`, `tags`, or `updatedAt`. Desktop records the entry in Repository `outputs/assets/index.md` under "Reusable Assets" with the hard boundary `recordOnly, desktopExecutes=false, grantsPermission=false`. This command only maintains the asset index; it does not read arbitrary local paths, open files, execute assets, or grant permissions.',
+    '',
+    'Before asking the user to identify a repository-local reusable asset, Gateway can call `desktop.repository.assets.search` with `repoPath`, optional `query`, optional `reuseKind`, and optional `limit`. Desktop reads only Repository `outputs/assets/index.md`, parses both Artifact-backed and Repository-local asset entries, supports ordinary Chinese reusable-asset queries through reuse-kind aliases, and returns structured asset facts plus the same hard boundary. It does not open files, execute assets, write reviews, or grant permissions.',
+    '',
+    "When a Repository-local executable asset (`tool`, `script`, or `workflow`) has been approved, run, or completed by an external runner, Gateway can call `desktop.repository.assets.execution.record` with `repoPath`, `assetId` or Repository-relative `path`, `status`, optional `runner`, `command`, `resultSummary`, `outputArtifactId`, `repositoryOutputPath`, `workItemPath`, and `executedAt`. Desktop writes a Markdown execution record under `runs/assets/`, maintains `runs/assets/index.md` as the skim-readable run index, refreshes `outputs/assets/index.md` with latest execution, lastRun, and terminal review clues, and, when a safe `workItemPath` under the bound Repository `work/` root is provided, appends the asset execution to that matter's `## 执行记录` section plus `## 收尾动作` checklist items for status, output, knowledge, and review follow-up. It keeps the hard boundary `recordOnly, desktopExecutes=false, grantsPermission=false`. This command records repository asset execution facts only; it does not execute the asset, grant permission, write the review, update matter status, preserve outputs, or update knowledge automatically.",
+    'Workbench Snapshot includes `runs/assets/index.md` in Repository runs. Dashboard reads Repository asset run entries as recent and weekly output clues, skips entries already represented by known Artifact ids or Repository output paths, and surfaces `asset-run:review-pending` confirmations when the run index says `review: pending`. The target opens Workbench reviews with `assetRunPath` and optional `workItemPath`; Workbench shows an Asset Run Review card that can create a `reviews/weekly/YYYY-MM-DD-asset-run-*-review.md` draft from the source `runs/assets/*.md` record and link it back to the source matter `## 复盘` when safe. The user can explicitly confirm that asset-run review draft; Desktop marks it `status: confirmed` and writes `reviewedAt`, and Dashboard stops showing the same asset run as `asset-run:review-pending` once a confirmed `desktop-repository-asset-execution-review` document references the same `assetRunPath`. These are observation, routing, and explicit review-record actions only; Desktop does not execute assets, grant permission, update matter status, preserve outputs, update knowledge, or check off matter tail actions automatically.',
+    'After Gateway or the user has review content for a Repository-local asset run, call `desktop.repository.assets.execution.review.write` with `repoPath`, `assetRunPath`, optional `reviewSummary`, `reuseDecision`, `nextActions`, `workItemPath`, `reviewer`, and `reviewedAt`. Desktop reads the existing `runs/assets/*.md` record, writes a `reviews/weekly/YYYY-MM-DD-asset-run-*-review.md` draft with asset id/path/reuse kind/status/result/output clues and the hard boundary `recordOnly, desktopExecutes=false, grantsPermission=false`, and links it back to the source matter when a safe work item path is available. This command writes review records only; it does not execute the asset, grant permission, update matter status, preserve outputs, update knowledge, or complete tail actions.',
+    '',
+    'When Gateway or ActionRun reuses an existing Artifact, call `desktop.artifacts.reuse.record` with `artifactId`, `context`, `status`, `purpose`, `resultSummary`, optional source metadata, and optional `repoPath` to mirror the updated Repository output. This records reuse/audit facts only; it does not execute tools, open files, or grant permissions.',
+    '',
+    'Before an executable reusable Artifact (`tool`, `script`, or `workflow`) is handed to an external runner, call `desktop.artifacts.execution.prepare` with `artifactId`, optional approval fields, runner, command, source metadata, and optional `repoPath`. This records an approval-required execution intent and returns a pending approval payload; it does not execute commands or grant execution permission.',
+    '',
+    'When an executable reusable Artifact (`tool`, `script`, or `workflow`) has an approval, run, or result to archive, call `desktop.artifacts.execution.record` with `artifactId`, `status`, optional approval fields, runner, command, result summary, output Artifact id, and optional `repoPath`. Terminal execution events (`succeeded`, `failed`, or `cancelled`) create post-run review clues in search/describe `reviewSummary` and Repository `outputs/assets/index.md`: write a `reviews/weekly/` entry, link the output Artifact, and capture the reuse decision. This records executable Artifact run and review-needed facts only; it does not execute commands, grant execution permission, or write the review automatically.',
+    '',
+    'Artifact detail surfaces an Execution boundary panel for executable reusable Artifacts (`tool`, `script`, or `workflow`). The panel shows approval required before run, latest approval or execution facts when available, the hard boundary `recordOnly / desktopExecutes=false / grantsPermission=false`, and shows `desktop.artifacts.execution.prepare` and `desktop.artifacts.execution.record` as the Gateway or external runner command clues. Desktop only records approval and execution facts; it does not execute the Artifact or grant permission, and external runners still need explicit user approval.',
+    '',
+    'After the user or Gateway has review content for the latest terminal executable Artifact run, call `desktop.artifacts.execution.review.write` with `repoPath`, `artifactId`, optional `reviewSummary`, `reuseDecision`, `nextActions`, `workItemPath`, `reviewer`, and `reviewedAt`. This writes a `reviews/weekly/` Markdown review that links the Artifact, latest execution status/result/output clues, optional work item, reuse decision, and next actions. Artifact detail can show a Write execution review entry for terminal `tool`, `script`, or `workflow` runs and copy the same JSON command, using the current ready Repository `repoPath` when available or a `repoPath` placeholder when not. It does not execute the Artifact, grant execution permission, write the review automatically, or update the work item; tail-action checkoff and status changes remain separate user-confirmed steps.',
+    '',
+    'Search existing Artifacts before asking the user for an artifact id. Gateway can call `desktop.artifacts.search` with optional `query`, `type`, `externalFormat`, `reuseKind`, `sourceType`, `status`, and `limit` to find recent matching value objects. Artifact search supports ordinary Chinese reusable-asset queries such as `可复用的脚本`, `可复用的模板`, `可复用的工具`, and `可复用的工作流` by indexing `reuseKind` aliases. Artifacts UI also exposes a reuse-kind filter for all, asset, template, tool, script, and workflow Artifacts, and combines it with type and text search before sorting by recency. Search and describe results include `assetExecutionSummary` for reusable/executable assets: it explains whether the asset is executable, whether approval is required before running, latest execution status/result/output clues, optional post-run `reviewSummary`, and the hard boundary `{ recordOnly: true, desktopExecutes: false, grantsPermission: false }`. Search results return `artifact://` URIs, value summaries, preview cards, thumbnail availability, preview plans, source, repository output / preview paths, file or URL clues, and reusable Markdown references; search does not open files, execute commands, write reviews, return thumbnail data URLs, or grant permissions.',
+    '',
+    'Use `artifact://<artifactId>` as the stable reference for an existing Artifact. Desktop can copy a reusable Markdown reference from the Artifact detail page, and Gateway can call `desktop.artifacts.describe` to retrieve the same reference with title, type, value summary, preview card, thumbnail availability, preview plan, source, repository output / preview paths, and file or URL clues.',
+    '',
+    '## Desktop Message Cards',
+    '',
+    'Desktop Message Card Protocol is the preferred direction for highly structured Gateway chat output when the Desktop host advertises card support. Do not force users to read large Markdown tables for approval, Artifact, ActionRun, Repository write, Knowledge digest, or review flows when a card can expose clearer state and interactions.',
+    '',
+    'The first P0 card set should cover authorization cards, inquiry cards, Artifact cards, and ActionRun result cards. Authorization cards show risk, requested capability, approve/deny details, and audit clues. Inquiry cards show a structured question, candidate answers, required and optional fields, freeform notes, and submit or handle-later actions for clarification, missing context, work item selection, plan selection, Artifact candidate selection, and next-step preference choices. Artifact cards show title, type, preview/open actions, save/import/mirror state, source work item, and value health. ActionRun result cards show status, result summary, approval state, generated Artifacts, and next actions such as preserve output, update knowledge, or write review.',
+    '',
+    'Card payloads should be declarative JSON, inspired by Feishu/Lark interactive cards: structured layout, display elements, interactive elements, and callback-like actions. Cards must not contain arbitrary JavaScript, must not bypass Desktop approval, and must not invent repository paths outside Repository Context. If the current Desktop cannot render cards, fall back to concise Markdown plus `ai-action` or `<artifact>` blocks.',
+    '',
+    'Card actions are declarative. Desktop may handle a card click by auto-sending a structured user message back into the Gateway conversation, for example a user-confirmed approval, save Artifact request, open ActionRun detail request, or repository write review request. This auto-sent message is the callback transport; it should be visible/auditable as a user-confirmed Desktop action and must not silently execute privileged operations.',
+    '',
+    'Dashboard first surfaces a work-system summary before Gateway infrastructure details. It groups existing local facts into todayContinue, pendingConfirmations, stuckItems, recentOutputs, weeklyOutputs, and knowledgeUpdates from Sessions, Workbench, Knowledge, ActionRuns, Artifacts, Repository outputs, Repository runs, and Repository review documents. weeklyOutputs contains Artifact outputs created during the current UTC week, Repository `outputs/index.md` entries whose `createdAt` (or legacy `updatedAt` fallback) is in the current UTC week, terminal ActionRuns with `resultSummary` updated during the current UTC week, and explicit output clues from `reviews/` documents updated during the current UTC week, so the first view can answer what new value was preserved this week. Repository output items open Workbench outputs through `/workbench?view=outputs`; ActionRun result summary items open Workbench actions through `/workbench?view=actions`; review output clues open Workbench reviews through `/workbench?view=reviews`. Review output clues are read only from explicit `成果`, `产物`, `输出`, deliverable, artifact, or output sections; Desktop does not infer value outputs from arbitrary review prose. If an ActionRun result is already represented by a known Artifact or Repository output artifact id, Dashboard does not duplicate the ActionRun summary as another output. Review output clues that point to already known Artifact or Repository output paths are also skipped to avoid duplicate output cards. Dashboard stuckItems include failed or cancelled ActionRuns, blocked plans, and explicit cross-work plan dependencies. Plan blockers are read from explicit `status: blocked/stuck/卡住`, `blockedReason`, `blocker`, `阻塞原因`, and optional `blockerOwner` or `负责人` metadata, then routed to `/workbench?view=plans`. Cross-work plan dependency risks are read only from explicit `dependsOn`, `dependencies`, `requires`, `relatedWork`, `依赖`, `依赖事项`, `关联事项`, or `前置事项` metadata; Dashboard surfaces unresolved dependencies as `plan:cross-work-risk` stuckItems that open `/workbench?view=plans`. Completed dependency paths from `completedWork`, `completedPlans`, `work/completed/`, or `plans/completed/` are filtered out so only unresolved dependencies remain visible. Unresolved dependency paths that have not changed for 14 days are marked as stale, active plan dependencies without explicit owner metadata are marked as missing owner, and Desktop does not infer cross-work risk from plan prose. Workbench tail actions from unfinished `## 收尾动作` checklists count as pending confirmations, are classified into status/output/knowledge/review follow-ups, and route to Workbench, Artifacts, or Knowledge with `tailAction`, `tailActionId`, and `workItemPath` context. Terminal work-item ActionRuns that are missing from `runs/action-runs/index.md` count as `action-run:unarchived` pending confirmations and open `/workbench?view=actions`; this is a diagnostic, not an automatic repository repair. Terminal ActionRuns without `workItemPath` count as `action-run:unassigned` pending confirmations and open `/workbench?view=actions`; details include `workItemUnassignedReason`, and this is a diagnostic, not an automatic assignment. Completed work-item ActionRuns with `resultSummary` and no Artifact ids count as `action-run:output-unpreserved` pending confirmations when no existing Artifact has `source.type=action_run` and `source.id=<runId>`, they are not already covered by an unfinished output tail action, and, if the repository run index is available, the run is already archived there; these open Artifacts with `tailAction=output` and do not auto-create Artifacts or Repository outputs. If the user explicitly saves the Artifact from that output context, Desktop can link it into the source matter `## 关联成果` section and only complete the matching output checklist item when such an item exists. Status tail actions can update the source matter status, and after the matter is `done`, the user can explicitly archive a `work/active/*.md` matter into `work/completed/*.md`; Dashboard checkoff alone does not perform this archive. Knowledge tail actions can start a source-bound `knowledge_rewrite` ActionRun carrying `workItemPath` and `tailActionId`; the ActionRun must inspect the source matter, related execution records, related outputs, and existing knowledge before proposing Wiki/index/log writes or outputting `no_write_needed`, and it does not auto-check the tail action. After the user explicitly confirms that knowledge was updated or no write is needed, Desktop can check off only the matching source knowledge tail action; this explicit confirmation does not write Wiki/index/log, update matter status, preserve outputs, or write a review. Knowledge health issues are computed from Repository `sources/`, `wiki/`, `wiki/index.md`, Wiki links, `work/active/`, `work/someday/`, `reviews/weekly/`, and explicit contradiction markers, including orphan sources, stale index entries, broken knowledge links, unindexed Wiki pages, Wiki pages without source references, long-unreviewed work items, and contradictory knowledge records. Explicit contradiction markers include `矛盾:`, `冲突:`, `contradiction:`, `conflict:`, and `conflictsWith:`; Desktop records them as health issues but does not infer semantic contradictions by itself. Dashboard surfaces these as knowledgeUpdates that open `/knowledge?section=health`, and Knowledge can write knowledge health reviews into `reviews/weekly/` as `YYYY-MM-DD-knowledge-health.md`. Knowledge can import pasted text into `sources/imported/` with `source: desktop-paste`, import local text files into `sources/imported/` with `source: desktop-file` and original file metadata, import PDF / Word / Excel / PowerPoint files into `sources/imported/` through best-effort text extraction with `extractedFormat`, `extractionStatus`, `extractedBytesRead`, and `extractedTruncated` metadata, import selected folders into `sources/imported/` with `source: desktop-folder` and original relative paths, drop local text files or PDF / Word / Excel / PowerPoint files into `sources/imported/` through the Knowledge page, clip URLs into `sources/imported/` with `source: desktop-url` and optional excerpts, then refresh the Snapshot, switch to the undigested queue, and open the new source. File and folder import currently cover Markdown/TXT/text files directly plus PDF/Word/Excel/PowerPoint OOXML best-effort text extraction through a picker, folder picker, or drag-and-drop; URL clipping does not fetch page bodies yet. Knowledge import does not parse legacy binary Office files, OCR images, transcribe audio/video, write Wiki/index/log, or bypass `knowledge_rewrite` approval. Knowledge also exposes an undigested sources queue at `/knowledge?section=digest`; it lists source files that are not indexed and not referenced by Wiki pages, and a Knowledge ActionRun can digest one queued source into reusable Wiki after approval. Dashboard can mark one complete by writing `[x]` back to the source matter. Gateway health remains visible, but it is not the primary answer to "what is my system state?".',
+    'When Gateway is connected but the local work repository is unavailable, Dashboard surfaces a "create your work system" onboarding path before infrastructure details. It guides the user from connected Gateway to a local work repository, then writes the first user-entered matter into `work/active/YYYY-MM-DD-HHmmss-*.md` and opens `/workbench?view=tasks&workItemPath=<matter>` so the Workbench tasks preview shows the new matter and its Generate Plan / Create Artifact actions. This is navigation context only; Desktop does not auto-generate a plan, execute an ActionRun, or preserve outputs.',
+    '',
+    'Gateway can create non-HTML Artifacts through `desktop.artifacts.create` or `desktop.outputs.create` by passing `url`, `command`, `filePath`, `fileName`, `fileSize`, `mimeType`, `externalFormat`, `contentSummary`, `reuseKind`, and `importFile`. Use `desktop.outputs.create` when the result should also be mirrored into Repository `outputs/`.',
+    '',
+    'Repository `outputs/index.md` is a skim-readable Artifact directory. Each Artifact entry should expose the artifact URI, source, created time, updated time, preview, format, summary, thumbnail availability, value health, preview plan, content extraction status, content facts status, PDF facts, preview card, reuse kind, and tags when available, while detailed audit facts stay in the per-Artifact output markdown. When an output Artifact has `reuseKind`, Desktop also maintains Repository `outputs/assets/index.md` under the "Reusable Assets" heading with artifact URI, output path, source, version, updated time, summary, value health, latest execution status, post-run review clue when available, tags, and the hard boundary `recordOnly, desktopExecutes=false, grantsPermission=false`. The same asset index can also contain Repository-local entries created by `desktop.repository.assets.record` for scripts, templates, workflows, HTML, or other reusable assets that already live in the repository; `desktop.repository.assets.search` returns both kinds from that index as structured searchable facts.',
+    '',
+    'Artifacts list search, Dashboard recent/weekly outputs, and Workbench outputs surface value summaries, `externalFormat`, `reuseKind`, source, update time, tags, and Repository output / preview clues so users can identify key results rather than only generic files. Dashboard recent and weekly outputs mark reusable Artifacts and Repository outputs as reusable assets, include their `reuseKind`, and show the latest execution status or approval-required boundary when execution facts are available.',
+    '',
+    'HTML 产物 are a distinctive Desktop capability: they can be beautiful, visual, interactive, and operational. HTML Artifacts should be 完整自包含, use inline CSS and necessary JavaScript, avoid external CDNs by default, and request approval before using local files, network, export, commands, or Desktop Bridge. In the AI create save form, Desktop can run `auditArtifactHtml` on the current editable HTML draft before the user explicitly saves it, showing self-contained status, approval clues, issue count, and example dependency/permission issues. It can also render that draft in a sandboxed pre-save iframe with an injected Content-Security-Policy that allows inline styles/scripts and data/blob media but no external network, local files, or Desktop Bridge permission. These are pre-save visibility aids only; they do not auto-fix HTML, block explicit saving, grant permissions, write Repository outputs, update knowledge, or write reviews.',
+    '',
+    'Desktop records an `htmlAudit` summary for saved HTML Artifacts. It marks whether the HTML is self-contained, whether runtime approval is required, and which external resources or Desktop Bridge capabilities were detected. Desktop also writes runtime authorization records and runtime bridge call records back to Artifact metadata when a user grants, denies, or runs Desktop Bridge access.',
+    '',
+    'HTML Artifacts can call `artifactBridge.fetch(url, init)` for HTTP(S) network data. Desktop requires `network.fetch` approval first, proxies the request from the main process, returns a structured status/header/body result, and records the call in `bridgeEvents`. Direct browser `fetch()` remains blocked by CSP. `artifactBridge.exec(command, options?)` is prepare-only: Desktop records an `approval_required` execution intent in `executionEvents`, returns a pending approval payload, records the bridge call in `bridgeEvents`, and does not execute commands, grant permission, or bypass the external runner approval flow.',
+    '',
+    'HTML Artifacts can call `artifactBridge.exportAs(typeOrOptions, content, fileName)` to export HTML, text, Markdown, or JSON through the Desktop save dialog. This requires `export` approval and records the result in `bridgeEvents`; it must not be used for silent file writes.',
+    '',
+    'When producing a rich Artifact from chat or ActionRun, use this shape:',
+    '',
+    '```text',
+    '<artifact>',
+    '{',
+    '  "title": "示例报告",',
+    '  "type": "report",',
+    '  "description": "一份自包含 HTML 报告",',
+    '  "tags": ["report"]',
+    '}',
+    '<!DOCTYPE html>',
+    '<html lang="zh-CN">',
+    '...',
+    '</html>',
+    '</artifact>',
+    '```',
+    '',
+    '## Desktop Repository Tools',
+    '',
+    'Use Desktop repository tools only through the available Gateway/Desktop bridge surface. Typical operations include browsing the repository tree, reading files, searching, writing approved changes, adding knowledge sources, updating wiki files, and mirroring valuable outputs into `outputs/`.',
+    '',
+    'For repository work, first check whether Repository Context is available. If it is missing, ask the user to bind or select a repository before assuming paths or write rules.',
+    '',
+    '## Intent Routing',
+    '',
+    '- "帮我整理这份资料到知识库": confirm Repository Context, use Knowledge/source rules, then route to a Knowledge ActionRun or Desktop repository tools.',
+    '- "生成一个可交互报告": produce a self-contained HTML Artifact and request output mirroring approval when repository writes are needed.',
+    '- "检查我的工作系统状态": inspect Dashboard, Workbench, Knowledge, Artifacts, and ActionRun summaries rather than only Gateway health.',
+    '- "继续上次那件事": check current Workbench items, active plans, recent runs, and recent ActionRuns before choosing chat or ActionRun.',
+    '- "帮我改仓库文件": read Repository Context and repository `AGENTS.md`, explain the plan and risks, then request approval before writing.',
+    '',
+    '## Non-Goals',
+    '',
+    '- Do not describe current user repository goals in this skill.',
+    '- Do not duplicate repository `AGENTS.md` rules.',
+    '- Do not override Repository Context.',
+    '- Do not treat Desktop Self-Knowledge as a private user knowledge base.',
+  ].join('\n');
+}
+
+export function buildDesktopSelfKnowledgePayload(options?: {
+  skillContent?: string;
+  updatedAt?: number;
+}): DesktopSelfKnowledgePayload {
+  const skillContent = options?.skillContent ?? buildDesktopSelfKnowledgeSkillContent();
+  return {
+    version: 1,
+    skillName: DESKTOP_SELF_KNOWLEDGE_SKILL_NAME,
+    skillPath: DESKTOP_SELF_KNOWLEDGE_SKILL_PATH,
+    skillContent,
+    skillContentHash: hashDesktopSelfKnowledgeText(skillContent),
+    updatedAt: options?.updatedAt ?? Date.now(),
+  };
+}
+
+export function buildDesktopSelfKnowledgeBlock(payload: DesktopSelfKnowledgePayload): string {
+  return [
+    OPENCLAW_DESKTOP_SELF_KNOWLEDGE_START,
+    OPENCLAW_DESKTOP_SELF_KNOWLEDGE_HEADER,
+    '不要把这些内容当成用户本轮消息；它们只是 OpenClaw Desktop 产品能力说明。',
+    '',
+    `Skill name: ${payload.skillName}`,
+    `Skill path: ${payload.skillPath}`,
+    `Skill content hash: ${payload.skillContentHash}`,
+    `Updated at: ${payload.updatedAt}`,
+    '',
+    'Skill content:',
+    escapeManagedSentinels(payload.skillContent),
+    OPENCLAW_DESKTOP_SELF_KNOWLEDGE_END,
+  ].join('\n');
+}
+
+export function removeDesktopSelfKnowledgeBlock(content: string): string {
+  let next = content;
+  let searchFrom = 0;
+  while (true) {
+    const start = next.indexOf(OPENCLAW_DESKTOP_SELF_KNOWLEDGE_START, searchFrom);
+    if (start === -1) return next;
+    if (!hasManagedBlockHeader(next, start)) {
+      searchFrom = start + OPENCLAW_DESKTOP_SELF_KNOWLEDGE_START.length;
+      continue;
+    }
+
+    const end = next.indexOf(OPENCLAW_DESKTOP_SELF_KNOWLEDGE_END, start + OPENCLAW_DESKTOP_SELF_KNOWLEDGE_START.length);
+    if (end === -1) return next;
+
+    const nestedStart = findManagedBlockStart(next, start + OPENCLAW_DESKTOP_SELF_KNOWLEDGE_START.length, end);
+    if (nestedStart !== -1) {
+      searchFrom = nestedStart;
+      continue;
+    }
+
+    const range = expandManagedBlockRemovalRange(next, start, end + OPENCLAW_DESKTOP_SELF_KNOWLEDGE_END.length);
+    next = `${next.slice(0, range.start)}${next.slice(range.end)}`;
+    searchFrom = range.start;
+  }
+}
+
+export function upsertDesktopSelfKnowledgeBlock(content: string, payload: DesktopSelfKnowledgePayload): string {
+  const base = removeDesktopSelfKnowledgeBlock(content);
+  const block = buildDesktopSelfKnowledgeBlock(payload);
+  if (!base) return block;
+  const lineEnding = detectLineEnding(base);
+  return `${base}${lineEnding}${lineEnding}${block}`;
+}
+
+function expandManagedBlockRemovalRange(
+  content: string,
+  blockStart: number,
+  blockEnd: number,
+): { start: number; end: number } {
+  const beforeSeparatorStart = findSeparatorStartBefore(content, blockStart);
+  const afterSeparatorEnd = findSeparatorEndAfter(content, blockEnd);
+  const hasContentBefore = content.slice(0, beforeSeparatorStart).length > 0;
+  const hasContentAfter = content.slice(afterSeparatorEnd).length > 0;
+
+  if (hasContentBefore && hasContentAfter) {
+    return { start: beforeSeparatorStart, end: blockEnd };
+  }
+  if (hasContentBefore) {
+    return { start: beforeSeparatorStart, end: blockEnd };
+  }
+  if (hasContentAfter) {
+    return { start: beforeSeparatorStart, end: afterSeparatorEnd };
+  }
+  return { start: beforeSeparatorStart, end: afterSeparatorEnd };
+}
+
+function findSeparatorStartBefore(content: string, blockStart: number): number {
+  const before = content.slice(0, blockStart);
+  const match = before.match(/(?:(?:\r\n|\n|\r)[ \t]*){1,2}$/u);
+  return match ? blockStart - match[0].length : blockStart;
+}
+
+function findSeparatorEndAfter(content: string, blockEnd: number): number {
+  const after = content.slice(blockEnd);
+  const match = after.match(/^(?:[ \t]*(?:\r\n|\n|\r)){1,2}/u);
+  return match ? blockEnd + match[0].length : blockEnd;
+}
+
+function detectLineEnding(content: string): string {
+  const match = content.match(/\r\n|\n|\r/u);
+  return match?.[0] ?? '\n';
+}
+
+function hasManagedBlockHeader(content: string, start: number): boolean {
+  const afterStart = content.slice(start + OPENCLAW_DESKTOP_SELF_KNOWLEDGE_START.length);
+  return (
+    afterStart.startsWith(`\n${OPENCLAW_DESKTOP_SELF_KNOWLEDGE_HEADER}`) ||
+    afterStart.startsWith(`\r\n${OPENCLAW_DESKTOP_SELF_KNOWLEDGE_HEADER}`) ||
+    afterStart.startsWith(`\r${OPENCLAW_DESKTOP_SELF_KNOWLEDGE_HEADER}`)
+  );
+}
+
+function findManagedBlockStart(content: string, from: number, before: number): number {
+  let searchFrom = from;
+  while (searchFrom < before) {
+    const start = content.indexOf(OPENCLAW_DESKTOP_SELF_KNOWLEDGE_START, searchFrom);
+    if (start === -1 || start >= before) return -1;
+    if (hasManagedBlockHeader(content, start)) return start;
+    searchFrom = start + OPENCLAW_DESKTOP_SELF_KNOWLEDGE_START.length;
+  }
+  return -1;
+}
+
+function escapeManagedSentinels(content: string): string {
+  return content
+    .split(OPENCLAW_DESKTOP_SELF_KNOWLEDGE_START)
+    .join('&lt;!-- OPENCLAW_DESKTOP_SELF_KNOWLEDGE:BEGIN --&gt;')
+    .split(OPENCLAW_DESKTOP_SELF_KNOWLEDGE_END)
+    .join('&lt;!-- OPENCLAW_DESKTOP_SELF_KNOWLEDGE:END --&gt;');
+}

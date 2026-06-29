@@ -1,10 +1,25 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, Button, Input, Select, Tag, Card, Spin, Empty, Toast, Popconfirm } from '@douyinfe/semi-ui';
 import { IconArrowLeft, IconPlay, IconDeleteStroked, IconRefresh } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
-import type { ArtifactMeta } from '../lib/artifact-types';
+import type { ArtifactEnrichmentStatus, ArtifactMeta } from '../lib/artifact-types';
+import { buildArtifactReuseReference } from '../lib/artifact-reference';
+import { buildArtifactVersionHistory } from '../lib/artifact-version-history';
+import { buildArtifactNativePreviewPanel, buildArtifactPreviewCard } from '../lib/artifact-display';
+import { buildArtifactValueHealth, type ArtifactValueHealthStatus } from '../lib/artifact-value-health';
+import {
+  ARTIFACT_EXECUTION_REVIEW_WRITE_COMMAND,
+  buildArtifactExecutionReviewWriteCommand,
+  formatArtifactExecutionReviewWriteCommand,
+} from '../lib/artifact-execution-review-command';
+import {
+  ARTIFACT_EXECUTION_PREPARE_COMMAND,
+  ARTIFACT_EXECUTION_RECORD_COMMAND,
+  buildArtifactExecutionBoundary,
+} from '../lib/artifact-execution-boundary';
+import { loadRepositoryBinding } from '../lib/agentic-repository-store';
 
 const { Text, Title } = Typography;
 
@@ -16,9 +31,11 @@ export default function ArtifactDetailPage() {
   const openArtifactWindow = useStore((s) => s.openArtifactWindow);
   const deleteArtifact = useStore((s) => s.deleteArtifact);
   const updateArtifact = useStore((s) => s.updateArtifact);
+  const currentInstanceId = useStore((s) => s.currentInstanceId);
   const [editingMeta, setEditingMeta] = useState(false);
   const [metaForm, setMetaForm] = useState<Partial<ArtifactMeta>>({});
   const [metaFormArtifactId, setMetaFormArtifactId] = useState<string | null>(null);
+  const [reviewCommandRepoPath, setReviewCommandRepoPath] = useState<string | null>(null);
 
   const meta = artifacts.find((a) => a.id === artifactId);
 
@@ -32,6 +49,29 @@ export default function ArtifactDetailPage() {
     });
     setMetaFormArtifactId(meta.id);
   }
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!currentInstanceId) {
+      setReviewCommandRepoPath(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    loadRepositoryBinding(currentInstanceId)
+      .then((binding) => {
+        if (cancelled) return;
+        setReviewCommandRepoPath(binding?.status === 'repo_ready' ? binding.repoPath : null);
+      })
+      .catch(() => {
+        if (!cancelled) setReviewCommandRepoPath(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentInstanceId]);
 
   if (!meta) {
     return (
@@ -59,6 +99,28 @@ export default function ArtifactDetailPage() {
     await deleteArtifact(artifactId);
     navigate('/artifacts');
     Toast.success(t('artifact.deleted'));
+  };
+
+  const handleCopyReference = async () => {
+    await navigator.clipboard.writeText(buildArtifactReuseReference(meta).markdown);
+    Toast.success(t('artifact.referenceCopied'));
+  };
+  const versions = buildArtifactVersionHistory(meta).slice().reverse();
+  const previewCard = buildArtifactPreviewCard(meta);
+  const nativePreviewPanel = buildArtifactNativePreviewPanel(meta);
+  const valueHealth = buildArtifactValueHealth(meta);
+  const enrichmentEvents = meta.enrichmentEvents ?? [];
+  const lastEnrichmentEvent = enrichmentEvents[enrichmentEvents.length - 1];
+  const executionBoundary = buildArtifactExecutionBoundary(meta);
+  const executionReviewCommand = buildArtifactExecutionReviewWriteCommand(meta, { repoPath: reviewCommandRepoPath });
+  const executionReviewCommandText = executionReviewCommand
+    ? formatArtifactExecutionReviewWriteCommand(executionReviewCommand)
+    : null;
+
+  const handleCopyExecutionReviewCommand = async () => {
+    if (!executionReviewCommandText) return;
+    await navigator.clipboard.writeText(executionReviewCommandText);
+    Toast.success(t('artifact.executionReviewCommandCopied'));
   };
 
   return (
@@ -214,6 +276,327 @@ export default function ArtifactDetailPage() {
                   <Text>{meta.description}</Text>
                 </div>
               )}
+              {meta.contentSummary && (
+                <div>
+                  <Text type="tertiary">{t('artifact.contentSummary')}: </Text>
+                  <Text>{meta.contentSummary}</Text>
+                </div>
+              )}
+              {meta.externalFormat && (
+                <div>
+                  <Text type="tertiary">{t('artifact.externalFormat')}: </Text>
+                  <Tag size="small">{meta.externalFormat}</Tag>
+                </div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div>
+                  <Text type="tertiary">{t('artifact.valueHealth')}: </Text>
+                  <Tag size="small" color={valueHealthColor(valueHealth.status)} type="light">
+                    {valueHealth.status}
+                  </Tag>
+                </div>
+                <Text type="secondary">{valueHealth.summary}</Text>
+                {valueHealth.gaps.length > 0 && (
+                  <div>
+                    <Text type="tertiary">{t('artifact.valueHealthGaps')}: </Text>
+                    <Text>{valueHealth.gaps.join(', ')}</Text>
+                  </div>
+                )}
+                {valueHealth.nextActions.length > 0 && (
+                  <div>
+                    <Text type="tertiary">{t('artifact.valueHealthNextActions')}: </Text>
+                    <Text>{valueHealth.nextActions.join(', ')}</Text>
+                  </div>
+                )}
+              </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '56px minmax(0, 1fr)',
+                  gap: 12,
+                  alignItems: 'center',
+                  padding: '10px 0',
+                }}
+              >
+                <div
+                  style={{
+                    width: 56,
+                    height: 42,
+                    borderRadius: 6,
+                    background: 'var(--semi-color-fill-0)',
+                    border: '1px solid var(--semi-color-border)',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 12,
+                    fontWeight: 700,
+                  }}
+                >
+                  {previewCard.thumbnailUrl ? (
+                    <img
+                      src={previewCard.thumbnailUrl}
+                      alt=""
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    />
+                  ) : (
+                    previewCard.thumbnailLabel
+                  )}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <Text strong>
+                    {previewCard.formatLabel} · {previewCard.actionLabel}
+                  </Text>
+                  <div>
+                    <Text type="secondary">{previewCard.summary}</Text>
+                  </div>
+                  {previewCard.location && (
+                    <div>
+                      <Text type="tertiary" copyable>
+                        {previewCard.location}
+                      </Text>
+                    </div>
+                  )}
+                  {previewCard.safetyNote && (
+                    <div>
+                      <Text type="tertiary" size="small">
+                        {previewCard.safetyNote}
+                      </Text>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {nativePreviewPanel && (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                    padding: 12,
+                    borderRadius: 6,
+                    border: '1px solid var(--semi-color-border)',
+                    background: 'var(--semi-color-fill-0)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                    <Text strong>{nativePreviewPanel.title}</Text>
+                    <Tag size="small" type="light">
+                      {previewCard.formatLabel}
+                    </Tag>
+                  </div>
+                  <div
+                    style={{
+                      height: 260,
+                      minHeight: 180,
+                      borderRadius: 6,
+                      border: '1px solid var(--semi-color-border)',
+                      background: 'var(--semi-color-bg-0)',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <img
+                      src={nativePreviewPanel.imageUrl}
+                      alt={nativePreviewPanel.alt}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        display: 'block',
+                      }}
+                    />
+                  </div>
+                  <Text type="secondary">{nativePreviewPanel.summary}</Text>
+                  <Text type="tertiary" size="small">
+                    {nativePreviewPanel.safetyNote}
+                  </Text>
+                </div>
+              )}
+              {meta.fileInspection && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div>
+                    <Text type="tertiary">{t('artifact.fileInspection')}: </Text>
+                    <Tag size="small">{meta.fileInspection.format}</Tag>
+                    <Tag size="small" type="light">
+                      {meta.fileInspection.sourceKind}
+                    </Tag>
+                    <Tag size="small" type="light">
+                      {meta.fileInspection.previewStatus}
+                    </Tag>
+                  </div>
+                  <Text type="secondary">{meta.fileInspection.summary}</Text>
+                  {meta.fileInspection.limitations.length > 0 && (
+                    <div>
+                      <Text type="tertiary">{t('artifact.fileInspectionLimitations')}: </Text>
+                      <Text>{meta.fileInspection.limitations.join(', ')}</Text>
+                    </div>
+                  )}
+                </div>
+              )}
+              {meta.previewPlan && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div>
+                    <Text type="tertiary">{t('artifact.previewPlan')}: </Text>
+                    <Tag size="small">{meta.previewPlan.strategy}</Tag>
+                    <Tag size="small" type="light">
+                      {meta.previewPlan.surface}
+                    </Tag>
+                    <Tag size="small" type="light">
+                      {meta.previewPlan.primaryAction}
+                    </Tag>
+                  </div>
+                  <Text type="secondary">{meta.previewPlan.summary}</Text>
+                  {meta.previewPlan.safetyNote && (
+                    <Text type="tertiary" size="small">
+                      {meta.previewPlan.safetyNote}
+                    </Text>
+                  )}
+                  {meta.previewPlan.limitations.length > 0 && (
+                    <div>
+                      <Text type="tertiary">{t('artifact.previewPlanLimitations')}: </Text>
+                      <Text>{meta.previewPlan.limitations.join(', ')}</Text>
+                    </div>
+                  )}
+                  {meta.previewPlan.nextSteps.length > 0 && (
+                    <div>
+                      <Text type="tertiary">{t('artifact.previewPlanNextSteps')}: </Text>
+                      <Text>{meta.previewPlan.nextSteps.join(', ')}</Text>
+                    </div>
+                  )}
+                </div>
+              )}
+              {meta.contentExtract && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div>
+                    <Text type="tertiary">{t('artifact.contentExtract')}: </Text>
+                    <Tag size="small">{meta.contentExtract.status}</Tag>
+                    <Tag size="small" type="light">
+                      {meta.contentExtract.format}
+                    </Tag>
+                    <Tag size="small" type="light">
+                      {meta.contentExtract.sourceKind}
+                    </Tag>
+                  </div>
+                  <Text type="secondary">{meta.contentExtract.summary}</Text>
+                  <Text type="tertiary" size="small">
+                    {meta.contentExtract.bytesRead} B · {meta.contentExtract.textLength} chars
+                    {meta.contentExtract.truncated ? ' · truncated' : ''}
+                  </Text>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <Text type="tertiary">{t('artifact.contentExtractSnippet')}: </Text>
+                    <Text
+                      code
+                      copyable
+                      style={{
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      {meta.contentExtract.snippet}
+                    </Text>
+                  </div>
+                </div>
+              )}
+              {lastEnrichmentEvent && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div>
+                    <Text type="tertiary">{t('artifact.enrichmentEvents')}: </Text>
+                    <Tag size="small" color={enrichmentStatusColor(lastEnrichmentEvent.status)} type="light">
+                      {lastEnrichmentEvent.status}
+                    </Tag>
+                    <Tag size="small" type="light">
+                      {lastEnrichmentEvent.kind}
+                    </Tag>
+                    <Tag size="small" type="light">
+                      {lastEnrichmentEvent.format}
+                    </Tag>
+                  </div>
+                  {(lastEnrichmentEvent.resultSummary || lastEnrichmentEvent.reason || lastEnrichmentEvent.error) && (
+                    <Text type="secondary">
+                      {lastEnrichmentEvent.resultSummary ?? lastEnrichmentEvent.reason ?? lastEnrichmentEvent.error}
+                    </Text>
+                  )}
+                  <Text type="tertiary" size="small">
+                    {t('artifact.enrichmentEventCount', { count: enrichmentEvents.length })}
+                  </Text>
+                </div>
+              )}
+              {meta.reuseKind && (
+                <div>
+                  <Text type="tertiary">{t('artifact.reuseKind')}: </Text>
+                  <Tag size="small" color="violet" type="light">
+                    {meta.reuseKind}
+                  </Tag>
+                </div>
+              )}
+              {executionBoundary && (
+                <div
+                  style={{
+                    padding: 10,
+                    borderRadius: 6,
+                    border: '1px solid var(--semi-color-border)',
+                    background: 'var(--semi-color-fill-0)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <Text strong>{t('artifact.executionBoundary')}</Text>
+                    <Tag size="small" color="orange" type="light">
+                      {t('artifact.executionRequiresApproval')}
+                    </Tag>
+                    <Tag size="small" color="grey" type="light">
+                      recordOnly
+                    </Tag>
+                  </div>
+                  <Text type="secondary" size="small">
+                    {t('artifact.executionBoundaryHint')}
+                  </Text>
+                  {executionBoundary.latestExecution && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <Text size="small" type="secondary">
+                        {executionBoundary.latestExecution.status}
+                        {executionBoundary.latestExecution.approvalTitle
+                          ? ` · ${executionBoundary.latestExecution.approvalTitle}`
+                          : ''}
+                        {executionBoundary.latestExecution.approvalRisk
+                          ? ` · ${executionBoundary.latestExecution.approvalRisk}`
+                          : ''}
+                        {executionBoundary.latestExecution.runner
+                          ? ` · ${executionBoundary.latestExecution.runner}`
+                          : ''}
+                      </Text>
+                      {executionBoundary.latestExecution.approvalReason && (
+                        <Text size="small" type="tertiary">
+                          {executionBoundary.latestExecution.approvalReason}
+                        </Text>
+                      )}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div>
+                      <Text type="tertiary" size="small">
+                        {t('artifact.executionPrepareCommand')}:
+                      </Text>
+                      <Text code copyable style={{ wordBreak: 'break-all' }}>
+                        {ARTIFACT_EXECUTION_PREPARE_COMMAND}
+                      </Text>
+                    </div>
+                    <div>
+                      <Text type="tertiary" size="small">
+                        {t('artifact.executionRecordCommand')}:
+                      </Text>
+                      <Text code copyable style={{ wordBreak: 'break-all' }}>
+                        {ARTIFACT_EXECUTION_RECORD_COMMAND}
+                      </Text>
+                    </div>
+                  </div>
+                </div>
+              )}
               {meta.tags.length > 0 && (
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                   {meta.tags.map((tag) => (
@@ -243,10 +626,219 @@ export default function ArtifactDetailPage() {
                   <Text>{meta.fileName}</Text>
                 </div>
               )}
+              {meta.fileSize !== undefined && (
+                <div>
+                  <Text type="tertiary">{t('artifact.fileSize')}: </Text>
+                  <Text>{meta.fileSize}</Text>
+                </div>
+              )}
+              {meta.mimeType && (
+                <div>
+                  <Text type="tertiary">MIME: </Text>
+                  <Text>{meta.mimeType}</Text>
+                </div>
+              )}
               {meta.filePath && (
                 <div>
                   <Text type="tertiary">路径: </Text>
                   <Text copyable>{meta.filePath}</Text>
+                </div>
+              )}
+              {meta.originalFilePath && (
+                <div>
+                  <Text type="tertiary">{t('artifact.originalFilePath')}: </Text>
+                  <Text copyable>{meta.originalFilePath}</Text>
+                </div>
+              )}
+              {meta.repositoryOutputPath && (
+                <div>
+                  <Text type="tertiary">{t('artifact.repositoryOutput')}: </Text>
+                  <Text copyable code>
+                    {meta.repositoryOutputPath}
+                  </Text>
+                </div>
+              )}
+              {meta.repositoryPreviewPath && (
+                <div>
+                  <Text type="tertiary">{t('artifact.repositoryPreview')}: </Text>
+                  <Text copyable code>
+                    {meta.repositoryPreviewPath}
+                  </Text>
+                </div>
+              )}
+              {meta.htmlAudit && (
+                <div>
+                  <Text type="tertiary">{t('artifact.htmlAudit')}: </Text>
+                  <Tag size="small" color={meta.htmlAudit.selfContained ? 'green' : 'red'} type="light">
+                    {meta.htmlAudit.selfContained
+                      ? t('artifact.htmlSelfContained')
+                      : t('artifact.htmlNotSelfContained')}
+                  </Tag>
+                  {meta.htmlAudit.requiresApproval && (
+                    <Tag size="small" color="orange" type="light" style={{ marginLeft: 4 }}>
+                      {t('artifact.htmlApprovalRequired')}
+                    </Tag>
+                  )}
+                  {meta.htmlAudit.issues.length > 0 && (
+                    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <Text type="tertiary" size="small">
+                        {t('artifact.htmlIssueCount', { count: meta.htmlAudit.issues.length })}
+                      </Text>
+                      {meta.htmlAudit.issues.slice(0, 6).map((issue) => (
+                        <Text key={`${issue.code}-${issue.detail ?? ''}`} size="small" type="secondary">
+                          {issue.message}
+                          {issue.detail ? `: ${issue.detail}` : ''}
+                        </Text>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {meta.authEvents && meta.authEvents.length > 0 && (
+                <div>
+                  <Text type="tertiary">{t('artifact.runtimeAuth')}: </Text>
+                  <Tag
+                    size="small"
+                    color={meta.authEvents[meta.authEvents.length - 1].granted ? 'green' : 'red'}
+                    type="light"
+                  >
+                    {meta.authEvents[meta.authEvents.length - 1].granted
+                      ? t('artifact.runtimeAuthGranted')
+                      : t('artifact.runtimeAuthDenied')}
+                  </Tag>
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <Text type="tertiary" size="small">
+                      {t('artifact.runtimeAuthCount', { count: meta.authEvents.length })}
+                    </Text>
+                    {meta.authEvents
+                      .slice(-3)
+                      .reverse()
+                      .map((event) => (
+                        <Text key={event.id} size="small" type="secondary">
+                          {event.capability} · {event.level}
+                          {event.detail ? ` · ${event.detail}` : ''}
+                        </Text>
+                      ))}
+                  </div>
+                </div>
+              )}
+              {meta.bridgeEvents && meta.bridgeEvents.length > 0 && (
+                <div>
+                  <Text type="tertiary">{t('artifact.runtimeBridge')}: </Text>
+                  <Tag
+                    size="small"
+                    color={meta.bridgeEvents[meta.bridgeEvents.length - 1].status === 'succeeded' ? 'green' : 'red'}
+                    type="light"
+                  >
+                    {meta.bridgeEvents[meta.bridgeEvents.length - 1].status}
+                  </Tag>
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <Text type="tertiary" size="small">
+                      {t('artifact.runtimeBridgeCount', { count: meta.bridgeEvents.length })}
+                    </Text>
+                    {meta.bridgeEvents
+                      .slice(-3)
+                      .reverse()
+                      .map((event) => (
+                        <Text key={event.id} size="small" type="secondary">
+                          {event.method} · {event.status}
+                          {event.detail ? ` · ${event.detail}` : ''}
+                          {event.resultSummary ? ` · ${event.resultSummary}` : ''}
+                          {event.error ? ` · ${event.error}` : ''}
+                        </Text>
+                      ))}
+                  </div>
+                </div>
+              )}
+              {meta.reuseEvents && meta.reuseEvents.length > 0 && (
+                <div>
+                  <Text type="tertiary">{t('artifact.reuseRecords')}: </Text>
+                  <Tag
+                    size="small"
+                    color={meta.reuseEvents[meta.reuseEvents.length - 1].status === 'failed' ? 'red' : 'green'}
+                    type="light"
+                  >
+                    {meta.reuseEvents[meta.reuseEvents.length - 1].status}
+                  </Tag>
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <Text type="tertiary" size="small">
+                      {t('artifact.reuseRecordCount', { count: meta.reuseEvents.length })}
+                    </Text>
+                    {meta.reuseEvents
+                      .slice(-3)
+                      .reverse()
+                      .map((event) => (
+                        <Text key={event.id} size="small" type="secondary">
+                          {event.context} · {event.status}
+                          {event.sourceName ? ` · ${event.sourceName}` : ''}
+                          {event.purpose ? ` · ${event.purpose}` : ''}
+                          {event.resultSummary ? ` · ${event.resultSummary}` : ''}
+                        </Text>
+                      ))}
+                  </div>
+                </div>
+              )}
+              {meta.executionEvents && meta.executionEvents.length > 0 && (
+                <div>
+                  <Text type="tertiary">{t('artifact.executionRecords')}: </Text>
+                  <Tag
+                    size="small"
+                    color={meta.executionEvents[meta.executionEvents.length - 1].status === 'failed' ? 'red' : 'green'}
+                    type="light"
+                  >
+                    {meta.executionEvents[meta.executionEvents.length - 1].status}
+                  </Tag>
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <Text type="tertiary" size="small">
+                      {t('artifact.executionRecordCount', { count: meta.executionEvents.length })}
+                    </Text>
+                    {meta.executionEvents
+                      .slice(-3)
+                      .reverse()
+                      .map((event) => (
+                        <Text key={event.id} size="small" type="secondary">
+                          {event.status}
+                          {event.runner ? ` · ${event.runner}` : ''}
+                          {event.command ? ` · ${event.command}` : ''}
+                          {event.resultSummary ? ` · ${event.resultSummary}` : ''}
+                          {event.error ? ` · ${event.error}` : ''}
+                          {event.repositoryOutputPath ? ` · ${event.repositoryOutputPath}` : ''}
+                        </Text>
+                      ))}
+                    {executionReviewCommandText && (
+                      <div
+                        style={{
+                          marginTop: 8,
+                          padding: 10,
+                          borderRadius: 6,
+                          border: '1px solid var(--semi-color-border)',
+                          background: 'var(--semi-color-fill-0)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 8,
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <Text strong>{t('artifact.executionReviewWrite')}</Text>
+                            <div>
+                              <Text type="secondary" size="small">
+                                {reviewCommandRepoPath
+                                  ? t('artifact.executionReviewWriteHint')
+                                  : t('artifact.executionReviewWriteMissingRepoHint')}
+                              </Text>
+                            </div>
+                          </div>
+                          <Button size="small" onClick={handleCopyExecutionReviewCommand}>
+                            {t('artifact.executionReviewCopyCommand')}
+                          </Button>
+                        </div>
+                        <Text code copyable style={{ wordBreak: 'break-all' }}>
+                          {ARTIFACT_EXECUTION_REVIEW_WRITE_COMMAND}
+                        </Text>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -254,13 +846,46 @@ export default function ArtifactDetailPage() {
         </Card>
 
         <Card title={t('artifact.versions')}>
-          <Empty title={t('artifact.noVersions')} />
+          {versions.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {versions.map((version) => (
+                <div
+                  key={version.version}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '8px 0',
+                    borderBottom: '1px solid var(--semi-color-border)',
+                  }}
+                >
+                  <Text strong={version.version === meta.currentVersion} style={{ flex: 1 }}>
+                    v{version.version} · {version.label}
+                  </Text>
+                  {version.version === meta.currentVersion && (
+                    <Tag size="small" color="green" type="light">
+                      {t('artifact.currentVersion')}
+                    </Tag>
+                  )}
+                  <Tag size="small" type="light">
+                    {version.createdBy}
+                  </Tag>
+                  <Text type="tertiary" size="small">
+                    {new Date(version.createdAt).toLocaleString()}
+                  </Text>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <Empty title={t('artifact.noVersions')} />
+          )}
         </Card>
       </div>
 
       <div style={{ marginTop: 24 }}>
         <Card title={t('artifact.actions')}>
           <div style={{ display: 'flex', gap: 12 }}>
+            <Button onClick={handleCopyReference}>{t('artifact.copyReference')}</Button>
             <Button icon={<IconRefresh />} onClick={() => Toast.info(t('artifact.regenNotImplemented'))}>
               {t('artifact.regen')}
             </Button>
@@ -279,6 +904,18 @@ export default function ArtifactDetailPage() {
       </div>
     </div>
   );
+}
+
+function valueHealthColor(status: ArtifactValueHealthStatus): 'green' | 'orange' | 'red' {
+  if (status === 'ready') return 'green';
+  if (status === 'usable_with_limits') return 'orange';
+  return 'red';
+}
+
+function enrichmentStatusColor(status: ArtifactEnrichmentStatus): 'green' | 'orange' | 'red' {
+  if (status === 'succeeded') return 'green';
+  if (status === 'unavailable') return 'orange';
+  return 'red';
 }
 
 export { ArtifactDetailPage };

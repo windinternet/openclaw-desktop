@@ -1,12 +1,21 @@
-import { useEffect, useState, useMemo, type ReactNode } from 'react';
+import { useEffect, useState, useMemo, useCallback, type ReactNode } from 'react';
 import { Typography, Button, Input, Tag, Select, Empty, Card, Spin, Toast } from '@douyinfe/semi-ui';
 import { IconPlus, IconSearch, IconAppCenter, IconAIFilledLevel1 } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from '../lib';
 import type { ArtifactMeta } from '../lib/artifact-types';
+import { buildArtifactDisplayLine, buildArtifactPreviewCard, formatArtifactSource } from '../lib/artifact-display';
+import { filterArtifactList, type ArtifactReuseKindFilter } from '../lib/artifact-list-filter';
+import { buildArtifactValueHealth, type ArtifactValueHealthStatus } from '../lib/artifact-value-health';
 import { ArtifactCreateDialog } from '../components/ArtifactCreateDialog';
 import { ArtifactAICreateDrawer } from '../components/ArtifactAICreateDrawer';
+import { loadRepositoryBinding } from '../lib/agentic-repository-store';
+import { loadAiActionRuns } from '../lib/ai-action-run-store';
+import { buildArtifactOutputPreservationPrompt } from '../lib/artifact-output-preservation';
+import { parseDashboardTailActionRoute } from '../lib/dashboard-tail-action-routing';
+import { preserveWorkbenchOutputFromTailAction } from '../lib/repository-workbench';
+import type { AiActionRun } from '../lib/types';
 
 const { Text } = Typography;
 
@@ -20,9 +29,41 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
   const artifacts = useStore((s) => s.artifacts);
   const fetchArtifacts = useStore((s) => s.fetchArtifacts);
   const openArtifactWindow = useStore((s) => s.openArtifactWindow);
+  const currentInstanceId = useStore((s) => s.currentInstanceId);
+  const actionRunsVersion = useStore((s) => s.actionRunsVersion);
   const navigate = useNavigate();
+  const location = useLocation();
+  const tailActionContext = useMemo(() => parseDashboardTailActionRoute(location.search), [location.search]);
+  const artifactTailActionContext = tailActionContext?.kind === 'output' ? tailActionContext : null;
+  const artifactTailActionRunId = artifactTailActionContext?.id?.startsWith('action-run-output:')
+    ? artifactTailActionContext.id.slice('action-run-output:'.length)
+    : undefined;
+  const [artifactTailActionRun, setArtifactTailActionRun] = useState<AiActionRun | null>(null);
+  const artifactTailActionRunResultSummary =
+    artifactTailActionRun && artifactTailActionRun.id === artifactTailActionRunId
+      ? artifactTailActionRun.resultSummary
+      : undefined;
+  const artifactTailActionRunAssistantResponse =
+    artifactTailActionRun && artifactTailActionRun.id === artifactTailActionRunId
+      ? artifactTailActionRun.lastAssistantResponse
+      : undefined;
+  const artifactTailActionInitialInput = useMemo(() => {
+    if (!artifactTailActionContext?.workItemPath) return undefined;
+    return buildArtifactOutputPreservationPrompt({
+      workItemPath: artifactTailActionContext.workItemPath,
+      actionRunOutputId: artifactTailActionRunId ? `action-run-output:${artifactTailActionRunId}` : undefined,
+      resultSummary: artifactTailActionRunResultSummary,
+      assistantResponse: artifactTailActionRunAssistantResponse,
+    });
+  }, [
+    artifactTailActionContext?.workItemPath,
+    artifactTailActionRunAssistantResponse,
+    artifactTailActionRunId,
+    artifactTailActionRunResultSummary,
+  ]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [reuseKindFilter, setReuseKindFilter] = useState<ArtifactReuseKindFilter>('all');
   const [showCreate, setShowCreate] = useState(false);
   const [showAICreate, setShowAICreate] = useState(false);
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
@@ -36,6 +77,28 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!embedded && artifactTailActionContext) setShowAICreate(true);
+  }, [artifactTailActionContext, embedded]);
+
+  useEffect(() => {
+    if (!currentInstanceId || !artifactTailActionRunId) {
+      setArtifactTailActionRun(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      const runs = await loadAiActionRuns(currentInstanceId).catch(() => []);
+      if (cancelled) return;
+      setArtifactTailActionRun(runs.find((run) => run.id === artifactTailActionRunId) ?? null);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [actionRunsVersion, artifactTailActionRunId, currentInstanceId]);
 
   const typeOptions = useMemo(
     () => [
@@ -59,22 +122,27 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
     [t],
   );
 
-  const filteredArtifacts = useMemo(() => {
-    let list = artifacts;
-    if (typeFilter !== 'all') list = list.filter((a) => a.type === typeFilter);
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (a) =>
-          a.title.toLowerCase().includes(q) ||
-          (a.description ?? '').toLowerCase().includes(q) ||
-          (a.url ?? '').toLowerCase().includes(q) ||
-          (a.command ?? '').toLowerCase().includes(q) ||
-          (a.fileName ?? '').toLowerCase().includes(q),
-      );
-    }
-    return list.sort((a, b) => b.updatedAt - a.updatedAt);
-  }, [artifacts, typeFilter, search]);
+  const reuseKindOptions = useMemo(
+    () => [
+      { value: 'all', label: t('artifact.reuseKindAll') },
+      { value: 'asset', label: t('artifact.reuseKindAsset') },
+      { value: 'template', label: t('artifact.reuseKindTemplate') },
+      { value: 'tool', label: t('artifact.reuseKindTool') },
+      { value: 'script', label: t('artifact.reuseKindScript') },
+      { value: 'workflow', label: t('artifact.reuseKindWorkflow') },
+    ],
+    [t],
+  );
+
+  const filteredArtifacts = useMemo(
+    () =>
+      filterArtifactList(artifacts, {
+        typeFilter,
+        reuseKindFilter,
+        search,
+      }),
+    [artifacts, typeFilter, reuseKindFilter, search],
+  );
 
   const HTML_TYPES = ['report', 'dashboard', 'analysis', 'checklist', 'code', 'document', 'slide', 'form', 'other'];
 
@@ -95,19 +163,6 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
     }
   };
 
-  const getSubInfo = (a: ArtifactMeta): string | null => {
-    if (a.type === 'link' && a.url) {
-      try {
-        return new URL(a.url).hostname;
-      } catch {
-        return a.url.slice(0, 40);
-      }
-    }
-    if (a.type === 'app' && a.command) return a.command.slice(0, 40);
-    if (['file', 'audio', 'image', 'video'].includes(a.type) && a.fileName) return a.fileName;
-    return null;
-  };
-
   const statusText = (status: string) => {
     if (status === 'draft') return t('artifact.statusDraft');
     if (status === 'published') return t('artifact.statusPublished');
@@ -115,13 +170,35 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
   };
 
   const formatTime = (ts: number) => {
-    // eslint-disable-next-line react-hooks/purity
     const diff = Date.now() - ts;
     if (diff < 60000) return t('artifact.justNow');
     if (diff < 3600000) return t('artifact.minAgo', { count: Math.floor(diff / 60000) });
     if (diff < 86400000) return t('artifact.hourAgo', { count: Math.floor(diff / 3600000) });
     return t('artifact.dayAgo', { count: Math.floor(diff / 86400000) });
   };
+
+  const handleArtifactTailActionSaved = useCallback(
+    async (artifact: ArtifactMeta) => {
+      if (!artifactTailActionContext?.workItemPath || !currentInstanceId) return;
+      try {
+        const binding = await loadRepositoryBinding(currentInstanceId);
+        if (!binding) {
+          Toast.warning(t('artifact.outputTailActionUnavailable'));
+          return;
+        }
+        const updated = await preserveWorkbenchOutputFromTailAction(binding, {
+          workItemPath: artifactTailActionContext.workItemPath,
+          tailActionId: artifactTailActionContext.id,
+          artifact,
+        });
+        if (updated) Toast.success(t('artifact.outputTailActionLinked'));
+        else Toast.warning(t('artifact.outputTailActionUnavailable'));
+      } catch (err) {
+        Toast.error(err instanceof Error ? err.message : t('artifact.outputTailActionLinkFailed'));
+      }
+    },
+    [artifactTailActionContext?.id, artifactTailActionContext?.workItemPath, currentInstanceId, t],
+  );
 
   const headerActions = useMemo(
     () => (
@@ -138,6 +215,12 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
           onChange={(v) => setTypeFilter(v as string)}
           optionList={typeOptions}
           style={{ width: 140 }}
+        />
+        <Select
+          value={reuseKindFilter}
+          onChange={(v) => setReuseKindFilter(v as ArtifactReuseKindFilter)}
+          optionList={reuseKindOptions}
+          style={{ width: 150 }}
         />
         <Button onClick={() => setViewMode(viewMode === 'card' ? 'list' : 'card')} theme="borderless">
           <IconAppCenter />
@@ -156,7 +239,7 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
         </Button>
       </>
     ),
-    [search, t, typeFilter, typeOptions, viewMode],
+    [search, t, typeFilter, typeOptions, reuseKindFilter, reuseKindOptions, viewMode],
   );
 
   useEffect(() => {
@@ -176,6 +259,30 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
         </div>
       )}
 
+      {!embedded && artifactTailActionContext?.workItemPath ? (
+        <div
+          style={{
+            border: '1px solid var(--semi-color-border)',
+            borderRadius: 8,
+            padding: 12,
+            marginBottom: 16,
+            background: 'var(--semi-color-fill-0)',
+          }}
+        >
+          <Tag color="green" size="small">
+            {t('artifact.tailActionContextTitle')}
+          </Tag>
+          <Text
+            type="tertiary"
+            size="small"
+            ellipsis={{ showTooltip: true }}
+            style={{ display: 'block', marginTop: 6 }}
+          >
+            {t('artifact.tailActionSource')}: {artifactTailActionContext.workItemPath}
+          </Text>
+        </div>
+      ) : null}
+
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
           <Spin />
@@ -184,55 +291,152 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
         <Empty title={t('artifact.empty')} description={t('artifact.emptyDesc')} />
       ) : viewMode === 'card' ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
-          {filteredArtifacts.map((a: ArtifactMeta) => (
-            <div key={a.id} onClick={() => handleOpenArtifact(a)} style={{ cursor: 'pointer' }}>
-              <Card
-                title={
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 20 }}>{a.icon}</span>
-                    <span
+          {filteredArtifacts.map((a: ArtifactMeta) => {
+            const previewCard = buildArtifactPreviewCard(a);
+            const valueHealth = buildArtifactValueHealth(a);
+            return (
+              <div key={a.id} onClick={() => handleOpenArtifact(a)} style={{ cursor: 'pointer' }}>
+                <Card
+                  title={
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 20 }}>{a.icon}</span>
+                      <span
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 600,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {a.title}
+                      </span>
+                    </div>
+                  }
+                  headerExtraContent={
+                    <Tag
+                      size="small"
+                      color={a.status === 'published' ? 'green' : a.status === 'draft' ? 'orange' : 'grey'}
+                      type="light"
+                    >
+                      {statusText(a.status)}
+                    </Tag>
+                  }
+                >
+                  <div style={{ fontSize: 12, color: 'var(--semi-color-text-2)', marginBottom: 8 }}>
+                    v{a.currentVersion} · {formatTime(a.updatedAt)}
+                  </div>
+                  {(a.externalFormat ||
+                    a.reuseKind ||
+                    a.repositoryOutputPath ||
+                    a.htmlAudit?.selfContained === false ||
+                    a.htmlAudit?.requiresApproval) && (
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: a.description ? 8 : 0 }}>
+                      {a.externalFormat && (
+                        <Tag size="small" color="blue" type="light">
+                          {a.externalFormat}
+                        </Tag>
+                      )}
+                      {a.reuseKind && (
+                        <Tag size="small" color="violet" type="light">
+                          {a.reuseKind}
+                        </Tag>
+                      )}
+                      {a.repositoryOutputPath && (
+                        <Tag size="small" color="green" type="light">
+                          {t('artifact.repositoryOutput')}
+                        </Tag>
+                      )}
+                      {a.htmlAudit?.selfContained === false && (
+                        <Tag size="small" color="red" type="light">
+                          {t('artifact.htmlNotSelfContained')}
+                        </Tag>
+                      )}
+                      {a.htmlAudit?.requiresApproval && (
+                        <Tag size="small" color="orange" type="light">
+                          {t('artifact.htmlApprovalRequired')}
+                        </Tag>
+                      )}
+                    </div>
+                  )}
+                  {a.description && (
+                    <div
                       style={{
-                        fontSize: 14,
-                        fontWeight: 600,
+                        fontSize: 13,
+                        color: 'var(--semi-color-text-1)',
+                        lineHeight: 1.5,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
                         overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
                       }}
                     >
-                      {a.title}
-                    </span>
-                  </div>
-                }
-                headerExtraContent={
-                  <Tag
-                    size="small"
-                    color={a.status === 'published' ? 'green' : a.status === 'draft' ? 'orange' : 'grey'}
-                    type="light"
-                  >
-                    {statusText(a.status)}
-                  </Tag>
-                }
-              >
-                <div style={{ fontSize: 12, color: 'var(--semi-color-text-2)', marginBottom: 8 }}>
-                  v{a.currentVersion} · {formatTime(a.updatedAt)}
-                </div>
-                {a.description && (
+                      {a.description}
+                    </div>
+                  )}
                   <div
                     style={{
-                      fontSize: 13,
-                      color: 'var(--semi-color-text-1)',
-                      lineHeight: 1.5,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
+                      display: 'grid',
+                      gridTemplateColumns: '44px minmax(0, 1fr)',
+                      gap: 10,
+                      alignItems: 'center',
+                      padding: '10px 0',
                     }}
                   >
-                    {a.description}
+                    <div
+                      style={{
+                        width: 44,
+                        height: 34,
+                        borderRadius: 6,
+                        background: 'var(--semi-color-fill-0)',
+                        border: '1px solid var(--semi-color-border)',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: 'var(--semi-color-text-1)',
+                      }}
+                    >
+                      {previewCard.thumbnailUrl ? (
+                        <img
+                          src={previewCard.thumbnailUrl}
+                          alt=""
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        />
+                      ) : (
+                        previewCard.thumbnailLabel
+                      )}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {previewCard.formatLabel} · {previewCard.actionLabel}
+                      </div>
+                      <div
+                        title={previewCard.summary}
+                        style={{
+                          fontSize: 12,
+                          color: 'var(--semi-color-text-2)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {previewCard.summary}
+                      </div>
+                    </div>
                   </div>
-                )}
-                {getSubInfo(a) && (
                   <div
+                    title={a.contentSummary ?? buildArtifactDisplayLine(a)}
                     style={{
                       fontSize: 12,
                       color: 'var(--semi-color-text-2)',
@@ -242,66 +446,168 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {getSubInfo(a)}
+                    {buildArtifactDisplayLine(a)}
                   </div>
-                )}
-                {a.tags.length > 0 && (
-                  <div style={{ marginTop: 8, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {a.tags.map((tag) => (
-                      <Tag key={tag} size="small" color="blue" type="light">
-                        {tag}
-                      </Tag>
-                    ))}
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+                    <Tag size="small" color={valueHealthColor(valueHealth.status)} type="light">
+                      {valueHealth.status}
+                    </Tag>
+                    <Tag size="small" color="grey" type="light">
+                      {formatArtifactSource(a)}
+                    </Tag>
                   </div>
-                )}
-              </Card>
-            </div>
-          ))}
+                  {a.tags.length > 0 && (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        display: 'flex',
+                        gap: 4,
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      {a.tags.map((tag) => (
+                        <Tag key={tag} size="small" color="blue" type="light">
+                          {tag}
+                        </Tag>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              </div>
+            );
+          })}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {filteredArtifacts.map((a: ArtifactMeta) => (
-            <div
-              key={a.id}
-              onClick={() => handleOpenArtifact(a)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '10px 16px',
-                borderRadius: 6,
-                cursor: 'pointer',
-                gap: 12,
-                background: 'var(--semi-color-bg-0)',
-                border: '1px solid var(--semi-color-border)',
-              }}
-            >
-              <span style={{ fontSize: 20 }}>{a.icon}</span>
-              <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{a.title}</span>
-              <Tag size="small" color="blue" type="light">
-                {a.type}
-              </Tag>
-              <Text type="tertiary" size="small">
-                v{a.currentVersion}
-              </Text>
-              <Text type="tertiary" size="small">
-                {formatTime(a.updatedAt)}
-              </Text>
-              <Tag
-                size="small"
-                color={a.status === 'published' ? 'green' : a.status === 'draft' ? 'orange' : 'grey'}
-                type="light"
+          {filteredArtifacts.map((a: ArtifactMeta) => {
+            const previewCard = buildArtifactPreviewCard(a);
+            const valueHealth = buildArtifactValueHealth(a);
+            return (
+              <div
+                key={a.id}
+                onClick={() => handleOpenArtifact(a)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '10px 16px',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  gap: 12,
+                  background: 'var(--semi-color-bg-0)',
+                  border: '1px solid var(--semi-color-border)',
+                }}
               >
-                {statusText(a.status)}
-              </Tag>
-            </div>
-          ))}
+                <span
+                  style={{
+                    width: 42,
+                    height: 34,
+                    flex: '0 0 42px',
+                    borderRadius: 6,
+                    border: '1px solid var(--semi-color-border)',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    textAlign: 'center',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: 'var(--semi-color-text-1)',
+                  }}
+                >
+                  {previewCard.thumbnailUrl ? (
+                    <img
+                      src={previewCard.thumbnailUrl}
+                      alt=""
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    />
+                  ) : (
+                    previewCard.thumbnailLabel
+                  )}
+                </span>
+                <span style={{ flex: 1, minWidth: 0 }} title={a.contentSummary ?? buildArtifactDisplayLine(a)}>
+                  <div style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {a.title}
+                  </div>
+                  <Text
+                    type="tertiary"
+                    size="small"
+                    ellipsis={{
+                      showTooltip: true,
+                    }}
+                  >
+                    {buildArtifactDisplayLine(a)}
+                  </Text>
+                </span>
+                <Tag size="small" color="blue" type="light">
+                  {a.type}
+                </Tag>
+                {a.externalFormat && (
+                  <Tag size="small" color="cyan" type="light">
+                    {a.externalFormat}
+                  </Tag>
+                )}
+                {a.reuseKind && (
+                  <Tag size="small" color="violet" type="light">
+                    {a.reuseKind}
+                  </Tag>
+                )}
+                <Tag size="small" color={valueHealthColor(valueHealth.status)} type="light">
+                  {valueHealth.status}
+                </Tag>
+                <Tag size="small" color="grey" type="light">
+                  {formatArtifactSource(a)}
+                </Tag>
+                {a.repositoryOutputPath && (
+                  <Tag size="small" color="green" type="light">
+                    {t('artifact.repositoryOutput')}
+                  </Tag>
+                )}
+                {a.htmlAudit?.selfContained === false && (
+                  <Tag size="small" color="red" type="light">
+                    {t('artifact.htmlNotSelfContained')}
+                  </Tag>
+                )}
+                {a.htmlAudit?.requiresApproval && (
+                  <Tag size="small" color="orange" type="light">
+                    {t('artifact.htmlApprovalRequired')}
+                  </Tag>
+                )}
+                <Text type="tertiary" size="small">
+                  v{a.currentVersion}
+                </Text>
+                <Text type="tertiary" size="small">
+                  {formatTime(a.updatedAt)}
+                </Text>
+                <Tag
+                  size="small"
+                  color={a.status === 'published' ? 'green' : a.status === 'draft' ? 'orange' : 'grey'}
+                  type="light"
+                >
+                  {statusText(a.status)}
+                </Tag>
+              </div>
+            );
+          })}
         </div>
       )}
 
       <ArtifactCreateDialog visible={showCreate} onClose={() => setShowCreate(false)} />
-      <ArtifactAICreateDrawer visible={showAICreate} onClose={() => setShowAICreate(false)} />
+      <ArtifactAICreateDrawer
+        visible={showAICreate}
+        onClose={() => setShowAICreate(false)}
+        sourcePage={artifactTailActionContext ? 'workbench' : 'artifacts'}
+        workItemPath={artifactTailActionContext?.workItemPath}
+        initialInput={artifactTailActionInitialInput}
+        onSaved={handleArtifactTailActionSaved}
+      />
     </div>
   );
+}
+
+function valueHealthColor(status: ArtifactValueHealthStatus): 'green' | 'orange' | 'red' {
+  if (status === 'ready') return 'green';
+  if (status === 'usable_with_limits') return 'orange';
+  return 'red';
 }
 
 export { ArtifactsPage };

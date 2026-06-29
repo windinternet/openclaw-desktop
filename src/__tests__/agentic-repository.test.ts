@@ -340,12 +340,16 @@ describe('agentic repository storage and templates', () => {
     expect(preload).toContain('repository:bootstrap');
     expect(preload).toContain('repository:init');
     expect(preload).toContain('repository:listTree');
+    expect(preload).toContain('repository:moveText');
     expect(preload).toContain('repository:gitLog');
     expect(preload).toContain('repository:gitCommit');
     expect(preload).toContain('watchAgentsFile');
     expect(preload).toContain('removeListener');
     expect(handlers).toContain('repository:watchAgentsFile');
     expect(handlers).toContain('repository:unwatchAgentsFile');
+    expect(handlers).toContain('repository:moveText');
+    expect(handlers).toContain('resolveSafeExistingRepoPath(repoPath, fromRelativePath)');
+    expect(handlers).toContain('resolveSafeWritableRepoPath(repoPath, toRelativePath)');
     expect(handlers).toContain('repository:agentsFileChanged');
     expect(handlers).toContain('persistent: false');
     expect(handlers).toContain("off('destroyed'");

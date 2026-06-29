@@ -1,22 +1,52 @@
 import { useEffect, useState } from 'react';
-import { Button, Card, Checkbox, Empty, Select, Space, Tag, Typography } from '@douyinfe/semi-ui';
+import { Button, Card, Checkbox, Empty, Select, Space, Tag, Toast, Typography } from '@douyinfe/semi-ui';
 import { IconBolt, IconBox, IconCheckList, IconFile } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { useStore } from '../lib';
+import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway, useStore } from '../lib';
 import type { RepositoryBinding } from '../lib/agentic-repository';
-import { loadAiActionRuns } from '../lib/ai-action-run-store';
-import type { WorkbenchSnapshot } from '../lib/repository-workbench';
-import { loadWorkbenchSnapshot, readWorkbenchMarkdown } from '../lib/repository-workbench';
-import type { RepositoryMarkdownFile } from '../lib/repository-knowledge';
+import { loadAiActionRuns, upsertAiActionRun } from '../lib/ai-action-run-store';
+import { buildPlanExecutePrompt, buildWorkMatterPlanPrompt } from '../lib/ai-action-prompts';
+import { buildArtifactOutputDescription } from '../lib/artifact-display';
 import type { ArtifactMeta } from '../lib/artifact-types';
+import {
+  buildDashboardTailActionTarget,
+  type DashboardTailActionRouteContext,
+} from '../lib/dashboard-tail-action-routing';
+import type { RepositoryMarkdownFile } from '../lib/repository-knowledge';
+import type { WorkbenchSnapshot } from '../lib/repository-workbench';
+import {
+  archiveCompletedWorkbenchMatter,
+  confirmWorkbenchAssetRunReviewDraft,
+  confirmWorkbenchReviewDraft,
+  loadWorkbenchSnapshot,
+  readWorkbenchMarkdown,
+  updateWorkbenchMatterStatusFromTailAction,
+  writeWorkbenchAssetRunReviewDraft,
+  writeWorkbenchReviewDraft,
+} from '../lib/repository-workbench';
 import type { AiActionRun, AiActionRunStatus } from '../lib/types';
+import { extractWorkbenchMatterId, isWorkbenchMatterPath } from '../lib/workbench-matter';
+import {
+  findPlanExecutionKnowledgeFollowUpRuns,
+  findPlanExecutionKnowledgeUpdateState,
+  findLatestPlanExecutionRun,
+  findPlanExecutionReviewState,
+  getPlanExecutionKnowledgeReviewSuggestion,
+  getPlanExecutionPostReviewActionSuggestion,
+  shouldOfferPlanExecutionKnowledgeUpdate,
+  shouldOfferPlanExecutionOutputPreservation,
+  shouldOfferPlanExecutionReview,
+  type PlanExecutionKnowledgeUpdateState,
+} from '../lib/workbench-plan-execution';
+import { ArtifactAICreateDrawer } from './ArtifactAICreateDrawer';
 import MarkdownView from './MarkdownView';
 
 const { Text, Title } = Typography;
 
 export type WorkbenchPanelView = 'dashboard' | 'projects' | 'tasks' | 'plans' | 'activity' | 'outputs' | 'reviews';
 type OutputGroupBy = 'none' | 'source' | 'type';
+const WORKBENCH_STATUS_OPTIONS = ['active', 'blocked', 'done', 'paused'] as const;
 
 interface ProjectDeliverable {
   id: string;
@@ -36,8 +66,27 @@ const ACTION_STATUS_LABEL_KEYS: Record<AiActionRunStatus, string> = {
   cancelled: 'actions.statusCancelled',
 };
 
+const PLAN_EXECUTION_KNOWLEDGE_STATUS_LABEL_KEYS: Record<PlanExecutionKnowledgeUpdateState['status'], string> = {
+  running: 'workbench.planExecutionKnowledgeRunning',
+  awaiting_approval: 'workbench.planExecutionKnowledgeAwaitingApproval',
+  done: 'workbench.planExecutionKnowledgeDone',
+  no_write_needed: 'workbench.planExecutionKnowledgeNoWrite',
+  failed: 'workbench.planExecutionKnowledgeFailed',
+  cancelled: 'workbench.planExecutionKnowledgeCancelled',
+};
+
 function actionStatusColor(status: AiActionRunStatus): 'blue' | 'green' | 'orange' | 'red' | 'grey' {
   if (status === 'done') return 'green';
+  if (status === 'failed') return 'red';
+  if (status === 'cancelled') return 'grey';
+  if (status === 'awaiting_approval') return 'orange';
+  return 'blue';
+}
+
+function knowledgeUpdateStatusColor(
+  status: PlanExecutionKnowledgeUpdateState['status'],
+): 'blue' | 'green' | 'orange' | 'red' | 'grey' {
+  if (status === 'done' || status === 'no_write_needed') return 'green';
   if (status === 'failed') return 'red';
   if (status === 'cancelled') return 'grey';
   if (status === 'awaiting_approval') return 'orange';
@@ -127,12 +176,22 @@ function dedupeDeliverables(items: ProjectDeliverable[]): ProjectDeliverable[] {
 export default function WorkbenchRepositoryPanel({
   binding,
   panelView = 'projects',
+  tailActionContext,
+  assetRunPath,
+  initialWorkItemPath,
+  initialPlanPath,
 }: {
   binding: RepositoryBinding;
   panelView?: WorkbenchPanelView;
+  tailActionContext?: DashboardTailActionRouteContext | null;
+  assetRunPath?: string | null;
+  initialWorkItemPath?: string | null;
+  initialPlanPath?: string | null;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const activeClient = useStore((s) => s.activeClient);
+  const agents = useStore((s) => s.agents);
   const actionRunsVersion = useStore((s) => s.actionRunsVersion);
   const artifacts = useStore((s) => s.artifacts);
   const fetchArtifacts = useStore((s) => s.fetchArtifacts);
@@ -142,10 +201,21 @@ export default function WorkbenchRepositoryPanel({
   const [repositoryTree, setRepositoryTree] = useState<string[]>([]);
   const [selectedPreviewPath, setSelectedPreviewPath] = useState('');
   const [selectedPreviewContent, setSelectedPreviewContent] = useState('');
+  const [openedInitialWorkItemPath, setOpenedInitialWorkItemPath] = useState('');
+  const [openedInitialPlanPath, setOpenedInitialPlanPath] = useState('');
   const [selectedProjectDocumentPath, setSelectedProjectDocumentPath] = useState('');
   const [outputSourceFilters, setOutputSourceFilters] = useState<string[]>([]);
   const [outputTypeFilters, setOutputTypeFilters] = useState<string[]>([]);
   const [outputGroupBy, setOutputGroupBy] = useState<OutputGroupBy>('none');
+  const [showMatterArtifactDrawer, setShowMatterArtifactDrawer] = useState(false);
+  const [planActionSubmitting, setPlanActionSubmitting] = useState(false);
+  const [planExecutionSubmitting, setPlanExecutionSubmitting] = useState(false);
+  const [reviewDraftWriting, setReviewDraftWriting] = useState(false);
+  const [reviewDraftConfirming, setReviewDraftConfirming] = useState(false);
+  const [statusTailActionValue, setStatusTailActionValue] =
+    useState<(typeof WORKBENCH_STATUS_OPTIONS)[number]>('active');
+  const [statusTailActionUpdating, setStatusTailActionUpdating] = useState(false);
+  const [completedMatterArchiving, setCompletedMatterArchiving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -161,7 +231,7 @@ export default function WorkbenchRepositoryPanel({
     let cancelled = false;
     loadAiActionRuns(binding.gatewayInstanceId)
       .then((runs) => {
-        if (!cancelled) setActivityRuns(runs.slice(0, 5));
+        if (!cancelled) setActivityRuns(runs);
       })
       .catch(() => {
         if (!cancelled) setActivityRuns([]);
@@ -208,6 +278,41 @@ export default function WorkbenchRepositoryPanel({
     readWorkbenchMarkdown(binding, firstProject.path).then(setSelectedPreviewContent);
   }, [binding, panelView, selectedPreviewPath, snapshot]);
 
+  useEffect(() => {
+    if (panelView !== 'tasks' || !initialWorkItemPath || !snapshot) return;
+    if (openedInitialWorkItemPath === initialWorkItemPath) return;
+    if (selectedPreviewPath === initialWorkItemPath) return;
+    const workItems = [...snapshot.activeWork, ...snapshot.completedWork, ...snapshot.somedayWork];
+    if (!workItems.some((item) => item.path === initialWorkItemPath)) return;
+
+    let cancelled = false;
+    setSelectedPreviewPath(initialWorkItemPath);
+    setOpenedInitialWorkItemPath(initialWorkItemPath);
+    readWorkbenchMarkdown(binding, initialWorkItemPath).then((content) => {
+      if (!cancelled) setSelectedPreviewContent(content);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [binding, initialWorkItemPath, openedInitialWorkItemPath, panelView, selectedPreviewPath, snapshot]);
+
+  useEffect(() => {
+    if (panelView !== 'plans' || !initialPlanPath || !snapshot) return;
+    if (openedInitialPlanPath === initialPlanPath) return;
+    if (selectedPreviewPath === initialPlanPath) return;
+    if (!snapshot.activePlans.some((plan) => plan.path === initialPlanPath)) return;
+
+    let cancelled = false;
+    setSelectedPreviewPath(initialPlanPath);
+    setOpenedInitialPlanPath(initialPlanPath);
+    readWorkbenchMarkdown(binding, initialPlanPath).then((content) => {
+      if (!cancelled) setSelectedPreviewContent(content);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [binding, initialPlanPath, openedInitialPlanPath, panelView, selectedPreviewPath, snapshot]);
+
   const openPreview = async (file: RepositoryMarkdownFile) => {
     setSelectedPreviewPath(file.path);
     setSelectedPreviewContent(await readWorkbenchMarkdown(binding, file.path));
@@ -232,6 +337,322 @@ export default function WorkbenchRepositoryPanel({
     const repoPath = binding.repoPath.replace(/\/+$/, '');
     const filePath = `${repoPath}/${relativePath.replace(/^\/+/, '')}`;
     window.open(encodeURI(`file://${filePath}`), '_blank');
+  };
+
+  const handleCreateReviewDraft = async (context: DashboardTailActionRouteContext) => {
+    if (!context.workItemPath) {
+      Toast.warning(t('workbench.reviewDraftMissingSource'));
+      return;
+    }
+
+    setReviewDraftWriting(true);
+    try {
+      const sourceRun = context.id?.startsWith('action-run-review:')
+        ? activityRuns.find((run) => run.id === context.id?.replace(/^action-run-review:/, ''))
+        : undefined;
+      const relatedKnowledgeRuns = findPlanExecutionKnowledgeFollowUpRuns(sourceRun, {
+        actionRuns: activityRuns,
+      });
+      const draft = await writeWorkbenchReviewDraft(binding, {
+        workItemPath: context.workItemPath,
+        tailActionId: context.id,
+        relatedKnowledgeRunIds: relatedKnowledgeRuns.map((run) => run.id),
+        relatedKnowledgeRuns: relatedKnowledgeRuns.map((run) => ({
+          id: run.id,
+          status: run.status,
+          resultSummary: run.resultSummary,
+          error: run.error,
+        })),
+      });
+      setSelectedPreviewPath(draft.path);
+      setSelectedPreviewContent(draft.content);
+      setSnapshot(await loadWorkbenchSnapshot(binding));
+      Toast.success(t('workbench.reviewDraftCreated'));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('workbench.reviewDraftCreateFailed'));
+    } finally {
+      setReviewDraftWriting(false);
+    }
+  };
+
+  const handleCreateAssetRunReviewDraft = async () => {
+    if (!assetRunPath) {
+      Toast.warning(t('workbench.assetRunReviewMissingSource'));
+      return;
+    }
+
+    setReviewDraftWriting(true);
+    try {
+      const draft = await writeWorkbenchAssetRunReviewDraft(binding, { assetRunPath });
+      setSelectedPreviewPath(draft.path);
+      setSelectedPreviewContent(draft.content);
+      setSnapshot(await loadWorkbenchSnapshot(binding));
+      Toast.success(t('workbench.reviewDraftCreated'));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('workbench.reviewDraftCreateFailed'));
+    } finally {
+      setReviewDraftWriting(false);
+    }
+  };
+
+  const handleConfirmAssetRunReviewDraft = async () => {
+    if (!assetRunPath || !selectedPreviewPath) {
+      Toast.warning(t('workbench.reviewDraftConfirmUnavailable'));
+      return;
+    }
+
+    setReviewDraftConfirming(true);
+    try {
+      const confirmed = await confirmWorkbenchAssetRunReviewDraft(binding, {
+        reviewPath: selectedPreviewPath,
+        assetRunPath,
+      });
+      if (!confirmed) {
+        Toast.warning(t('workbench.reviewDraftConfirmUnavailable'));
+        return;
+      }
+      setSelectedPreviewContent(await readWorkbenchMarkdown(binding, selectedPreviewPath));
+      setSnapshot(await loadWorkbenchSnapshot(binding));
+      Toast.success(t('workbench.assetRunReviewDraftConfirmed'));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('workbench.reviewDraftConfirmFailed'));
+    } finally {
+      setReviewDraftConfirming(false);
+    }
+  };
+
+  const handleConfirmReviewDraft = async (context: DashboardTailActionRouteContext) => {
+    if (!context.workItemPath || !context.id || !selectedPreviewPath) {
+      Toast.warning(t('workbench.reviewDraftConfirmUnavailable'));
+      return;
+    }
+
+    setReviewDraftConfirming(true);
+    try {
+      const confirmed = await confirmWorkbenchReviewDraft(binding, {
+        reviewPath: selectedPreviewPath,
+        workItemPath: context.workItemPath,
+        tailActionId: context.id,
+      });
+      if (!confirmed) {
+        Toast.warning(t('workbench.reviewDraftConfirmUnavailable'));
+        return;
+      }
+      setSelectedPreviewContent(await readWorkbenchMarkdown(binding, selectedPreviewPath));
+      setSnapshot(await loadWorkbenchSnapshot(binding));
+      Toast.success(
+        t(
+          context.id.startsWith('action-run-review:')
+            ? 'workbench.reviewSourceDraftConfirmed'
+            : 'workbench.reviewDraftConfirmed',
+        ),
+      );
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('workbench.reviewDraftConfirmFailed'));
+    } finally {
+      setReviewDraftConfirming(false);
+    }
+  };
+
+  const handleUpdateMatterStatus = async (context: DashboardTailActionRouteContext) => {
+    if (!context.workItemPath || !context.id) {
+      Toast.warning(t('workbench.statusTailActionUnavailable'));
+      return;
+    }
+
+    setStatusTailActionUpdating(true);
+    try {
+      const updated = await updateWorkbenchMatterStatusFromTailAction(binding, {
+        workItemPath: context.workItemPath,
+        tailActionId: context.id,
+        status: statusTailActionValue,
+      });
+      if (!updated) {
+        Toast.warning(t('workbench.statusTailActionUnavailable'));
+        return;
+      }
+      setSelectedPreviewPath(context.workItemPath);
+      setSelectedPreviewContent(await readWorkbenchMarkdown(binding, context.workItemPath));
+      setSnapshot(await loadWorkbenchSnapshot(binding));
+      Toast.success(t('workbench.matterStatusUpdated'));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('workbench.matterStatusUpdateFailed'));
+    } finally {
+      setStatusTailActionUpdating(false);
+    }
+  };
+
+  const handleArchiveCompletedMatter = async (context: DashboardTailActionRouteContext) => {
+    if (!context.workItemPath) {
+      Toast.warning(t('workbench.archiveCompletedMatterUnavailable'));
+      return;
+    }
+
+    setCompletedMatterArchiving(true);
+    try {
+      const result = await archiveCompletedWorkbenchMatter(binding, { workItemPath: context.workItemPath });
+      if (!result.archived || !result.archivedPath) {
+        Toast.warning(t('workbench.archiveCompletedMatterUnavailable'));
+        return;
+      }
+      setSelectedPreviewPath(result.archivedPath);
+      setSelectedPreviewContent(await readWorkbenchMarkdown(binding, result.archivedPath));
+      setSnapshot(await loadWorkbenchSnapshot(binding));
+      Toast.success(t('workbench.completedMatterArchived'));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('workbench.completedMatterArchiveFailed'));
+    } finally {
+      setCompletedMatterArchiving(false);
+    }
+  };
+
+  const handleCreateMatterPlanActionRun = async () => {
+    if (!selectedWorkItemPath) {
+      Toast.warning(t('workbench.generatePlanMissingMatter'));
+      return;
+    }
+    if (!activeClient) {
+      Toast.error(t('workbench.generatePlanNotConnected'));
+      return;
+    }
+    const agent = agents[0];
+    if (!agent) {
+      Toast.error(t('workbench.generatePlanNoAgent'));
+      return;
+    }
+
+    setPlanActionSubmitting(true);
+    const input = [t('workbench.generatePlanActionTitle'), `workItemPath: ${selectedWorkItemPath}`].join('\n');
+    const actionRun = createAiActionRun({
+      type: 'work_matter_plan',
+      sourcePage: 'workbench',
+      instanceId: binding.gatewayInstanceId,
+      agentId: agent.id,
+      executionMode: 'isolated-session',
+      input,
+      workItemId: selectedWorkItemId,
+      workItemPath: selectedWorkItemPath,
+    });
+
+    await upsertAiActionRun(binding.gatewayInstanceId, { ...actionRun, status: 'planning', updatedAt: Date.now() });
+    try {
+      const runningRun = await executeAiActionRunWithGateway(activeClient, actionRun, {
+        title: t('workbench.generatePlanActionTitle'),
+        prompt: buildWorkMatterPlanPrompt({
+          workItemPath: selectedWorkItemPath,
+          workItemContent: selectedPreviewContent,
+        }),
+      });
+      await upsertAiActionRun(binding.gatewayInstanceId, runningRun);
+
+      let latestRun = runningRun;
+      for (let index = 0; index < 4; index += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        latestRun = await syncAiActionRunWithGateway(activeClient, latestRun);
+        await upsertAiActionRun(binding.gatewayInstanceId, latestRun);
+        if (latestRun.status === 'awaiting_approval' || latestRun.status === 'done' || latestRun.status === 'failed')
+          break;
+      }
+
+      useStore.getState().fetchSessions();
+      Toast.success(t('workbench.generatePlanStarted'));
+      navigate(`/actions?runId=${encodeURIComponent(latestRun.id)}`);
+    } catch (err) {
+      const error = err instanceof Error ? err.message : t('workbench.generatePlanFailed');
+      await upsertAiActionRun(binding.gatewayInstanceId, {
+        ...actionRun,
+        status: 'failed',
+        error,
+        updatedAt: Date.now(),
+      });
+      Toast.error(error);
+    } finally {
+      setPlanActionSubmitting(false);
+    }
+  };
+
+  const handleExecutePlanActionRun = async () => {
+    if (!selectedPlanPath) {
+      Toast.warning(t('workbench.executePlanMissingPlan'));
+      return;
+    }
+    if (!activeClient) {
+      Toast.error(t('workbench.executePlanNotConnected'));
+      return;
+    }
+    const agent = agents[0];
+    if (!agent) {
+      Toast.error(t('workbench.executePlanNoAgent'));
+      return;
+    }
+
+    setPlanExecutionSubmitting(true);
+    let workItemContent = '';
+    let workItemId: string | undefined;
+    if (safeSelectedPlanWorkItemPath) {
+      try {
+        workItemContent = await readWorkbenchMarkdown(binding, safeSelectedPlanWorkItemPath);
+        workItemId = extractWorkbenchMatterId(workItemContent);
+      } catch {
+        workItemContent = '';
+      }
+    }
+
+    const input = [
+      t('workbench.executePlanActionTitle'),
+      `planPath: ${selectedPlanPath}`,
+      safeSelectedPlanWorkItemPath ? `workItemPath: ${safeSelectedPlanWorkItemPath}` : undefined,
+    ]
+      .filter(Boolean)
+      .join('\n');
+    const actionRun = createAiActionRun({
+      type: 'plan_execute',
+      sourcePage: 'workbench',
+      instanceId: binding.gatewayInstanceId,
+      agentId: agent.id,
+      executionMode: 'isolated-session',
+      input,
+      workItemId,
+      workItemPath: safeSelectedPlanWorkItemPath,
+    });
+
+    await upsertAiActionRun(binding.gatewayInstanceId, { ...actionRun, status: 'planning', updatedAt: Date.now() });
+    try {
+      const runningRun = await executeAiActionRunWithGateway(activeClient, actionRun, {
+        title: t('workbench.executePlanActionTitle'),
+        prompt: buildPlanExecutePrompt({
+          planPath: selectedPlanPath,
+          planContent: selectedPreviewContent,
+          workItemPath: safeSelectedPlanWorkItemPath,
+          workItemContent,
+        }),
+      });
+      await upsertAiActionRun(binding.gatewayInstanceId, runningRun);
+
+      let latestRun = runningRun;
+      for (let index = 0; index < 4; index += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        latestRun = await syncAiActionRunWithGateway(activeClient, latestRun);
+        await upsertAiActionRun(binding.gatewayInstanceId, latestRun);
+        if (latestRun.status === 'awaiting_approval' || latestRun.status === 'done' || latestRun.status === 'failed')
+          break;
+      }
+
+      useStore.getState().fetchSessions();
+      Toast.success(t('workbench.executePlanStarted'));
+      navigate(`/actions?runId=${encodeURIComponent(latestRun.id)}`);
+    } catch (err) {
+      const error = err instanceof Error ? err.message : t('workbench.executePlanFailed');
+      await upsertAiActionRun(binding.gatewayInstanceId, {
+        ...actionRun,
+        status: 'failed',
+        error,
+        updatedAt: Date.now(),
+      });
+      Toast.error(error);
+    } finally {
+      setPlanExecutionSubmitting(false);
+    }
   };
 
   const renderFileButton = (file: RepositoryMarkdownFile) => (
@@ -553,9 +974,18 @@ export default function WorkbenchRepositoryPanel({
       snapshot?.taskGroups.flatMap((group) =>
         group.items.map((item) => ({ ...item, groupTitle: group.title, groupId: group.id })),
       ) ?? [];
-    if (taskItems.length === 0) return renderWorkView();
+    const statusTailActionCard = renderStatusTailActionCard();
+    if (taskItems.length === 0) {
+      return (
+        <Space vertical align="start" style={{ width: '100%' }} spacing={12}>
+          {statusTailActionCard}
+          {renderWorkView()}
+        </Space>
+      );
+    }
     return (
       <Space vertical align="start" style={{ width: '100%' }}>
+        {statusTailActionCard}
         {taskItems.map((item) => (
           <button
             key={item.id}
@@ -586,6 +1016,68 @@ export default function WorkbenchRepositoryPanel({
           </button>
         ))}
       </Space>
+    );
+  };
+
+  const renderStatusTailActionCard = () => {
+    const statusTailActionContext = tailActionContext?.kind === 'status' ? tailActionContext : null;
+    if (!statusTailActionContext) return null;
+    const canArchiveCompletedMatter =
+      statusTailActionValue === 'done' && Boolean(statusTailActionContext.workItemPath?.startsWith('work/active/'));
+    return (
+      <div
+        style={{
+          border: '1px solid var(--semi-color-border)',
+          borderRadius: 8,
+          padding: 12,
+          width: '100%',
+          background: 'var(--semi-color-fill-0)',
+        }}
+      >
+        <Space vertical align="start" style={{ width: '100%' }}>
+          <Space align="center" wrap>
+            <Tag color="orange">{t('workbench.statusTailActionTitle')}</Tag>
+            <Tag color="blue">work/</Tag>
+          </Space>
+          <Text size="small">{t('workbench.statusTailActionDesc')}</Text>
+          {statusTailActionContext.workItemPath ? (
+            <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }}>
+              {t('workbench.tailActionSource')}: {statusTailActionContext.workItemPath}
+            </Text>
+          ) : null}
+          <Space align="center" wrap>
+            <Select
+              size="small"
+              value={statusTailActionValue}
+              onChange={(value) => setStatusTailActionValue(value as (typeof WORKBENCH_STATUS_OPTIONS)[number])}
+              style={{ width: 160 }}
+            >
+              {WORKBENCH_STATUS_OPTIONS.map((status) => (
+                <Select.Option key={status} value={status}>
+                  {t(`workbench.matterStatus.${status}`)}
+                </Select.Option>
+              ))}
+            </Select>
+            <Button
+              size="small"
+              type="primary"
+              loading={statusTailActionUpdating}
+              onClick={() => void handleUpdateMatterStatus(statusTailActionContext)}
+            >
+              {t('workbench.updateMatterStatus')}
+            </Button>
+            <Button
+              size="small"
+              type="secondary"
+              loading={completedMatterArchiving}
+              disabled={!canArchiveCompletedMatter}
+              onClick={() => void handleArchiveCompletedMatter(statusTailActionContext)}
+            >
+              {t('workbench.archiveCompletedMatter')}
+            </Button>
+          </Space>
+        </Space>
+      </div>
     );
   };
 
@@ -622,6 +1114,23 @@ export default function WorkbenchRepositoryPanel({
     </Space>
   );
 
+  const renderPlanExecutionState = (planPath: string) => {
+    const run = findLatestPlanExecutionRun(planPath, activityRuns);
+    if (!run) return null;
+    const summary = run.resultSummary || run.error || run.gatewaySessionKey || run.id;
+    return (
+      <Space align="center" wrap style={{ marginTop: 8 }}>
+        <Tag color={actionStatusColor(run.status)}>{t(ACTION_STATUS_LABEL_KEYS[run.status])}</Tag>
+        <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }}>
+          {t('workbench.latestPlanExecution')}: {summary || t('workbench.planExecutionNoSummary')}
+        </Text>
+        <Button size="small" type="tertiary" onClick={() => navigate(`/actions?runId=${encodeURIComponent(run.id)}`)}>
+          {t('workbench.openPlanExecutionRuns')}
+        </Button>
+      </Space>
+    );
+  };
+
   const renderPlansView = () => (
     <div
       style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, width: '100%' }}
@@ -630,7 +1139,42 @@ export default function WorkbenchRepositoryPanel({
         <Title heading={6} style={{ marginTop: 0 }}>
           {t('workbench.activePlans')}
         </Title>
-        {renderFileList(snapshot?.activePlans ?? [], t('workbench.emptyActivePlans'))}
+        {snapshot?.activePlans && snapshot.activePlans.length > 0 ? (
+          <Space vertical align="start" style={{ width: '100%' }}>
+            {snapshot.activePlans.map((file) => (
+              <button
+                key={file.path}
+                type="button"
+                onClick={() => void openPreview(file)}
+                style={{
+                  width: '100%',
+                  border:
+                    selectedPreviewPath === file.path
+                      ? '1px solid var(--semi-color-primary)'
+                      : '1px solid var(--semi-color-border)',
+                  background:
+                    selectedPreviewPath === file.path
+                      ? 'var(--semi-color-primary-light-default)'
+                      : 'var(--semi-color-bg-0)',
+                  borderRadius: 6,
+                  padding: '8px 10px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <Text strong ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>
+                  {file.name}
+                </Text>
+                <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block' }}>
+                  {file.path}
+                </Text>
+                {renderPlanExecutionState(file.path)}
+              </button>
+            ))}
+          </Space>
+        ) : (
+          <Empty description={t('workbench.emptyActivePlans')} />
+        )}
       </div>
       <div style={sectionStyle}>
         <Title heading={6} style={{ marginTop: 0 }}>
@@ -784,11 +1328,11 @@ export default function WorkbenchRepositoryPanel({
       ...dialogArtifacts.map((artifact: ArtifactMeta) => ({
         id: artifact.id,
         title: artifact.title,
-        description: artifact.description || artifact.url || artifact.type,
+        description: buildArtifactOutputDescription(artifact),
         sourceKey: 'dialog',
         sourceLabel: t('workbench.dialogArtifacts'),
-        typeKey: artifact.type,
-        typeLabel: artifact.type,
+        typeKey: artifact.reuseKind ?? artifact.externalFormat ?? artifact.type,
+        typeLabel: artifact.reuseKind ?? artifact.externalFormat ?? artifact.type,
         color: 'violet' as const,
         previewPath: undefined,
         icon: <IconBox />,
@@ -979,6 +1523,146 @@ export default function WorkbenchRepositoryPanel({
     );
   };
 
+  const renderAssetRunReviewCard = () => {
+    if (!assetRunPath) return null;
+    const canConfirmAssetRunReviewDraft =
+      selectedPreviewPath.startsWith('reviews/') &&
+      /^status:\s*draft\s*$/m.test(selectedPreviewContent) &&
+      /^source:\s*desktop-repository-asset-execution-review\s*$/m.test(selectedPreviewContent) &&
+      new RegExp(`^assetRunPath:\\s*${assetRunPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'm').test(
+        selectedPreviewContent,
+      );
+    return (
+      <div
+        style={{
+          border: '1px solid var(--semi-color-border)',
+          borderRadius: 8,
+          padding: 12,
+          marginBottom: 12,
+          background: 'var(--semi-color-fill-0)',
+        }}
+      >
+        <Space vertical align="start" style={{ width: '100%' }}>
+          <Space align="center" wrap>
+            <Tag color="orange">{t('workbench.assetRunReviewTitle')}</Tag>
+            <Tag color="blue">reviews/weekly/</Tag>
+          </Space>
+          <Text size="small">{t('workbench.assetRunReviewDesc')}</Text>
+          <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }}>
+            {t('workbench.assetRunReviewSource')}: {assetRunPath}
+          </Text>
+          <Text type="tertiary" size="small" style={{ fontFamily: 'var(--semi-font-family-monospace)' }}>
+            {t('workbench.reviewTailActionWriteCommand')}: desktop.repository.assets.execution.review.write
+          </Text>
+          <Space align="center" wrap>
+            <Button
+              size="small"
+              type="primary"
+              loading={reviewDraftWriting}
+              onClick={() => void handleCreateAssetRunReviewDraft()}
+            >
+              {t('workbench.createReviewDraft')}
+            </Button>
+            <Button size="small" type="tertiary" onClick={() => openRepositoryFile(assetRunPath)}>
+              {t('workbench.openAssetRunRecord')}
+            </Button>
+            <Button size="small" type="tertiary" onClick={() => openRepositoryFile('reviews/weekly/')}>
+              {t('workbench.openReviewFolder')}
+            </Button>
+            {canConfirmAssetRunReviewDraft ? (
+              <Button
+                size="small"
+                type="secondary"
+                loading={reviewDraftConfirming}
+                onClick={() => void handleConfirmAssetRunReviewDraft()}
+              >
+                {t('workbench.confirmAssetRunReviewDraft')}
+              </Button>
+            ) : null}
+          </Space>
+        </Space>
+      </div>
+    );
+  };
+
+  const renderReviewTailActionCard = () => {
+    const reviewTailActionContext = tailActionContext?.kind === 'review' ? tailActionContext : null;
+    if (!reviewTailActionContext) return null;
+    const reviewTailActionCanConfirm = Boolean(
+      reviewTailActionContext.id && reviewTailActionContext.id.includes(':tail-action:'),
+    );
+    const reviewSourceExecutionCanConfirm = Boolean(
+      reviewTailActionContext.id && reviewTailActionContext.id.startsWith('action-run-review:'),
+    );
+    const reviewTailActionRunId = reviewTailActionContext.id?.startsWith('action-run-review:')
+      ? reviewTailActionContext.id
+      : undefined;
+    const canConfirmReviewDraft =
+      selectedPreviewPath.startsWith('reviews/') &&
+      /^status:\s*draft\s*$/m.test(selectedPreviewContent) &&
+      (reviewTailActionCanConfirm || reviewSourceExecutionCanConfirm) &&
+      Boolean(reviewTailActionContext.workItemPath && reviewTailActionContext.id);
+    return (
+      <div
+        style={{
+          border: '1px solid var(--semi-color-border)',
+          borderRadius: 8,
+          padding: 12,
+          marginBottom: 12,
+          background: 'var(--semi-color-fill-0)',
+        }}
+      >
+        <Space vertical align="start" style={{ width: '100%' }}>
+          <Space align="center" wrap>
+            <Tag color="orange">{t('workbench.reviewTailActionTitle')}</Tag>
+            <Tag color="blue">reviews/weekly/</Tag>
+          </Space>
+          <Text size="small">{t('workbench.reviewTailActionDesc')}</Text>
+          {reviewTailActionContext.workItemPath ? (
+            <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }}>
+              {t('workbench.tailActionSource')}: {reviewTailActionContext.workItemPath}
+            </Text>
+          ) : null}
+          {reviewTailActionRunId ? (
+            <Text type="tertiary" size="small">
+              {t('workbench.reviewTailActionRunSource')}: {reviewTailActionRunId}
+            </Text>
+          ) : null}
+          <Text type="tertiary" size="small" style={{ fontFamily: 'var(--semi-font-family-monospace)' }}>
+            {t('workbench.reviewTailActionWriteCommand')}: desktop.artifacts.execution.review.write
+          </Text>
+          <Space align="center" wrap>
+            <Button
+              size="small"
+              type="primary"
+              loading={reviewDraftWriting}
+              onClick={() => void handleCreateReviewDraft(reviewTailActionContext)}
+            >
+              {t('workbench.createReviewDraft')}
+            </Button>
+            <Button size="small" type="tertiary" onClick={() => openRepositoryFile('reviews/weekly/')}>
+              {t('workbench.openReviewFolder')}
+            </Button>
+            {canConfirmReviewDraft ? (
+              <Button
+                size="small"
+                type="secondary"
+                loading={reviewDraftConfirming}
+                onClick={() => void handleConfirmReviewDraft(reviewTailActionContext)}
+              >
+                {t(
+                  reviewSourceExecutionCanConfirm
+                    ? 'workbench.confirmReviewSourceDraft'
+                    : 'workbench.confirmReviewDraft',
+                )}
+              </Button>
+            ) : null}
+          </Space>
+        </Space>
+      </div>
+    );
+  };
+
   const renderReviewsView = () => (
     <div
       style={{
@@ -1003,6 +1687,8 @@ export default function WorkbenchRepositoryPanel({
         <Title heading={6} style={{ marginTop: 0 }}>
           {t('workbench.reviews')}
         </Title>
+        {renderAssetRunReviewCard()}
+        {renderReviewTailActionCard()}
         {snapshot?.reviewGroups && snapshot.reviewGroups.length > 0 ? (
           <Space vertical align="start" style={{ width: '100%' }}>
             {snapshot.reviewGroups.map((group) => (
@@ -1033,6 +1719,46 @@ export default function WorkbenchRepositoryPanel({
   };
 
   const selectedProject = snapshot?.projects.find((project) => project.path === selectedPreviewPath);
+  const selectedWorkItemPath = isWorkbenchMatterPath(selectedPreviewPath) ? selectedPreviewPath : undefined;
+  const selectedWorkItemId = selectedWorkItemPath ? extractWorkbenchMatterId(selectedPreviewContent) : undefined;
+  const selectedPlanPath = snapshot?.activePlans.some((plan) => plan.path === selectedPreviewPath)
+    ? selectedPreviewPath
+    : undefined;
+  const selectedPlanMetadata = selectedPlanPath
+    ? snapshot?.planMetadata.find((item) => item.path === selectedPlanPath)
+    : undefined;
+  const safeSelectedPlanWorkItemPath =
+    selectedPlanMetadata?.workItemPath && isWorkbenchMatterPath(selectedPlanMetadata.workItemPath)
+      ? selectedPlanMetadata.workItemPath
+      : undefined;
+  const selectedPlanLatestRun = selectedPlanPath
+    ? findLatestPlanExecutionRun(selectedPlanPath, activityRuns)
+    : undefined;
+  const selectedPlanRelatedKnowledgeRunIds = findPlanExecutionKnowledgeFollowUpRuns(selectedPlanLatestRun, {
+    actionRuns: activityRuns,
+  }).map((run) => run.id);
+  const selectedPlanKnowledgeUpdateState = findPlanExecutionKnowledgeUpdateState(selectedPlanLatestRun, {
+    actionRuns: activityRuns,
+  });
+  const selectedPlanCanPreserveOutput = shouldOfferPlanExecutionOutputPreservation(selectedPlanLatestRun);
+  const selectedPlanCanUpdateKnowledge = shouldOfferPlanExecutionKnowledgeUpdate(selectedPlanLatestRun, {
+    actionRuns: activityRuns,
+  });
+  const selectedPlanCanWriteReview = shouldOfferPlanExecutionReview(selectedPlanLatestRun, {
+    reviewDocuments: snapshot?.reviewDocuments,
+  });
+  const selectedPlanReviewState = findPlanExecutionReviewState(selectedPlanLatestRun, {
+    reviewDocuments: snapshot?.reviewDocuments,
+  });
+  const selectedPlanOutputSuggestion = getPlanExecutionPostReviewActionSuggestion('output', selectedPlanReviewState);
+  const selectedPlanKnowledgeSuggestion = getPlanExecutionPostReviewActionSuggestion(
+    'knowledge',
+    selectedPlanReviewState,
+  );
+  const selectedPlanReviewHasKnowledgeContext = selectedPlanRelatedKnowledgeRunIds.length > 0;
+  const selectedPlanReviewSuggestion = getPlanExecutionKnowledgeReviewSuggestion(
+    selectedPlanReviewHasKnowledgeContext ? selectedPlanKnowledgeUpdateState : undefined,
+  );
   const previewTitle =
     panelView === 'projects' ? t('workbench.projectPreview') : selectedPreviewPath || t('workbench.preview');
   const standaloneView = panelView === 'dashboard' || panelView === 'outputs';
@@ -1191,13 +1917,157 @@ export default function WorkbenchRepositoryPanel({
               overflow: 'auto',
             }}
           >
-            <Title heading={5} style={{ marginTop: 0 }} ellipsis={{ showTooltip: true }}>
-              {previewTitle}
-            </Title>
+            <Space align="center" style={{ justifyContent: 'space-between', width: '100%', marginBottom: 12 }}>
+              <Title heading={5} style={{ margin: 0 }} ellipsis={{ showTooltip: true }}>
+                {previewTitle}
+              </Title>
+              {(selectedWorkItemPath || selectedPlanPath) && (
+                <Space align="center" spacing={8}>
+                  {selectedPlanPath && (
+                    <>
+                      {selectedPlanLatestRun && (
+                        <>
+                          <Tag color={actionStatusColor(selectedPlanLatestRun.status)}>
+                            {t(ACTION_STATUS_LABEL_KEYS[selectedPlanLatestRun.status])}
+                          </Tag>
+                          {selectedPlanKnowledgeUpdateState && (
+                            <Tag color={knowledgeUpdateStatusColor(selectedPlanKnowledgeUpdateState.status)}>
+                              {t(PLAN_EXECUTION_KNOWLEDGE_STATUS_LABEL_KEYS[selectedPlanKnowledgeUpdateState.status])}
+                            </Tag>
+                          )}
+                          {selectedPlanReviewState && (
+                            <Tag color={selectedPlanReviewState.status === 'confirmed' ? 'green' : 'orange'}>
+                              {t(
+                                selectedPlanReviewState.status === 'confirmed'
+                                  ? 'workbench.planExecutionReviewConfirmed'
+                                  : 'workbench.planExecutionReviewDraft',
+                              )}
+                            </Tag>
+                          )}
+                          <Button
+                            size="small"
+                            type="tertiary"
+                            onClick={() => navigate(`/actions?runId=${encodeURIComponent(selectedPlanLatestRun.id)}`)}
+                          >
+                            {t('workbench.openPlanExecutionRuns')}
+                          </Button>
+                          {selectedPlanCanPreserveOutput && (
+                            <Button
+                              size="small"
+                              type="tertiary"
+                              icon={<IconBox />}
+                              title={
+                                selectedPlanOutputSuggestion.hintKey
+                                  ? t(selectedPlanOutputSuggestion.hintKey)
+                                  : undefined
+                              }
+                              onClick={() =>
+                                navigate(
+                                  buildDashboardTailActionTarget('/artifacts', {
+                                    kind: 'output',
+                                    id: `action-run-output:${selectedPlanLatestRun.id}`,
+                                    workItemPath: selectedPlanLatestRun.workItemPath,
+                                  }),
+                                )
+                              }
+                            >
+                              {t(selectedPlanOutputSuggestion.labelKey)}
+                            </Button>
+                          )}
+                          {selectedPlanCanUpdateKnowledge && (
+                            <Button
+                              size="small"
+                              type="tertiary"
+                              icon={<IconFile />}
+                              title={
+                                selectedPlanKnowledgeSuggestion.hintKey
+                                  ? t(selectedPlanKnowledgeSuggestion.hintKey)
+                                  : undefined
+                              }
+                              onClick={() =>
+                                navigate(
+                                  buildDashboardTailActionTarget('/knowledge', {
+                                    kind: 'knowledge',
+                                    id: `action-run-knowledge:${selectedPlanLatestRun.id}`,
+                                    workItemPath: selectedPlanLatestRun.workItemPath,
+                                  }),
+                                )
+                              }
+                            >
+                              {t(selectedPlanKnowledgeSuggestion.labelKey)}
+                            </Button>
+                          )}
+                          {selectedPlanCanWriteReview && (
+                            <Button
+                              size="small"
+                              type="tertiary"
+                              icon={<IconCheckList />}
+                              title={
+                                selectedPlanReviewSuggestion.hintKey
+                                  ? t(selectedPlanReviewSuggestion.hintKey)
+                                  : undefined
+                              }
+                              onClick={() =>
+                                navigate(
+                                  buildDashboardTailActionTarget('/workbench', {
+                                    kind: 'review',
+                                    id: `action-run-review:${selectedPlanLatestRun.id}`,
+                                    workItemPath: selectedPlanLatestRun.workItemPath,
+                                  }),
+                                )
+                              }
+                            >
+                              {t(selectedPlanReviewSuggestion.labelKey)}
+                            </Button>
+                          )}
+                        </>
+                      )}
+                      <Button
+                        size="small"
+                        type="tertiary"
+                        icon={<IconBolt />}
+                        loading={planExecutionSubmitting}
+                        onClick={() => void handleExecutePlanActionRun()}
+                      >
+                        {t('workbench.executePlanForMatter')}
+                      </Button>
+                    </>
+                  )}
+                  {selectedWorkItemPath && (
+                    <>
+                      <Button
+                        size="small"
+                        type="tertiary"
+                        icon={<IconCheckList />}
+                        loading={planActionSubmitting}
+                        onClick={() => void handleCreateMatterPlanActionRun()}
+                      >
+                        {t('workbench.generatePlanForMatter')}
+                      </Button>
+                      <Button
+                        size="small"
+                        type="tertiary"
+                        icon={<IconBolt />}
+                        onClick={() => setShowMatterArtifactDrawer(true)}
+                      >
+                        {t('workbench.createArtifactForMatter')}
+                      </Button>
+                    </>
+                  )}
+                </Space>
+              )}
+            </Space>
             {renderPreviewContent()}
           </Card>
         )}
       </div>
+      <ArtifactAICreateDrawer
+        visible={showMatterArtifactDrawer}
+        onClose={() => setShowMatterArtifactDrawer(false)}
+        sourcePage="workbench"
+        workItemId={selectedWorkItemId}
+        workItemPath={selectedWorkItemPath}
+      />
     </Space>
   );
 }

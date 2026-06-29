@@ -173,6 +173,7 @@ describe('new session creation params', () => {
       reviewGroups: [],
       semanticSections: [],
       projects: [],
+      tailActions: [],
       taskGroups: [
         {
           id: 'current',
@@ -244,6 +245,7 @@ describe('new session creation params', () => {
       reviewGroups: [],
       semanticSections: [],
       projects: [],
+      tailActions: [],
       taskGroups: [],
     });
 
