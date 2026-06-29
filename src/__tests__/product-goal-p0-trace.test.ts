@@ -111,11 +111,21 @@ describe('product goal P0 traceability', () => {
     expect(roadmap).toContain('/workbench?view=tasks&workItemPath=<matter>');
     expect(plans).toContain('docs/exec-plans/active/p0-onboarding-golden-path.md');
     expect(roadmap).toContain('docs/exec-plans/active/p0-onboarding-golden-path.md');
+    expect(plans).toContain('选择工作空间');
+    expect(plans).toContain('跳过仓库初始化');
+    expect(roadmap).toContain('选择工作空间');
+    expect(roadmap).toContain('绑定已有仓库');
     expect(onboardingGoldenPath).toContain('开箱金线独立推进设计与实施文档');
     expect(onboardingGoldenPath).toContain('Gateway 是基础设施，不是用户目标');
     expect(onboardingGoldenPath).toContain(
-      '打开应用 -> 选择语言/主题 -> 自动发现或安装 Gateway -> 创建本地工作仓库 -> 输入第一件事 -> 进入工作台',
+      '打开应用 -> 选择语言/主题 -> 自动发现或安装 Gateway -> 选择工作空间 -> 输入第一件事或先体验 -> 进入工作台',
     );
+    expect(onboardingGoldenPath).toContain('不要把仓库初始化做成强制门槛');
+    expect(onboardingGoldenPath).toContain('跳过仓库初始化');
+    expect(onboardingGoldenPath).toContain('新建推荐结构仓库');
+    expect(onboardingGoldenPath).toContain('绑定已有仓库');
+    expect(onboardingGoldenPath).toContain('生成映射');
+    expect(onboardingGoldenPath).toContain('改造已有仓库');
     expect(onboardingGoldenPath).toContain('当前代码事实');
     expect(onboardingGoldenPath).toContain('并行新会话启动提示');
     expect(onboardingGoldenPath).toContain('不以产物系统为主线');
