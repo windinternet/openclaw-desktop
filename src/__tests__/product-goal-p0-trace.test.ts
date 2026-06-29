@@ -79,6 +79,7 @@ describe('product goal P0 traceability', () => {
     expect(source).toContain('AI 产物创建保存前文件/链接细节编辑');
     expect(source).toContain('AI 产物创建保存前 HTML 检查提示');
     expect(source).toContain('AI 产物创建保存前 HTML 可视预览');
+    expect(source).toContain('AI 产物创建保存前预览策略卡片');
     expect(source).toContain('Artifact 执行复盘 UI 入口');
     expect(source).toContain('Knowledge PDF/Office 资料导入第一片');
     expect(source).toContain('Repository 手动资产登记入口');
@@ -193,6 +194,7 @@ describe('product goal P0 traceability', () => {
     expect(plans).toContain('AI 创建保存表单已支持保存前编辑 HTML 正文');
     expect(plans).toContain('AI 创建保存表单会对当前 selected candidate 的 HTML 草稿即时运行 `auditArtifactHtml`');
     expect(plans).toContain('AI 创建保存表单会把当前 selected candidate 的 HTML 草稿渲染到受限 iframe');
+    expect(plans).toContain('AI 创建保存表单会为当前 selected candidate 显示预览策略卡片');
     expect(plans).toContain('AI 创建保存表单已支持保存前编辑文件/链接细节');
     expect(plans).toContain('Artifact 详情页已能在 `tool / script / workflow` 最近执行');
     expect(plans).toContain('复制 `desktop.artifacts.execution.review.write` JSON 命令');
@@ -276,6 +278,7 @@ describe('product goal P0 traceability', () => {
     expect(roadmap).toContain('AI 创建保存表单已支持保存前 HTML 正文编辑');
     expect(roadmap).toContain('AI 创建保存表单已支持保存前 HTML 检查提示');
     expect(roadmap).toContain('AI 创建保存表单已支持保存前 HTML 可视预览');
+    expect(roadmap).toContain('AI 创建保存表单已支持保存前预览策略卡片');
     expect(roadmap).toContain('AI 创建保存表单已支持保存前文件/链接细节编辑');
     expect(roadmap).toContain('Artifact 详情页已在执行记录下暴露“写执行复盘”入口');
     expect(roadmap).toContain('复制 `desktop.artifacts.execution.review.write` JSON 命令');
@@ -373,6 +376,7 @@ describe('product goal P0 traceability', () => {
     expect(skillContent).toContain('edit the HTML body for HTML candidates');
     expect(skillContent).toContain('run `auditArtifactHtml` on the current editable HTML draft');
     expect(skillContent).toContain('render that draft in a sandboxed pre-save iframe');
+    expect(skillContent).toContain('show a pre-save preview strategy card for the selected Artifact candidate');
     expect(skillContent).toContain('preserve HTML body exactly');
     expect(skillContent).toContain('external format, reuse kind, URL, command, file path');
     expect(skillContent).toContain('trim file/link metadata strings');

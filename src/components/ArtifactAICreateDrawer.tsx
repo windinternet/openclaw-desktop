@@ -21,6 +21,7 @@ import { buildArtifactCreatePrompt } from '../lib/ai-action-prompts';
 import { upsertAiActionRun } from '../lib/ai-action-run-store';
 import {
   buildArtifactAICreateGenerateParams,
+  buildArtifactAICreatePreviewCard,
   parseArtifactAICreatePreviews,
   selectArtifactAICreatePreviewsForSave,
   type ArtifactAICreatePreview,
@@ -224,6 +225,10 @@ export function ArtifactAICreateDrawer({
     if (!canEditHtmlBody) return '';
     return buildAICreateHtmlPreviewSrcDoc(previewHtml ?? '');
   }, [canEditHtmlBody, previewHtml]);
+  const selectedPreviewCard = useMemo(() => {
+    if (!preview) return null;
+    return buildArtifactAICreatePreviewCard(preview);
+  }, [preview]);
 
   useEffect(() => {
     if (visible && initialInput !== undefined) setInput(initialInput);
@@ -771,6 +776,50 @@ export function ArtifactAICreateDrawer({
                   {t('artifact.aiCreateExternalDetailsHint')}
                 </Text>
               </div>
+              {selectedPreviewCard && (
+                <div
+                  style={{
+                    padding: 10,
+                    border: '1px solid var(--semi-color-border)',
+                    borderRadius: 8,
+                    background: 'var(--semi-color-fill-0)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                  }}
+                >
+                  <Space align="center" wrap spacing={4}>
+                    <Text strong size="small">
+                      {t('artifact.aiCreatePreviewPlanTitle')}
+                    </Text>
+                    <Tag size="small" color="cyan" type="light">
+                      {selectedPreviewCard.formatLabel}
+                    </Tag>
+                    <Tag size="small" color="blue" type="light">
+                      {selectedPreviewCard.actionLabel}
+                    </Tag>
+                    <Tag size="small" type="light">
+                      {selectedPreviewCard.thumbnailLabel}
+                    </Tag>
+                  </Space>
+                  <Text type="tertiary" size="small">
+                    {t('artifact.aiCreatePreviewPlanHint')}
+                  </Text>
+                  <Text type="secondary" size="small">
+                    {selectedPreviewCard.summary}
+                  </Text>
+                  {selectedPreviewCard.location && (
+                    <Text type="tertiary" size="small" copyable ellipsis={{ showTooltip: true }}>
+                      {selectedPreviewCard.location}
+                    </Text>
+                  )}
+                  {selectedPreviewCard.safetyNote && (
+                    <Text type="tertiary" size="small">
+                      {selectedPreviewCard.safetyNote}
+                    </Text>
+                  )}
+                </div>
+              )}
             </div>
             <div
               style={{

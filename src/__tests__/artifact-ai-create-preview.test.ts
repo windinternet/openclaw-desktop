@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildArtifactAICreateGenerateParams,
+  buildArtifactAICreatePreviewCard,
   normalizeArtifactAICreatePreviewDraft,
   parseArtifactAICreatePreview,
   parseArtifactAICreatePreviews,
@@ -263,6 +264,30 @@ describe('artifact AI create preview', () => {
         url: 'https://openclaw.ai/docs',
         description: '官方文档',
         tags: ['docs'],
+      }),
+    );
+  });
+
+  it('builds a pre-save preview card for file-like AI-created candidates without opening them', () => {
+    const card = buildArtifactAICreatePreviewCard({
+      title: '路线图 PPT',
+      type: 'file',
+      fileName: 'roadmap.pptx',
+      fileSize: 4096,
+      externalFormat: 'powerpoint',
+      contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+      tags: ['roadmap'],
+    });
+
+    expect(card).toEqual(
+      expect.objectContaining({
+        formatLabel: 'PowerPoint',
+        thumbnailLabel: 'PPT',
+        summary: 'PowerPoint · roadmap.pptx · 4 KB',
+        location: 'roadmap.pptx',
+        primaryAction: 'open_file',
+        actionLabel: '查看文件',
+        safetyNote: '本地文件通过系统默认应用打开，不会在 Desktop 内静默执行。',
       }),
     );
   });

@@ -1,6 +1,7 @@
 import { parseArtifactsFromText } from './artifact-parser';
+import { buildArtifactPreviewCard, type ArtifactPreviewCard } from './artifact-display';
 import type { GenerateParams } from './artifact-service';
-import type { ArtifactExternalFormat, ArtifactReuseKind, ArtifactType } from './artifact-types';
+import type { ArtifactExternalFormat, ArtifactMeta, ArtifactReuseKind, ArtifactType } from './artifact-types';
 
 export interface ArtifactAICreatePreview {
   title: string;
@@ -119,6 +120,33 @@ export function buildArtifactAICreateGenerateParams(
     importFile: normalizedPreview.importFile,
     source: { type: 'action_run', id: sourceRunId, name: 'AI 魔法创建' },
   };
+}
+
+export function buildArtifactAICreatePreviewCard(preview: ArtifactAICreatePreview): ArtifactPreviewCard {
+  const normalizedPreview = normalizeArtifactAICreatePreviewDraft(preview);
+  const previewArtifact: ArtifactMeta = {
+    id: 'ai-create-preview',
+    title: normalizedPreview.title || 'AI Artifact Preview',
+    description: normalizedPreview.description,
+    icon: '📎',
+    type: normalizedPreview.type,
+    source: { type: 'action_run', name: 'AI 魔法创建' },
+    tags: normalizedPreview.tags ?? [],
+    currentVersion: 1,
+    status: 'draft',
+    createdAt: 0,
+    updatedAt: 0,
+    url: normalizedPreview.url,
+    command: normalizedPreview.command,
+    filePath: normalizedPreview.filePath,
+    fileName: normalizedPreview.fileName,
+    fileSize: normalizedPreview.fileSize,
+    mimeType: normalizedPreview.mimeType,
+    externalFormat: normalizedPreview.externalFormat,
+    contentSummary: normalizedPreview.contentSummary,
+    reuseKind: normalizedPreview.reuseKind,
+  };
+  return buildArtifactPreviewCard(previewArtifact);
 }
 
 function parseLegacyAiActionPreviews(response: string): ArtifactAICreatePreview[] {

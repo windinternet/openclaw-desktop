@@ -1003,6 +1003,8 @@
     "aiCreateHtmlAuditClean": "未发现外部依赖或需审批能力线索。",
     "aiCreateHtmlPreviewTitle": "保存前 HTML 预览",
     "aiCreateHtmlPreviewHint": "在受限 iframe 中渲染当前 HTML 草稿；仅允许内联样式/脚本与 data/blob 媒体，不授予 Bridge、本地文件或外部网络权限。",
+    "aiCreatePreviewPlanTitle": "保存后预览方式",
+    "aiCreatePreviewPlanHint": "根据当前元数据预估保存后的查看方式；这里只展示策略，不会打开文件、链接、命令或授予权限。",
     "aiCreateExternalDetails": "格式、复用与文件/链接细节",
     "aiCreateExternalDetailsHint": "这些字段只影响显式保存时写入的产物元数据；不会在编辑时读取本地文件、打开链接、执行命令或授予权限。",
     "aiCreateUrl": "链接 URL",

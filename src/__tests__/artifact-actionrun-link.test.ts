@@ -129,6 +129,28 @@ describe('artifact ActionRun linkage', () => {
     expect(en.artifact.aiCreateHtmlPreviewHint).toBeTruthy();
   });
 
+  it('surfaces the save-time preview strategy for non-HTML artifact candidates', () => {
+    const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
+    const preview = readFileSync('src/lib/artifact-ai-create-preview.ts', 'utf8');
+    const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
+    const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
+
+    expect(preview).toContain('buildArtifactAICreatePreviewCard');
+    expect(preview).toContain('buildArtifactPreviewCard');
+    expect(drawer).toContain('buildArtifactAICreatePreviewCard(preview)');
+    expect(drawer).toContain('selectedPreviewCard');
+    expect(drawer).toContain("t('artifact.aiCreatePreviewPlanTitle')");
+    expect(drawer).toContain("t('artifact.aiCreatePreviewPlanHint')");
+    expect(drawer).toContain('selectedPreviewCard.formatLabel');
+    expect(drawer).toContain('selectedPreviewCard.actionLabel');
+    expect(drawer).toContain('selectedPreviewCard.location');
+    expect(drawer).toContain('selectedPreviewCard.safetyNote');
+    expect(zh.artifact.aiCreatePreviewPlanTitle).toBeTruthy();
+    expect(zh.artifact.aiCreatePreviewPlanHint).toBeTruthy();
+    expect(en.artifact.aiCreatePreviewPlanTitle).toBeTruthy();
+    expect(en.artifact.aiCreatePreviewPlanHint).toBeTruthy();
+  });
+
   it('lets users edit selected AI-created file and link details before saving', () => {
     const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
     const preview = readFileSync('src/lib/artifact-ai-create-preview.ts', 'utf8');
