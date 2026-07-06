@@ -8,7 +8,6 @@ import {
   Descriptions,
   Empty,
   Modal,
-  Select,
   Space,
   Spin,
   Tag,
@@ -27,12 +26,13 @@ import {
   upsertAiActionRun,
 } from '../lib/ai-action-run-store';
 import { loadRepositoryBinding } from '../lib/agentic-repository-store';
-import { applyWorkbenchMatterPlanApproval, loadWorkbenchSnapshot } from '../lib/repository-workbench';
+import { applyWorkbenchMatterPlanApproval } from '../lib/repository-workbench';
 import { applyKnowledgeRewriteApproval, formatKnowledgeRewriteWrittenPaths } from '../lib/repository-knowledge';
+import { ActionRunWorkItemPicker } from '../components/ActionRunWorkItemPicker';
 import MarkdownView from '../components/MarkdownView';
 import { useStore } from '../lib';
+import { useWorkbenchWorkItemOptions } from '../lib/workbench-work-items';
 import type { AiActionApproval, AiActionRun, AiActionRunStatus } from '../lib/types';
-import type { RepositoryMarkdownFile } from '../lib/repository-knowledge';
 
 const { Title, Text } = Typography;
 
@@ -120,8 +120,6 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
   const [decisionLoadingId, setDecisionLoadingId] = useState<string | null>(null);
   const [resyncLoadingId, setResyncLoadingId] = useState<string | null>(null);
   const [resumeLoadingId, setResumeLoadingId] = useState<string | null>(null);
-  const [workItemOptions, setWorkItemOptions] = useState<RepositoryMarkdownFile[]>([]);
-  const [selectedAssignmentPath, setSelectedAssignmentPath] = useState('');
   const [assignmentLoading, setAssignmentLoading] = useState(false);
   const selectedSearchRunId = useMemo(() => getActionCenterSearchRunId(location.search), [location.search]);
 
@@ -129,6 +127,19 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
     () => runs.find((run) => run.id === selectedRunId) ?? runs[0] ?? null,
     [runs, selectedRunId],
   );
+  const {
+    createWorkItem: createActionCenterWorkItem,
+    creating: creatingActionCenterWorkItem,
+    loading: actionCenterWorkItemLoading,
+    options: actionCenterWorkItemOptions,
+    selectedPath: selectedActionCenterWorkItemPath,
+    setSelectedPath: setSelectedActionCenterWorkItemPath,
+    selectedWorkItem: selectedActionCenterWorkItem,
+  } = useWorkbenchWorkItemOptions({
+    instanceId: currentInstanceId,
+    enabled: Boolean(selectedRun?.workItemRequired && !selectedRun.workItemPath),
+  });
+  const selectedAssignmentPath = selectedActionCenterWorkItem?.path ?? '';
 
   const statusLabel = (status: AiActionRunStatus): string => {
     const key = STATUS_LABEL_KEYS[status];
@@ -171,38 +182,12 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
 
   useEffect(() => {
     if (!selectedSearchRunId) return;
-    if (!runs.some((run) => run.id === selectedSearchRunId)) return;
-    setSelectedRunId(selectedSearchRunId);
+    const matchedSearchRun = runs.find(
+      (run) => run.id === selectedSearchRunId || run.gatewayRunId === selectedSearchRunId,
+    );
+    if (!matchedSearchRun) return;
+    setSelectedRunId(matchedSearchRun.id);
   }, [runs, selectedSearchRunId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!currentInstanceId) {
-      setWorkItemOptions([]);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    loadRepositoryBinding(currentInstanceId)
-      .then(async (binding) => {
-        if (!binding || binding.status !== 'repo_ready') return [];
-        const snapshot = await loadWorkbenchSnapshot(binding);
-        return [...snapshot.activeWork, ...snapshot.somedayWork, ...snapshot.completedWork];
-      })
-      .then((items) => {
-        if (cancelled) return;
-        setWorkItemOptions(items);
-        setSelectedAssignmentPath((current) => (current && items.some((item) => item.path === current) ? current : ''));
-      })
-      .catch(() => {
-        if (!cancelled) setWorkItemOptions([]);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentInstanceId]);
 
   const clearRuns = useCallback(() => {
     if (!currentInstanceId || runs.length === 0) return;
@@ -264,6 +249,7 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
           });
           updated = {
             ...updated,
+            status: 'done',
             resultSummary: t('actions.knowledgeRewriteWritten', {
               count: writeResult.writtenPaths.length,
               paths: formatKnowledgeRewriteWrittenPaths(writeResult.writtenPaths),
@@ -335,14 +321,14 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
     try {
       const updated = await assignAiActionRunToWorkItem(currentInstanceId, selectedRun.id, selectedAssignmentPath);
       setRuns((current) => current.map((run) => (run.id === updated.id ? updated : run)));
-      setSelectedAssignmentPath('');
+      setSelectedActionCenterWorkItemPath('');
       Toast.success(t('actions.workItemAssigned'));
     } catch (err) {
       Toast.error(err instanceof Error ? err.message : t('actions.workItemAssignFailed'));
     } finally {
       setAssignmentLoading(false);
     }
-  }, [currentInstanceId, selectedAssignmentPath, selectedRun, t]);
+  }, [currentInstanceId, selectedAssignmentPath, selectedRun, setSelectedActionCenterWorkItemPath, t]);
 
   const headerActions = useMemo(
     () => (
@@ -512,24 +498,22 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
                           <Tag color="grey">{selectedRun.workItemUnassignedReason}</Tag>
                         )}
                       </Space>
-                      <Text type="tertiary" size="small">
-                        {t('actions.workItemAssignmentDesc')}
-                      </Text>
-                      <Space align="center" wrap>
-                        <Select
+                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 10 }}>
+                        <ActionRunWorkItemPicker
                           size="small"
-                          value={selectedAssignmentPath}
-                          placeholder={t('actions.workItemPlaceholder')}
-                          onChange={(value) => setSelectedAssignmentPath(String(value))}
-                          style={{ width: 320 }}
-                          disabled={workItemOptions.length === 0}
-                        >
-                          {workItemOptions.map((item) => (
-                            <Select.Option key={item.path} value={item.path}>
-                              {item.name} · {item.path}
-                            </Select.Option>
-                          ))}
-                        </Select>
+                          description={t('actions.workItemAssignmentDesc')}
+                          selectPlaceholder={t('actions.workItemPlaceholder')}
+                          createLabel={t('actions.workItemCreate')}
+                          createPlaceholder={t('actions.workItemCreatePlaceholder')}
+                          createSuccessMessage={t('actions.workItemCreateSuccess')}
+                          options={actionCenterWorkItemOptions}
+                          selectedPath={selectedActionCenterWorkItemPath}
+                          onSelectedPathChange={setSelectedActionCenterWorkItemPath}
+                          createWorkItem={createActionCenterWorkItem}
+                          disabled={assignmentLoading}
+                          creating={creatingActionCenterWorkItem}
+                          loading={actionCenterWorkItemLoading}
+                        />
                         <Button
                           size="small"
                           type="primary"
@@ -537,10 +521,11 @@ export default function ActionCenterPage({ embedded = false, onHeaderActionsChan
                           loading={assignmentLoading}
                           disabled={!selectedAssignmentPath}
                           onClick={() => void handleAssignWorkItem()}
+                          style={{ alignSelf: 'end' }}
                         >
                           {t('actions.assignWorkItem')}
                         </Button>
-                      </Space>
+                      </div>
                     </div>
                   </div>
                 )}

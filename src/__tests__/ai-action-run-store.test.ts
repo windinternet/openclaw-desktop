@@ -3,6 +3,7 @@ import { createEmptyAgentTeamProfile, createInstruction, upsertAgentProfile } fr
 import {
   assignAiActionRunToWorkItem,
   buildAiActionRunMarkdown,
+  recordAiActionRunArtifactOutput,
   reconcileGatewayAgentCreationRun,
   upsertAiActionRun,
 } from '../lib/ai-action-run-store';
@@ -406,6 +407,174 @@ describe('AI ActionRun repository summaries', () => {
     expect(workItemWrite).toContain('- [ ] 判断是否需要把本次执行结果沉淀为成果，并关联到事项。');
   });
 
+  it('lets users assign an unbound terminal ActionRun to a semantic-mapped work item', async () => {
+    const writeText = vi.fn();
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'runs/action-runs/index.md') return '# Action Runs\n';
+      if (relativePath === '10-ops/tasks/active/release.md') {
+        return [
+          '---',
+          'id: mapped-work-release',
+          'status: active',
+          '---',
+          '',
+          '# 映射发布推进',
+          '',
+          '## 执行记录',
+          '',
+          '- 暂无',
+          '',
+          '## 收尾动作',
+          '',
+          '- 暂无',
+          '',
+        ].join('\n');
+      }
+      return '';
+    });
+    const saveInstanceData = vi.fn();
+    const existingRun = createRun({
+      id: 'action-mapped-unassigned',
+      type: 'artifact_create',
+      sourcePage: 'artifacts',
+      status: 'done',
+      input: '生成映射发布报告',
+      resultSummary: '映射发布报告已生成',
+      workItemRequired: true,
+      workItemUnassignedReason: 'pending_work_item_assignment',
+      updatedAt: 2,
+    });
+    const loadInstanceData = vi.fn(async (_instanceId: string, key: string) => {
+      if (key === AI_ACTION_RUNS_STORAGE_KEY) return [existingRun];
+      if (key === AGENTIC_REPOSITORY_STORAGE_KEY) {
+        return {
+          id: 'repo_instance-1',
+          name: 'Repo',
+          location: 'desktop-local',
+          repoPath: '/repo',
+          gatewayInstanceId: 'instance-1',
+          status: 'repo_ready',
+          paths: {
+            sources: 'sources',
+            wiki: 'wiki',
+            work: '10-ops/tasks',
+            plans: '10-ops/plans',
+            runs: 'runs',
+            outputs: 'outputs',
+            reviews: 'reviews',
+            schemas: 'schemas',
+          },
+        };
+      }
+      return null;
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        storage: {
+          loadInstanceData,
+          saveInstanceData,
+        },
+        repository: {
+          readText,
+          writeText,
+        },
+      },
+    });
+
+    const updated = await assignAiActionRunToWorkItem(
+      'instance-1',
+      'action-mapped-unassigned',
+      '10-ops/tasks/active/release.md',
+    );
+
+    expect(updated).toMatchObject({
+      id: 'action-mapped-unassigned',
+      workItemRequired: true,
+      workItemPath: '10-ops/tasks/active/release.md',
+      workItemId: 'mapped-work-release',
+      workItemUnassignedReason: undefined,
+    });
+    const runWrite = writeText.mock.calls.find(
+      (call) => call[1] === 'runs/action-runs/action-mapped-unassigned.md',
+    )?.[2] as string | undefined;
+    expect(runWrite).toContain('workItemPath: 10-ops/tasks/active/release.md');
+    expect(runWrite).not.toContain('workItemUnassignedReason');
+    const workItemWrite = writeText.mock.calls.find(
+      (call) => call[1] === '10-ops/tasks/active/release.md',
+    )?.[2] as string;
+    expect(workItemWrite).toContain(
+      '- 1970-01-01T00:00:00.002Z · artifact_create · done · [runs/action-runs/action-mapped-unassigned.md](../../../runs/action-runs/action-mapped-unassigned.md) · 映射发布报告已生成',
+    );
+    expect(workItemWrite).toContain('- [ ] 判断是否需要更新知识库。');
+  });
+
+  it('rejects absolute paths when assigning an ActionRun to a semantic-mapped work item', async () => {
+    const writeText = vi.fn();
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'runs/action-runs/index.md') return '# Action Runs\n';
+      if (relativePath === '/10-ops/tasks/active/release.md') throw new Error('absolute path should not be read');
+      if (relativePath === '10-ops/tasks/active/release.md') {
+        return ['---', 'id: mapped-work-release', 'status: active', '---', '', '# 映射发布推进', ''].join('\n');
+      }
+      return '';
+    });
+    const existingRun = createRun({
+      id: 'action-mapped-unassigned',
+      type: 'artifact_create',
+      sourcePage: 'artifacts',
+      status: 'done',
+      input: '生成映射发布报告',
+      resultSummary: '映射发布报告已生成',
+      workItemRequired: true,
+      workItemUnassignedReason: 'pending_work_item_assignment',
+      updatedAt: 2,
+    });
+    const loadInstanceData = vi.fn(async (_instanceId: string, key: string) => {
+      if (key === AI_ACTION_RUNS_STORAGE_KEY) return [existingRun];
+      if (key === AGENTIC_REPOSITORY_STORAGE_KEY) {
+        return {
+          id: 'repo_instance-1',
+          name: 'Repo',
+          location: 'desktop-local',
+          repoPath: '/repo',
+          gatewayInstanceId: 'instance-1',
+          status: 'repo_ready',
+          paths: {
+            sources: 'sources',
+            wiki: 'wiki',
+            work: '10-ops/tasks',
+            plans: '10-ops/plans',
+            runs: 'runs',
+            outputs: 'outputs',
+            reviews: 'reviews',
+            schemas: 'schemas',
+          },
+        };
+      }
+      return null;
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        storage: {
+          loadInstanceData,
+          saveInstanceData: vi.fn(),
+        },
+        repository: {
+          readText,
+          writeText,
+        },
+      },
+    });
+
+    await expect(
+      assignAiActionRunToWorkItem('instance-1', 'action-mapped-unassigned', '/10-ops/tasks/active/release.md'),
+    ).rejects.toThrow('ActionRun can only be assigned to a work item markdown file');
+
+    expect(writeText).not.toHaveBeenCalled();
+    expect(readText).not.toHaveBeenCalledWith('/repo', '/10-ops/tasks/active/release.md');
+    expect(readText).not.toHaveBeenCalledWith('/repo', '10-ops/tasks/active/release.md');
+  });
+
   it('includes artifact details and repository output paths when metadata is available', () => {
     const markdown = buildAiActionRunMarkdown(
       createRun({
@@ -469,6 +638,9 @@ describe('AI ActionRun repository summaries', () => {
 
     expect(markdown).toContain('  - summary: PowerPoint · roadmap.pptx · 4 KB');
     expect(markdown).toContain('  - valueHealth: usable_with_limits');
+    expect(markdown).toContain(
+      '  - valueHealthStrengths: file-open-ready, repository-output-recorded, reuse-classified',
+    );
     expect(markdown).toContain('  - valueHealthGaps: native-preview-missing, content-extraction-missing');
     expect(markdown).toContain(
       '  - valueHealthNextActions: open-with-system-app, add-native-preview, add-content-extraction',
@@ -605,6 +777,47 @@ describe('AI ActionRun repository summaries', () => {
         }),
       ]),
     );
+  });
+
+  it('does not auto-save artifact_create preview blocks before the user explicitly saves', async () => {
+    const saveInstanceData = vi.fn();
+    const loadInstanceData = vi.fn(async (_instanceId: string, key: string) => {
+      if (key === AI_ACTION_RUNS_STORAGE_KEY) return [];
+      return null;
+    });
+    const saveMeta = vi.fn();
+    vi.stubGlobal('window', {
+      electronAPI: {
+        artifact: {
+          list: vi.fn(async () => []),
+          saveMeta,
+          saveHtml: vi.fn(),
+          updateIndex: vi.fn(),
+        },
+        storage: {
+          loadInstanceData,
+          saveInstanceData,
+        },
+      },
+    });
+
+    await upsertAiActionRun(
+      'instance-1',
+      createRun({
+        id: 'artifact-create-run',
+        type: 'artifact_create',
+        sourcePage: 'artifacts',
+        status: 'done',
+        input: '生成成果报告',
+        resultSummary: '成果报告候选已生成',
+        lastAssistantResponse:
+          '<artifact>\n{"title":"成果报告","type":"report"}\n<!doctype html><html><body>ok</body></html>\n</artifact>',
+      }),
+    );
+
+    expect(saveMeta).not.toHaveBeenCalled();
+    const savedRuns = saveInstanceData.mock.calls[0][2] as AiActionRun[];
+    expect(savedRuns[0]).not.toHaveProperty('artifactIds');
   });
 
   it('imports and mirrors file artifact blocks from completed ActionRun responses', async () => {
@@ -817,5 +1030,92 @@ describe('AI ActionRun repository summaries', () => {
     );
     const savedRuns = saveInstanceData.mock.calls[0][2] as AiActionRun[];
     expect(savedRuns[0]).not.toHaveProperty('artifactIds');
+  });
+
+  it('records explicitly saved output artifacts on the source ActionRun', async () => {
+    const sourceRun = createRun({
+      id: 'plan-run-1',
+      type: 'plan_execute',
+      sourcePage: 'workbench',
+      status: 'done',
+      input: '执行计划\nplanPath: plans/active/release.md\nworkItemPath: work/active/release.md',
+      resultSummary: '生成发布报告',
+      artifactIds: ['art_existing'],
+    });
+    const storedRuns = [sourceRun];
+    const saveInstanceData = vi.fn(async (_instanceId: string, _key: string, value: AiActionRun[]) => {
+      storedRuns.splice(0, storedRuns.length, ...value);
+    });
+    const loadInstanceData = vi.fn(async (_instanceId: string, key: string) => {
+      if (key === AI_ACTION_RUNS_STORAGE_KEY) return storedRuns;
+      return null;
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        storage: {
+          loadInstanceData,
+          saveInstanceData,
+        },
+      },
+    });
+
+    const updated = await recordAiActionRunArtifactOutput('instance-1', 'plan-run-1', ['art_existing', 'art_new']);
+
+    expect(updated?.artifactIds).toEqual(['art_existing', 'art_new']);
+    expect(saveInstanceData).toHaveBeenCalledWith(
+      'instance-1',
+      AI_ACTION_RUNS_STORAGE_KEY,
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'plan-run-1',
+          artifactIds: ['art_existing', 'art_new'],
+        }),
+      ]),
+    );
+  });
+
+  it('records explicitly saved output artifacts when the tail action carries the Gateway run id', async () => {
+    const sourceRun = createRun({
+      id: 'local-plan-run-1',
+      gatewayRunId: 'gateway-plan-run-1',
+      type: 'plan_execute',
+      sourcePage: 'workbench',
+      status: 'done',
+      input: '执行计划\nplanPath: plans/active/release.md\nworkItemPath: work/active/release.md',
+      resultSummary: '生成发布报告',
+      artifactIds: ['art_existing'],
+    });
+    const storedRuns = [sourceRun];
+    const saveInstanceData = vi.fn(async (_instanceId: string, _key: string, value: AiActionRun[]) => {
+      storedRuns.splice(0, storedRuns.length, ...value);
+    });
+    const loadInstanceData = vi.fn(async (_instanceId: string, key: string) => {
+      if (key === AI_ACTION_RUNS_STORAGE_KEY) return storedRuns;
+      return null;
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        storage: {
+          loadInstanceData,
+          saveInstanceData,
+        },
+      },
+    });
+
+    const updated = await recordAiActionRunArtifactOutput('instance-1', 'gateway-plan-run-1', ['art_new']);
+
+    expect(updated?.id).toBe('local-plan-run-1');
+    expect(updated?.artifactIds).toEqual(['art_existing', 'art_new']);
+    expect(saveInstanceData).toHaveBeenCalledWith(
+      'instance-1',
+      AI_ACTION_RUNS_STORAGE_KEY,
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'local-plan-run-1',
+          gatewayRunId: 'gateway-plan-run-1',
+          artifactIds: ['art_existing', 'art_new'],
+        }),
+      ]),
+    );
   });
 });

@@ -12,6 +12,15 @@ describe('Sidebar session list', () => {
     expect(source).toContain('session-spinner');
   });
 
+  it('uses react-virtualized commonjs deep imports to avoid production module directive warnings', () => {
+    const source = readFileSync('src/components/Sidebar.tsx', 'utf8');
+
+    expect(source).not.toContain("from 'react-virtualized'");
+    expect(source).toContain("from 'react-virtualized/dist/commonjs/InfiniteLoader'");
+    expect(source).toContain("from 'react-virtualized/dist/commonjs/AutoSizer'");
+    expect(source).toContain("from 'react-virtualized/dist/commonjs/List'");
+  });
+
   it('emphasizes the active session title', () => {
     const source = readFileSync('src/components/Sidebar.tsx', 'utf8');
 

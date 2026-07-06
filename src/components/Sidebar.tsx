@@ -3,7 +3,8 @@ import type { ComponentClass, CSSProperties, KeyboardEvent as ReactKeyboardEvent
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Nav, Avatar, Button, Typography, Input, Toast, Tooltip } from '@douyinfe/semi-ui';
-import { InfiniteLoader, AutoSizer } from 'react-virtualized';
+import InfiniteLoader from 'react-virtualized/dist/commonjs/InfiniteLoader';
+import AutoSizer from 'react-virtualized/dist/commonjs/AutoSizer';
 import VList from 'react-virtualized/dist/commonjs/List';
 import {
   IconGithubLogo,

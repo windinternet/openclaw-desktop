@@ -6,7 +6,7 @@
  */
 
 import { marked, type Token, type Tokens } from 'marked';
-import type { GatewayClient } from './gateway';
+import { createGatewayClient, type GatewayClient } from './gateway';
 import type { GatewayUser } from './types';
 
 /** agents.files.list 返回的单个文件条目 */
@@ -156,7 +156,7 @@ export async function fetchUserProfile(client: GatewayClient, agentId: string = 
     const files = Array.isArray(listData) ? listData : (listData?.files ?? []);
     const hasUserMd = files.some((f) => f.name === 'USER.md');
     if (!hasUserMd) {
-      console.warn(`[fetchUserProfile] USER.md not found for agent "${agentId}"`);
+      window.electronAPI?.log?.send('WARN', `[fetchUserProfile] USER.md not found for agent "${agentId}"`);
       return null;
     }
 
@@ -177,14 +177,14 @@ export async function fetchUserProfile(client: GatewayClient, agentId: string = 
           : (fileData as { content?: string })?.content;
 
     if (!content) {
-      console.warn(`[fetchUserProfile] USER.md is empty for agent "${agentId}"`);
+      window.electronAPI?.log?.send('WARN', `[fetchUserProfile] USER.md is empty for agent "${agentId}"`);
       return null;
     }
 
     // Step 3: 解析为结构化数据
     return parseUserMd(content);
   } catch (err) {
-    console.error(`[fetchUserProfile] failed for agent "${agentId}":`, err);
+    window.electronAPI?.log?.send('ERROR', `[fetchUserProfile] failed for agent "${agentId}":`, err);
     return null;
   }
 }
@@ -200,7 +200,6 @@ export async function fetchGatewayUser(
   token: string,
   agentId: string = 'main',
 ): Promise<GatewayUser | null> {
-  const { createGatewayClient } = await import('./gateway');
   const client = createGatewayClient({ url: gatewayUrl, token });
 
   try {

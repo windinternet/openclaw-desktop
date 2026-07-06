@@ -20,6 +20,7 @@ export interface AiActionAssistantResponse {
   repositoryWrite?: AiActionRepositoryWrite;
   result?: {
     agentId?: string;
+    artifactIds?: string[];
   };
   error?: string;
 }
@@ -57,6 +58,58 @@ export function buildUniqueAiActionSessionLabel(title: string, actionRunId: stri
   return `${buildAiActionSessionLabel(title)} · ${actionRunId}`;
 }
 
+function optionalTrimmedString(value: string | null | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed || undefined;
+}
+
+export interface AiActionWorkItemAssignmentOptions {
+  workItemId?: string | null;
+  workItemPath?: string | null;
+  selectedWorkItem?: { id?: string | null; path?: string | null } | null;
+  selectedWorkItemId?: string | null;
+}
+
+export interface AiActionRunCreateOptions {
+  type: string;
+  sourcePage: string;
+  instanceId: string;
+  agentId?: string;
+  input: string;
+  executionMode?: AiActionExecutionMode;
+  workItemRequired?: boolean;
+  workItemUnassignedReason?: string;
+  workItemId?: string;
+  workItemPath?: string;
+}
+
+export type AiActionRunLaunchOptions = Omit<AiActionRunCreateOptions, 'input' | 'workItemId' | 'workItemPath'> &
+  AiActionWorkItemAssignmentOptions & {
+    input: string | ((assignment: { workItemId?: string; workItemPath?: string }) => string);
+  };
+
+export function resolveAiActionWorkItemAssignment(options: AiActionWorkItemAssignmentOptions): {
+  workItemId?: string;
+  workItemPath?: string;
+} {
+  const explicitPath = optionalTrimmedString(options.workItemPath);
+  if (explicitPath) {
+    return {
+      workItemId: optionalTrimmedString(options.workItemId),
+      workItemPath: explicitPath,
+    };
+  }
+
+  const selectedPath = optionalTrimmedString(options.selectedWorkItem?.path);
+  if (!selectedPath) return {};
+
+  return {
+    workItemId:
+      optionalTrimmedString(options.selectedWorkItemId) ?? optionalTrimmedString(options.selectedWorkItem?.id),
+    workItemPath: selectedPath,
+  };
+}
+
 export function isDesktopManagedSession(session: Pick<SessionInfo, 'key' | 'sessionKey' | 'label' | 'title'>): boolean {
   const key = session.key || session.sessionKey || '';
   return (
@@ -72,23 +125,13 @@ export function filterUserVisibleSessions(sessions: SessionInfo[]): SessionInfo[
   return sessions.filter((session) => !isDesktopManagedSession(session));
 }
 
-export function createAiActionRun(options: {
-  type: string;
-  sourcePage: string;
-  instanceId: string;
-  agentId?: string;
-  input: string;
-  executionMode?: AiActionExecutionMode;
-  workItemRequired?: boolean;
-  workItemUnassignedReason?: string;
-  workItemId?: string;
-  workItemPath?: string;
-}): AiActionRun {
+export function createAiActionRun(options: AiActionRunCreateOptions): AiActionRun {
   const timestamp = now();
   const id = generateActionRunId();
   const agentId = options.agentId || 'main';
   const executionMode = options.executionMode || 'isolated-session';
   const workItemPath = options.workItemPath?.trim() || undefined;
+  const workItemId = workItemPath ? options.workItemId?.trim() || undefined : undefined;
   const workItemRequired = options.workItemRequired ?? true;
   const workItemUnassignedReason =
     workItemRequired && !workItemPath
@@ -108,7 +151,7 @@ export function createAiActionRun(options: {
     status: 'draft',
     executionMode,
     input: options.input,
-    workItemId: options.workItemId,
+    workItemId,
     workItemPath,
     gatewaySessionKey,
     childSessionKeys: [],
@@ -118,6 +161,23 @@ export function createAiActionRun(options: {
     createdAt: timestamp,
     updatedAt: timestamp,
   };
+}
+
+export function createAiActionRunWithWorkItemAssignment(options: AiActionRunLaunchOptions): AiActionRun {
+  const { selectedWorkItem, selectedWorkItemId, workItemId, workItemPath, input, ...createOptions } = options;
+  const assignment = resolveAiActionWorkItemAssignment({
+    workItemId,
+    workItemPath,
+    selectedWorkItem,
+    selectedWorkItemId,
+  });
+  const resolvedInput = typeof input === 'function' ? input(assignment) : input;
+
+  return createAiActionRun({
+    ...createOptions,
+    input: resolvedInput,
+    ...assignment,
+  });
 }
 
 export function buildAiActionGatewaySessionCreateRequest(
@@ -181,6 +241,82 @@ function normalizeRepositoryWrite(value: unknown): AiActionRepositoryWrite | und
   };
 }
 
+function normalizeArtifactIdsFromValue(value: unknown): string[] {
+  if (!isRecord(value)) return [];
+  const artifactIds: string[] = [];
+  const artifactId = typeof value.artifactId === 'string' ? value.artifactId.trim() : '';
+  if (artifactId) artifactIds.push(artifactId);
+  if (Array.isArray(value.artifactIds)) {
+    for (const id of value.artifactIds) {
+      if (typeof id === 'string' && id.trim()) artifactIds.push(id.trim());
+    }
+  }
+  if (isRecord(value.artifact)) {
+    const nestedId = typeof value.artifact.id === 'string' ? value.artifact.id.trim() : '';
+    if (nestedId) artifactIds.push(nestedId);
+  }
+  if (isRecord(value.result)) {
+    artifactIds.push(...normalizeArtifactIdsFromValue(value.result));
+  }
+  return Array.from(new Set(artifactIds));
+}
+
+function normalizeDirectArtifactCommandResponse(value: unknown): AiActionAssistantResponse | null {
+  if (!isRecord(value) || value.ok !== true) return null;
+  const artifactIds = normalizeArtifactIdsFromValue(value);
+  if (artifactIds.length === 0) return null;
+  const title = isRecord(value.artifact) && typeof value.artifact.title === 'string' ? value.artifact.title.trim() : '';
+  const outputPath = isRecord(value.output) && typeof value.output.path === 'string' ? value.output.path.trim() : '';
+  const summary = title ? `Artifact 已创建：${title}` : `Artifact 已创建：${artifactIds[0]}`;
+  return {
+    version: 1,
+    kind: 'completed',
+    summary: outputPath ? `${summary}；Repository output：${outputPath}` : summary,
+    result: {
+      artifactIds,
+    },
+  };
+}
+
+function normalizeDirectCommandFailureResponse(value: unknown): AiActionAssistantResponse | null {
+  if (!isRecord(value) || value.ok !== false) return null;
+  const error = typeof value.error === 'string' ? value.error.trim() : '';
+  if (!error) return null;
+  const message = typeof value.message === 'string' ? value.message.trim() : '';
+  const command = typeof value.command === 'string' ? value.command.trim() : '';
+  const summary = command ? `Desktop command failed: ${command}` : 'Desktop command failed';
+  return {
+    version: 1,
+    kind: 'failed',
+    summary: message ? `${summary} (${message})` : summary,
+    error: message ? `${error}: ${message}` : error,
+  };
+}
+
+function hasArtifactFallbackBlock(text: string): boolean {
+  return /<artifact>\s*[\s\S]*?<\/artifact>/i.test(text);
+}
+
+function normalizeArtifactFallbackResponse(text: string): AiActionAssistantResponse | null {
+  if (!hasArtifactFallbackBlock(text)) return null;
+  return {
+    version: 1,
+    kind: 'completed',
+    summary: '直写失败，已返回可保存的 Artifact 候选用于保存前预览',
+  };
+}
+
+function attachArtifactIds(response: AiActionAssistantResponse, artifactIds: string[]): AiActionAssistantResponse {
+  if (artifactIds.length === 0) return response;
+  return {
+    ...response,
+    result: {
+      ...response.result,
+      artifactIds: Array.from(new Set([...(response.result?.artifactIds ?? []), ...artifactIds])),
+    },
+  };
+}
+
 function normalizeStructuredResponse(value: unknown): AiActionAssistantResponse | null {
   if (!isRecord(value)) return null;
   const rawKind = value.kind;
@@ -207,25 +343,93 @@ function normalizeStructuredResponse(value: unknown): AiActionAssistantResponse 
     };
   }
 
+  const agentId = isRecord(value.result)
+    ? typeof value.result.agentId === 'string'
+      ? value.result.agentId.trim() || undefined
+      : undefined
+    : undefined;
+  const artifactIds = isRecord(value.result) ? normalizeArtifactIdsFromValue(value.result) : [];
+  const result = agentId || artifactIds.length > 0 ? { agentId, artifactIds } : undefined;
   return {
     version: 1,
     kind,
     summary,
-    result: isRecord(value.result)
-      ? {
-          agentId: typeof value.result.agentId === 'string' ? value.result.agentId.trim() || undefined : undefined,
-        }
-      : undefined,
+    result,
     error: typeof value.error === 'string' ? value.error.trim() : undefined,
+  };
+}
+
+function extractLooseJsonStringField(text: string, field: string): string | undefined {
+  const match = text.match(new RegExp(`"${field}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`));
+  if (!match) return undefined;
+  try {
+    const parsed = JSON.parse(`"${match[1]}"`);
+    return typeof parsed === 'string' && parsed.trim() ? parsed.trim() : undefined;
+  } catch {
+    return match[1].trim() || undefined;
+  }
+}
+
+function parseLooseStructuredResponse(text: string): AiActionAssistantResponse | null {
+  const kind = extractLooseJsonStringField(text, 'kind');
+  if (kind !== 'approval_required' && kind !== 'completed' && kind !== 'failed' && kind !== 'no_write_needed') {
+    return null;
+  }
+  const summary = extractLooseJsonStringField(text, 'summary');
+  if (!summary) return null;
+
+  if (kind === 'approval_required') {
+    const title = extractLooseJsonStringField(text, 'title');
+    const reason = extractLooseJsonStringField(text, 'reason');
+    if (!title || !reason) return null;
+    const path = extractLooseJsonStringField(text, 'path');
+    const content = extractLooseJsonStringField(text, 'content');
+    return {
+      version: 1,
+      kind,
+      summary,
+      approval: {
+        title,
+        risk: normalizeRisk(extractLooseJsonStringField(text, 'risk')),
+        reason,
+      },
+      repositoryWrite:
+        path && content
+          ? {
+              path,
+              content,
+              workItemPath: extractLooseJsonStringField(text, 'workItemPath'),
+              sourcePath: extractLooseJsonStringField(text, 'sourcePath'),
+              selectedPath: extractLooseJsonStringField(text, 'selectedPath'),
+            }
+          : undefined,
+    };
+  }
+
+  return {
+    version: 1,
+    kind: kind === 'no_write_needed' ? 'completed' : kind,
+    summary,
+    error: extractLooseJsonStringField(text, 'error'),
   };
 }
 
 export function parseAiActionAssistantResponse(text: string): AiActionAssistantResponse | null {
   const objects = parseModelJsonObjects(text);
+  const artifactIds = Array.from(new Set(objects.flatMap(normalizeArtifactIdsFromValue)));
+  const artifactFallback = normalizeArtifactFallbackResponse(text);
   for (let index = objects.length - 1; index >= 0; index -= 1) {
     const normalized = normalizeStructuredResponse(objects[index]);
-    if (normalized) return normalized;
+    if (normalized) return attachArtifactIds(normalized, artifactIds);
+    const directArtifactCommand = normalizeDirectArtifactCommandResponse(objects[index]);
+    if (directArtifactCommand) return attachArtifactIds(directArtifactCommand, artifactIds);
+    const directCommandFailure = normalizeDirectCommandFailureResponse(objects[index]);
+    if (directCommandFailure && artifactFallback) return artifactFallback;
+    if (directCommandFailure) return directCommandFailure;
   }
+
+  const loose = parseLooseStructuredResponse(text);
+  if (loose) return loose;
 
   if (/(需要你确认|需要确认|是否\s*OK|确认后.*执行|是否需要执行|是否执行)/i.test(text)) {
     return {
@@ -241,6 +445,13 @@ export function parseAiActionAssistantResponse(text: string): AiActionAssistantR
   }
 
   return null;
+}
+
+function mergeArtifactIds(existing: string[] | undefined, next: string[] | undefined): string[] | undefined {
+  const artifactIds = Array.from(
+    new Set([...(existing ?? []), ...(next ?? [])].map((id) => id.trim()).filter(Boolean)),
+  );
+  return artifactIds.length > 0 ? artifactIds : undefined;
 }
 
 export function applyAiActionAssistantResponse(run: AiActionRun, text: string): AiActionRun {
@@ -304,6 +515,7 @@ export function applyAiActionAssistantResponse(run: AiActionRun, text: string): 
     status: 'done',
     resultSummary: response.summary,
     gatewayAgentId: response.result?.agentId || run.gatewayAgentId,
+    artifactIds: mergeArtifactIds(run.artifactIds, response.result?.artifactIds),
     error: undefined,
     lastAssistantResponse: responseText,
     updatedAt: timestamp,
@@ -481,14 +693,20 @@ export async function executeAiActionRunWithGateway(
 
 export function normalizeAiActionRuns(value: AiActionRun[] | null | undefined): AiActionRun[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(
-    (run): run is AiActionRun =>
-      Boolean(run) &&
-      typeof run.id === 'string' &&
-      typeof run.type === 'string' &&
-      typeof run.sourcePage === 'string' &&
-      typeof run.instanceId === 'string' &&
-      typeof run.agentId === 'string' &&
-      typeof run.input === 'string',
-  );
+  return value
+    .filter(
+      (run): run is AiActionRun =>
+        Boolean(run) &&
+        typeof run.id === 'string' &&
+        typeof run.type === 'string' &&
+        typeof run.sourcePage === 'string' &&
+        typeof run.instanceId === 'string' &&
+        typeof run.agentId === 'string' &&
+        typeof run.input === 'string',
+    )
+    .map((run) => {
+      if (!['planning', 'running'].includes(run.status) || !run.lastAssistantResponse) return run;
+      const normalized = applyAiActionAssistantResponse(run, run.lastAssistantResponse);
+      return normalized === run ? run : { ...normalized, updatedAt: run.updatedAt };
+    });
 }

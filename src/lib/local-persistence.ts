@@ -21,7 +21,7 @@ function getElectronStorage(): ElectronStorageApi | null {
 
 function persistSafely(action: Promise<unknown>, label: string): void {
   void action.catch((error) => {
-    console.warn(`[local-persistence] ${label} failed`, error);
+    window.electronAPI?.log?.send('WARN', `[local-persistence] ${label} failed`, error);
   });
 }
 
@@ -75,6 +75,15 @@ function normalizeLoadedSettings(settings?: Partial<AppSettings> | null): { sett
   const schemaVersion = typeof raw.settingsSchemaVersion === 'number' ? raw.settingsSchemaVersion : 1;
   if (schemaVersion < 2 && raw.sessionToolCallDisplay === 'hidden') {
     merged.sessionToolCallDisplay = 'compact';
+    migrated = true;
+  }
+
+  if (
+    merged.artifactWriteChannel !== 'auto-direct-with-fallback' &&
+    merged.artifactWriteChannel !== 'preview-first' &&
+    merged.artifactWriteChannel !== 'conversation-only'
+  ) {
+    merged.artifactWriteChannel = DEFAULT_SETTINGS.artifactWriteChannel;
     migrated = true;
   }
 

@@ -44,7 +44,9 @@ describe('navigation restructure', () => {
     expect(app).toContain('<Navigate to={homeOption.route} replace />');
     expect(settingsPage).toContain("t('settings.defaultHomeView')");
     expect(settingsPage).toContain("value={settings.defaultHomeView ?? 'dashboard'}");
-    expect(settingsPage).toContain('updateSettings({ defaultHomeView: val as DefaultHomeView })');
+    expect(settingsPage).toContain('function isDefaultHomeView(value: unknown): value is DefaultHomeView');
+    expect(settingsPage).toContain('if (!isDefaultHomeView(val)) return;');
+    expect(settingsPage).toContain('updateSettings({ defaultHomeView: val })');
     expect(settingsPage).toContain('DEFAULT_HOME_VIEW_OPTIONS.map');
   });
 

@@ -1,5 +1,12 @@
 import { CONTEXT_SUMMARY_END, CONTEXT_SUMMARY_START, USER_MESSAGE_START } from './agent-switching';
+import type { ArtifactMeta, ArtifactType } from './artifact-types';
 import { buildSemiMessageContent, type GatewayChatAttachment } from './chat-attachments';
+import {
+  buildDashboardTailActionTarget,
+  isRepositoryAssetRunPathLike,
+  isSafeRepositoryAssetRunPath,
+} from './dashboard-tail-action-routing';
+import { isSafeWorkbenchMarkdownPath, isSafeWorkbenchTailActionWorkItemPath } from './workbench-matter';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -202,6 +209,195 @@ export interface ChatReasoningContent {
   status?: string;
 }
 
+export type DesktopMessageCardKind = 'authorization' | 'inquiry' | 'artifact' | 'action-run-result';
+
+export type DesktopMessageCardActionKind =
+  | 'approve'
+  | 'deny'
+  | 'submit'
+  | 'handle-later'
+  | 'open-artifact'
+  | 'preview-artifact'
+  | 'save-artifact'
+  | 'import-artifact'
+  | 'mirror-artifact'
+  | 'open-artifacts'
+  | 'open-actions'
+  | 'open-action-run'
+  | 'open-dashboard'
+  | 'open-control-center'
+  | 'open-new-session'
+  | 'open-setup'
+  | 'open-settings'
+  | 'open-workbench'
+  | 'open-workbench-actions'
+  | 'open-workbench-tasks'
+  | 'open-workbench-plans'
+  | 'open-workbench-outputs'
+  | 'open-workbench-asset-runs'
+  | 'open-workbench-reviews'
+  | 'open-plan'
+  | 'open-knowledge'
+  | 'open-knowledge-health'
+  | 'open-knowledge-digest'
+  | 'open-knowledge-document'
+  | 'open-asset-run'
+  | 'open-output'
+  | 'open-review'
+  | 'preserve-output'
+  | 'update-knowledge'
+  | 'write-review';
+
+export interface DesktopMessageCardAction {
+  id: string;
+  label: string;
+  kind: DesktopMessageCardActionKind;
+  values?: Record<string, unknown>;
+}
+
+export interface DesktopMessageCardFieldOption {
+  label: string;
+  value: string;
+}
+
+export type DesktopMessageCardFieldOptionsSource = 'work-items' | 'plans' | 'artifacts';
+
+export interface DesktopMessageCardField {
+  id: string;
+  label: string;
+  required: boolean;
+  value?: string;
+  placeholder?: string;
+  multiline?: boolean;
+  options?: DesktopMessageCardFieldOption[];
+  optionsSource?: DesktopMessageCardFieldOptionsSource;
+}
+
+export interface DesktopMessageCard {
+  id?: string;
+  version: 1;
+  kind: DesktopMessageCardKind;
+  title: string;
+  body?: string;
+  fields: DesktopMessageCardField[];
+  actions: DesktopMessageCardAction[];
+  unsupportedActionCount?: number;
+  unsupportedActionDefinitionCount?: number;
+  unsupportedActionValueCount?: number;
+  unsupportedActionListCount?: number;
+  unsupportedOptionsSourceCount?: number;
+  unsupportedFieldOptionCount?: number;
+  unsupportedFieldOptionListCount?: number;
+  unsupportedFieldCount?: number;
+  unsupportedFieldListCount?: number;
+  unsupportedArtifactClueCount?: number;
+  unsupportedActionRunClueCount?: number;
+  artifact?: {
+    id?: string;
+    title?: string;
+    type?: string;
+    uri?: string;
+    repositoryOutputPath?: string;
+    filePath?: string;
+    fileName?: string;
+    fileSize?: number;
+    mimeType?: string;
+  };
+  actionRun?: {
+    id?: string;
+    gatewayRunId?: string;
+    status?: string;
+    artifactId?: string;
+    artifactUri?: string;
+    workItemPath?: string;
+    workItemId?: string;
+    planPath?: string;
+    repositoryOutputPath?: string;
+    knowledgePath?: string;
+    assetRunPath?: string;
+    reviewPath?: string;
+  };
+}
+
+export type DesktopCardActionHandlerName =
+  | 'authorization-approval'
+  | 'artifact-save'
+  | 'artifact-import'
+  | 'artifact-mirror';
+
+export interface DesktopCardActionHandlerRoute {
+  dispatch: 'desktop-handler';
+  handler: DesktopCardActionHandlerName;
+  requiresExplicitUserConfirmation: true;
+  requiresRepositoryBoundary?: true;
+}
+
+export interface DesktopCardActionUserMessageInput {
+  cardId?: string;
+  kind: DesktopMessageCardKind;
+  actionId: string;
+  actionKind: DesktopMessageCardActionKind;
+  artifact?: DesktopMessageCard['artifact'];
+  actionRun?: DesktopMessageCard['actionRun'];
+  handlerRoute?: DesktopCardActionHandlerRoute | null;
+  values?: Record<string, unknown>;
+}
+
+export interface DesktopCardActionInteraction {
+  actionValues: Record<string, unknown>;
+  missingRequiredFields: DesktopMessageCardField[];
+  navigationTarget: string | null;
+  handlerRoute: DesktopCardActionHandlerRoute | null;
+  shouldSendCallback: boolean;
+}
+
+export interface DesktopCardArtifactImportParams {
+  title?: string;
+  type?: ArtifactType;
+  description?: string;
+  filePath?: string;
+  fileName?: string;
+  fileSize?: number;
+  mimeType?: string;
+  source?: ArtifactMeta['source'];
+}
+
+export interface DesktopCardAuthorizationApprovalParams {
+  actionRunId?: string;
+  approvalId?: string;
+  decision: 'approved' | 'rejected';
+  repositoryAssetExecution?: {
+    repoPath?: string;
+    assetId?: string;
+    path?: string;
+    approvalTitle?: string;
+    approvalRisk?: string;
+    approvalReason?: string;
+    sourceApprovalRunPath?: string;
+    runner?: string;
+    command?: string;
+    workItemPath?: string;
+  };
+  artifactExecution?: {
+    artifactId: string;
+    eventId?: string;
+    approvalTitle?: string;
+    approvalRisk?: string;
+    approvalReason?: string;
+    runner?: string;
+    command?: string;
+  };
+}
+
+function normalizeDesktopCardFieldValue(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed ? trimmed : undefined;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return undefined;
+}
+
 /** ContentItem 联合类型 —— 可直接传入 AIChatDialogue Message.content */
 export type ChatContentItem = ChatTextContent | ChatToolCallContent | ChatReasoningContent;
 
@@ -387,6 +583,1464 @@ function toolStatusLabel(status: unknown): string {
   return normalized || '进行中';
 }
 
+const DESKTOP_CARD_PATTERN = /<desktop-card>([\s\S]*?)<\/desktop-card>/gi;
+
+export function stripDesktopMessageCardBlocks(value: string): string {
+  return value
+    .replace(DESKTOP_CARD_PATTERN, (block, rawCard) => (isRenderableDesktopMessageCardBlock(rawCard) ? '' : block))
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function isRenderableDesktopMessageCardBlock(value: string): boolean {
+  try {
+    return normalizeDesktopMessageCard(JSON.parse(value)) !== null;
+  } catch {
+    return false;
+  }
+}
+
+export function parseDesktopMessageCards(value: unknown): DesktopMessageCard[] {
+  const text = extractSessionMessageText(value);
+  if (!text) return [];
+  const cards: DesktopMessageCard[] = [];
+  for (const match of text.matchAll(DESKTOP_CARD_PATTERN)) {
+    try {
+      const parsed = JSON.parse(match[1] ?? '');
+      const card = normalizeDesktopMessageCard(parsed);
+      if (card) cards.push(card);
+    } catch {
+      // Invalid card blocks fall back to normal message text.
+    }
+  }
+  return cards;
+}
+
+function normalizeDesktopMessageCard(value: unknown): DesktopMessageCard | null {
+  if (!isRecord(value) || value.version !== 1) return null;
+  const kind = normalizeDesktopMessageCardKind(value.kind);
+  const title = getNonEmptyString(value.title);
+  if (!kind || !title) return null;
+  return {
+    id: getNonEmptyString(value.id),
+    version: 1,
+    kind,
+    title,
+    body: getNonEmptyString(value.body ?? value.description ?? value.summary),
+    fields: normalizeDesktopMessageCardFields(value.fields),
+    actions: normalizeDesktopMessageCardActions(value.actions),
+    unsupportedActionCount: countUnsupportedDesktopMessageCardActions(value.actions) || undefined,
+    unsupportedActionDefinitionCount: countUnsupportedDesktopMessageCardActionDefinitions(value.actions) || undefined,
+    unsupportedActionValueCount: countUnsupportedDesktopMessageCardActionValues(value.actions) || undefined,
+    unsupportedActionListCount: countUnsupportedDesktopMessageCardActionList(value) || undefined,
+    unsupportedOptionsSourceCount: countUnsupportedDesktopMessageCardOptionsSources(value.fields) || undefined,
+    unsupportedFieldOptionCount: countUnsupportedDesktopMessageCardFieldOptions(value.fields) || undefined,
+    unsupportedFieldOptionListCount: countUnsupportedDesktopMessageCardFieldOptionLists(value.fields) || undefined,
+    unsupportedFieldCount: countUnsupportedDesktopMessageCardFields(value.fields) || undefined,
+    unsupportedFieldListCount: countUnsupportedDesktopMessageCardFieldList(value) || undefined,
+    unsupportedArtifactClueCount: countUnsupportedDesktopMessageCardArtifactClue(value) || undefined,
+    unsupportedActionRunClueCount: countUnsupportedDesktopMessageCardActionRunClue(value) || undefined,
+    artifact: normalizeDesktopMessageCardArtifact(value.artifact),
+    actionRun: normalizeDesktopMessageCardActionRun(value.actionRun ?? value.action_run),
+  };
+}
+
+function normalizeDesktopMessageCardKind(value: unknown): DesktopMessageCardKind | null {
+  switch (value) {
+    case 'authorization':
+    case 'inquiry':
+    case 'artifact':
+    case 'action-run-result':
+      return value;
+    default:
+      return null;
+  }
+}
+
+function normalizeDesktopMessageCardFields(value: unknown): DesktopMessageCardField[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!isRecord(item)) return null;
+      const id = getNonEmptyString(item.id);
+      const label = getNonEmptyString(item.label);
+      if (!id || !label) return null;
+      const field: DesktopMessageCardField = {
+        id,
+        label,
+        required: item.required === true,
+      };
+      const fieldValue = getNonEmptyString(item.value);
+      if (fieldValue) field.value = fieldValue;
+      const placeholder = getNonEmptyString(item.placeholder);
+      if (placeholder) field.placeholder = placeholder;
+      if (item.multiline === true) field.multiline = true;
+      const options = normalizeDesktopMessageCardFieldOptions(item.options);
+      if (options.length > 0) field.options = options;
+      const optionsSource = normalizeDesktopMessageCardFieldOptionsSource(item.optionsSource ?? item.options_source);
+      if (optionsSource) field.optionsSource = optionsSource;
+      return field;
+    })
+    .filter((item): item is DesktopMessageCardField => item !== null);
+}
+
+function normalizeDesktopMessageCardFieldOptionsSource(
+  value: unknown,
+): DesktopMessageCardFieldOptionsSource | undefined {
+  return value === 'work-items' || value === 'plans' || value === 'artifacts' ? value : undefined;
+}
+
+function countUnsupportedDesktopMessageCardFields(value: unknown): number {
+  if (!Array.isArray(value)) return 0;
+  return value.filter((item) => {
+    if (!isRecord(item)) return true;
+    return !getNonEmptyString(item.id) || !getNonEmptyString(item.label);
+  }).length;
+}
+
+function countUnsupportedDesktopMessageCardFieldList(value: Record<string, unknown>): number {
+  if (!Object.prototype.hasOwnProperty.call(value, 'fields')) return 0;
+  return Array.isArray(value.fields) ? 0 : 1;
+}
+
+function countUnsupportedDesktopMessageCardOptionsSources(value: unknown): number {
+  if (!Array.isArray(value)) return 0;
+  return value.filter((item) => {
+    if (!isRecord(item)) return false;
+    const id = getNonEmptyString(item.id);
+    const label = getNonEmptyString(item.label);
+    const optionSource = getNonEmptyString(item.optionsSource ?? item.options_source);
+    return Boolean(id && label && optionSource && !normalizeDesktopMessageCardFieldOptionsSource(optionSource));
+  }).length;
+}
+
+function normalizeDesktopMessageCardFieldOptions(value: unknown): DesktopMessageCardFieldOption[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!isRecord(item)) return null;
+      const label = getNonEmptyString(item.label);
+      const optionValue = getNonEmptyString(item.value);
+      if (!label || !optionValue) return null;
+      return { label, value: optionValue };
+    })
+    .filter((item): item is DesktopMessageCardFieldOption => item !== null);
+}
+
+function countUnsupportedDesktopMessageCardFieldOptions(value: unknown): number {
+  if (!Array.isArray(value)) return 0;
+  return value.reduce((count, item) => {
+    if (!isRecord(item)) return count;
+    const id = getNonEmptyString(item.id);
+    const label = getNonEmptyString(item.label);
+    if (!id || !label || !Array.isArray(item.options)) return count;
+    return (
+      count +
+      item.options.filter((option) => {
+        if (!isRecord(option)) return true;
+        return !getNonEmptyString(option.label) || !getNonEmptyString(option.value);
+      }).length
+    );
+  }, 0);
+}
+
+function countUnsupportedDesktopMessageCardFieldOptionLists(value: unknown): number {
+  if (!Array.isArray(value)) return 0;
+  return value.filter((item) => {
+    if (!isRecord(item)) return false;
+    const id = getNonEmptyString(item.id);
+    const label = getNonEmptyString(item.label);
+    if (!id || !label || !Object.prototype.hasOwnProperty.call(item, 'options')) return false;
+    return !Array.isArray(item.options);
+  }).length;
+}
+
+function normalizeDesktopMessageCardActions(value: unknown): DesktopMessageCardAction[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!isRecord(item)) return null;
+      const id = getNonEmptyString(item.id);
+      const label = getNonEmptyString(item.label);
+      const kind = normalizeDesktopMessageCardActionKind(item.kind);
+      if (!id || !label || !kind) return null;
+      const action: DesktopMessageCardAction = {
+        id,
+        label,
+        kind,
+      };
+      if (isDesktopMessageCardActionValues(item.values)) action.values = item.values;
+      return action;
+    })
+    .filter((item): item is DesktopMessageCardAction => item !== null);
+}
+
+function isDesktopMessageCardActionValues(value: unknown): value is Record<string, unknown> {
+  return isRecord(value) && !Array.isArray(value);
+}
+
+function countUnsupportedDesktopMessageCardActions(value: unknown): number {
+  if (!Array.isArray(value)) return 0;
+  return value.filter((item) => {
+    if (!isRecord(item)) return false;
+    const id = getNonEmptyString(item.id);
+    const label = getNonEmptyString(item.label);
+    return Boolean(id && label && !normalizeDesktopMessageCardActionKind(item.kind));
+  }).length;
+}
+
+function countUnsupportedDesktopMessageCardActionDefinitions(value: unknown): number {
+  if (!Array.isArray(value)) return 0;
+  return value.filter((item) => {
+    if (!isRecord(item)) return true;
+    return !getNonEmptyString(item.id) || !getNonEmptyString(item.label);
+  }).length;
+}
+
+function countUnsupportedDesktopMessageCardActionValues(value: unknown): number {
+  if (!Array.isArray(value)) return 0;
+  return value.filter((item) => {
+    if (!isRecord(item)) return false;
+    const id = getNonEmptyString(item.id);
+    const label = getNonEmptyString(item.label);
+    const kind = normalizeDesktopMessageCardActionKind(item.kind);
+    if (!id || !label || !kind) return false;
+    return Object.prototype.hasOwnProperty.call(item, 'values') && !isDesktopMessageCardActionValues(item.values);
+  }).length;
+}
+
+function countUnsupportedDesktopMessageCardActionList(value: Record<string, unknown>): number {
+  if (!Object.prototype.hasOwnProperty.call(value, 'actions')) return 0;
+  return Array.isArray(value.actions) ? 0 : 1;
+}
+
+function normalizeDesktopMessageCardActionKind(value: unknown): DesktopMessageCardActionKind | null {
+  switch (value) {
+    case 'approve':
+    case 'deny':
+    case 'submit':
+    case 'handle-later':
+    case 'open-artifact':
+    case 'preview-artifact':
+    case 'save-artifact':
+    case 'import-artifact':
+    case 'mirror-artifact':
+    case 'open-artifacts':
+    case 'open-actions':
+    case 'open-action-run':
+    case 'open-dashboard':
+    case 'open-control-center':
+    case 'open-new-session':
+    case 'open-setup':
+    case 'open-settings':
+    case 'open-workbench':
+    case 'open-workbench-actions':
+    case 'open-workbench-tasks':
+    case 'open-workbench-plans':
+    case 'open-workbench-outputs':
+    case 'open-workbench-asset-runs':
+    case 'open-workbench-reviews':
+    case 'open-plan':
+    case 'open-knowledge':
+    case 'open-knowledge-health':
+    case 'open-knowledge-digest':
+    case 'open-knowledge-document':
+    case 'open-asset-run':
+    case 'open-output':
+    case 'open-review':
+    case 'preserve-output':
+    case 'update-knowledge':
+    case 'write-review':
+      return value;
+    default:
+      return null;
+  }
+}
+
+function normalizeDesktopMessageCardArtifact(value: unknown): DesktopMessageCard['artifact'] {
+  if (!isRecord(value)) return undefined;
+  const artifact = {
+    id:
+      getNonEmptyString(value.id ?? value.artifactId ?? value.artifact_id) ??
+      getFirstNonEmptyStringFromList(value.ids ?? value.artifactIds ?? value.artifact_ids),
+    title: getNonEmptyString(value.title ?? value.artifactTitle ?? value.artifact_title),
+    type: getNonEmptyString(value.type ?? value.artifactType ?? value.artifact_type),
+    uri:
+      getDesktopCardArtifactUriFromKeys(value, ['uri', 'artifactUri', 'artifact_uri']) ??
+      getFirstDesktopCardArtifactUriFromList(value.uris ?? value.artifactUris ?? value.artifact_uris),
+    repositoryOutputPath:
+      getNonEmptyString(
+        value.repositoryOutputPath ?? value.repository_output_path ?? value.outputPath ?? value.output_path,
+      ) ??
+      getFirstDesktopCardRepositoryOutputPathFromList(
+        value.repositoryOutputPaths ?? value.repository_output_paths ?? value.outputPaths ?? value.output_paths,
+      ),
+    filePath:
+      getNonEmptyString(value.filePath ?? value.file_path ?? value.sourcePath ?? value.source_path ?? value.path) ??
+      getFirstNonEmptyStringFromList(
+        value.filePaths ?? value.file_paths ?? value.sourcePaths ?? value.source_paths ?? value.paths,
+      ),
+    fileName: getNonEmptyString(value.fileName ?? value.file_name ?? value.name),
+    fileSize: getDesktopCardActionNumberValue(value, ['fileSize', 'file_size', 'size']),
+    mimeType: getNonEmptyString(value.mimeType ?? value.mime_type),
+  };
+  return artifact.id ||
+    artifact.title ||
+    artifact.type ||
+    artifact.uri ||
+    artifact.repositoryOutputPath ||
+    artifact.filePath ||
+    artifact.fileName ||
+    artifact.fileSize !== undefined ||
+    artifact.mimeType
+    ? artifact
+    : undefined;
+}
+
+function countUnsupportedDesktopMessageCardArtifactClue(value: Record<string, unknown>): number {
+  if (!Object.prototype.hasOwnProperty.call(value, 'artifact')) return 0;
+  return normalizeDesktopMessageCardArtifact(value.artifact) ? 0 : 1;
+}
+
+function getFirstNonEmptyStringFromList(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined;
+  for (const item of value) {
+    const text = getNonEmptyString(item);
+    if (text) return text;
+  }
+  return undefined;
+}
+
+function getDesktopCardArtifactUri(value: unknown): string | undefined {
+  const text = getNonEmptyString(value);
+  return getDesktopCardArtifactIdFromUri(text) ? text : undefined;
+}
+
+function getDesktopCardArtifactUriFromKeys(
+  value: Record<string, unknown> | undefined,
+  keys: string[],
+): string | undefined {
+  if (!value) return undefined;
+  for (const key of keys) {
+    const text = getDesktopCardArtifactUri(value[key]);
+    if (text) return text;
+  }
+  return undefined;
+}
+
+function getFirstDesktopCardArtifactUriFromList(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined;
+  for (const item of value) {
+    const text = getDesktopCardArtifactUri(item);
+    if (text) return text;
+  }
+  return undefined;
+}
+
+function getFirstDesktopCardActivePlanPathFromList(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined;
+  for (const item of value) {
+    const text = getNonEmptyString(item);
+    if (isDesktopCardActivePlanPath(text)) return text;
+  }
+  return undefined;
+}
+
+function getDesktopCardActivePlanPath(value: unknown): string | undefined {
+  const text = getNonEmptyString(value);
+  return isDesktopCardActivePlanPath(text) ? text : undefined;
+}
+
+function getDesktopCardActivePlanPathFromKeys(
+  value: Record<string, unknown> | undefined,
+  keys: string[],
+): string | undefined {
+  if (!value) return undefined;
+  for (const key of keys) {
+    const text = getDesktopCardActivePlanPath(value[key]);
+    if (text) return text;
+  }
+  return undefined;
+}
+
+function getFirstDesktopCardWorkbenchMatterPathFromList(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined;
+  for (const item of value) {
+    const text = getNonEmptyString(item);
+    if (isDesktopCardWorkbenchMatterPath(text)) return text;
+  }
+  return undefined;
+}
+
+function getDesktopCardWorkbenchMatterPath(value: unknown): string | undefined {
+  const text = getNonEmptyString(value);
+  return isDesktopCardWorkbenchMatterPath(text) ? text : undefined;
+}
+
+function getDesktopCardWorkbenchMatterPathFromKeys(
+  value: Record<string, unknown> | undefined,
+  keys: string[],
+): string | undefined {
+  if (!value) return undefined;
+  for (const key of keys) {
+    const text = getDesktopCardWorkbenchMatterPath(value[key]);
+    if (text) return text;
+  }
+  return undefined;
+}
+
+function getFirstDesktopCardKnowledgePathFromList(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined;
+  for (const item of value) {
+    const text = getNonEmptyString(item);
+    if (text && isSafeWorkbenchMarkdownPath(text)) return text;
+  }
+  return undefined;
+}
+
+function getDesktopCardKnowledgePath(value: unknown): string | undefined {
+  const text = getNonEmptyString(value);
+  return text && isSafeWorkbenchMarkdownPath(text) ? text : undefined;
+}
+
+function getDesktopCardKnowledgePathFromKeys(
+  value: Record<string, unknown> | undefined,
+  keys: string[],
+): string | undefined {
+  if (!value) return undefined;
+  for (const key of keys) {
+    const text = getDesktopCardKnowledgePath(value[key]);
+    if (text) return text;
+  }
+  return undefined;
+}
+
+function getFirstDesktopCardRepositoryOutputPathFromList(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined;
+  for (const item of value) {
+    const text = getNonEmptyString(item);
+    if (isDesktopCardRepositoryOutputPath(text)) return text;
+  }
+  return undefined;
+}
+
+function getDesktopCardRepositoryOutputPath(value: unknown): string | undefined {
+  const text = getNonEmptyString(value);
+  return isDesktopCardRepositoryOutputPath(text) ? text : undefined;
+}
+
+function getDesktopCardRepositoryOutputPathFromKeys(
+  value: Record<string, unknown> | undefined,
+  keys: string[],
+): string | undefined {
+  if (!value) return undefined;
+  for (const key of keys) {
+    const text = getDesktopCardRepositoryOutputPath(value[key]);
+    if (text) return text;
+  }
+  return undefined;
+}
+
+function getFirstDesktopCardReviewPathFromList(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined;
+  for (const item of value) {
+    const text = getNonEmptyString(item);
+    if (isSafeWorkbenchReviewPath(text)) return text;
+  }
+  return undefined;
+}
+
+function getDesktopCardReviewPath(value: unknown): string | undefined {
+  const text = getNonEmptyString(value);
+  return isSafeWorkbenchReviewPath(text) ? text : undefined;
+}
+
+function getDesktopCardReviewPathFromKeys(
+  value: Record<string, unknown> | undefined,
+  keys: string[],
+): string | undefined {
+  if (!value) return undefined;
+  for (const key of keys) {
+    const text = getDesktopCardReviewPath(value[key]);
+    if (text) return text;
+  }
+  return undefined;
+}
+
+function getFirstDesktopCardAssetRunPathFromList(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined;
+  for (const item of value) {
+    const text = getNonEmptyString(item);
+    if (isSafeRepositoryAssetRunPath(text)) return text;
+  }
+  return undefined;
+}
+
+function getDesktopCardAssetRunPath(value: unknown): string | undefined {
+  const text = getNonEmptyString(value);
+  return isSafeRepositoryAssetRunPath(text) ? text : undefined;
+}
+
+function getDesktopCardAssetRunPathFromKeys(
+  value: Record<string, unknown> | undefined,
+  keys: string[],
+): string | undefined {
+  if (!value) return undefined;
+  for (const key of keys) {
+    const text = getDesktopCardAssetRunPath(value[key]);
+    if (text) return text;
+  }
+  return undefined;
+}
+
+function normalizeDesktopMessageCardActionRun(value: unknown): DesktopMessageCard['actionRun'] {
+  if (!isRecord(value)) return undefined;
+  const actionRun = {
+    id: getNonEmptyString(value.id),
+    gatewayRunId:
+      getNonEmptyString(value.gatewayRunId ?? value.gateway_run_id ?? value.runId ?? value.run_id) ??
+      getFirstNonEmptyStringFromList(
+        value.gatewayRunIds ??
+          value.gateway_run_ids ??
+          value.runIds ??
+          value.run_ids ??
+          value.actionRunIds ??
+          value.action_run_ids,
+      ),
+    status: getNonEmptyString(value.status),
+    artifactId:
+      getNonEmptyString(
+        value.artifactId ?? value.artifact_id ?? value.generatedArtifactId ?? value.generated_artifact_id,
+      ) ??
+      getFirstNonEmptyStringFromList(
+        value.artifactIds ?? value.artifact_ids ?? value.generatedArtifactIds ?? value.generated_artifact_ids,
+      ),
+    artifactUri:
+      getDesktopCardArtifactUriFromKeys(value, [
+        'artifactUri',
+        'artifact_uri',
+        'generatedArtifactUri',
+        'generated_artifact_uri',
+      ]) ??
+      getFirstDesktopCardArtifactUriFromList(
+        value.artifactUris ?? value.artifact_uris ?? value.generatedArtifactUris ?? value.generated_artifact_uris,
+      ),
+    workItemPath:
+      getDesktopCardWorkbenchMatterPathFromKeys(value, ['workItemPath', 'work_item_path']) ??
+      getFirstDesktopCardWorkbenchMatterPathFromList(value.workItemPaths ?? value.work_item_paths),
+    workItemId: getNonEmptyString(value.workItemId ?? value.work_item_id),
+    planPath:
+      getDesktopCardActivePlanPathFromKeys(value, ['planPath', 'plan_path']) ??
+      getFirstDesktopCardActivePlanPathFromList(value.planPaths ?? value.plan_paths),
+    repositoryOutputPath:
+      getDesktopCardRepositoryOutputPathFromKeys(value, [
+        'repositoryOutputPath',
+        'repository_output_path',
+        'outputPath',
+        'output_path',
+      ]) ??
+      getFirstDesktopCardRepositoryOutputPathFromList(
+        value.repositoryOutputPaths ?? value.repository_output_paths ?? value.outputPaths ?? value.output_paths,
+      ),
+    knowledgePath:
+      getDesktopCardKnowledgePathFromKeys(value, [
+        'knowledgePath',
+        'knowledge_path',
+        'repositoryKnowledgePath',
+        'repository_knowledge_path',
+        'sourcePath',
+        'source_path',
+        'wikiPath',
+        'wiki_path',
+      ]) ??
+      getFirstDesktopCardKnowledgePathFromList(
+        value.knowledgePaths ??
+          value.knowledge_paths ??
+          value.repositoryKnowledgePaths ??
+          value.repository_knowledge_paths ??
+          value.sourcePaths ??
+          value.source_paths ??
+          value.wikiPaths ??
+          value.wiki_paths,
+      ),
+    assetRunPath:
+      getDesktopCardAssetRunPathFromKeys(value, ['assetRunPath', 'asset_run_path']) ??
+      getFirstDesktopCardAssetRunPathFromList(value.assetRunPaths ?? value.asset_run_paths),
+    reviewPath:
+      getDesktopCardReviewPathFromKeys(value, [
+        'reviewPath',
+        'review_path',
+        'repositoryReviewPath',
+        'repository_review_path',
+      ]) ??
+      getFirstDesktopCardReviewPathFromList(
+        value.reviewPaths ?? value.review_paths ?? value.repositoryReviewPaths ?? value.repository_review_paths,
+      ),
+  };
+  return actionRun.id ||
+    actionRun.gatewayRunId ||
+    actionRun.status ||
+    actionRun.artifactId ||
+    actionRun.artifactUri ||
+    actionRun.workItemPath ||
+    actionRun.workItemId ||
+    actionRun.planPath ||
+    actionRun.repositoryOutputPath ||
+    actionRun.knowledgePath ||
+    actionRun.assetRunPath ||
+    actionRun.reviewPath
+    ? actionRun
+    : undefined;
+}
+
+function countUnsupportedDesktopMessageCardActionRunClue(value: Record<string, unknown>): number {
+  const hasActionRun = Object.prototype.hasOwnProperty.call(value, 'actionRun');
+  const hasSnakeActionRun = Object.prototype.hasOwnProperty.call(value, 'action_run');
+  if (!hasActionRun && !hasSnakeActionRun) return 0;
+  const actionRunValue = hasActionRun ? value.actionRun : value.action_run;
+  return normalizeDesktopMessageCardActionRun(actionRunValue) ? 0 : 1;
+}
+
+function getDesktopCardActionValue(values: Record<string, unknown> | undefined, keys: string[]): string | undefined {
+  if (!values) return undefined;
+  for (const key of keys) {
+    const value = normalizeDesktopCardFieldValue(values[key]);
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function getDesktopCardActionNumberValue(
+  values: Record<string, unknown> | undefined,
+  keys: string[],
+): number | undefined {
+  if (!values) return undefined;
+  for (const key of keys) {
+    const value = values[key];
+    if (typeof value === 'number' && Number.isFinite(value) && value >= 0) return value;
+    if (typeof value !== 'string') continue;
+    const trimmed = value.trim();
+    if (!trimmed) continue;
+    const parsed = Number(trimmed);
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  }
+  return undefined;
+}
+
+function getDesktopCardArtifactIdFromUri(uri: string | undefined): string | undefined {
+  if (!uri?.startsWith('artifact://')) return undefined;
+  try {
+    const parsed = new URL(uri);
+    const id = parsed.hostname || parsed.pathname.replace(/^\/+/, '');
+    return normalizeDesktopCardFieldValue(id);
+  } catch {
+    return normalizeDesktopCardFieldValue(uri.slice('artifact://'.length));
+  }
+}
+
+export function getDesktopCardActionArtifactId(
+  card: DesktopMessageCard,
+  action: DesktopMessageCardAction,
+): string | undefined {
+  const artifactUri =
+    getDesktopCardArtifactUriFromKeys(action.values, ['artifactUri', 'artifact_uri', 'uri']) ??
+    getFirstArtifactUriFromListValue(action.values, [
+      'artifactUris',
+      'artifact_uris',
+      'generatedArtifactUris',
+      'generated_artifact_uris',
+    ]);
+  return (
+    getDesktopCardActionValueOrFirstListValue(
+      action.values,
+      ['artifactId', 'artifact_id', 'id'],
+      ['artifactIds', 'artifact_ids', 'generatedArtifactIds', 'generated_artifact_ids'],
+    ) ??
+    getDesktopCardArtifactIdFromUri(artifactUri) ??
+    card.artifact?.id ??
+    getDesktopCardArtifactIdFromUri(card.artifact?.uri) ??
+    card.actionRun?.artifactId ??
+    getDesktopCardArtifactIdFromUri(card.actionRun?.artifactUri)
+  );
+}
+
+function getFirstArtifactUriFromListValue(
+  values: Record<string, unknown> | undefined,
+  keys: string[],
+): string | undefined {
+  if (!values) return undefined;
+  for (const key of keys) {
+    const text = getFirstDesktopCardArtifactUriFromList(values[key]);
+    if (text) return text;
+  }
+  return undefined;
+}
+
+export function getDesktopCardActionValueOrFirstListValue(
+  values: Record<string, unknown> | undefined,
+  keys: string[],
+  listKeys: string[],
+): string | undefined {
+  return getDesktopCardActionValue(values, keys) ?? getFirstNonEmptyStringFromListValue(values, listKeys);
+}
+
+function getDesktopCardActionValueOrFirstActivePlanPathValue(
+  values: Record<string, unknown> | undefined,
+): string | undefined {
+  return (
+    getDesktopCardActivePlanPathFromKeys(values, ['planPath', 'plan_path']) ??
+    getFirstActivePlanPathFromListValue(values, ['planPaths', 'plan_paths'])
+  );
+}
+
+function getDesktopCardActionValueOrFirstWorkbenchMatterPathValue(
+  values: Record<string, unknown> | undefined,
+): string | undefined {
+  return (
+    getDesktopCardWorkbenchMatterPathFromKeys(values, ['workItemPath', 'work_item_path']) ??
+    getFirstWorkbenchMatterPathFromListValue(values, ['workItemPaths', 'work_item_paths'])
+  );
+}
+
+function getDesktopCardActionValueOrFirstKnowledgePathValue(
+  values: Record<string, unknown> | undefined,
+): string | undefined {
+  return (
+    getDesktopCardKnowledgePathFromKeys(values, [
+      'knowledgePath',
+      'knowledge_path',
+      'sourcePath',
+      'source_path',
+      'wikiPath',
+      'wiki_path',
+    ]) ??
+    getFirstKnowledgePathFromListValue(values, [
+      'knowledgePaths',
+      'knowledge_paths',
+      'sourcePaths',
+      'source_paths',
+      'wikiPaths',
+      'wiki_paths',
+    ])
+  );
+}
+
+function getDesktopCardActionValueOrFirstRepositoryOutputPathValue(
+  values: Record<string, unknown> | undefined,
+): string | undefined {
+  return (
+    getDesktopCardRepositoryOutputPathFromKeys(values, [
+      'outputPath',
+      'output_path',
+      'repositoryOutputPath',
+      'repository_output_path',
+    ]) ??
+    getFirstRepositoryOutputPathFromListValue(values, [
+      'outputPaths',
+      'output_paths',
+      'repositoryOutputPaths',
+      'repository_output_paths',
+    ])
+  );
+}
+
+function getDesktopCardActionValueOrFirstReviewPathValue(
+  values: Record<string, unknown> | undefined,
+): string | undefined {
+  return (
+    getDesktopCardReviewPathFromKeys(values, [
+      'reviewPath',
+      'review_path',
+      'repositoryReviewPath',
+      'repository_review_path',
+    ]) ??
+    getFirstReviewPathFromListValue(values, [
+      'reviewPaths',
+      'review_paths',
+      'repositoryReviewPaths',
+      'repository_review_paths',
+    ])
+  );
+}
+
+function getDesktopCardActionValueOrFirstAssetRunPathValue(
+  values: Record<string, unknown> | undefined,
+): string | undefined {
+  return (
+    getDesktopCardAssetRunPathFromKeys(values, ['assetRunPath', 'asset_run_path']) ??
+    getFirstAssetRunPathFromListValue(values, ['assetRunPaths', 'asset_run_paths'])
+  );
+}
+
+function getDesktopCardActionValueOrFirstSourceApprovalRunPathValue(
+  values: Record<string, unknown> | undefined,
+): string | undefined {
+  return (
+    getDesktopCardAssetRunPathFromKeys(values, [
+      'sourceApprovalRunPath',
+      'source_approval_run_path',
+      'assetRunPath',
+      'asset_run_path',
+    ]) ??
+    getFirstAssetRunPathFromListValue(values, [
+      'sourceApprovalRunPaths',
+      'source_approval_run_paths',
+      'assetRunPaths',
+      'asset_run_paths',
+    ])
+  );
+}
+
+function getFirstNonEmptyStringFromListValue(
+  values: Record<string, unknown> | undefined,
+  keys: string[],
+): string | undefined {
+  if (!values) return undefined;
+  for (const key of keys) {
+    const value = getFirstNonEmptyStringFromList(values[key]);
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function getFirstActivePlanPathFromListValue(
+  values: Record<string, unknown> | undefined,
+  keys: string[],
+): string | undefined {
+  if (!values) return undefined;
+  for (const key of keys) {
+    const value = getFirstDesktopCardActivePlanPathFromList(values[key]);
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function getFirstWorkbenchMatterPathFromListValue(
+  values: Record<string, unknown> | undefined,
+  keys: string[],
+): string | undefined {
+  if (!values) return undefined;
+  for (const key of keys) {
+    const value = getFirstDesktopCardWorkbenchMatterPathFromList(values[key]);
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function getFirstKnowledgePathFromListValue(
+  values: Record<string, unknown> | undefined,
+  keys: string[],
+): string | undefined {
+  if (!values) return undefined;
+  for (const key of keys) {
+    const value = getFirstDesktopCardKnowledgePathFromList(values[key]);
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function getFirstRepositoryOutputPathFromListValue(
+  values: Record<string, unknown> | undefined,
+  keys: string[],
+): string | undefined {
+  if (!values) return undefined;
+  for (const key of keys) {
+    const value = getFirstDesktopCardRepositoryOutputPathFromList(values[key]);
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function getFirstReviewPathFromListValue(
+  values: Record<string, unknown> | undefined,
+  keys: string[],
+): string | undefined {
+  if (!values) return undefined;
+  for (const key of keys) {
+    const value = getFirstDesktopCardReviewPathFromList(values[key]);
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function getFirstAssetRunPathFromListValue(
+  values: Record<string, unknown> | undefined,
+  keys: string[],
+): string | undefined {
+  if (!values) return undefined;
+  for (const key of keys) {
+    const value = getFirstDesktopCardAssetRunPathFromList(values[key]);
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function getDesktopCardRepositoryAssetPath(value: unknown): string | undefined {
+  const text = getNonEmptyString(value);
+  return text && !isRepositoryAssetRunPathLike(text) ? text : undefined;
+}
+
+function getDesktopCardRepositoryAssetPathFromKeys(
+  value: Record<string, unknown> | undefined,
+  keys: string[],
+): string | undefined {
+  if (!value) return undefined;
+  for (const key of keys) {
+    const text = getDesktopCardRepositoryAssetPath(value[key]);
+    if (text) return text;
+  }
+  return undefined;
+}
+
+function getFirstDesktopCardRepositoryAssetPathFromList(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined;
+  for (const item of value) {
+    const text = getDesktopCardRepositoryAssetPath(item);
+    if (text) return text;
+  }
+  return undefined;
+}
+
+function getFirstRepositoryAssetPathFromListValue(
+  values: Record<string, unknown> | undefined,
+  keys: string[],
+): string | undefined {
+  if (!values) return undefined;
+  for (const key of keys) {
+    const value = getFirstDesktopCardRepositoryAssetPathFromList(values[key]);
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function getDesktopCardActionValueOrFirstRepositoryAssetPathValue(
+  values: Record<string, unknown> | undefined,
+): string | undefined {
+  return (
+    getDesktopCardRepositoryAssetPathFromKeys(values, ['assetPath', 'asset_path', 'path']) ??
+    getFirstRepositoryAssetPathFromListValue(values, ['assetPaths', 'asset_paths', 'paths'])
+  );
+}
+
+const DESKTOP_CARD_IMPORT_ARTIFACT_TYPES = new Set<ArtifactType>(['file', 'audio', 'image', 'video', 'document']);
+
+function getDesktopCardImportArtifactType(value: string | undefined): ArtifactType {
+  return value && DESKTOP_CARD_IMPORT_ARTIFACT_TYPES.has(value as ArtifactType) ? (value as ArtifactType) : 'file';
+}
+
+export function buildDesktopCardArtifactImportParams(
+  card: DesktopMessageCard,
+  actionValues: Record<string, unknown> | undefined,
+): DesktopCardArtifactImportParams | null {
+  const filePath =
+    getDesktopCardActionValueOrFirstListValue(
+      actionValues,
+      ['filePath', 'file_path', 'sourcePath', 'source_path', 'path'],
+      ['filePaths', 'file_paths', 'sourcePaths', 'source_paths', 'paths'],
+    ) ?? card.artifact?.filePath;
+  if (!filePath) return null;
+
+  const actionType = getDesktopCardActionValue(actionValues, ['type', 'artifactType', 'artifact_type']);
+  const title =
+    getDesktopCardActionValue(actionValues, ['title', 'name', 'artifactTitle', 'artifact_title']) ??
+    getDesktopCardActionValue(actionValues, ['fileName', 'file_name']) ??
+    card.artifact?.title;
+  const sourceActionRunId = card.actionRun?.id ?? card.actionRun?.gatewayRunId;
+  const source =
+    sourceActionRunId !== undefined
+      ? ({ type: 'action_run', id: sourceActionRunId, name: 'Desktop message card' } as const)
+      : ({ type: 'manual' } as const);
+
+  return {
+    title,
+    type: getDesktopCardImportArtifactType(actionType ?? card.artifact?.type),
+    description: getDesktopCardActionValue(actionValues, ['description', 'desc', 'summary']),
+    filePath,
+    fileName: getDesktopCardActionValue(actionValues, ['fileName', 'file_name']) ?? card.artifact?.fileName,
+    fileSize:
+      getDesktopCardActionNumberValue(actionValues, ['fileSize', 'file_size', 'size']) ?? card.artifact?.fileSize,
+    mimeType: getDesktopCardActionValue(actionValues, ['mimeType', 'mime_type']) ?? card.artifact?.mimeType,
+    source,
+  };
+}
+
+export function buildDesktopCardAuthorizationApprovalParams(
+  card: DesktopMessageCard,
+  action: DesktopMessageCardAction,
+  actionValues: Record<string, unknown> | undefined,
+): DesktopCardAuthorizationApprovalParams | null {
+  if (action.kind !== 'approve' && action.kind !== 'deny') return null;
+  const decision = action.kind === 'approve' ? 'approved' : 'rejected';
+  const actionRunId =
+    getDesktopCardActionValueOrFirstListValue(
+      actionValues,
+      ['actionRunId', 'action_run_id', 'runId', 'run_id', 'gatewayRunId', 'gateway_run_id'],
+      ['actionRunIds', 'action_run_ids', 'runIds', 'run_ids', 'gatewayRunIds', 'gateway_run_ids'],
+    ) ??
+    card.actionRun?.id ??
+    card.actionRun?.gatewayRunId;
+  const approvalId = getDesktopCardActionValueOrFirstListValue(
+    actionValues,
+    ['approvalId', 'approval_id'],
+    ['approvalIds', 'approval_ids'],
+  );
+  if (actionRunId && approvalId) return { actionRunId, approvalId, decision };
+
+  const artifactId = getDesktopCardActionArtifactId(card, action);
+  const executionEventId = getDesktopCardActionValueOrFirstListValue(
+    actionValues,
+    ['executionEventId', 'execution_event_id', 'eventId', 'event_id'],
+    ['executionEventIds', 'execution_event_ids', 'eventIds', 'event_ids'],
+  );
+  const artifactExecutionCommand = getDesktopCardActionValue(actionValues, ['command']);
+  if (artifactId && (executionEventId || artifactExecutionCommand)) {
+    return {
+      decision,
+      artifactExecution: {
+        artifactId,
+        eventId: executionEventId,
+        approvalTitle: getDesktopCardActionValue(actionValues, ['approvalTitle', 'approval_title', 'title']),
+        approvalRisk: getDesktopCardActionValue(actionValues, ['approvalRisk', 'approval_risk', 'risk']),
+        approvalReason: getDesktopCardActionValue(actionValues, ['approvalReason', 'approval_reason', 'reason']),
+        runner: getDesktopCardActionValue(actionValues, ['runner']),
+        command: artifactExecutionCommand,
+      },
+    };
+  }
+
+  const assetId = getDesktopCardActionValueOrFirstListValue(
+    actionValues,
+    ['assetId', 'asset_id'],
+    ['assetIds', 'asset_ids'],
+  );
+  const rawAssetPath = getDesktopCardActionValueOrFirstListValue(
+    actionValues,
+    ['assetPath', 'asset_path', 'path'],
+    ['assetPaths', 'asset_paths', 'paths'],
+  );
+  const executableAssetPath = getDesktopCardActionValueOrFirstRepositoryAssetPathValue(actionValues);
+  const rawSourceApprovalRunPath =
+    getDesktopCardActionValueOrFirstSourceApprovalRunPathValue(actionValues) ??
+    (isSafeRepositoryAssetRunPath(rawAssetPath) ? rawAssetPath : undefined) ??
+    card.actionRun?.assetRunPath;
+  const sourceApprovalRunPath = isSafeRepositoryAssetRunPath(rawSourceApprovalRunPath)
+    ? rawSourceApprovalRunPath
+    : undefined;
+  const actionRunWorkItemPath = isDesktopCardWorkbenchMatterPath(card.actionRun?.workItemPath)
+    ? card.actionRun?.workItemPath
+    : undefined;
+  if (!assetId && !executableAssetPath) return null;
+  return {
+    decision,
+    repositoryAssetExecution: {
+      repoPath: getDesktopCardActionValue(actionValues, ['repoPath', 'repo_path', 'repositoryPath', 'repository_path']),
+      assetId,
+      path: executableAssetPath,
+      approvalTitle: getDesktopCardActionValue(actionValues, ['approvalTitle', 'approval_title', 'title']),
+      approvalRisk: getDesktopCardActionValue(actionValues, ['approvalRisk', 'approval_risk', 'risk']),
+      approvalReason: getDesktopCardActionValue(actionValues, ['approvalReason', 'approval_reason', 'reason']),
+      sourceApprovalRunPath,
+      runner: getDesktopCardActionValue(actionValues, ['runner']),
+      command: getDesktopCardActionValue(actionValues, ['command']),
+      workItemPath: getDesktopCardActionValueOrFirstWorkbenchMatterPathValue(actionValues) ?? actionRunWorkItemPath,
+    },
+  };
+}
+
+function buildDesktopCardTailActionTarget(
+  baseTarget: string,
+  kind: 'output' | 'knowledge' | 'review',
+  card: DesktopMessageCard,
+  action: DesktopMessageCardAction,
+  fallbackTarget = baseTarget,
+): string {
+  const rawWorkItemPath =
+    getDesktopCardActionValueOrFirstWorkbenchMatterPathValue(action.values) ?? card.actionRun?.workItemPath;
+  const workItemPath =
+    rawWorkItemPath && isSafeWorkbenchTailActionWorkItemPath(rawWorkItemPath) ? rawWorkItemPath : undefined;
+  const assetRunPath = getDesktopCardActionValueOrFirstAssetRunPathValue(action.values) ?? card.actionRun?.assetRunPath;
+  const safeAssetRunPath = isSafeRepositoryAssetRunPath(assetRunPath) ? assetRunPath : undefined;
+  if (!workItemPath && !safeAssetRunPath) return fallbackTarget;
+
+  const tailActionId =
+    getDesktopCardActionValueOrFirstListValue(
+      action.values,
+      ['tailActionId', 'tail_action_id', 'id'],
+      ['tailActionIds', 'tail_action_ids'],
+    ) ?? getDesktopCardActionRunTailActionId(kind, card.actionRun?.id ?? card.actionRun?.gatewayRunId);
+  return buildDashboardTailActionTarget(baseTarget, {
+    kind,
+    id: tailActionId,
+    workItemPath,
+    assetRunPath: safeAssetRunPath,
+  });
+}
+
+function getDesktopCardActionRunTailActionId(
+  kind: 'output' | 'knowledge' | 'review',
+  runId: string | undefined,
+): string | undefined {
+  if (!runId) return undefined;
+  if (kind === 'output') return `action-run-output:${runId}`;
+  if (kind === 'knowledge') return `action-run-knowledge:${runId}`;
+  return `action-run-review:${runId}`;
+}
+
+function isDesktopCardWorkbenchMatterPath(path: string | undefined): path is string {
+  return Boolean(path && isSafeWorkbenchTailActionWorkItemPath(path));
+}
+
+function isDesktopCardActivePlanPath(path: string | undefined): path is string {
+  if (!path || !isSafeWorkbenchMarkdownPath(path)) return false;
+  const segments = path.split('/').map((segment) => segment.toLowerCase());
+  return segments.some(
+    (segment, index) => segment === 'plans' && segments[index + 1] === 'active' && index + 2 < segments.length,
+  );
+}
+
+function buildDesktopCardWorkbenchTarget(card: DesktopMessageCard, action: DesktopMessageCardAction): string {
+  const workItemPath =
+    getDesktopCardActionValueOrFirstWorkbenchMatterPathValue(action.values) ?? card.actionRun?.workItemPath;
+  if (isDesktopCardWorkbenchMatterPath(workItemPath)) {
+    const search = new URLSearchParams();
+    search.set('view', 'tasks');
+    search.set('workItemPath', workItemPath);
+    return `/workbench?${search.toString()}`;
+  }
+
+  const planPath = getDesktopCardActionValueOrFirstActivePlanPathValue(action.values);
+  if (isDesktopCardActivePlanPath(planPath)) {
+    const search = new URLSearchParams();
+    search.set('view', 'plans');
+    search.set('planPath', planPath);
+    return `/workbench?${search.toString()}`;
+  }
+
+  return '/workbench';
+}
+
+function buildDesktopCardPlanTarget(card: DesktopMessageCard, action: DesktopMessageCardAction): string {
+  const planPath = getDesktopCardActionValueOrFirstActivePlanPathValue(action.values) ?? card.actionRun?.planPath;
+  const search = new URLSearchParams();
+  search.set('view', 'plans');
+  if (isDesktopCardActivePlanPath(planPath)) search.set('planPath', planPath);
+  return `/workbench?${search.toString()}`;
+}
+
+function buildDesktopCardKnowledgeTarget(action: DesktopMessageCardAction): string {
+  const section = getDesktopCardActionValue(action.values, ['section', 'knowledgeSection', 'knowledge_section']);
+  if (section === 'health' || section === 'digest') {
+    const search = new URLSearchParams();
+    search.set('section', section);
+    return `/knowledge?${search.toString()}`;
+  }
+  return '/knowledge';
+}
+
+function buildDesktopCardKnowledgeDocumentTarget(card: DesktopMessageCard, action: DesktopMessageCardAction): string {
+  const knowledgePath =
+    getDesktopCardActionValueOrFirstKnowledgePathValue(action.values) ?? card.actionRun?.knowledgePath;
+  if (!knowledgePath || !isSafeWorkbenchMarkdownPath(knowledgePath)) return '/knowledge';
+  const search = new URLSearchParams();
+  search.set('knowledgePath', knowledgePath);
+  return `/knowledge?${search.toString()}`;
+}
+
+function buildDesktopCardAssetRunTarget(card: DesktopMessageCard, action: DesktopMessageCardAction): string {
+  const assetRunPath = getDesktopCardActionValueOrFirstAssetRunPathValue(action.values) ?? card.actionRun?.assetRunPath;
+  const search = new URLSearchParams();
+  search.set('view', 'outputs');
+  if (isSafeRepositoryAssetRunPath(assetRunPath)) search.set('assetRunPath', assetRunPath);
+  return `/workbench?${search.toString()}`;
+}
+
+const NON_OUTPUT_PREVIEW_ROOTS = new Set(['work', 'runs', 'wiki', 'sources', 'reviews']);
+
+function isDesktopCardRepositoryOutputPath(path: string | undefined): path is string {
+  if (!path || !isSafeWorkbenchMarkdownPath(path)) return false;
+  const segments = path.split('/');
+  const root = segments[0]?.toLowerCase();
+  if (root === 'plans') return segments[1]?.toLowerCase() === 'completed';
+  return !NON_OUTPUT_PREVIEW_ROOTS.has(root);
+}
+
+function buildDesktopCardOutputTarget(card: DesktopMessageCard, action: DesktopMessageCardAction): string {
+  const outputPath =
+    getDesktopCardActionValueOrFirstRepositoryOutputPathValue(action.values) ??
+    card.artifact?.repositoryOutputPath ??
+    card.actionRun?.repositoryOutputPath;
+  const search = new URLSearchParams();
+  search.set('view', 'outputs');
+  if (isDesktopCardRepositoryOutputPath(outputPath)) search.set('outputPath', outputPath);
+  return `/workbench?${search.toString()}`;
+}
+
+function isSafeWorkbenchReviewPath(path: string | undefined): path is string {
+  return Boolean(path && isSafeWorkbenchMarkdownPath(path) && path.startsWith('reviews/'));
+}
+
+function buildDesktopCardReviewTarget(card: DesktopMessageCard, action: DesktopMessageCardAction): string {
+  const reviewPath = getDesktopCardActionValueOrFirstReviewPathValue(action.values) ?? card.actionRun?.reviewPath;
+  const search = new URLSearchParams();
+  search.set('view', 'reviews');
+  if (isSafeWorkbenchReviewPath(reviewPath)) search.set('reviewPath', reviewPath);
+  return `/workbench?${search.toString()}`;
+}
+
+export function getDesktopCardActionNavigationTarget(
+  card: DesktopMessageCard,
+  action: DesktopMessageCardAction,
+): string | null {
+  if (action.kind === 'open-artifact' || action.kind === 'preview-artifact') {
+    const artifactId = getDesktopCardActionArtifactId(card, action);
+    return artifactId ? `/artifacts/${encodeURIComponent(artifactId)}` : '/artifacts';
+  }
+
+  if (action.kind === 'open-artifacts') {
+    return '/artifacts';
+  }
+
+  if (action.kind === 'open-action-run') {
+    const runId = getDesktopCardActionValueOrFirstListValue(
+      action.values,
+      ['runId', 'run_id', 'gatewayRunId', 'gateway_run_id', 'actionRunId', 'action_run_id', 'id'],
+      ['runIds', 'run_ids', 'gatewayRunIds', 'gateway_run_ids', 'actionRunIds', 'action_run_ids'],
+    );
+    const targetRunId = runId ?? card.actionRun?.id ?? card.actionRun?.gatewayRunId;
+    return targetRunId ? `/actions?runId=${encodeURIComponent(targetRunId)}` : '/actions';
+  }
+
+  if (action.kind === 'open-actions') {
+    return '/actions';
+  }
+
+  if (action.kind === 'open-dashboard') {
+    return '/';
+  }
+
+  if (action.kind === 'open-control-center') {
+    return '/control-center';
+  }
+
+  if (action.kind === 'open-new-session') {
+    return '/new-session';
+  }
+
+  if (action.kind === 'open-setup') {
+    return '/setup';
+  }
+
+  if (action.kind === 'open-settings') {
+    return '/settings';
+  }
+
+  if (action.kind === 'open-workbench') {
+    return buildDesktopCardWorkbenchTarget(card, action);
+  }
+
+  if (action.kind === 'open-workbench-actions') {
+    return '/workbench?view=actions';
+  }
+
+  if (action.kind === 'open-workbench-tasks') {
+    return '/workbench?view=tasks';
+  }
+
+  if (action.kind === 'open-workbench-plans') {
+    return '/workbench?view=plans';
+  }
+
+  if (action.kind === 'open-workbench-outputs') {
+    return '/workbench?view=outputs';
+  }
+
+  if (action.kind === 'open-workbench-asset-runs') {
+    return '/workbench?view=outputs';
+  }
+
+  if (action.kind === 'open-workbench-reviews') {
+    return '/workbench?view=reviews';
+  }
+
+  if (action.kind === 'open-plan') {
+    return buildDesktopCardPlanTarget(card, action);
+  }
+
+  if (action.kind === 'open-knowledge') {
+    return buildDesktopCardKnowledgeTarget(action);
+  }
+
+  if (action.kind === 'open-knowledge-health') {
+    return '/knowledge?section=health';
+  }
+
+  if (action.kind === 'open-knowledge-digest') {
+    return '/knowledge?section=digest';
+  }
+
+  if (action.kind === 'open-knowledge-document') {
+    return buildDesktopCardKnowledgeDocumentTarget(card, action);
+  }
+
+  if (action.kind === 'open-asset-run') {
+    return buildDesktopCardAssetRunTarget(card, action);
+  }
+
+  if (action.kind === 'open-output') {
+    return buildDesktopCardOutputTarget(card, action);
+  }
+
+  if (action.kind === 'open-review') {
+    return buildDesktopCardReviewTarget(card, action);
+  }
+
+  if (action.kind === 'preserve-output') {
+    return buildDesktopCardTailActionTarget('/artifacts', 'output', card, action);
+  }
+
+  if (action.kind === 'update-knowledge') {
+    return buildDesktopCardTailActionTarget('/knowledge', 'knowledge', card, action);
+  }
+
+  if (action.kind === 'write-review') {
+    return buildDesktopCardTailActionTarget('/workbench', 'review', card, action, '/workbench?view=reviews');
+  }
+
+  return null;
+}
+
+export function getDesktopCardActionHandlerRoute(
+  _card: DesktopMessageCard,
+  action: DesktopMessageCardAction,
+): DesktopCardActionHandlerRoute | null {
+  if (action.kind === 'approve' || action.kind === 'deny') {
+    return {
+      dispatch: 'desktop-handler',
+      handler: 'authorization-approval',
+      requiresExplicitUserConfirmation: true,
+    };
+  }
+
+  if (action.kind === 'save-artifact') {
+    return {
+      dispatch: 'desktop-handler',
+      handler: 'artifact-save',
+      requiresExplicitUserConfirmation: true,
+    };
+  }
+
+  if (action.kind === 'import-artifact') {
+    return {
+      dispatch: 'desktop-handler',
+      handler: 'artifact-import',
+      requiresExplicitUserConfirmation: true,
+    };
+  }
+
+  if (action.kind === 'mirror-artifact') {
+    return {
+      dispatch: 'desktop-handler',
+      handler: 'artifact-mirror',
+      requiresExplicitUserConfirmation: true,
+      requiresRepositoryBoundary: true,
+    };
+  }
+
+  return null;
+}
+
+export function resolveDesktopCardActionInteraction(
+  card: DesktopMessageCard,
+  action: DesktopMessageCardAction,
+  fieldValues: Record<string, unknown>,
+): DesktopCardActionInteraction {
+  const actionValues = buildDesktopCardActionValues(card, action, fieldValues);
+  const missingRequiredFields =
+    action.kind === 'handle-later' ? [] : getMissingRequiredDesktopCardFields(card, action, fieldValues);
+  if (missingRequiredFields.length > 0) {
+    return {
+      actionValues,
+      missingRequiredFields,
+      navigationTarget: null,
+      handlerRoute: null,
+      shouldSendCallback: false,
+    };
+  }
+
+  const navigationTarget = getDesktopCardActionNavigationTarget(card, action);
+  if (navigationTarget) {
+    return {
+      actionValues,
+      missingRequiredFields,
+      navigationTarget,
+      handlerRoute: null,
+      shouldSendCallback: false,
+    };
+  }
+
+  return {
+    actionValues,
+    missingRequiredFields,
+    navigationTarget: null,
+    handlerRoute: getDesktopCardActionHandlerRoute(card, action),
+    shouldSendCallback: true,
+  };
+}
+
+export function buildDesktopCardActionUserMessage(input: DesktopCardActionUserMessageInput): string {
+  return [
+    'Desktop message card action confirmed.',
+    '```json',
+    JSON.stringify({
+      source: 'desktop-message-card',
+      cardId: input.cardId,
+      cardKind: input.kind,
+      actionId: input.actionId,
+      actionKind: input.actionKind,
+      artifact: input.artifact,
+      actionRun: input.actionRun,
+      handlerRoute: input.handlerRoute ?? undefined,
+      values: input.values ?? {},
+    }),
+    '```',
+  ].join('\n');
+}
+
+export function buildDesktopCardActionValues(
+  card: DesktopMessageCard,
+  action: DesktopMessageCardAction,
+  fieldValues: Record<string, unknown>,
+): Record<string, unknown> {
+  const values = Object.fromEntries(
+    card.fields
+      .map((field): [string, string] | null => {
+        const value =
+          normalizeDesktopCardFieldValue(fieldValues[field.id]) ?? normalizeDesktopCardFieldValue(field.value);
+        return value ? [field.id, value] : null;
+      })
+      .filter((entry): entry is [string, string] => entry !== null),
+  );
+  return {
+    ...values,
+    ...(action.values ?? {}),
+  };
+}
+
+export function getMissingRequiredDesktopCardFields(
+  card: DesktopMessageCard,
+  action: DesktopMessageCardAction,
+  fieldValues: Record<string, unknown>,
+): DesktopMessageCardField[] {
+  return card.fields.filter((field) => {
+    if (!field.required) return false;
+    const value =
+      normalizeDesktopCardFieldValue(action.values?.[field.id]) ??
+      normalizeDesktopCardFieldValue(fieldValues[field.id]) ??
+      normalizeDesktopCardFieldValue(field.value);
+    return !value;
+  });
+}
+
 function firstReadableValue(value: unknown): string {
   if (typeof value === 'string') return value;
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
@@ -536,7 +2190,7 @@ export function parseHistoryMessageToContentItems(
     items.push(...reasoningItems);
   }
 
-  const text = extractSessionMessageText(message);
+  const text = stripDesktopMessageCardBlocks(extractSessionMessageText(message));
   const attachments = extractHistoryAttachments(message);
   if (attachments.length > 0) {
     items.push(...buildSemiMessageContent(text, attachments));

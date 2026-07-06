@@ -20,7 +20,7 @@ import { buildArtifactRepositoryOutputUpdates, mirrorArtifactToReadyRepositoryOu
 import { buildArtifactOutputDescription } from './artifact-display';
 import { buildArtifactValueHealth } from './artifact-value-health';
 import { loadInstanceData, saveInstanceDataAwaited } from './local-persistence';
-import { extractWorkbenchMatterId, isWorkbenchMatterPath } from './workbench-matter';
+import { extractWorkbenchMatterId, isSafeWorkbenchMatterLikePath } from './workbench-matter';
 import type { ArtifactMeta } from './artifact-types';
 import type { RepositoryBinding } from './agentic-repository';
 import type { AgentTeamProfile, AiActionRun, AiActionRunStatus } from './types';
@@ -38,6 +38,14 @@ export async function saveAiActionRuns(instanceId: string, runs: AiActionRun[]):
   await saveInstanceDataAwaited(instanceId, AI_ACTION_RUNS_STORAGE_KEY, runs);
 }
 
+export function findAiActionRunByLocalOrGatewayId(
+  runs: AiActionRun[],
+  actionRunId: string | undefined,
+): AiActionRun | undefined {
+  if (!actionRunId) return undefined;
+  return runs.find((item) => item.id === actionRunId || item.gatewayRunId === actionRunId);
+}
+
 export async function upsertAiActionRun(instanceId: string, run: AiActionRun): Promise<AiActionRun[]> {
   const runWithArtifacts = await saveArtifactsFromTerminalAiActionRun(instanceId, run);
   const runs = await loadAiActionRuns(instanceId);
@@ -50,13 +58,42 @@ export async function upsertAiActionRun(instanceId: string, run: AiActionRun): P
   return nextRuns;
 }
 
+export async function recordAiActionRunArtifactOutput(
+  instanceId: string,
+  actionRunId: string,
+  artifactIds: string[],
+): Promise<AiActionRun | null> {
+  const normalizedArtifactIds = artifactIds.map((id) => id.trim()).filter(Boolean);
+  if (normalizedArtifactIds.length === 0) return null;
+
+  const runs = await loadAiActionRuns(instanceId);
+  const run = findAiActionRunByLocalOrGatewayId(runs, actionRunId);
+  if (!run) return null;
+
+  const nextArtifactIds = Array.from(new Set([...(run.artifactIds ?? []), ...normalizedArtifactIds]));
+  if (nextArtifactIds.length === (run.artifactIds ?? []).length) return run;
+
+  const updated: AiActionRun = {
+    ...run,
+    artifactIds: nextArtifactIds,
+    updatedAt: Date.now(),
+  };
+  await saveAiActionRuns(
+    instanceId,
+    runs.map((item) => (item.id === updated.id ? updated : item)),
+  );
+  await mirrorTerminalAiActionRunToRepository(instanceId, updated);
+  return updated;
+}
+
 export async function assignAiActionRunToWorkItem(
   instanceId: string,
   actionRunId: string,
   workItemPath: string,
 ): Promise<AiActionRun> {
-  const normalizedWorkItemPath = workItemPath.trim();
-  if (!isWorkbenchMatterPath(normalizedWorkItemPath)) {
+  const binding = await loadRepositoryBinding(instanceId);
+  const normalizedWorkItemPath = normalizeRunWorkItemPath(workItemPath, binding?.paths.work ?? 'work');
+  if (!normalizedWorkItemPath) {
     throw new Error('ActionRun can only be assigned to a work item markdown file');
   }
 
@@ -147,6 +184,7 @@ function buildAiActionRunArtifactValueLines(artifact: ArtifactMeta): string[] {
   return [
     valueSummary ? `  - summary: ${valueSummary}` : undefined,
     `  - valueHealth: ${valueHealth.status}`,
+    valueHealth.strengths.length ? `  - valueHealthStrengths: ${valueHealth.strengths.join(', ')}` : undefined,
     valueHealth.gaps.length ? `  - valueHealthGaps: ${valueHealth.gaps.join(', ')}` : undefined,
     valueHealth.nextActions.length ? `  - valueHealthNextActions: ${valueHealth.nextActions.join(', ')}` : undefined,
     artifact.previewPlan
@@ -215,9 +253,10 @@ async function appendActionRunExecutionRecordToWorkItem(
 
 function normalizeRunWorkItemPath(value: string | undefined, workRoot: string): string | null {
   if (!value) return null;
-  const path = value.trim().replace(/^\/+/, '');
+  const path = value.trim();
   const root = workRoot.trim().replace(/^\/+|\/+$/g, '');
   if (!path || !root || !path.endsWith('.md') || path.includes('..') || root.includes('..')) return null;
+  if (!isSafeWorkbenchMatterLikePath(path)) return null;
   return path.startsWith(`${root}/`) ? path : null;
 }
 
@@ -301,6 +340,7 @@ async function loadRunArtifacts(artifactIds: string[] | undefined): Promise<Arti
 
 async function saveArtifactsFromTerminalAiActionRun(instanceId: string, run: AiActionRun): Promise<AiActionRun> {
   if (run.status !== 'done' || !run.lastAssistantResponse) return run;
+  if (run.type === 'artifact_create') return run;
 
   const parsedArtifacts = parseArtifactsFromText(run.lastAssistantResponse);
   if (parsedArtifacts.length === 0) return run;

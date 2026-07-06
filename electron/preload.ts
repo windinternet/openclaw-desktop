@@ -1,9 +1,9 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron';
 
 function getStartupThemeMode(): 'light' | 'dark' {
-  const arg = process.argv.find((value) => value.startsWith('--openclaw-startup-theme-mode='))
-  const mode = arg?.split('=')[1]
-  return mode === 'light' ? 'light' : 'dark'
+  const arg = process.argv.find((value) => value.startsWith('--openclaw-startup-theme-mode='));
+  const mode = arg?.split('=')[1];
+  return mode === 'light' ? 'light' : 'dark';
 }
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -42,12 +42,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getDefaultPath: () => ipcRenderer.invoke('repository:getDefaultPath'),
     inspect: (repoPath: string) => ipcRenderer.invoke('repository:inspect', repoPath),
     bootstrap: (repoPath: string) => ipcRenderer.invoke('repository:bootstrap', repoPath),
+    adapt: (repoPath: string) => ipcRenderer.invoke('repository:adapt', repoPath),
     init: (repoPath: string) => ipcRenderer.invoke('repository:init', repoPath),
-    listTree: (repoPath: string, maxEntries?: number) => ipcRenderer.invoke('repository:listTree', repoPath, maxEntries),
-    listMarkdown: (repoPath: string, directory: string) => ipcRenderer.invoke('repository:listMarkdown', repoPath, directory),
-    readText: (repoPath: string, relativePath: string) => ipcRenderer.invoke('repository:readText', repoPath, relativePath),
+    listTree: (repoPath: string, maxEntries?: number) =>
+      ipcRenderer.invoke('repository:listTree', repoPath, maxEntries),
+    listMarkdown: (repoPath: string, directory: string) =>
+      ipcRenderer.invoke('repository:listMarkdown', repoPath, directory),
+    readText: (repoPath: string, relativePath: string) =>
+      ipcRenderer.invoke('repository:readText', repoPath, relativePath),
     extractKnowledgeFileText: (params: { fileName: string; mimeType?: string; bytes: ArrayBuffer }) =>
       ipcRenderer.invoke('repository:extractKnowledgeFileText', params),
+    fetchKnowledgeUrl: (params: { url: string }) => ipcRenderer.invoke('repository:fetchKnowledgeUrl', params),
     writeText: (repoPath: string, relativePath: string, content: string) =>
       ipcRenderer.invoke('repository:writeText', repoPath, relativePath, content),
     moveText: (repoPath: string, fromRelativePath: string, toRelativePath: string) =>
@@ -60,21 +65,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('repository:gitLog', repoPath, relativePath, limit),
     gitCommit: (repoPath: string, message: string) => ipcRenderer.invoke('repository:gitCommit', repoPath, message),
     watchAgentsFile: async (repoPath: string, cb: (event: { watchId: string; repoPath: string }) => void) => {
-      let activeWatchId: string | null = null
+      let activeWatchId: string | null = null;
       const handler = (_event: Electron.IpcRendererEvent, payload: { watchId: string; repoPath: string }) => {
-        if (payload.watchId === activeWatchId) cb(payload)
-      }
-      ipcRenderer.on('repository:agentsFileChanged', handler)
+        if (payload.watchId === activeWatchId) cb(payload);
+      };
+      ipcRenderer.on('repository:agentsFileChanged', handler);
       try {
-        const result = await ipcRenderer.invoke('repository:watchAgentsFile', repoPath) as { watchId: string; repoPath: string }
-        activeWatchId = result.watchId
+        const result = (await ipcRenderer.invoke('repository:watchAgentsFile', repoPath)) as {
+          watchId: string;
+          repoPath: string;
+        };
+        activeWatchId = result.watchId;
         return () => {
-          ipcRenderer.removeListener('repository:agentsFileChanged', handler)
-          void ipcRenderer.invoke('repository:unwatchAgentsFile', result.watchId)
-        }
+          ipcRenderer.removeListener('repository:agentsFileChanged', handler);
+          void ipcRenderer.invoke('repository:unwatchAgentsFile', result.watchId);
+        };
       } catch (error) {
-        ipcRenderer.removeListener('repository:agentsFileChanged', handler)
-        throw error
+        ipcRenderer.removeListener('repository:agentsFileChanged', handler);
+        throw error;
       }
     },
   },
@@ -83,17 +91,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getMeta: (artifactId: string) => ipcRenderer.invoke('artifact:getMeta', artifactId),
     getHtml: (artifactId: string, version?: number) => ipcRenderer.invoke('artifact:getHtml', artifactId, version),
     saveMeta: (artifactId: string, meta: unknown) => ipcRenderer.invoke('artifact:saveMeta', artifactId, meta),
-    saveHtml: (artifactId: string, version: number, html: string) => ipcRenderer.invoke('artifact:saveHtml', artifactId, version, html),
-    importFile: (artifactId: string, sourcePath: string, preferredFileName?: string) => ipcRenderer.invoke('artifact:importFile', artifactId, sourcePath, preferredFileName),
+    saveHtml: (artifactId: string, version: number, html: string) =>
+      ipcRenderer.invoke('artifact:saveHtml', artifactId, version, html),
+    importFile: (artifactId: string, sourcePath: string, preferredFileName?: string) =>
+      ipcRenderer.invoke('artifact:importFile', artifactId, sourcePath, preferredFileName),
     readImportedText: (artifactId: string) => ipcRenderer.invoke('artifact:readImportedText', artifactId),
     readImportedFileFacts: (artifactId: string) => ipcRenderer.invoke('artifact:readImportedFileFacts', artifactId),
-    readImportedImageThumbnail: (artifactId: string) => ipcRenderer.invoke('artifact:readImportedImageThumbnail', artifactId),
+    readImportedImageThumbnail: (artifactId: string) =>
+      ipcRenderer.invoke('artifact:readImportedImageThumbnail', artifactId),
+    readImportedNativeThumbnail: (artifactId: string) =>
+      ipcRenderer.invoke('artifact:readImportedNativeThumbnail', artifactId),
+    readImportedDocumentPreview: (artifactId: string) =>
+      ipcRenderer.invoke('artifact:readImportedDocumentPreview', artifactId),
     list: () => ipcRenderer.invoke('artifact:list'),
     updateIndex: (entries: unknown) => ipcRenderer.invoke('artifact:updateIndex', entries),
-    requestAuth: (artifactId: string, capability: string, detail: string) => ipcRenderer.invoke('artifact:requestAuth', artifactId, capability, detail),
-    onAuthRequest: (cb: (_event: unknown, artifactId: string, capability: string, detail: string) => void) => { ipcRenderer.on('artifact:requestAuth', cb as (event: Electron.IpcRendererEvent, ...args: unknown[]) => void); },
-      grantAuth: (result: { granted: boolean; level: string }) => ipcRenderer.send('artifact:grantAuth', result),
-      writeSkill: (dummy: string, content: string) => ipcRenderer.invoke('artifact:writeSkill', dummy, content),
+    requestAuth: (artifactId: string, capability: string, detail: string) =>
+      ipcRenderer.invoke('artifact:requestAuth', artifactId, capability, detail),
+    onAuthRequest: (cb: (_event: unknown, artifactId: string, capability: string, detail: string) => void) => {
+      ipcRenderer.on('artifact:requestAuth', cb as (event: Electron.IpcRendererEvent, ...args: unknown[]) => void);
+    },
+    grantAuth: (result: { granted: boolean; level: string }) => ipcRenderer.send('artifact:grantAuth', result),
+    writeSkill: (dummy: string, content: string) => ipcRenderer.invoke('artifact:writeSkill', dummy, content),
   },
   device: {
     signChallenge: (params: {
@@ -103,8 +121,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       clientMode?: string;
       role?: string;
       scopes?: string[];
-    }) =>
-      ipcRenderer.invoke('device:signChallenge', params),
+    }) => ipcRenderer.invoke('device:signChallenge', params),
   },
   install: {
     run: () => ipcRenderer.invoke('install:openclaw'),
@@ -124,15 +141,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setAiLink: (enabled: boolean) => ipcRenderer.invoke('pet:set-ai-link', enabled),
     toggle: () => ipcRenderer.invoke('pet:toggle'),
     onEvent: (cb: (event: unknown) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, petEvent: unknown) => cb(petEvent)
-      ipcRenderer.on('pet:event', handler)
-      return () => { ipcRenderer.removeListener('pet:event', handler) }
+      const handler = (_event: Electron.IpcRendererEvent, petEvent: unknown) => cb(petEvent);
+      ipcRenderer.on('pet:event', handler);
+      return () => {
+        ipcRenderer.removeListener('pet:event', handler);
+      };
     },
     onAiLinkChanged: (cb: (enabled: boolean) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, enabled: boolean) => cb(enabled)
-      ipcRenderer.on('pet:ai-link-changed', handler)
-      return () => { ipcRenderer.removeListener('pet:ai-link-changed', handler) }
+      const handler = (_event: Electron.IpcRendererEvent, enabled: boolean) => cb(enabled);
+      ipcRenderer.on('pet:ai-link-changed', handler);
+      return () => {
+        ipcRenderer.removeListener('pet:ai-link-changed', handler);
+      };
     },
     move: (dx: number, dy: number) => ipcRenderer.invoke('pet:move', { dx, dy }),
   },
-})
+});

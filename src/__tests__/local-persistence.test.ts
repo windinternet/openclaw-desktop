@@ -105,6 +105,40 @@ describe('local persistence migration', () => {
     expect(snapshot.settings.sessionReasoningDisplay).toBe('visible');
   });
 
+  it('normalizes Artifact write channel settings during persistence migration', async () => {
+    const saveSettings = vi.fn();
+    vi.stubGlobal('window', {
+      electronAPI: {
+        storage: {
+          loadAppState: vi.fn(async () => ({
+            settings: {
+              settingsSchemaVersion: 4,
+              initialized: true,
+              themeMode: 'dark',
+              themeColor: 'blue',
+              locale: 'zh-CN',
+              artifactWriteChannel: 'silent-direct',
+            },
+            instances: [],
+            currentInstanceId: null,
+          })),
+          saveSettings,
+          saveInstances: vi.fn(),
+          saveCurrentInstanceId: vi.fn(),
+        },
+      },
+    });
+
+    const snapshot = await loadAppSnapshot();
+
+    expect(snapshot.settings.artifactWriteChannel).toBe('auto-direct-with-fallback');
+    expect(saveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        artifactWriteChannel: 'auto-direct-with-fallback',
+      }),
+    );
+  });
+
   it('keeps Electron instance data whitelist aligned with renderer storage keys', () => {
     const source = readFileSync('electron/local-storage.ts', 'utf8');
     const expectedKeys = [
@@ -122,5 +156,15 @@ describe('local persistence migration', () => {
     expect(source).toContain(
       "const AGENTIC_REPOSITORY_BINDING_LOCATIONS = new Set(['desktop-local', 'gateway-local'])",
     );
+  });
+
+  it('routes async persistence failures through the preload log bridge', () => {
+    const source = readFileSync('src/lib/local-persistence.ts', 'utf8');
+    const types = readFileSync('src/vite-env.d.ts', 'utf8');
+
+    expect(source).toContain("window.electronAPI?.log?.send('WARN'");
+    expect(source).not.toContain('console.warn');
+    expect(types).toContain('log?: {');
+    expect(types).toContain('send: (level: string, ...args: unknown[]) => void;');
   });
 });

@@ -62,6 +62,11 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+function logGatewayClient(level: string, ...args: unknown[]): void {
+  if (typeof window === 'undefined') return;
+  window.electronAPI?.log?.send(level, ...args);
+}
+
 export interface GatewayClient {
   connect(): Promise<HelloOk>;
   disconnect(): void;
@@ -77,7 +82,7 @@ export interface GatewayClient {
 export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
   const wsUrl = normalizeGatewayUrl(opts.url);
   const token = opts.token ?? '';
-  console.log('[GatewayClient] createGatewayClient:', {
+  logGatewayClient('INFO', '[GatewayClient] createGatewayClient:', {
     wsUrl,
     hasToken: !!token,
     tokenLength: token.length,
@@ -181,7 +186,7 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
     nonce: string;
   }): void {
     const auth = token ? { token } : undefined;
-    console.log('[GatewayClient] sendConnect:', {
+    logGatewayClient('INFO', '[GatewayClient] sendConnect:', {
       hasDevice: !!device,
       hasAuth: !!auth,
       hasToken: !!token,
@@ -214,7 +219,7 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
     const nonce = connectNonce;
     if (!nonce) return;
 
-    console.log('[GatewayClient] handleDeviceChallenge:', {
+    logGatewayClient('INFO', '[GatewayClient] handleDeviceChallenge:', {
       nonce: nonce?.slice(0, 12) + '...',
       hasToken: !!token,
       tokenPreview: token ? token.slice(0, 8) + '...' : '(empty)',
@@ -252,7 +257,7 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
     const id = String(f.id ?? '');
 
     if (id === 'c1') {
-      console.log('[GatewayClient] connect response:', { ok: f.ok, error: f.error });
+      logGatewayClient('INFO', '[GatewayClient] connect response:', { ok: f.ok, error: f.error });
       if (connectTimer !== null) {
         clearTimeout(connectTimer);
         connectTimer = null;
@@ -418,7 +423,7 @@ export function createGatewayClient(opts: GatewayClientOptions): GatewayClient {
     }
 
     ws.onopen = () => {
-      console.log('[GatewayClient] WebSocket opened, waiting for challenge...');
+      logGatewayClient('INFO', '[GatewayClient] WebSocket opened, waiting for challenge...');
       connectTimer = setTimeout(() => {
         connectTimer = null;
         failConnectHandshake('Connection handshake timeout');

@@ -21,6 +21,8 @@ export const PRESET_THEME_COLORS: ThemeColor[] = [
 
 export type SupportedLocale = 'zh-CN' | 'en-US';
 export type DefaultHomeView = PrimaryNavKey;
+export type ExternalLinkMode = 'system' | 'internal';
+export type ArtifactWriteChannel = 'auto-direct-with-fallback' | 'preview-first' | 'conversation-only';
 export const DEFAULT_HOME_VIEW_OPTIONS = NAV_GROUPS.flatMap((group) => group.items).map((item) => ({
   value: item.key,
   route: item.route,
@@ -36,7 +38,8 @@ export interface AppSettings {
   userDisplayName: string;
   aiCompletionSound: string;
   connectAllInstancesOnStartup: boolean;
-  externalLinkMode: 'system' | 'internal';
+  externalLinkMode: ExternalLinkMode;
+  artifactWriteChannel: ArtifactWriteChannel;
   agentSwitchStrategy: AgentSwitchStrategy;
   sessionToolCallDisplay: SessionToolCallDisplay;
   sessionReasoningDisplay: SessionReasoningDisplay;
@@ -47,7 +50,7 @@ export interface AppSettings {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  settingsSchemaVersion: 4,
+  settingsSchemaVersion: 5,
   initialized: false,
   themeMode: 'dark',
   themeColor: 'blue',
@@ -56,6 +59,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   aiCompletionSound: 'mixkit-message-pop-alert-2354.mp3',
   connectAllInstancesOnStartup: false,
   externalLinkMode: 'system',
+  artifactWriteChannel: 'auto-direct-with-fallback',
   agentSwitchStrategy: 'new-session',
   sessionToolCallDisplay: 'compact',
   sessionReasoningDisplay: 'visible',

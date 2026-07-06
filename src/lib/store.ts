@@ -23,17 +23,25 @@ import type {
   GatewayStatus,
   GatewayUser,
   GatewayRetryInfo,
+  AiActionRun,
 } from './types';
-import type { ArtifactMeta } from './artifact-types';
+import type { ArtifactMeta, ArtifactType } from './artifact-types';
+import { recordArtifactExecutionEvent } from './artifact-execution-record';
 import { artifactService, type GenerateParams } from './artifact-service';
 import { artifactPersistence } from './artifact-persistence';
-import { buildArtifactRepositoryOutputUpdates, mirrorArtifactToReadyRepositoryOutput } from './repository-outputs';
+import {
+  buildArtifactRepositoryOutputUpdates,
+  mirrorArtifactToReadyRepositoryOutput,
+  recordRepositoryAssetExecution,
+  type RepositoryOutputResult,
+} from './repository-outputs';
 import { createGatewayClient, type GatewayClient } from './gateway';
 import { connectDesktopBridgeToGateway, disconnectDesktopBridge } from './desktop-bridge';
 import { emitPetEvent } from './pet-bridge';
 import { fetchSkillMarketplaceSkills } from './skill-marketplace';
 import { fetchGatewayUser, fetchUserProfile } from './user';
 import { fetchGatewayAgents } from './gateway-agents';
+import { resolveAiActionApprovalWithGateway } from './ai-action-center';
 import {
   approveDesktopCompanionApprovalRequest,
   createDesktopCompanionInstallSession,
@@ -54,8 +62,17 @@ import {
   isAssistantCompletionEvent,
   notifyAssistantCompletion,
 } from './assistant-completion-notifier';
-import { recoverInterruptedAiActionRuns, syncAiActionRunsWithGateway } from './ai-action-run-store';
+import {
+  loadAiActionRuns,
+  recoverInterruptedAiActionRuns,
+  syncAiActionRunsWithGateway,
+  upsertAiActionRun,
+} from './ai-action-run-store';
 import { writeArtifactSkill } from './artifact-skill';
+import { loadRepositoryBinding } from './agentic-repository-store';
+import { applyWorkbenchMatterPlanApproval } from './repository-workbench';
+import { applyKnowledgeRewriteApproval, formatKnowledgeRewriteWrittenPaths } from './repository-knowledge';
+import { isRepositoryAssetRunPathLike, isSafeRepositoryAssetRunPath } from './dashboard-tail-action-routing';
 import { loadAppSnapshot, removePersistedInstance, saveCurrentInstanceId, saveInstances } from './local-persistence';
 import {
   syncDesktopSelfKnowledgeWithCompanion,
@@ -72,12 +89,90 @@ const repositoryAgentsFileSyncWatchers = new Map<string, { repoPath: string; cle
 const repositoryAgentsFileSyncWatcherTokens = new Map<string, number>();
 let repositoryAgentsFileSyncWatcherSeq = 0;
 
+function logStore(level: string, ...args: unknown[]): void {
+  if (typeof window === 'undefined') return;
+  window.electronAPI?.log?.send(level, ...args);
+}
+
+export interface ImportArtifactFileParams {
+  title?: string;
+  type?: ArtifactType;
+  description?: string;
+  filePath?: string;
+  fileName?: string;
+  fileSize?: number;
+  mimeType?: string;
+  source?: ArtifactMeta['source'];
+}
+
+export interface ResolveDesktopCardAuthorizationApprovalParams {
+  actionRunId?: string;
+  approvalId?: string;
+  decision: 'approved' | 'rejected';
+  repositoryAssetExecution?: {
+    repoPath?: string;
+    assetId?: string;
+    path?: string;
+    runner?: string;
+    command?: string;
+    approvalTitle?: string;
+    approvalRisk?: string;
+    approvalReason?: string;
+    sourceApprovalRunPath?: string;
+    workItemPath?: string;
+  };
+  artifactExecution?: {
+    artifactId?: string;
+    eventId?: string;
+    runner?: string;
+    command?: string;
+    approvalTitle?: string;
+    approvalRisk?: string;
+    approvalReason?: string;
+  };
+}
+
+export type ResolveDesktopCardAuthorizationApprovalRepositoryResult =
+  | { kind: 'work-matter-plan'; planPath: string }
+  | { kind: 'knowledge-rewrite'; writtenPaths: string[] }
+  | { kind: 'repository-asset-approval'; runPath: string; status: 'approved' | 'denied' }
+  | { kind: 'artifact-execution-approval'; artifactId: string; status: 'approved' | 'denied' };
+
+export interface ResolveDesktopCardAuthorizationApprovalResult {
+  run?: AiActionRun;
+  repositoryResult?: ResolveDesktopCardAuthorizationApprovalRepositoryResult;
+}
+
 function getCompletionEventKey(instanceId: string, event: { payload?: unknown; seq?: number }): string {
   const payload =
     typeof event.payload === 'object' && event.payload !== null ? (event.payload as Record<string, unknown>) : {};
   const runId = payload.runId ?? payload.run_id;
   const sessionKey = payload.sessionKey ?? payload.session_key;
   return `${instanceId}:${typeof runId === 'string' ? runId : `${String(sessionKey ?? 'unknown')}:${event.seq ?? 'completion'}`}`;
+}
+
+function trimOptionalString(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function normalizeDesktopCardRepositoryAssetApprovalPath(value: string | undefined): string | undefined {
+  const normalized = value?.trim().replace(/\\/g, '/').replace(/\/+/g, '/').replace(/^\.\//, '');
+  if (!normalized || isRepositoryAssetRunPathLike(normalized)) return undefined;
+  const isWindowsAbsolutePath = /^[a-zA-Z]:\//.test(normalized);
+  const segments = normalized.split('/');
+  if (
+    normalized.startsWith('/') ||
+    isWindowsAbsolutePath ||
+    segments.some((segment) => !segment || segment === '.' || segment === '..' || segment === '.git')
+  ) {
+    return undefined;
+  }
+  return normalized;
+}
+
+function fileNameFromImportPath(filePath: string): string {
+  return filePath.split(/[\\/]/).filter(Boolean).pop() ?? 'Imported file';
 }
 
 export interface InstanceRuntime {
@@ -243,6 +338,12 @@ interface StoreState {
   clearSessionActivityState: (sessionKey: string) => void;
   fetchArtifacts: () => Promise<void>;
   generateArtifact: (params: GenerateParams) => Promise<ArtifactMeta>;
+  resolveDesktopCardAuthorizationApproval: (
+    params: ResolveDesktopCardAuthorizationApprovalParams,
+  ) => Promise<ResolveDesktopCardAuthorizationApprovalResult | null>;
+  publishArtifact: (artifactId: string) => Promise<boolean>;
+  importArtifactFromFile: (params: ImportArtifactFileParams) => Promise<ArtifactMeta | null>;
+  mirrorArtifactToRepository: (artifactId: string) => Promise<RepositoryOutputResult | null>;
   updateArtifact: (artifactId: string, updates: Partial<ArtifactMeta>) => Promise<void>;
   openArtifactWindow: (artifactId: string, version?: number) => Promise<void>;
   deleteArtifact: (artifactId: string) => Promise<void>;
@@ -346,7 +447,7 @@ function cleanupRepositoryAgentsFileSyncWatcher(instanceId: string): void {
   try {
     watcher.cleanup();
   } catch (error) {
-    console.warn('[cleanupRepositoryAgentsFileSyncWatcher]', error);
+    logStore('WARN', '[cleanupRepositoryAgentsFileSyncWatcher]', error);
   }
 }
 
@@ -873,14 +974,14 @@ export const useStore = create<StoreState>((set, get) => ({
       const result = await syncRepositoryContextWithCompanion(target.client, target.instanceId);
       if (result.status === 'failed') {
         cleanupRepositoryAgentsFileSyncWatcher(target.instanceId);
-        console.warn('[syncRepositoryContextForInstance]', result.message);
+        logStore('WARN', '[syncRepositoryContextForInstance]', result.message);
       } else if (
         result.status === 'repository_api_unavailable' ||
         result.status === 'fallback_available' ||
         result.status === 'no_binding'
       ) {
         cleanupRepositoryAgentsFileSyncWatcher(target.instanceId);
-        console.info('[syncRepositoryContextForInstance]', result);
+        logStore('INFO', '[syncRepositoryContextForInstance]', result);
       } else if (result.status === 'synced') {
         await ensureRepositoryAgentsFileSyncWatcher(
           target.instanceId,
@@ -892,11 +993,11 @@ export const useStore = create<StoreState>((set, get) => ({
             return get().instanceRuntimes[target.instanceId]?.client?.getStatus() === 'connected';
           },
         );
-        if (result.warning) console.warn('[syncRepositoryContextForInstance]', result.warning);
+        if (result.warning) logStore('WARN', '[syncRepositoryContextForInstance]', result.warning);
       }
     } catch (err) {
       cleanupRepositoryAgentsFileSyncWatcher(target.instanceId);
-      console.error('[syncRepositoryContextForInstance]', err);
+      logStore('ERROR', '[syncRepositoryContextForInstance]', err);
     }
   },
 
@@ -906,17 +1007,17 @@ export const useStore = create<StoreState>((set, get) => ({
     try {
       const result = await syncDesktopSelfKnowledgeWithCompanion(target.client);
       if (result.status === 'failed') {
-        console.warn('[syncDesktopSelfKnowledgeForInstance]', result.message);
+        logStore('WARN', '[syncDesktopSelfKnowledgeForInstance]', result.message);
         return result;
       }
       if (result.status === 'fallback_partial') {
-        console.warn('[syncDesktopSelfKnowledgeForInstance]', result);
+        logStore('WARN', '[syncDesktopSelfKnowledgeForInstance]', result);
         return result;
       }
-      console.info('[syncDesktopSelfKnowledgeForInstance]', result);
+      logStore('INFO', '[syncDesktopSelfKnowledgeForInstance]', result);
       return result;
     } catch (err) {
-      console.error('[syncDesktopSelfKnowledgeForInstance]', err);
+      logStore('ERROR', '[syncDesktopSelfKnowledgeForInstance]', err);
       return { status: 'failed', message: err instanceof Error ? err.message : String(err) };
     }
   },
@@ -1052,7 +1153,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
       set((state) => withInstanceRuntime(state, instanceId, { sessions: list as SessionInfo[] }));
     } catch (err) {
-      console.error('[fetchSessions]', err);
+      logStore('ERROR', '[fetchSessions]', err);
     }
   },
 
@@ -1064,7 +1165,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const list = await fetchGatewayAgents(client);
       set((state) => withInstanceRuntime(state, instanceId, { agents: list }));
     } catch (err) {
-      console.error('[fetchAgents]', err);
+      logStore('ERROR', '[fetchAgents]', err);
     }
   },
 
@@ -1078,7 +1179,7 @@ export const useStore = create<StoreState>((set, get) => ({
         withInstanceRuntime(state, instanceId, { models: Array.isArray(data) ? data : (data?.models ?? []) }),
       );
     } catch (err) {
-      console.error('[fetchModels]', err);
+      logStore('ERROR', '[fetchModels]', err);
     }
   },
 
@@ -1091,7 +1192,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const list = Array.isArray(data) ? data : (data?.jobs ?? []);
       set((state) => withInstanceRuntime(state, instanceId, { cronJobs: list as CronJob[] }));
     } catch (err) {
-      console.error('[fetchCronJobs]', err);
+      logStore('ERROR', '[fetchCronJobs]', err);
     }
   },
 
@@ -1116,7 +1217,7 @@ export const useStore = create<StoreState>((set, get) => ({
         durationMs: typeof entry.durationMs === 'number' ? entry.durationMs : undefined,
       })) as CronRun[];
     } catch (err) {
-      console.error('[fetchCronRuns]', err);
+      logStore('ERROR', '[fetchCronRuns]', err);
       return [];
     }
   },
@@ -1131,7 +1232,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const pluginGroups = data?.groups?.filter((g) => g.source === 'plugin') ?? [];
       set((state) => withInstanceRuntime(state, instanceId, { tools: list, pluginGroups }));
     } catch (err) {
-      console.error('[fetchTools]', err);
+      logStore('ERROR', '[fetchTools]', err);
     }
   },
 
@@ -1185,7 +1286,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const list = Array.isArray(data) ? data : (data?.skills ?? []);
       set((state) => withInstanceRuntime(state, instanceId, { skills: list as SkillInfo[] }));
     } catch (err) {
-      console.error('[fetchSkills]', err);
+      logStore('ERROR', '[fetchSkills]', err);
     }
   },
 
@@ -1226,7 +1327,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const data = await client.request<WorkspaceFile[]>('agents.files.list', { agentId });
       set((state) => withInstanceRuntime(state, instanceId, { workspaceFiles: Array.isArray(data) ? data : [] }));
     } catch (err) {
-      console.error('[fetchWorkspaceFiles]', err);
+      logStore('ERROR', '[fetchWorkspaceFiles]', err);
     }
   },
 
@@ -1238,7 +1339,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const data = await client.request<GatewayHealth>('health');
       set((state) => withInstanceRuntime(state, instanceId, { health: data }));
     } catch (err) {
-      console.error('[fetchHealth]', err);
+      logStore('ERROR', '[fetchHealth]', err);
     }
   },
 
@@ -1250,7 +1351,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const data = await client.request<GatewayStatus>('status');
       set((state) => withInstanceRuntime(state, instanceId, { gatewayStatus: data }));
     } catch (err) {
-      console.error('[fetchGatewayStatus]', err);
+      logStore('ERROR', '[fetchGatewayStatus]', err);
     }
   },
 
@@ -1284,10 +1385,10 @@ export const useStore = create<StoreState>((set, get) => ({
     const { instanceId, client } = target;
     try {
       const data = await client.request<AgentIdentity>('agent.identity.get', { agentId });
-      console.log('[fetchAgentIdentity]', JSON.stringify(data));
+      logStore('INFO', '[fetchAgentIdentity]', JSON.stringify(data));
       set((state) => withInstanceRuntime(state, instanceId, { agentIdentity: data }));
     } catch (err) {
-      console.error('[fetchAgentIdentity]', err);
+      logStore('ERROR', '[fetchAgentIdentity]', err);
     }
   },
 
@@ -1309,7 +1410,7 @@ export const useStore = create<StoreState>((set, get) => ({
             .catch(() => client.request<AssistantInfo>('assistant.get').catch(() => null)),
         );
       if (!info) return;
-      console.log('[fetchAssistantInfo]', JSON.stringify(info));
+      logStore('INFO', '[fetchAssistantInfo]', JSON.stringify(info));
       const assistantName = info?.displayName || info?.name;
       const avatarUrl = info?.avatarUrl || info?.avatar;
       if (assistantName || avatarUrl) {
@@ -1324,7 +1425,7 @@ export const useStore = create<StoreState>((set, get) => ({
         });
       }
     } catch (err) {
-      console.error('[fetchAssistantInfo]', err);
+      logStore('ERROR', '[fetchAssistantInfo]', err);
     }
   },
 
@@ -1337,7 +1438,7 @@ export const useStore = create<StoreState>((set, get) => ({
       await client.request('cron.add', job);
       await get().fetchCronJobs();
     } catch (err) {
-      console.error('[createCronJob]', err);
+      logStore('ERROR', '[createCronJob]', err);
     }
   },
 
@@ -1348,7 +1449,7 @@ export const useStore = create<StoreState>((set, get) => ({
       await client.request('cron.update', { id, patch: updates });
       await get().fetchCronJobs();
     } catch (err) {
-      console.error('[updateCronJob]', err);
+      logStore('ERROR', '[updateCronJob]', err);
     }
   },
 
@@ -1359,7 +1460,7 @@ export const useStore = create<StoreState>((set, get) => ({
       await client.request('cron.remove', { id });
       await get().fetchCronJobs();
     } catch (err) {
-      console.error('[removeCronJob]', err);
+      logStore('ERROR', '[removeCronJob]', err);
     }
   },
 
@@ -1370,7 +1471,7 @@ export const useStore = create<StoreState>((set, get) => ({
       await client.request('cron.update', { id, patch: { enabled } });
       await get().fetchCronJobs();
     } catch (err) {
-      console.error('[toggleCronJob]', err);
+      logStore('ERROR', '[toggleCronJob]', err);
     }
   },
 
@@ -1487,12 +1588,233 @@ export const useStore = create<StoreState>((set, get) => ({
           Object.assign(meta, repositoryOutputUpdates);
         }
       } catch (error) {
-        console.warn('[artifact] repository mirror failed', error);
+        logStore('WARN', '[artifact] repository mirror failed', error);
       }
     }
     const { fetchArtifacts } = get();
     await fetchArtifacts();
     return meta;
+  },
+
+  resolveDesktopCardAuthorizationApproval: async (params: ResolveDesktopCardAuthorizationApprovalParams) => {
+    const instanceId = get().currentInstanceId;
+    if (!instanceId) return null;
+    const assetApproval = params.repositoryAssetExecution;
+    const assetId = trimOptionalString(assetApproval?.assetId);
+    const assetPath = normalizeDesktopCardRepositoryAssetApprovalPath(trimOptionalString(assetApproval?.path));
+    if (assetApproval && (assetId || assetPath)) {
+      const binding = await loadRepositoryBinding(instanceId);
+      if (!binding || binding.status !== 'repo_ready') {
+        throw new Error('当前工作空间尚未就绪，无法记录资产审批决定');
+      }
+      const requestedRepoPath = trimOptionalString(assetApproval.repoPath);
+      if (requestedRepoPath && requestedRepoPath !== binding.repoPath) {
+        throw new Error('卡片请求的仓库与当前工作空间不一致，已拒绝记录资产审批决定');
+      }
+
+      const status = params.decision === 'approved' ? 'approved' : 'denied';
+      const result = await recordRepositoryAssetExecution({
+        binding,
+        status,
+        ...(assetId ? { assetId } : {}),
+        ...(assetPath ? { path: assetPath } : {}),
+        ...(trimOptionalString(assetApproval.runner) ? { runner: trimOptionalString(assetApproval.runner) } : {}),
+        ...(trimOptionalString(assetApproval.command) ? { command: trimOptionalString(assetApproval.command) } : {}),
+        ...(trimOptionalString(assetApproval.approvalTitle)
+          ? { approvalTitle: trimOptionalString(assetApproval.approvalTitle) }
+          : {}),
+        ...(trimOptionalString(assetApproval.approvalRisk)
+          ? { approvalRisk: trimOptionalString(assetApproval.approvalRisk) }
+          : {}),
+        ...(trimOptionalString(assetApproval.approvalReason)
+          ? { approvalReason: trimOptionalString(assetApproval.approvalReason) }
+          : {}),
+        ...(isSafeRepositoryAssetRunPath(trimOptionalString(assetApproval.sourceApprovalRunPath))
+          ? { sourceApprovalRunPath: trimOptionalString(assetApproval.sourceApprovalRunPath) }
+          : {}),
+        ...(trimOptionalString(assetApproval.workItemPath)
+          ? { workItemPath: trimOptionalString(assetApproval.workItemPath) }
+          : {}),
+      });
+      return {
+        repositoryResult: {
+          kind: 'repository-asset-approval',
+          runPath: result.runPath,
+          status,
+        },
+      };
+    }
+
+    const artifactApproval = params.artifactExecution;
+    const artifactId = trimOptionalString(artifactApproval?.artifactId);
+    if (artifactApproval && artifactId) {
+      const artifact =
+        get().artifacts.find((item) => item.id === artifactId) ?? (await artifactPersistence.loadMeta(artifactId));
+      if (!artifact) return null;
+
+      const eventId = trimOptionalString(artifactApproval.eventId);
+      const executionEvents = artifact.executionEvents ?? [];
+      const sourceEvent =
+        (eventId ? executionEvents.find((event) => event.id === eventId) : undefined) ??
+        [...executionEvents].reverse().find((event) => event.status === 'approval_required');
+      const status = params.decision === 'approved' ? 'approved' : 'denied';
+      const updatedArtifact = recordArtifactExecutionEvent(artifact, {
+        status,
+        sourceId: sourceEvent?.id,
+        sourceName: 'desktop-card-authorization',
+        runner: trimOptionalString(artifactApproval.runner) ?? sourceEvent?.runner,
+        command: trimOptionalString(artifactApproval.command) ?? sourceEvent?.command ?? artifact.command,
+        approvalTitle: trimOptionalString(artifactApproval.approvalTitle) ?? sourceEvent?.approvalTitle,
+        approvalRisk: trimOptionalString(artifactApproval.approvalRisk) ?? sourceEvent?.approvalRisk,
+        approvalReason: trimOptionalString(artifactApproval.approvalReason) ?? sourceEvent?.approvalReason,
+        resultSummary:
+          status === 'approved'
+            ? 'User approved external runner handoff for Artifact execution; Desktop did not execute the command or grant permission.'
+            : 'User denied external runner handoff for Artifact execution; Desktop did not execute the command or grant permission.',
+        requestedAt: Date.now(),
+      });
+
+      await artifactService.update(artifact.id, {
+        executionEvents: updatedArtifact.executionEvents,
+      });
+      await get().fetchArtifacts();
+
+      return {
+        repositoryResult: {
+          kind: 'artifact-execution-approval',
+          artifactId: artifact.id,
+          status,
+        },
+      };
+    }
+
+    const actionRunId = trimOptionalString(params.actionRunId);
+    const approvalId = trimOptionalString(params.approvalId);
+    if (!actionRunId || !approvalId) return null;
+
+    const client = getClient(get());
+    if (!client) throw new Error('未连接 Gateway，无法提交审批决定');
+
+    const runs = await loadAiActionRuns(instanceId);
+    const run = runs.find((item) => item.id === actionRunId || item.gatewayRunId === actionRunId);
+    if (!run) return null;
+    const approval = run.approvals?.find((item) => item.id === approvalId && item.status === 'pending');
+    if (!approval) return null;
+
+    let updated = await resolveAiActionApprovalWithGateway(client, run, approvalId, params.decision);
+    await upsertAiActionRun(instanceId, updated);
+    get().notifyActionRunsChanged();
+
+    if (params.decision !== 'approved' || !approval.repositoryWrite) {
+      return { run: updated };
+    }
+
+    if (run.type === 'work_matter_plan') {
+      const binding = await loadRepositoryBinding(instanceId);
+      if (!binding || binding.status !== 'repo_ready') {
+        throw new Error('当前工作空间尚未就绪，无法写入已批准的计划');
+      }
+      const writeResult = await applyWorkbenchMatterPlanApproval(binding, {
+        actionRunId: run.id,
+        workItemPath: run.workItemPath,
+        repositoryWrite: approval.repositoryWrite,
+      });
+      updated = {
+        ...updated,
+        resultSummary: `已写入计划：${writeResult.planPath}`,
+        updatedAt: Date.now(),
+      };
+      await upsertAiActionRun(instanceId, updated);
+      get().notifyActionRunsChanged();
+      return {
+        run: updated,
+        repositoryResult: {
+          kind: 'work-matter-plan',
+          planPath: writeResult.planPath,
+        },
+      };
+    }
+
+    if (run.type === 'knowledge_rewrite') {
+      const binding = await loadRepositoryBinding(instanceId);
+      if (!binding || binding.status !== 'repo_ready') {
+        throw new Error('当前工作空间尚未就绪，无法写入已批准的知识更新');
+      }
+      const writeResult = await applyKnowledgeRewriteApproval(binding, {
+        actionRunId: run.id,
+        repositoryWrite: approval.repositoryWrite,
+      });
+      updated = {
+        ...updated,
+        status: 'done',
+        resultSummary: `已写入知识库：${formatKnowledgeRewriteWrittenPaths(writeResult.writtenPaths)}`,
+        updatedAt: Date.now(),
+      };
+      await upsertAiActionRun(instanceId, updated);
+      get().notifyActionRunsChanged();
+      return {
+        run: updated,
+        repositoryResult: {
+          kind: 'knowledge-rewrite',
+          writtenPaths: writeResult.writtenPaths,
+        },
+      };
+    }
+
+    return { run: updated };
+  },
+
+  publishArtifact: async (artifactId: string) => {
+    const artifact =
+      get().artifacts.find((item) => item.id === artifactId) ?? (await artifactPersistence.loadMeta(artifactId));
+    if (!artifact) return false;
+
+    await artifactService.update(artifact.id, { status: 'published' });
+    await get().fetchArtifacts();
+    return true;
+  },
+
+  importArtifactFromFile: async (params: ImportArtifactFileParams) => {
+    const filePath = trimOptionalString(params.filePath);
+    if (!filePath) return null;
+
+    const fileName = trimOptionalString(params.fileName);
+    const generateParams: GenerateParams = {
+      title: trimOptionalString(params.title) ?? fileName ?? fileNameFromImportPath(filePath),
+      type: params.type ?? 'file',
+      filePath,
+      importFile: true,
+      source: params.source ?? { type: 'manual' },
+    };
+    const description = trimOptionalString(params.description);
+    if (description) generateParams.description = description;
+    if (fileName) generateParams.fileName = fileName;
+    if (typeof params.fileSize === 'number' && Number.isFinite(params.fileSize) && params.fileSize >= 0) {
+      generateParams.fileSize = params.fileSize;
+    }
+    const mimeType = trimOptionalString(params.mimeType);
+    if (mimeType) generateParams.mimeType = mimeType;
+
+    const artifact = await artifactService.generate(generateParams);
+    await get().fetchArtifacts();
+    return artifact;
+  },
+
+  mirrorArtifactToRepository: async (artifactId: string) => {
+    const instanceId = get().currentInstanceId;
+    if (!instanceId) return null;
+
+    const artifact =
+      get().artifacts.find((item) => item.id === artifactId) ?? (await artifactPersistence.loadMeta(artifactId));
+    if (!artifact) return null;
+
+    const html = await artifactPersistence.loadHtml(artifact.id, artifact.currentVersion);
+    const output = await mirrorArtifactToReadyRepositoryOutput(instanceId, artifact, html ?? undefined);
+    if (!output) return null;
+
+    await artifactService.update(artifact.id, buildArtifactRepositoryOutputUpdates(output));
+    await get().fetchArtifacts();
+    return output;
   },
 
   updateArtifact: async (artifactId: string, updates: Partial<ArtifactMeta>) => {
