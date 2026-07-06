@@ -151,3 +151,6 @@ jobs:
 
           echo ""
           echo "✅ Doc links validated."
+
+      - name: Validate docs status
+        run: npm run docs:status

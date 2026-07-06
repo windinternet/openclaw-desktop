@@ -53,7 +53,6 @@ export default function SetupPage() {
     useSettingsStore.getState().markInitialized();
 
     const { instances } = useStore.getState();
-    console.log('[SetupPage] 🎯 Finish clicked, instances:', instances.length);
     if (instances.length > 0) {
       navigate(WORK_SYSTEM_ONBOARDING_ROUTE, { replace: true });
     } else {

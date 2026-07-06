@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, Button, Space, Typography, Tag, Spin, Empty, Divider, Toast, Input, Modal } from '@douyinfe/semi-ui';
 import { IconSearch, IconLink, IconPlay, IconTickCircle, IconClose, IconDownload } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +26,11 @@ function deriveName(url: string): string {
   }
 }
 
+function logConnectionWizard(level: string, ...args: unknown[]): void {
+  if (typeof window === 'undefined') return;
+  window.electronAPI?.log?.send(level, ...args);
+}
+
 export default function ConnectionWizard({ onConnected }: ConnectionWizardProps) {
   const { t } = useTranslation();
   const [mode, setMode] = useState<'auto' | 'manual'>('auto');
@@ -46,15 +51,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
 
   const isElectron = typeof window !== 'undefined' && 'electronAPI' in window;
 
-  useEffect(() => {
-    if (isElectron) {
-      handleScan();
-    } else {
-      setScannedOnce(true);
-    }
-  }, []);
-
-  const handleScan = async () => {
+  const handleScan = useCallback(async () => {
     setDiscovering(true);
     setDiscoverError(null);
     setDiscovered([]);
@@ -75,7 +72,15 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
       setDiscovering(false);
       setScannedOnce(true);
     }
-  };
+  }, [isElectron, t]);
+
+  useEffect(() => {
+    if (isElectron) {
+      handleScan();
+    } else {
+      setScannedOnce(true);
+    }
+  }, [handleScan, isElectron]);
 
   const handleInstall = async () => {
     if (!isElectron) return;
@@ -113,7 +118,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
   };
 
   const doConnect = async (url: string, token: string, name?: string) => {
-    console.log('[ConnectionWizard] doConnect called:', { url, hasToken: !!token, name });
+    logConnectionWizard('INFO', '[ConnectionWizard] doConnect called:', { url, hasToken: !!token, name });
     setConnecting(true);
     const fallbackName = name ?? deriveName(url);
     try {
@@ -132,13 +137,13 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
       let assistantName: string | undefined;
       let avatarUrl: string | undefined;
 
-      console.log('[ConnectionWizard] connected, methods:', methods);
+      logConnectionWizard('INFO', '[ConnectionWizard] connected, methods:', methods);
 
       try {
         if (methods.includes('assistant.info') || methods.includes('assistant.get')) {
           const method = methods.includes('assistant.info') ? 'assistant.info' : 'assistant.get';
           const info = await client.request<Record<string, unknown>>(method);
-          console.log('[ConnectionWizard] assistant info:', info);
+          logConnectionWizard('INFO', '[ConnectionWizard] assistant info:', info);
           assistantName =
             typeof info?.displayName === 'string'
               ? info.displayName
@@ -153,20 +158,20 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
                 : undefined;
         }
       } catch {
-        console.log('[ConnectionWizard] assistant info not available');
+        logConnectionWizard('INFO', '[ConnectionWizard] assistant info not available');
       }
 
       try {
         if (methods.includes('server.info') || methods.includes('meta')) {
           const method = methods.includes('server.info') ? 'server.info' : 'meta';
           const info = await client.request<Record<string, unknown>>(method);
-          console.log('[ConnectionWizard] server info:', info);
+          logConnectionWizard('INFO', '[ConnectionWizard] server info:', info);
           const nodeName =
             typeof info?.name === 'string' ? info.name : typeof info?.hostname === 'string' ? info.hostname : undefined;
           if (nodeName) instanceName = nodeName;
         }
       } catch {
-        console.log('[ConnectionWizard] server info not available');
+        logConnectionWizard('INFO', '[ConnectionWizard] server info not available');
       }
 
       useStore.getState().addInstance({
@@ -193,25 +198,25 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
         (err instanceof Error && err.message.includes('CONTROL_UI_ORIGIN_NOT_ALLOWED'));
 
       if (isGatewayError) {
-        console.log('[ConnectionWizard] control-ui origin not allowed:', {
+        logConnectionWizard('INFO', '[ConnectionWizard] control-ui origin not allowed:', {
           isGatewayConnectError: err instanceof GatewayConnectError,
           message: err instanceof Error ? err.message : String(err),
         });
 
-        const api = (window as any).electronAPI;
+        const api = window.electronAPI;
         if (api?.connect?.isLocal && api?.connect?.autoApprove) {
-          console.log('[ConnectionWizard] checking if url is local:', url);
+          logConnectionWizard('INFO', '[ConnectionWizard] checking if url is local:', url);
           const isLocal = await api.connect.isLocal(url);
-          console.log('[ConnectionWizard] isLocal result:', isLocal);
+          logConnectionWizard('INFO', '[ConnectionWizard] isLocal result:', isLocal);
           if (isLocal) {
             if (autoApproveRetriedRef.current) {
               Toast.error('自动批准后仍被拒绝，请检查 Gateway 配置');
             } else {
               autoApproveRetriedRef.current = true;
               Toast.info('检测到本机连接，正在自动批准…');
-              console.log('[ConnectionWizard] calling autoApprove');
+              logConnectionWizard('INFO', '[ConnectionWizard] calling autoApprove');
               const result = await api.connect.autoApprove();
-              console.log('[ConnectionWizard] autoApprove result:', result);
+              logConnectionWizard('INFO', '[ConnectionWizard] autoApprove result:', result);
               if (result.success) {
                 Toast.success('已自动批准 origin，重启 Gateway 后重试连接…');
                 setTimeout(() => {
@@ -226,7 +231,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
             setRemoteHelpVisible(true);
           }
         } else {
-          console.log('[ConnectionWizard] electronAPI.connect not available');
+          logConnectionWizard('INFO', '[ConnectionWizard] electronAPI.connect not available');
           setRemoteHelpUrl(url);
           setRemoteHelpVisible(true);
         }
@@ -241,7 +246,7 @@ export default function ConnectionWizard({ onConnected }: ConnectionWizardProps)
   };
 
   const handleConnectDiscovered = async (instance: DiscoveredInstance) => {
-    console.log('[ConnectionWizard] handleConnectDiscovered instance:', {
+    logConnectionWizard('INFO', '[ConnectionWizard] handleConnectDiscovered instance:', {
       url: instance.url,
       hasToken: !!instance.token,
       tokenPreview: instance.token ? instance.token.slice(0, 8) + '...' : '(empty)',

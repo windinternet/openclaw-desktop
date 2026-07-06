@@ -16,7 +16,7 @@ const typescriptRecommendedRules = {
 };
 
 const reactHooksRules = {
-  ...reactHooksPlugin.configs.recommended.rules,
+  ...reactHooksPlugin.configs['recommended-latest'].rules,
   // These rules target React Compiler readiness. This app is React 18 and does not enable the compiler yet.
   'react-hooks/immutability': 'off',
   'react-hooks/preserve-manual-memoization': 'off',
@@ -98,6 +98,14 @@ export default [
       ],
       'react/react-in-jsx-scope': 'off',
       'react/prop-types': 'off',
+    },
+  },
+
+  // Console bridge files intentionally wrap and forward console methods.
+  {
+    files: ['electron/logger.ts', 'src/lib/console-hook.ts'],
+    rules: {
+      'no-console': 'off',
     },
   },
 

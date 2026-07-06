@@ -20,7 +20,13 @@ const PROVIDERS = [
   { value: 'brave', label: 'Brave Search' },
   { value: 'duckduckgo', label: 'DuckDuckGo' },
   { value: 'exa', label: 'Exa' },
-];
+] as const;
+
+type WebSearchProvider = (typeof PROVIDERS)[number]['value'];
+
+function isWebSearchProvider(value: unknown): value is WebSearchProvider {
+  return PROVIDERS.some((provider) => provider.value === value);
+}
 
 function formatTimestamp(ts: number | undefined): string {
   if (!ts) return '';
@@ -81,14 +87,14 @@ export default function SearchPage() {
 
   // ── Web search ──
   const [webQuery, setWebQuery] = useState('');
-  const [provider, setProvider] = useState('brave');
+  const [provider, setProvider] = useState<WebSearchProvider>('brave');
   const [webResults, setWebResults] = useState<WebSearchResult[]>([]);
   const [webLoading, setWebLoading] = useState(false);
   const [webError, setWebError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const handleProviderChange = useCallback((value: any) => {
-    if (typeof value === 'string') setProvider(value);
+  const handleProviderChange = useCallback((value: unknown) => {
+    if (isWebSearchProvider(value)) setProvider(value);
   }, []);
 
   const handleWebSearch = useCallback(async () => {
@@ -99,7 +105,7 @@ export default function SearchPage() {
     setWebResults([]);
     setHasSearched(true);
 
-    const toolMap: Record<string, string> = {
+    const toolMap: Record<WebSearchProvider, string> = {
       brave: 'brave_web_search',
       duckduckgo: 'web_search',
       exa: 'exa_search',

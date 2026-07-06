@@ -127,7 +127,7 @@ export default function MemoryPage() {
           setExpanded((prev) => new Set(prev).add(fileName));
         }
       } catch (err) {
-        console.error('[MemoryPage] read file error:', err);
+        window.electronAPI?.log?.send('ERROR', '[MemoryPage] read file error:', err);
       } finally {
         setLoadingContent((prev) => {
           const next = new Set(prev);

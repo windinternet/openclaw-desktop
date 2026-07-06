@@ -3,7 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { Card, Typography, Select, Input, Button, Tag, Space, Switch } from '@douyinfe/semi-ui';
 import { useSettingsStore } from '../lib/settings-store';
 import { DEFAULT_HOME_VIEW_OPTIONS, PRESET_THEME_COLORS } from '../lib/settings-types';
-import type { ThemeMode, SupportedLocale, DefaultHomeView } from '../lib/settings-types';
+import type {
+  ArtifactWriteChannel,
+  ThemeMode,
+  SupportedLocale,
+  DefaultHomeView,
+  ExternalLinkMode,
+} from '../lib/settings-types';
 import type { AgentSwitchStrategy, InstanceAgentSwitchStrategy } from '../lib/agent-switch-settings';
 import type { AssistantReplyGrouping } from '../lib/session-content';
 import { useStore } from '../lib';
@@ -27,6 +33,22 @@ const LOCALE_OPTIONS: { value: SupportedLocale; label: string }[] = [
 const AGENT_SWITCH_OPTIONS: AgentSwitchStrategy[] = ['new-session', 'subagent-session'];
 const INSTANCE_AGENT_SWITCH_OPTIONS: InstanceAgentSwitchStrategy[] = ['inherit', 'new-session', 'subagent-session'];
 const ASSISTANT_REPLY_GROUPING_OPTIONS: AssistantReplyGrouping[] = ['merged', 'message-boundary'];
+
+function isSupportedLocale(value: unknown): value is SupportedLocale {
+  return LOCALE_OPTIONS.some((option) => option.value === value);
+}
+
+function isDefaultHomeView(value: unknown): value is DefaultHomeView {
+  return DEFAULT_HOME_VIEW_OPTIONS.some((option) => option.value === value);
+}
+
+function isExternalLinkMode(value: unknown): value is ExternalLinkMode {
+  return value === 'system' || value === 'internal';
+}
+
+function isArtifactWriteChannel(value: unknown): value is ArtifactWriteChannel {
+  return value === 'auto-direct-with-fallback' || value === 'preview-first' || value === 'conversation-only';
+}
 
 /* ── Section wrapper ── */
 function SectionCard({
@@ -104,7 +126,7 @@ export default function SettingsPage({ embedded = false }: SettingsPageProps = {
 
   /* ── About info ── */
   const appVersion = '0.1.0';
-  const electronVersion = (window as any)?.electron?.version ?? '—';
+  const electronVersion = window.electronAPI?.versions.electron ?? '—';
   const chromeVersion = navigator?.userAgent?.match(/Chrome\/([\d.]+)/)?.[1] ?? '—';
 
   const isConnected = connectionStatus === 'connected';
@@ -243,7 +265,10 @@ export default function SettingsPage({ embedded = false }: SettingsPageProps = {
           <SectionCard icon="🌐" title={t('settings.language')} desc={t('settings.languageDesc')}>
             <Select
               value={settings.locale}
-              onChange={(val: any) => updateSettings({ locale: val as SupportedLocale })}
+              onChange={(val: unknown) => {
+                if (!isSupportedLocale(val)) return;
+                updateSettings({ locale: val });
+              }}
               style={{ width: 200 }}
             >
               {LOCALE_OPTIONS.map((opt) => (
@@ -283,7 +308,10 @@ export default function SettingsPage({ embedded = false }: SettingsPageProps = {
                 </div>
                 <Select
                   value={settings.defaultHomeView ?? 'dashboard'}
-                  onChange={(val: any) => updateSettings({ defaultHomeView: val as DefaultHomeView })}
+                  onChange={(val: unknown) => {
+                    if (!isDefaultHomeView(val)) return;
+                    updateSettings({ defaultHomeView: val });
+                  }}
                   style={{ width: 220 }}
                 >
                   {DEFAULT_HOME_VIEW_OPTIONS.map((opt) => (
@@ -347,14 +375,50 @@ export default function SettingsPage({ embedded = false }: SettingsPageProps = {
               </div>
               <Select
                 value={settings.externalLinkMode ?? 'system'}
-                onChange={(val: any) => {
-                  updateSettings({ externalLinkMode: val as 'system' | 'internal' });
-                  (window as any).electronAPI?.setExternalLinkMode?.(val);
+                onChange={(val: unknown) => {
+                  if (!isExternalLinkMode(val)) return;
+                  updateSettings({ externalLinkMode: val });
+                  window.electronAPI?.setExternalLinkMode?.(val);
                 }}
                 style={{ width: 140 }}
               >
                 <Select.Option value="system">{t('settings.systemBrowser')}</Select.Option>
                 <Select.Option value="internal">{t('settings.internalWindow')}</Select.Option>
+              </Select>
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            icon="📦"
+            title={t('settings.artifactWriteChannel')}
+            desc={t('settings.artifactWriteChannelDesc')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24 }}>
+              <div style={{ minWidth: 0 }}>
+                <Text style={{ display: 'block', color: 'var(--semi-color-text-0)' }}>
+                  {t('settings.artifactWriteChannelMode')}
+                </Text>
+                <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4, maxWidth: 560 }}>
+                  {t('settings.artifactWriteChannelModeDesc')}
+                </Text>
+              </div>
+              <Select
+                value={settings.artifactWriteChannel}
+                onChange={(val: unknown) => {
+                  if (!isArtifactWriteChannel(val)) return;
+                  updateSettings({ artifactWriteChannel: val });
+                }}
+                style={{ width: 240 }}
+              >
+                <Select.Option value="auto-direct-with-fallback">
+                  {t('settings.artifactWriteChannelOptions.auto-direct-with-fallback')}
+                </Select.Option>
+                <Select.Option value="preview-first">
+                  {t('settings.artifactWriteChannelOptions.preview-first')}
+                </Select.Option>
+                <Select.Option value="conversation-only">
+                  {t('settings.artifactWriteChannelOptions.conversation-only')}
+                </Select.Option>
               </Select>
             </div>
           </SectionCard>

@@ -25,7 +25,6 @@ interface SetupWizardProps {
 }
 
 export default function SetupWizard({ onComplete }: SetupWizardProps) {
-  console.log('[SetupWizard] 🧩 COMPONENT MOUNTED');
   const { t } = useTranslation();
 
   const [currentStep, setCurrentStep] = useState(0);

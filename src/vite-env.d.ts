@@ -27,6 +27,9 @@ interface Window {
     notifications: {
       show: (params: { title: string; body: string }) => Promise<boolean>;
     };
+    log?: {
+      send: (level: string, ...args: unknown[]) => void;
+    };
     marketplace: {
       search: (
         params: import('./lib/types').SkillMarketplaceSearchParams,
@@ -59,6 +62,7 @@ interface Window {
         detectedProfile?: string;
         suggestedPaths?: Partial<import('./lib/agentic-repository').RepositoryPaths>;
         suggestedKnowledge?: Partial<import('./lib/agentic-repository').KnowledgeRepositoryMapping>;
+        missingTemplateEntries?: string[];
       }>;
       bootstrap: (repoPath: string) => Promise<{
         pathExists: boolean;
@@ -70,6 +74,19 @@ interface Window {
         detectedProfile?: string;
         suggestedPaths?: Partial<import('./lib/agentic-repository').RepositoryPaths>;
         suggestedKnowledge?: Partial<import('./lib/agentic-repository').KnowledgeRepositoryMapping>;
+        missingTemplateEntries?: string[];
+      }>;
+      adapt: (repoPath: string) => Promise<{
+        pathExists: boolean;
+        isDirectory: boolean;
+        isGitRepo: boolean;
+        isEmpty: boolean;
+        hasRequiredTemplate: boolean;
+        permissionDenied: boolean;
+        detectedProfile?: string;
+        suggestedPaths?: Partial<import('./lib/agentic-repository').RepositoryPaths>;
+        suggestedKnowledge?: Partial<import('./lib/agentic-repository').KnowledgeRepositoryMapping>;
+        missingTemplateEntries?: string[];
       }>;
       init?: (repoPath: string) => Promise<{
         pathExists: boolean;
@@ -81,6 +98,7 @@ interface Window {
         detectedProfile?: string;
         suggestedPaths?: Partial<import('./lib/agentic-repository').RepositoryPaths>;
         suggestedKnowledge?: Partial<import('./lib/agentic-repository').KnowledgeRepositoryMapping>;
+        missingTemplateEntries?: string[];
       }>;
       listTree?: (repoPath: string, maxEntries?: number) => Promise<string[]>;
       listMarkdown?: (
@@ -94,6 +112,9 @@ interface Window {
         bytesRead: number;
         truncated: boolean;
       }>;
+      fetchKnowledgeUrl?: (params: {
+        url: string;
+      }) => Promise<import('./lib/repository-knowledge').KnowledgeUrlFetchMetadata>;
       writeText?: (repoPath: string, relativePath: string, content: string) => Promise<void>;
       moveText?: (repoPath: string, fromRelativePath: string, toRelativePath: string) => Promise<void>;
       search?: (
@@ -133,6 +154,16 @@ interface Window {
     install: {
       run: () => Promise<void>;
     };
+    connect?: {
+      isLocal: (url: string) => Promise<boolean>;
+      autoApprove: () => Promise<{
+        success: boolean;
+        origins?: string[];
+        restartFailed?: boolean;
+        error?: string;
+      }>;
+    };
+    setExternalLinkMode?: (mode: import('./lib/settings-types').ExternalLinkMode) => void;
     pet?: {
       emitEvent: (event: import('./lib/pet-types').PetEvent) => Promise<void>;
       getState: () => Promise<import('./lib/pet-types').PetPersistedState>;
@@ -180,6 +211,16 @@ interface Window {
         };
       }>;
       readImportedImageThumbnail: (artifactId: string) => Promise<{
+        dataUrl: string;
+        bytesRead: number;
+        mimeType: string;
+      }>;
+      readImportedNativeThumbnail: (artifactId: string) => Promise<{
+        dataUrl: string;
+        bytesRead: number;
+        mimeType: string;
+      }>;
+      readImportedDocumentPreview: (artifactId: string) => Promise<{
         dataUrl: string;
         bytesRead: number;
         mimeType: string;

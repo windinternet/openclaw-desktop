@@ -15,6 +15,7 @@ import {
   Input,
   Select,
 } from '@douyinfe/semi-ui';
+import type { OnExpand } from '@douyinfe/semi-ui/lib/es/table/interface';
 import {
   IconPlayCircle,
   IconEdit,
@@ -28,7 +29,7 @@ import {
 } from '@douyinfe/semi-icons';
 import { useStore } from '../lib';
 import {
-  createAiActionRun,
+  createAiActionRunWithWorkItemAssignment,
   executeAiActionRunWithGateway,
   syncAiActionRunWithGateway,
   filterUserVisibleSessions,
@@ -37,12 +38,31 @@ import { upsertAiActionRun } from '../lib/ai-action-run-store';
 import type { AiActionRun } from '../lib/types';
 import type { CronJob, CronRun } from '../lib/types';
 import { formatCronSchedule } from '../lib/types';
+import { ActionRunWorkItemPicker } from '../components/ActionRunWorkItemPicker';
+import { useWorkbenchWorkItemOptions } from '../lib/workbench-work-items';
 
 const { Text } = Typography;
 
 function agentNameString(name: unknown): string {
   if (typeof name === 'string') return name;
   return '';
+}
+
+function stringValueOrUndefined(value: unknown): string | undefined {
+  return typeof value === 'string' && value ? value : undefined;
+}
+
+function stringValueOrFallback(value: unknown, fallback: string): string {
+  return typeof value === 'string' ? value : fallback;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function recordFromMagicFillValue(value: unknown): Record<string, unknown> | null {
+  if (!isRecord(value)) return null;
+  return isRecord(value.result) ? value.result : value;
 }
 
 function formatTime(ts?: number): string {
@@ -83,11 +103,16 @@ export interface TasksPageHandle {
   openAdd(): void;
 }
 
+interface TasksFormApi {
+  setValues: (values: Record<string, unknown>) => void;
+}
+
 const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function TasksPage({ embedded = false }, ref) {
   const { t } = useTranslation();
   const cronJobs = useStore((s) => s.cronJobs);
   const agents = useStore((s) => s.agents);
   const connectionStatus = useStore((s) => s.connectionStatus);
+  const currentInstanceId = useStore((s) => s.currentInstanceId);
 
   const fetchCronJobs = useStore((s) => s.fetchCronJobs);
   const createCronJob = useStore((s) => s.createCronJob);
@@ -98,7 +123,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
   const fetchCronRuns = useStore((s) => s.fetchCronRuns);
 
   const sessions = filterUserVisibleSessions(useStore((s) => s.sessions));
-  const realApiRef = useRef<any>(null);
+  const realApiRef = useRef<TasksFormApi | null>(null);
 
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [editJob, setEditJob] = useState<CronJob | null>(null);
@@ -119,6 +144,19 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
   const [enabledFilter, setEnabledFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [scheduleKindFilter, setScheduleKindFilter] = useState<string>('all');
+  const {
+    createWorkItem: createTaskWorkItem,
+    creating: creatingTaskWorkItem,
+    loading: taskWorkItemLoading,
+    options: taskWorkItemOptions,
+    selectedPath: selectedTaskWorkItemPath,
+    setSelectedPath: setSelectedTaskWorkItemPath,
+    selectedWorkItem: selectedTaskWorkItem,
+    selectedWorkItemId: selectedTaskWorkItemId,
+  } = useWorkbenchWorkItemOptions({
+    instanceId: currentInstanceId,
+    enabled: addModalVisible || !!editJob,
+  });
 
   useEffect(() => {
     if (connectionStatus === 'connected') {
@@ -144,7 +182,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
       Toast.error(t('tasks.cronRequired'));
       return;
     }
-    const job: any = {
+    const job: Omit<CronJob, 'id'> = {
       name: titleDraft || '',
       prompt: promptDraft || undefined,
       schedule: scheduleDraft.trim(),
@@ -180,21 +218,22 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
 
   const handleEdit = useCallback(async () => {
     if (!editJob) return;
+    const updates: Partial<CronJob> = {
+      name: '',
+      prompt: promptDraft || undefined,
+      schedule: scheduleDraft.trim(),
+      agentId: agentIdDraft || undefined,
+      delivery:
+        deliveryModeDraft !== 'none'
+          ? {
+              mode: deliveryModeDraft as 'announce' | 'webhook',
+              target: deliveryTargetDraft || undefined,
+              to: deliveryToDraft || undefined,
+            }
+          : { mode: 'none' as const },
+    };
     try {
-      await updateCronJob(editJob.id, {
-        name: '',
-        prompt: promptDraft || undefined,
-        schedule: scheduleDraft.trim(),
-        agentId: agentIdDraft || undefined,
-        delivery:
-          deliveryModeDraft !== 'none'
-            ? {
-                mode: deliveryModeDraft as 'announce' | 'webhook',
-                target: deliveryTargetDraft || undefined,
-                to: deliveryToDraft || undefined,
-              }
-            : { mode: 'none' as const },
-      } as any);
+      await updateCronJob(editJob.id, updates);
       Toast.success(t('tasks.updated'));
       setEditJob(null);
     } catch {
@@ -203,7 +242,6 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
   }, [
     editJob,
     updateCronJob,
-    titleDraft,
     promptDraft,
     scheduleDraft,
     agentIdDraft,
@@ -228,7 +266,14 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
 
     setMagicLoading(true);
     try {
-      const run = createAiActionRun({ type: 'cron-task-parser', sourcePage: 'tasks', instanceId, input: promptDraft });
+      const run = createAiActionRunWithWorkItemAssignment({
+        type: 'cron-task-parser',
+        sourcePage: 'tasks',
+        instanceId,
+        input: promptDraft,
+        selectedWorkItem: selectedTaskWorkItem,
+        selectedWorkItemId: selectedTaskWorkItemId,
+      });
       await upsertAiActionRun(instanceId, run);
       const executed = await executeAiActionRunWithGateway(client, run, {
         title: t('tasks.parseTitle'),
@@ -256,12 +301,12 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
 
       // Parse
       const text = synced.lastAssistantResponse ?? '';
-      let obj: any = null;
+      let obj: Record<string, unknown> | null = null;
       const blocks = Array.from(text.matchAll(/```(?:json|ai-action)\s*([\s\S]*?)```/gi));
       for (let i = blocks.length - 1; i >= 0 && !obj; i--) {
         try {
-          const p = JSON.parse(blocks[i][1].trim());
-          obj = p?.result ?? p;
+          const parsed = JSON.parse(blocks[i][1].trim()) as unknown;
+          obj = recordFromMagicFillValue(parsed);
         } catch {
           /* Try older fenced blocks until one parses. */
         }
@@ -288,13 +333,12 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
       realApiRef.current?.setValues(fields);
 
       Toast.success(t('tasks.contentFilled'));
-    } catch (err) {
-      console.error('[magicFill]', err);
+    } catch {
       Toast.error(t('tasks.parseError'));
     } finally {
       setMagicLoading(false);
     }
-  }, [promptDraft, t]);
+  }, [promptDraft, selectedTaskWorkItem, selectedTaskWorkItemId, t]);
 
   const handleDelete = useCallback(
     (job: CronJob) => {
@@ -345,12 +389,22 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
     [runCronJob, runningJobs, t],
   );
 
-  const handleExpand = useCallback(
-    async (expanded: boolean, record: CronJob) => {
+  const handleExpand = useCallback<OnExpand<CronJob>>(
+    (expanded, record) => {
+      if (!record) {
+        setExpandedRowKeys([]);
+        return;
+      }
+      const jobId = 'id' in record && typeof record.id === 'string' ? record.id : null;
+      if (!jobId) {
+        setExpandedRowKeys([]);
+        return;
+      }
       if (expanded) {
-        const runs = await fetchCronRuns(record.id);
-        setRunHistory((prev) => ({ ...prev, [record.id]: runs }));
-        setExpandedRowKeys([record.id]);
+        void fetchCronRuns(jobId).then((runs) => {
+          setRunHistory((prev) => ({ ...prev, [jobId]: runs }));
+          setExpandedRowKeys([jobId]);
+        });
       } else {
         setExpandedRowKeys([]);
       }
@@ -557,11 +611,27 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
           </Text>
         }
       />
+      {currentInstanceId ? (
+        <ActionRunWorkItemPicker
+          description={t('tasks.actionWorkItemDesc')}
+          selectPlaceholder={t('tasks.actionWorkItemPlaceholder')}
+          createLabel={t('tasks.actionNewWorkItem')}
+          createPlaceholder={t('tasks.actionNewWorkItemPlaceholder')}
+          createSuccessMessage={t('tasks.actionNewWorkItemSuccess')}
+          options={taskWorkItemOptions}
+          selectedPath={selectedTaskWorkItemPath}
+          onSelectedPathChange={setSelectedTaskWorkItemPath}
+          createWorkItem={createTaskWorkItem}
+          disabled={magicLoading}
+          creating={creatingTaskWorkItem}
+          loading={taskWorkItemLoading}
+        />
+      ) : null}
       <Form.Select
         field="agentId"
         label={t('tasks.agent')}
         placeholder={t('tasks.agentPlaceholder')}
-        onChange={(v: any) => setAgentIdDraft(v || undefined)}
+        onChange={(v: unknown) => setAgentIdDraft(stringValueOrUndefined(v))}
         style={{ width: '100%' }}
         showClear
       >
@@ -576,7 +646,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
         label={t('tasks.deliveryMode')}
         placeholder={t('tasks.deliveryModePlaceholder')}
         style={{ width: '100%' }}
-        onChange={(v: any) => setDeliveryModeDraft(String(v ?? 'none'))}
+        onChange={(v: unknown) => setDeliveryModeDraft(stringValueOrFallback(v, 'none'))}
       >
         <Form.Select.Option value="none">{t('common.none')}</Form.Select.Option>
         <Form.Select.Option value="announce">{t('tasks.deliveryAnnounce')}</Form.Select.Option>
@@ -588,12 +658,12 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
         label={t('tasks.targetSession')}
         placeholder={t('tasks.targetSessionPlaceholder')}
         style={{ width: '100%' }}
-        onChange={(v: any) => setDeliveryToDraft(String(v ?? ''))}
+        onChange={(v: unknown) => setDeliveryToDraft(stringValueOrFallback(v, ''))}
         showClear
       >
         {sessions
-          .filter((s: any) => s.key || s.sessionKey)
-          .map((s: any) => (
+          .filter((s) => s.key || s.sessionKey)
+          .map((s) => (
             <Form.Select.Option key={s.key || s.sessionKey || ''} value={s.key || s.sessionKey || ''}>
               <Tooltip
                 content={
@@ -793,7 +863,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
               );
             }}
             expandedRowKeys={expandedRowKeys}
-            onExpand={handleExpand as any}
+            onExpand={handleExpand}
             pagination={{ pageSize: 20 }}
             size="middle"
             bordered
@@ -811,7 +881,7 @@ const TasksPage = forwardRef<TasksPageHandle, { embedded?: boolean }>(function T
         destroyOnClose
       >
         <Form
-          getFormApi={(api: any) => {
+          getFormApi={(api: TasksFormApi) => {
             realApiRef.current = api;
           }}
           labelPosition="top"

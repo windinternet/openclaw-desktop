@@ -83,7 +83,7 @@ function MemoryTab() {
       setLoading(true);
       fetchWorkspaceFiles().finally(() => setLoading(false));
     }
-  }, [isConnected]);
+  }, [isConnected, workspaceFiles.length, fetchWorkspaceFiles]);
 
   const memoryFiles = useMemo(() => {
     return workspaceFiles

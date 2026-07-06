@@ -59,7 +59,7 @@ export function PetApp(): React.ReactElement {
         animFrameRef.current = requestAnimationFrame(tick);
       })
       .catch((err) => {
-        console.error('Failed to load pet sprites:', err);
+        window.electronAPI?.log?.send('ERROR', 'Failed to load pet sprites:', err);
       });
 
     const unsubEvent = petEventBus.addEventListener((event: PetEvent) => {

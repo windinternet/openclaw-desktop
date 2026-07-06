@@ -43,7 +43,7 @@ import {
   upsertAgentProfile,
   type AgentTeamMember,
 } from '../lib/agent-team';
-import { createAiActionRun, executeAiActionRunWithGateway } from '../lib/ai-action-center';
+import { createAiActionRunWithWorkItemAssignment, executeAiActionRunWithGateway } from '../lib/ai-action-center';
 import { upsertAiActionRun } from '../lib/ai-action-run-store';
 import { buildAgentTeamComposePrompt, buildGatewayAgentCreatePrompt } from '../lib/ai-action-prompts';
 import { loadInstanceData, saveInstanceDataAwaited } from '../lib/local-persistence';
@@ -409,17 +409,15 @@ export default function TeamsPage({ embedded = false, onHeaderActionsChange }: E
 
     setActionSubmitting(true);
     const createsAgent = shouldCreateAgentFromInstruction(text);
-    const resolvedWorkItemPath = selectedTeamWorkItem?.path;
-    const resolvedWorkItemId = selectedTeamWorkItemId;
-    const baseActionRun = createAiActionRun({
+    const baseActionRun = createAiActionRunWithWorkItemAssignment({
       type: createsAgent ? 'gateway_agent_create' : 'agent_team_compose',
       sourcePage: 'teams',
       instanceId: currentInstanceId,
       agentId: selectedMember?.agent.id || agents.find((agent) => agent.default)?.id || agents[0]?.id || 'main',
       input: text,
       executionMode: 'isolated-session',
-      workItemId: resolvedWorkItemId,
-      workItemPath: resolvedWorkItemPath,
+      selectedWorkItem: selectedTeamWorkItem,
+      selectedWorkItemId: selectedTeamWorkItemId,
     });
     let nextProfile = teamProfile;
     let desiredProfile: AgentLocalProfile | undefined;
@@ -510,8 +508,6 @@ export default function TeamsPage({ embedded = false, onHeaderActionsChange }: E
 
     setActionSubmitting(true);
     const desiredProfile = buildQuickAgentProfile(quickDraft, teamProfile);
-    const resolvedWorkItemPath = selectedTeamWorkItem?.path;
-    const resolvedWorkItemId = selectedTeamWorkItemId;
     const input = `${t('teams.createAgentTitle')}：${desiredProfile.displayName}${desiredProfile.role ? `，${t('teams.role')}：${desiredProfile.role}` : ''}`;
     const instruction = createInstruction(input, desiredProfile.agentId);
     const pendingProfile = {
@@ -519,15 +515,15 @@ export default function TeamsPage({ embedded = false, onHeaderActionsChange }: E
       instructions: [instruction, ...teamProfile.instructions],
     };
     await persistProfile(pendingProfile);
-    const actionRun = createAiActionRun({
+    const actionRun = createAiActionRunWithWorkItemAssignment({
       type: 'gateway_agent_create',
       sourcePage: 'teams',
       instanceId: currentInstanceId,
       agentId: agents.find((agent) => agent.default)?.id || agents[0]?.id || 'main',
       input,
       executionMode: 'isolated-session',
-      workItemId: resolvedWorkItemId,
-      workItemPath: resolvedWorkItemPath,
+      selectedWorkItem: selectedTeamWorkItem,
+      selectedWorkItemId: selectedTeamWorkItemId,
     });
     actionRun.targetAgentId = desiredProfile.agentId;
     await upsertActionRun({ ...actionRun, status: 'planning', updatedAt: Date.now() });

@@ -34,7 +34,6 @@ export default function WelcomePage() {
 
       <ConnectionWizard
         onConnected={() => {
-          console.log('[WelcomePage] 🎯 connected → navigating to work system onboarding');
           navigate(WORK_SYSTEM_ONBOARDING_ROUTE, { replace: true });
         }}
       />

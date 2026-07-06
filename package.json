@@ -20,6 +20,7 @@
     "format": "prettier \"src/**/*.{ts,tsx,js,jsx,json,css,less,md}\" --check",
     "format:fix": "prettier \"src/**/*.{ts,tsx,js,jsx,json,css,less,md}\" --write",
     "check": "npm run lint && npm run format && npm run stylelint",
+    "docs:status": "node scripts/validate-doc-status.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
