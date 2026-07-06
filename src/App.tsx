@@ -1,8 +1,9 @@
-import { HashRouter, Navigate, Routes, Route, useLocation } from 'react-router-dom';
+import { HashRouter, Navigate, Routes, Route } from 'react-router-dom';
 import SetupPage from './pages/SetupPage';
 import WelcomePage from './pages/WelcomePage';
 import MainPage from './pages/MainPage';
 import DashboardPage from './pages/DashboardPage';
+import WorkspaceOnboardingPage from './pages/WorkspaceOnboardingPage';
 import SearchPage from './pages/SearchPage';
 import NewSessionPage from './pages/NewSessionPage';
 import SessionsPage from './pages/SessionsPage';
@@ -24,17 +25,11 @@ import { ArtifactDetailPage } from './pages/ArtifactDetailPage';
 import AppGuard from './components/AppGuard';
 import { useSettingsStore } from './lib/settings-store';
 import { DEFAULT_HOME_VIEW_OPTIONS } from './lib/settings-types';
-import { isWorkSystemOnboardingSearch } from './lib/work-system-onboarding';
 
 function HomeRoute() {
-  const location = useLocation();
   const defaultHomeView = useSettingsStore((s) => s.settings.defaultHomeView);
   const homeOption =
     DEFAULT_HOME_VIEW_OPTIONS.find((option) => option.value === defaultHomeView) ?? DEFAULT_HOME_VIEW_OPTIONS[0];
-
-  if (isWorkSystemOnboardingSearch(location.search)) {
-    return <DashboardPage />;
-  }
 
   if (homeOption.route !== '/') {
     return <Navigate to={homeOption.route} replace />;
@@ -49,6 +44,14 @@ function App() {
       <Routes>
         <Route path="/setup" element={<SetupPage />} />
         <Route path="/welcome" element={<WelcomePage />} />
+        <Route
+          path="/onboarding/workspace"
+          element={
+            <AppGuard>
+              <WorkspaceOnboardingPage />
+            </AppGuard>
+          }
+        />
         <Route
           path="/"
           element={

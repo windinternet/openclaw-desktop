@@ -12,7 +12,7 @@ import {
   IconServer,
   IconTickCircle,
 } from '@douyinfe/semi-icons';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useStore, type AiActionRun, type SessionInfo } from '../lib';
 import {
@@ -43,13 +43,6 @@ import {
   loadWorkbenchSnapshot,
   type WorkbenchSnapshot,
 } from '../lib/repository-workbench';
-import WorkSystemWorkspaceChoice from '../components/WorkSystemWorkspaceChoice';
-import {
-  buildSkippedWorkspaceSessionState,
-  isWorkSystemOnboardingSearch,
-  WORK_SYSTEM_ONBOARDING_ANCHOR,
-} from '../lib/work-system-onboarding';
-import { createFirstWorkbenchMatter } from '../lib/workbench-first-matter';
 
 const { Title, Text } = Typography;
 
@@ -250,7 +243,6 @@ function AssetRow({
 export default function DashboardPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const location = useLocation();
 
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const agents = useStore((s) => s.agents);
@@ -271,15 +263,11 @@ export default function DashboardPage() {
   const [usageDashboard, setUsageDashboard] = useState<GatewayUsageDashboard | null>(null);
   const [repositoryBinding, setRepositoryBinding] = useState<RepositoryBinding | null>(null);
   const [repositoryUnavailable, setRepositoryUnavailable] = useState(false);
-  const [repositorySetupNeeded, setRepositorySetupNeeded] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
-  const [firstMatterDraft, setFirstMatterDraft] = useState('');
-  const [firstMatterCreating, setFirstMatterCreating] = useState(false);
   const [completingTailActionId, setCompletingTailActionId] = useState('');
 
   const isLoading = connectionStatus === 'connecting';
   const isConnected = connectionStatus === 'connected';
-  const onboardingRequested = isWorkSystemOnboardingSearch(location.search);
 
   useEffect(() => {
     void fetchArtifacts().catch(() => undefined);
@@ -312,7 +300,6 @@ export default function DashboardPage() {
     setActionRuns([]);
     setRepositoryBinding(null);
     setRepositoryUnavailable(false);
-    setRepositorySetupNeeded(false);
 
     if (!currentInstanceId) {
       setRepositoryUnavailable(true);
@@ -327,7 +314,6 @@ export default function DashboardPage() {
       if (!binding) {
         if (!cancelled) {
           setRepositoryUnavailable(true);
-          setRepositorySetupNeeded(true);
         }
         return;
       }
@@ -342,7 +328,6 @@ export default function DashboardPage() {
       if (cancelled) return;
       if (workbenchResult.status === 'fulfilled') setWorkbenchSnapshot(workbenchResult.value);
       if (knowledgeResult.status === 'fulfilled') setKnowledgeSnapshot(knowledgeResult.value);
-      setRepositorySetupNeeded(false);
       setRepositoryUnavailable(workbenchResult.status === 'rejected' || knowledgeResult.status === 'rejected');
     })();
 
@@ -350,13 +335,6 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, [currentInstanceId, actionRunsVersion, refreshTick]);
-
-  useEffect(() => {
-    if (!onboardingRequested) return;
-    window.requestAnimationFrame(() => {
-      document.getElementById(WORK_SYSTEM_ONBOARDING_ANCHOR)?.scrollIntoView({ block: 'start' });
-    });
-  }, [onboardingRequested, repositorySetupNeeded]);
 
   const recentSessions = useMemo(
     () => [...sessions].sort((a, b) => getSessionTime(b) - getSessionTime(a)).slice(0, 5),
@@ -484,34 +462,6 @@ export default function DashboardPage() {
     await fetchArtifacts().catch(() => undefined);
     setRefreshTick((value) => value + 1);
     Toast.success(t('dashboard.refreshed'));
-  };
-
-  const handleCreateFirstMatter = async (binding: RepositoryBinding) => {
-    const title = firstMatterDraft.trim();
-    if (!title) {
-      Toast.warning(t('dashboard.firstMatterRequired'));
-      return;
-    }
-
-    setFirstMatterCreating(true);
-    try {
-      const matter = await createFirstWorkbenchMatter(binding, title);
-      setFirstMatterDraft('');
-      setRefreshTick((value) => value + 1);
-      Toast.success(t('dashboard.firstMatterCreated'));
-      navigate(`/workbench?view=tasks&workItemPath=${encodeURIComponent(matter.path)}`);
-    } catch (err) {
-      Toast.error(err instanceof Error ? err.message : t('dashboard.firstMatterCreateFailed'));
-    } finally {
-      setFirstMatterCreating(false);
-    }
-  };
-
-  const handleSkipWorkspaceSetup = () => {
-    Toast.info(t('dashboard.workspaceChoiceSkipToast'));
-    navigate('/new-session', {
-      state: buildSkippedWorkspaceSessionState(firstMatterDraft, t('dashboard.workspaceChoiceSkip')),
-    });
   };
 
   const handleCompleteTailAction = async (item: DashboardWorkSystemSummaryItem) => {
@@ -650,63 +600,6 @@ export default function DashboardPage() {
       </div>
     </DashboardSection>
   );
-
-  const renderWorkSystemOnboarding = () => {
-    if (!onboardingRequested && (!repositorySetupNeeded || !isConnected)) return null;
-
-    return (
-      <DashboardSection
-        id={WORK_SYSTEM_ONBOARDING_ANCHOR}
-        title={t('dashboard.onboardingTitle')}
-        description={t('dashboard.onboardingDesc')}
-      >
-        <div className="dashboard-onboarding-steps">
-          <div className="dashboard-onboarding-step dashboard-onboarding-step-done">
-            <span className="dashboard-onboarding-step-icon">
-              <IconTickCircle />
-            </span>
-            <span>
-              <Text strong>{t('dashboard.onboardingGatewayDone')}</Text>
-              <Text type="tertiary" size="small">
-                {t('dashboard.onboardingGatewayDoneDesc')}
-              </Text>
-            </span>
-          </div>
-          <div className="dashboard-onboarding-step dashboard-onboarding-step-active">
-            <span className="dashboard-onboarding-step-icon">
-              <IconBranch />
-            </span>
-            <span>
-              <Text strong>{t('dashboard.onboardingRepositoryNext')}</Text>
-              <Text type="tertiary" size="small">
-                {t('dashboard.onboardingRepositoryNextDesc')}
-              </Text>
-            </span>
-          </div>
-          <div className="dashboard-onboarding-step">
-            <span className="dashboard-onboarding-step-icon">
-              <IconBolt />
-            </span>
-            <span>
-              <Text strong>{t('dashboard.onboardingFirstThingNext')}</Text>
-              <Text type="tertiary" size="small">
-                {t('dashboard.onboardingFirstThingNextDesc')}
-              </Text>
-            </span>
-          </div>
-        </div>
-        <WorkSystemWorkspaceChoice
-          firstMatterDraft={firstMatterDraft}
-          firstMatterCreating={firstMatterCreating}
-          onFirstMatterDraftChange={setFirstMatterDraft}
-          onCreateFirstMatter={(binding) => {
-            void handleCreateFirstMatter(binding);
-          }}
-          onSkipWorkspace={handleSkipWorkspaceSetup}
-        />
-      </DashboardSection>
-    );
-  };
 
   const renderGatewayStatusSection = () => (
     <DashboardSection
@@ -1051,7 +944,6 @@ export default function DashboardPage() {
         </div>
 
         {renderWorkSystemSection()}
-        {renderWorkSystemOnboarding()}
         {renderGatewayStatusSection()}
         {renderUsageSection()}
         {renderRecentAssetsSection()}

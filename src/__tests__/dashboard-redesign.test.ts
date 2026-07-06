@@ -104,21 +104,23 @@ describe('dashboard redesign', () => {
     expect(getByPath(en, 'dashboard.tailActionCompleted')).toBeTruthy();
   });
 
-  it('puts repository setup into the dashboard work-system onboarding path', () => {
+  it('keeps repository setup out of Dashboard onboarding surface', () => {
     const dashboard = readFileSync('src/pages/DashboardPage.tsx', 'utf8');
+    const workspaceOnboarding = readFileSync('src/pages/WorkspaceOnboardingPage.tsx', 'utf8');
     const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
     const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
 
-    expect(dashboard).toContain('renderWorkSystemOnboarding');
-    expect(dashboard).toContain("t('dashboard.onboardingTitle')");
-    expect(dashboard).toContain("t('dashboard.onboardingGatewayDone')");
-    expect(dashboard).toContain("t('dashboard.onboardingRepositoryNext')");
-    expect(dashboard).toContain("t('dashboard.onboardingFirstThingNext')");
-    expect(dashboard).toContain('repositorySetupNeeded');
-    expect(dashboard).toContain('<WorkSystemWorkspaceChoice');
-    expect(dashboard.indexOf('{renderWorkSystemOnboarding()}')).toBeLessThan(
-      dashboard.indexOf('{renderGatewayStatusSection()}'),
-    );
+    expect(dashboard).not.toContain('renderWorkSystemOnboarding');
+    expect(dashboard).not.toContain("t('dashboard.onboardingTitle')");
+    expect(dashboard).not.toContain("t('dashboard.onboardingGatewayDone')");
+    expect(dashboard).not.toContain("t('dashboard.onboardingRepositoryNext')");
+    expect(dashboard).not.toContain("t('dashboard.onboardingFirstThingNext')");
+    expect(dashboard).not.toContain('repositorySetupNeeded');
+    expect(dashboard).not.toContain('<WorkSystemWorkspaceChoice');
+    expect(workspaceOnboarding).toContain("t('dashboard.onboardingTitle')");
+    expect(workspaceOnboarding).toContain("t('dashboard.onboardingGatewayDone')");
+    expect(workspaceOnboarding).toContain("t('dashboard.onboardingRepositoryNext')");
+    expect(workspaceOnboarding).toContain("t('dashboard.onboardingFirstThingNext')");
     expect(getByPath(zh, 'dashboard.onboardingTitle')).toBeTruthy();
     expect(getByPath(zh, 'dashboard.onboardingRepositoryNext')).toBeTruthy();
     expect(getByPath(en, 'dashboard.onboardingTitle')).toBeTruthy();
