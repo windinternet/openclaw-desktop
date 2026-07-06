@@ -7,7 +7,7 @@ Fix the opening golden path so workspace setup is step 4 of onboarding, not a Da
 ## Scope
 
 - After language/theme and Gateway connection, keep users inside the same Setup wizard and advance to a fourth workspace step.
-- The fourth step first offers three directions: skip for now, create a recommended repository, or use an existing repository. Mapping/adaptation stays inside the existing-repository flow when detailed repository parameters are needed.
+- The fourth step first offers three directions: skip for now, create a work repository, or bind an existing repository. Create and bind use separate follow-up flows instead of exposing the full generic repository gate.
 - Skipping enters the app through the existing lightweight new-session path.
 - If users skip and later open Workbench or Knowledge, the existing `RepositoryGate` remains the prominent setup surface.
 - Dashboard returns to being an observation page only: current work, pending confirmations, stuck items, outputs, knowledge updates, usage, and Gateway status.
@@ -15,13 +15,13 @@ Fix the opening golden path so workspace setup is step 4 of onboarding, not a Da
 ## Non-Goals
 
 - Do not expand ActionRun, Artifact, or desktop message card behavior.
-- Do not add a second repository binding implementation.
+- Do not add a second repository binding model; onboarding may use a narrower UI while reusing the existing binding, inspect, bootstrap, adapt, and semantic mapping functions.
 - Do not change RepositoryGate semantics.
-- Do not auto-create, auto-map, or auto-migrate repositories.
+- Do not auto-map or auto-migrate existing repositories. Existing repository adaptation still requires explicit approval.
 
 ## Design
 
-Add the workspace step directly to `SetupPage`, matching the existing appearance/language/connection Stepper UI. Reuse `WorkSystemWorkspaceChoice` and its existing RepositoryGate integration. Move first-matter creation and skip handling from Dashboard into Setup step 4.
+Add the workspace step directly to `SetupPage`, matching the existing appearance/language/connection Stepper UI. `WorkSystemWorkspaceChoice` owns a narrow onboarding flow: create asks for a repository save location and initializes the recommended Desktop-host structure; bind asks for an existing repository and inspects it before offering semantic mapping or approved adaptation. When the connected Gateway is remote, the flow first asks whether the repository should live on the Desktop host or Gateway host. Move first-matter creation and skip handling from Dashboard into Setup step 4.
 
 Update `WORK_SYSTEM_ONBOARDING_ROUTE` to `/setup?step=workspace`. Setup connection success advances to step 4 without marking initialization complete; final "start using", skip, or first-matter creation marks initialization complete before leaving Setup. Welcome continues using the same constant after connection.
 

@@ -615,8 +615,12 @@ describe('desktop self-knowledge helpers', () => {
     expect(skillContent).toContain('urlFetchStatus');
     expect(skillContent).not.toContain('URL clipping does not fetch page bodies yet');
     expect(skillContent).toContain('not the primary answer to "what is my system state?"');
-    expect(skillContent).toContain('Dashboard surfaces a "create your work system" onboarding path');
-    expect(skillContent).toContain('choosing a workspace: continue temporarily');
+    expect(skillContent).toContain('onboarding step 4 surfaces "create your work system" inside Setup');
+    expect(skillContent).toContain('three directions: continue temporarily, create a work repository');
+    expect(skillContent).toContain('Create and bind are separate flows');
+    expect(skillContent).toContain(
+      'Desktop asks whether the repository should live on the Desktop host or the Gateway host',
+    );
     expect(skillContent).toContain('temporary-session carryover section with follow-ups');
     expect(skillContent).toContain('Parallel Shared Contract');
     expect(skillContent).toContain('main controller session');

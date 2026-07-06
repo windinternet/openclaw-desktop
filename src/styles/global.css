@@ -1443,6 +1443,59 @@ body[theme-mode='dark'] .new-session-card-chip {
   margin-top: 0 !important;
 }
 
+.dashboard-workspace-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dashboard-workspace-host-selector,
+.dashboard-workspace-flow-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--semi-color-border);
+  border-radius: 8px;
+  background: var(--semi-color-bg-0);
+}
+
+.dashboard-workspace-host-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dashboard-workspace-flow-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dashboard-workspace-path-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.dashboard-workspace-status-line {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--semi-color-fill-0);
+}
+
+.dashboard-workspace-status-line > span:nth-child(2) {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .dashboard-onboarding-ready {
   display: flex;
   gap: 12px;

@@ -112,8 +112,18 @@ describe('work system onboarding route', () => {
     expect(workspaceChoice).toContain("t('dashboard.workspaceChoiceBind')");
     expect(workspaceChoice).not.toContain("t('dashboard.workspaceChoiceMap')");
     expect(workspaceChoice).not.toContain("t('dashboard.workspaceChoiceProposal')");
-    expect(workspaceChoice).toContain("useState<'create' | 'existing' | null>(null)");
-    expect(workspaceChoice).toContain('activeChoice ? (');
+    expect(workspaceChoice).toContain("type WorkspaceChoice = 'create' | 'existing'");
+    expect(workspaceChoice).toContain('useState<WorkspaceChoice | null>(null)');
+    expect(workspaceChoice).not.toContain('<RepositoryGate area="workbench"');
+    expect(workspaceChoice).toContain('workspaceHostTarget');
+    expect(workspaceChoice).toContain('bootstrapRepositoryBinding');
+    expect(workspaceChoice).toContain('inspectRepositoryBinding');
+    expect(workspaceChoice).toContain('handleSemanticWorkbenchMapping');
+    expect(zh.dashboard.workspaceChoiceCreate).toBe('新建工作仓库');
+    expect(zh.dashboard.workspaceChoiceCreateAction).toBe('选择仓库保存位置');
+    expect(zh.dashboard.workspaceChoiceBindAction).toBe('选择已有仓库');
+    expect(en.dashboard.workspaceChoiceCreateAction).toBe('Choose save location');
+    expect(en.dashboard.workspaceChoiceBindAction).toBe('Choose existing repository');
   });
 
   it('carries skipped workspace onboarding into a lightweight new-session context', () => {
