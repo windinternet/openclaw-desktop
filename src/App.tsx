@@ -3,7 +3,6 @@ import SetupPage from './pages/SetupPage';
 import WelcomePage from './pages/WelcomePage';
 import MainPage from './pages/MainPage';
 import DashboardPage from './pages/DashboardPage';
-import WorkspaceOnboardingPage from './pages/WorkspaceOnboardingPage';
 import SearchPage from './pages/SearchPage';
 import NewSessionPage from './pages/NewSessionPage';
 import SessionsPage from './pages/SessionsPage';
@@ -44,14 +43,6 @@ function App() {
       <Routes>
         <Route path="/setup" element={<SetupPage />} />
         <Route path="/welcome" element={<WelcomePage />} />
-        <Route
-          path="/onboarding/workspace"
-          element={
-            <AppGuard>
-              <WorkspaceOnboardingPage />
-            </AppGuard>
-          }
-        />
         <Route
           path="/"
           element={

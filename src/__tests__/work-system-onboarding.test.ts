@@ -16,8 +16,8 @@ import {
 } from '../lib/work-system-onboarding';
 
 describe('work system onboarding route', () => {
-  it('uses a stable standalone route for connection-success workspace onboarding', () => {
-    expect(WORK_SYSTEM_ONBOARDING_ROUTE).toBe('/onboarding/workspace');
+  it('uses a stable setup route for connection-success workspace onboarding', () => {
+    expect(WORK_SYSTEM_ONBOARDING_ROUTE).toBe('/setup?step=workspace');
     expect(WORK_SYSTEM_ONBOARDING_ANCHOR).toBe('work-system-onboarding');
     expect(isWorkSystemOnboardingSearch('?onboarding=work-system')).toBe(true);
     expect(isWorkSystemOnboardingSearch('?foo=bar&onboarding=work-system')).toBe(true);
@@ -25,47 +25,48 @@ describe('work system onboarding route', () => {
     expect(isWorkSystemOnboardingSearch('')).toBe(false);
   });
 
-  it('connects Welcome, Setup, and App routing to the standalone onboarding page', () => {
+  it('connects Welcome and Setup routing to the setup workspace step', () => {
     const app = readFileSync('src/App.tsx', 'utf8');
     const welcome = readFileSync('src/pages/WelcomePage.tsx', 'utf8');
     const setup = readFileSync('src/pages/SetupPage.tsx', 'utf8');
     const dashboard = readFileSync('src/pages/DashboardPage.tsx', 'utf8');
-    const workspaceOnboarding = readFileSync('src/pages/WorkspaceOnboardingPage.tsx', 'utf8');
 
-    expect(app).toContain("import WorkspaceOnboardingPage from './pages/WorkspaceOnboardingPage'");
-    expect(app).toContain('path="/onboarding/workspace"');
-    expect(app).toContain('<WorkspaceOnboardingPage />');
+    expect(app).not.toContain("import WorkspaceOnboardingPage from './pages/WorkspaceOnboardingPage'");
+    expect(app).not.toContain('path="/onboarding/workspace"');
+    expect(app).not.toContain('<WorkspaceOnboardingPage />');
     expect(app).not.toContain("import { isWorkSystemOnboardingSearch } from './lib/work-system-onboarding'");
     expect(app).not.toContain('isWorkSystemOnboardingSearch(location.search)');
     expect(welcome).toContain("import { WORK_SYSTEM_ONBOARDING_ROUTE } from '../lib/work-system-onboarding'");
     expect(welcome).toContain('navigate(WORK_SYSTEM_ONBOARDING_ROUTE');
-    expect(setup).toContain("import { WORK_SYSTEM_ONBOARDING_ROUTE } from '../lib/work-system-onboarding'");
-    expect(setup).toContain('navigate(WORK_SYSTEM_ONBOARDING_ROUTE');
-    expect(workspaceOnboarding).toContain('WORK_SYSTEM_ONBOARDING_ANCHOR');
-    expect(workspaceOnboarding).toContain('id={WORK_SYSTEM_ONBOARDING_ANCHOR}');
-    expect(workspaceOnboarding).toContain('<WorkSystemWorkspaceChoice');
+    expect(setup).toContain('WORK_SYSTEM_ONBOARDING_ROUTE');
+    expect(setup).toContain('step=workspace');
+    expect(setup).toContain("<Steps.Step title={t('wizard.stepWorkspace')} />");
+    expect(setup).toContain('setCurrentStep(3)');
+    expect(setup).toContain('WORK_SYSTEM_ONBOARDING_ANCHOR');
+    expect(setup).toContain('id={WORK_SYSTEM_ONBOARDING_ANCHOR}');
+    expect(setup).toContain('<WorkSystemWorkspaceChoice');
     expect(dashboard).not.toContain('isWorkSystemOnboardingSearch');
     expect(dashboard).not.toContain('onboardingRequested');
   });
 
   it('creates a first matter and opens Workbench after the work repository is ready', () => {
-    const workspaceOnboarding = readFileSync('src/pages/WorkspaceOnboardingPage.tsx', 'utf8');
+    const setup = readFileSync('src/pages/SetupPage.tsx', 'utf8');
     const workspaceChoice = readFileSync('src/components/WorkSystemWorkspaceChoice.tsx', 'utf8');
 
-    expect(workspaceOnboarding).toContain('createFirstWorkbenchMatter');
-    expect(workspaceOnboarding).toContain('firstMatterDraft');
+    expect(setup).toContain('createFirstWorkbenchMatter');
+    expect(setup).toContain('firstMatterDraft');
     expect(workspaceChoice).toContain('dashboard.firstMatterPlaceholder');
-    expect(workspaceOnboarding).toContain('`/workbench?view=tasks&workItemPath=${encodeURIComponent(matter.path)}`');
+    expect(setup).toContain('`/workbench?view=tasks&workItemPath=${encodeURIComponent(matter.path)}`');
   });
 
   it('opens the newly created first matter in Workbench tasks preview', () => {
-    const workspaceOnboarding = readFileSync('src/pages/WorkspaceOnboardingPage.tsx', 'utf8');
+    const setup = readFileSync('src/pages/SetupPage.tsx', 'utf8');
     const workbench = readFileSync('src/pages/WorkbenchPage.tsx', 'utf8');
     const panel = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
 
-    expect(workspaceOnboarding).toContain('const matter = await createFirstWorkbenchMatter');
-    expect(workspaceOnboarding).toContain('encodeURIComponent(matter.path)');
-    expect(workspaceOnboarding).toContain('`/workbench?view=tasks&workItemPath=${encodeURIComponent(matter.path)}`');
+    expect(setup).toContain('const matter = await createFirstWorkbenchMatter');
+    expect(setup).toContain('encodeURIComponent(matter.path)');
+    expect(setup).toContain('`/workbench?view=tasks&workItemPath=${encodeURIComponent(matter.path)}`');
     expect(workbench).toContain('getWorkbenchSearchWorkItemPath');
     expect(workbench).toContain('initialWorkItemPath={searchWorkItemPath}');
     expect(panel).toContain('initialWorkItemPath');
@@ -89,15 +90,17 @@ describe('work system onboarding route', () => {
 
   it('presents workspace choice instead of forcing local repository creation during onboarding', () => {
     const dashboard = readFileSync('src/pages/DashboardPage.tsx', 'utf8');
-    const workspaceOnboarding = readFileSync('src/pages/WorkspaceOnboardingPage.tsx', 'utf8');
+    const setup = readFileSync('src/pages/SetupPage.tsx', 'utf8');
     const workspaceChoice = readFileSync('src/components/WorkSystemWorkspaceChoice.tsx', 'utf8');
     const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
     const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
 
-    expect(workspaceOnboarding).toContain(
-      "import WorkSystemWorkspaceChoice from '../components/WorkSystemWorkspaceChoice'",
-    );
-    expect(workspaceOnboarding).toContain('<WorkSystemWorkspaceChoice');
+    expect(setup).toContain("import WorkSystemWorkspaceChoice from '../components/WorkSystemWorkspaceChoice'");
+    expect(setup).toContain('<WorkSystemWorkspaceChoice');
+    expect(setup).toContain("t('dashboard.onboardingTitle')");
+    expect(setup).toContain("t('dashboard.onboardingGatewayDone')");
+    expect(setup).toContain("t('dashboard.onboardingRepositoryNext')");
+    expect(setup).toContain("t('dashboard.onboardingFirstThingNext')");
     expect(dashboard).not.toContain("import WorkSystemWorkspaceChoice from '../components/WorkSystemWorkspaceChoice'");
     expect(dashboard).not.toContain('<WorkSystemWorkspaceChoice');
     expect(dashboard).not.toContain('<RepositoryGate area="workbench"');
@@ -111,7 +114,7 @@ describe('work system onboarding route', () => {
   });
 
   it('carries skipped workspace onboarding into a lightweight new-session context', () => {
-    const workspaceOnboarding = readFileSync('src/pages/WorkspaceOnboardingPage.tsx', 'utf8');
+    const setup = readFileSync('src/pages/SetupPage.tsx', 'utf8');
     const newSession = readFileSync('src/pages/NewSessionPage.tsx', 'utf8');
 
     expect(buildSkippedWorkspaceSessionMessage('整理家庭账单')).toContain('整理家庭账单');
@@ -129,8 +132,8 @@ describe('work system onboarding route', () => {
       firstThingTitle: '整理家庭账单',
       starterLabel: '继续体验',
     });
-    expect(workspaceOnboarding).toContain('buildSkippedWorkspaceSessionState(firstMatterDraft');
-    expect(workspaceOnboarding).toContain("navigate('/new-session', {");
+    expect(setup).toContain('buildSkippedWorkspaceSessionState(firstMatterDraft');
+    expect(setup).toContain("navigate('/new-session', {");
     expect(newSession).toContain('useLocation');
     expect(newSession).toContain('getWorkSystemOnboardingSessionState(location.state)');
     expect(newSession).toContain('useState(onboardingSessionState.initialMessage)');

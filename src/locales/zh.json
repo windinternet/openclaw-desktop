@@ -654,6 +654,7 @@
     "stepTheme": "外观",
     "stepLanguage": "语言",
     "stepConnection": "连接",
+    "stepWorkspace": "工作空间",
     "themeTitle": "选择主题",
     "themeDesc": "选择您偏好的外观模式和主题色",
     "lightMode": "浅色",

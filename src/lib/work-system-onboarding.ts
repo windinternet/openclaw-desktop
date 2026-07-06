@@ -2,7 +2,7 @@ import type { FirstWorkbenchMatterCarryover } from './workbench-first-matter';
 import type { RepositoryBinding } from './agentic-repository';
 import { extractSessionMessageItems } from './session-content';
 
-export const WORK_SYSTEM_ONBOARDING_ROUTE = '/onboarding/workspace';
+export const WORK_SYSTEM_ONBOARDING_ROUTE = '/setup?step=workspace';
 export const WORK_SYSTEM_ONBOARDING_ANCHOR = 'work-system-onboarding';
 export const WORK_SYSTEM_ONBOARDING_STATE_SOURCE = 'work-system-onboarding-skip';
 

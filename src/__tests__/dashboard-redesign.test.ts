@@ -106,7 +106,7 @@ describe('dashboard redesign', () => {
 
   it('keeps repository setup out of Dashboard onboarding surface', () => {
     const dashboard = readFileSync('src/pages/DashboardPage.tsx', 'utf8');
-    const workspaceOnboarding = readFileSync('src/pages/WorkspaceOnboardingPage.tsx', 'utf8');
+    const setup = readFileSync('src/pages/SetupPage.tsx', 'utf8');
     const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
     const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
 
@@ -117,10 +117,10 @@ describe('dashboard redesign', () => {
     expect(dashboard).not.toContain("t('dashboard.onboardingFirstThingNext')");
     expect(dashboard).not.toContain('repositorySetupNeeded');
     expect(dashboard).not.toContain('<WorkSystemWorkspaceChoice');
-    expect(workspaceOnboarding).toContain("t('dashboard.onboardingTitle')");
-    expect(workspaceOnboarding).toContain("t('dashboard.onboardingGatewayDone')");
-    expect(workspaceOnboarding).toContain("t('dashboard.onboardingRepositoryNext')");
-    expect(workspaceOnboarding).toContain("t('dashboard.onboardingFirstThingNext')");
+    expect(setup).toContain("t('dashboard.onboardingTitle')");
+    expect(setup).toContain("t('dashboard.onboardingGatewayDone')");
+    expect(setup).toContain("t('dashboard.onboardingRepositoryNext')");
+    expect(setup).toContain("t('dashboard.onboardingFirstThingNext')");
     expect(getByPath(zh, 'dashboard.onboardingTitle')).toBeTruthy();
     expect(getByPath(zh, 'dashboard.onboardingRepositoryNext')).toBeTruthy();
     expect(getByPath(en, 'dashboard.onboardingTitle')).toBeTruthy();

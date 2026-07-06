@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Steps, Button, Typography } from '@douyinfe/semi-ui';
+import { Steps, Button, Toast, Typography } from '@douyinfe/semi-ui';
+import { IconBolt, IconBranch, IconTickCircle } from '@douyinfe/semi-icons';
 import { useSettingsStore } from '../lib/settings-store';
 import { PRESET_THEME_COLORS, DEFAULT_SETTINGS } from '../lib/settings-types';
 import type { ThemeMode, SupportedLocale } from '../lib/settings-types';
@@ -9,7 +10,14 @@ import { applyTheme } from '../lib/theme';
 import { useStore } from '../lib';
 import i18n from '../i18n';
 import ConnectionWizard from '../components/ConnectionWizard';
-import { WORK_SYSTEM_ONBOARDING_ROUTE } from '../lib/work-system-onboarding';
+import WorkSystemWorkspaceChoice from '../components/WorkSystemWorkspaceChoice';
+import type { RepositoryBinding } from '../lib/agentic-repository';
+import {
+  buildSkippedWorkspaceSessionState,
+  WORK_SYSTEM_ONBOARDING_ANCHOR,
+  WORK_SYSTEM_ONBOARDING_ROUTE,
+} from '../lib/work-system-onboarding';
+import { createFirstWorkbenchMatter } from '../lib/workbench-first-matter';
 
 const { Title, Text } = Typography;
 
@@ -24,14 +32,23 @@ const LANGUAGE_OPTIONS: { key: SupportedLocale; native: string; selfName: string
   { key: 'en-US', native: 'English', selfName: 'English (US)' },
 ];
 
+function getInitialStep(search: string): number {
+  return new URLSearchParams(search).get('step') === 'workspace' ? 3 : 0;
+}
+
 export default function SetupPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const instances = useStore((s) => s.instances);
+  const initialSettings = useSettingsStore.getState().settings;
 
-  const [currentStep, setCurrentStep] = useState(0);
-  const [themeMode, setThemeMode] = useState<ThemeMode>(DEFAULT_SETTINGS.themeMode);
-  const [themeColor, setThemeColor] = useState<string>(DEFAULT_SETTINGS.themeColor);
-  const [locale, setLocale] = useState<SupportedLocale>(DEFAULT_SETTINGS.locale);
+  const [currentStep, setCurrentStep] = useState(() => getInitialStep(location.search));
+  const [themeMode, setThemeMode] = useState<ThemeMode>(initialSettings.themeMode);
+  const [themeColor, setThemeColor] = useState<string>(initialSettings.themeColor);
+  const [locale, setLocale] = useState<SupportedLocale>(initialSettings.locale);
+  const [firstMatterDraft, setFirstMatterDraft] = useState('');
+  const [firstMatterCreating, setFirstMatterCreating] = useState(false);
 
   useEffect(() => {
     const settings = { ...DEFAULT_SETTINGS, themeMode, themeColor, locale };
@@ -42,7 +59,7 @@ export default function SetupPage() {
   }, [themeMode, themeColor, locale]);
 
   const handleNext = useCallback(() => {
-    setCurrentStep((prev) => Math.min(prev + 1, 2));
+    setCurrentStep((prev) => Math.min(prev + 1, 3));
   }, []);
 
   const handlePrev = useCallback(() => {
@@ -51,16 +68,50 @@ export default function SetupPage() {
 
   const handleFinish = useCallback(() => {
     useSettingsStore.getState().markInitialized();
-
-    const { instances } = useStore.getState();
-    if (instances.length > 0) {
-      navigate(WORK_SYSTEM_ONBOARDING_ROUTE, { replace: true });
-    } else {
-      navigate('/welcome', { replace: true });
-    }
+    navigate('/', { replace: true });
   }, [navigate]);
 
-  const isLastStep = currentStep === 2;
+  const handleCreateFirstMatter = useCallback(
+    async (binding: RepositoryBinding) => {
+      const title = firstMatterDraft.trim();
+      if (!title) {
+        Toast.warning(t('dashboard.firstMatterRequired'));
+        return;
+      }
+
+      setFirstMatterCreating(true);
+      try {
+        const matter = await createFirstWorkbenchMatter(binding, title);
+        setFirstMatterDraft('');
+        useSettingsStore.getState().markInitialized();
+        Toast.success(t('dashboard.firstMatterCreated'));
+        navigate(`/workbench?view=tasks&workItemPath=${encodeURIComponent(matter.path)}`, { replace: true });
+      } catch (err) {
+        Toast.error(err instanceof Error ? err.message : t('dashboard.firstMatterCreateFailed'));
+      } finally {
+        setFirstMatterCreating(false);
+      }
+    },
+    [firstMatterDraft, navigate, t],
+  );
+
+  const handleSkipWorkspaceSetup = useCallback(() => {
+    useSettingsStore.getState().markInitialized();
+    Toast.info(t('dashboard.workspaceChoiceSkipToast'));
+    navigate('/new-session', {
+      replace: true,
+      state: buildSkippedWorkspaceSessionState(firstMatterDraft, t('dashboard.workspaceChoiceSkip')),
+    });
+  }, [firstMatterDraft, navigate, t]);
+
+  const handleConnectionReady = useCallback(() => {
+    setCurrentStep(3);
+    if (location.search !== '?step=workspace') {
+      navigate(WORK_SYSTEM_ONBOARDING_ROUTE, { replace: true });
+    }
+  }, [location.search, navigate]);
+
+  const isLastStep = currentStep === 3;
 
   return (
     <div
@@ -79,7 +130,7 @@ export default function SetupPage() {
           height: '100%',
           gap: 28,
           padding: '24px 40px',
-          maxWidth: 720,
+          maxWidth: currentStep === 3 ? 920 : 720,
           margin: '0 auto',
           width: '100%',
         }}
@@ -97,6 +148,7 @@ export default function SetupPage() {
           <Steps.Step title={t('wizard.stepTheme')} />
           <Steps.Step title={t('wizard.stepLanguage')} />
           <Steps.Step title={t('wizard.stepConnection')} />
+          <Steps.Step title={t('wizard.stepWorkspace')} />
         </Steps>
 
         <div
@@ -311,9 +363,74 @@ export default function SetupPage() {
               </div>
               <ConnectionWizard
                 onConnected={() => {
-                  useSettingsStore.getState().markInitialized();
-                  navigate(WORK_SYSTEM_ONBOARDING_ROUTE, { replace: true });
+                  handleConnectionReady();
                 }}
+              />
+            </div>
+          )}
+
+          {currentStep === 3 && (
+            <div
+              id={WORK_SYSTEM_ONBOARDING_ANCHOR}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'stretch',
+                gap: 20,
+                width: '100%',
+              }}
+            >
+              <div style={{ textAlign: 'center' }}>
+                <Title heading={3} style={{ marginBottom: 8 }}>
+                  {t('dashboard.onboardingTitle')}
+                </Title>
+                <Text type="secondary">{t('dashboard.onboardingDesc')}</Text>
+              </div>
+
+              <div className="dashboard-onboarding-steps">
+                <div className="dashboard-onboarding-step dashboard-onboarding-step-done">
+                  <span className="dashboard-onboarding-step-icon">
+                    <IconTickCircle />
+                  </span>
+                  <span>
+                    <Text strong>{t('dashboard.onboardingGatewayDone')}</Text>
+                    <Text type="tertiary" size="small">
+                      {t('dashboard.onboardingGatewayDoneDesc')}
+                    </Text>
+                  </span>
+                </div>
+                <div className="dashboard-onboarding-step dashboard-onboarding-step-active">
+                  <span className="dashboard-onboarding-step-icon">
+                    <IconBranch />
+                  </span>
+                  <span>
+                    <Text strong>{t('dashboard.onboardingRepositoryNext')}</Text>
+                    <Text type="tertiary" size="small">
+                      {t('dashboard.onboardingRepositoryNextDesc')}
+                    </Text>
+                  </span>
+                </div>
+                <div className="dashboard-onboarding-step">
+                  <span className="dashboard-onboarding-step-icon">
+                    <IconBolt />
+                  </span>
+                  <span>
+                    <Text strong>{t('dashboard.onboardingFirstThingNext')}</Text>
+                    <Text type="tertiary" size="small">
+                      {t('dashboard.onboardingFirstThingNextDesc')}
+                    </Text>
+                  </span>
+                </div>
+              </div>
+
+              <WorkSystemWorkspaceChoice
+                firstMatterDraft={firstMatterDraft}
+                firstMatterCreating={firstMatterCreating}
+                onFirstMatterDraftChange={setFirstMatterDraft}
+                onCreateFirstMatter={(binding) => {
+                  void handleCreateFirstMatter(binding);
+                }}
+                onSkipWorkspace={handleSkipWorkspaceSetup}
               />
             </div>
           )}
@@ -346,7 +463,12 @@ export default function SetupPage() {
               {t('wizard.finish')}
             </Button>
           ) : (
-            <Button theme="solid" type="primary" onClick={handleNext}>
+            <Button
+              theme="solid"
+              type="primary"
+              onClick={handleNext}
+              disabled={currentStep === 2 && instances.length === 0}
+            >
               {t('wizard.next')}
             </Button>
           )}
