@@ -27,6 +27,37 @@ describe('artifact ActionRun linkage', () => {
     expect(prompt).toContain('如果一次生成多个有价值产物');
   });
 
+  it('keeps artifact creation ActionRuns aligned with the direct-write channel strategy', () => {
+    const prompt = readFileSync('src/prompts/ai-actions/artifact-create.md', 'utf8');
+
+    expect(prompt).toContain('desktop.artifacts.create');
+    expect(prompt).toContain('desktop.outputs.create');
+    expect(prompt).toContain('插件直写优先');
+    expect(prompt).toContain('直写失败');
+    expect(prompt).toContain('<artifact>');
+    expect(prompt).toContain('用户显式保存');
+    expect(prompt).toContain('审批边界');
+  });
+
+  it('passes the current artifact write channel setting into AI creation prompts', () => {
+    const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
+
+    expect(drawer).toContain("import { useSettingsStore } from '../lib/settings-store'");
+    expect(drawer).toContain('const artifactWriteChannel = useSettingsStore((s) => s.settings.artifactWriteChannel)');
+    expect(drawer).toContain('buildArtifactCreatePrompt({ input: input.trim(), artifactWriteChannel })');
+    expect(drawer).toContain('artifactWriteChannel,');
+  });
+
+  it('treats direct-write artifact ids as completed creation instead of requiring preview blocks', () => {
+    const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
+
+    expect(drawer).toContain('directCreatedArtifactIds');
+    expect(drawer).toContain('latestRun.artifactIds');
+    expect(drawer).toContain('setDirectCreatedArtifactIds(directArtifactIds)');
+    expect(drawer).toContain('无需再次保存');
+    expect(drawer).not.toContain("setError('AI 未能生成有效的产物结构，请尝试更具体的描述');\n        }\n      }");
+  });
+
   it('keeps multiple AI-created artifact candidates selectable before saving', () => {
     const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
     const preview = readFileSync('src/lib/artifact-ai-create-preview.ts', 'utf8');
@@ -187,6 +218,18 @@ describe('artifact ActionRun linkage', () => {
     expect(drawer).toContain('notifyActionRunsChanged();');
   });
 
+  it('records output-tail saved artifacts on the source ActionRun', () => {
+    const page = readFileSync('src/pages/ArtifactsPage.tsx', 'utf8');
+    const store = readFileSync('src/lib/ai-action-run-store.ts', 'utf8');
+
+    expect(page).toContain('recordAiActionRunArtifactOutput');
+    expect(page).toContain('artifactTailActionRunId');
+    expect(page).toContain('recordAiActionRunArtifactOutput(currentInstanceId, artifactTailActionRunId');
+    expect(store).toContain('export async function recordAiActionRunArtifactOutput');
+    expect(store).toContain('await mirrorTerminalAiActionRunToRepository(instanceId, updated)');
+    expect(store).toContain("if (run.type === 'artifact_create') return run;");
+  });
+
   it('carries the selected work item into workbench-created artifact ActionRuns', () => {
     const drawer = readFileSync('src/components/ArtifactAICreateDrawer.tsx', 'utf8');
     const workbench = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
@@ -199,7 +242,7 @@ describe('artifact ActionRun linkage', () => {
     expect(drawer).toContain('workItemPath,');
 
     expect(workbench).toContain("import { ArtifactAICreateDrawer } from './ArtifactAICreateDrawer'");
-    expect(workbench).toContain('isWorkbenchMatterPath(selectedPreviewPath)');
+    expect(workbench).toContain('isWorkbenchSnapshotMatterPath(snapshot, selectedPreviewPath)');
     expect(workbench).toContain('extractWorkbenchMatterId(selectedPreviewContent)');
     expect(workbench).toContain("t('workbench.createArtifactForMatter')");
     expect(workbench).toContain('sourcePage="workbench"');
@@ -216,8 +259,9 @@ describe('artifact ActionRun linkage', () => {
     expect(drawer).toContain('selectedWorkItemPath');
     expect(drawer).toContain('selectedWorkItemId');
     expect(drawer).toContain("t('artifact.aiCreateWorkItemPlaceholder')");
-    expect(drawer).toContain('workItemId: resolvedWorkItemId');
-    expect(drawer).toContain('workItemPath: resolvedWorkItemPath');
+    expect(drawer).toContain('createAiActionRunWithWorkItemAssignment');
+    expect(drawer).toContain('selectedWorkItem,');
+    expect(drawer).toContain('selectedWorkItemId,');
     expect(zh.artifact.aiCreateWorkItem).toBeTruthy();
     expect(en.artifact.aiCreateWorkItem).toBeTruthy();
   });

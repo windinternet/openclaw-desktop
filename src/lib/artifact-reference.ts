@@ -1,5 +1,6 @@
 import type { ArtifactMeta } from './artifact-types';
 import { formatArtifactPdfFacts } from './artifact-content-facts';
+import { describeArtifactThumbnail } from './artifact-thumbnail';
 import { buildArtifactValueHealth } from './artifact-value-health';
 
 export interface ArtifactReuseReference {
@@ -12,6 +13,7 @@ export function buildArtifactReuseReference(artifact: ArtifactMeta): ArtifactReu
   const lastReuseEvent = artifact.reuseEvents?.[artifact.reuseEvents.length - 1];
   const lastExecutionEvent = artifact.executionEvents?.[artifact.executionEvents.length - 1];
   const valueHealth = buildArtifactValueHealth(artifact);
+  const thumbnail = describeArtifactThumbnail(artifact);
   const lines = [
     `- [${artifact.title}](${uri})`,
     `  - artifactId: ${artifact.id}`,
@@ -20,7 +22,12 @@ export function buildArtifactReuseReference(artifact: ArtifactMeta): ArtifactReu
     artifact.externalFormat ? `  - format: ${artifact.externalFormat}` : undefined,
     artifact.contentSummary ? `  - summary: ${artifact.contentSummary}` : undefined,
     artifact.thumbnail ? '  - thumbnail: available' : undefined,
+    thumbnail ? `  - thumbnailKind: ${thumbnail.kind}` : undefined,
+    thumbnail ? `  - thumbnailSummary: ${thumbnail.summary}` : undefined,
+    artifact.documentPreview ? '  - documentPreview: available' : undefined,
+    artifact.documentPreview ? `  - documentPreviewSummary: ${artifact.documentPreview.summary}` : undefined,
     `  - valueHealth: ${valueHealth.status}`,
+    valueHealth.strengths.length ? `  - valueHealthStrengths: ${valueHealth.strengths.join(', ')}` : undefined,
     valueHealth.gaps.length ? `  - valueHealthGaps: ${valueHealth.gaps.join(', ')}` : undefined,
     valueHealth.nextActions.length ? `  - valueHealthNextActions: ${valueHealth.nextActions.join(', ')}` : undefined,
     `  - source: ${formatSource(artifact)}`,

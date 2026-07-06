@@ -3,10 +3,17 @@ import { artifactPersistence } from './artifact-persistence';
 import { auditArtifactHtml } from './artifact-html-audit';
 import { buildArtifactContentFacts, resolveArtifactContentFactsEligibility } from './artifact-content-facts';
 import { buildArtifactContentExtract, resolveArtifactContentExtractEligibility } from './artifact-content-extract';
+import { buildArtifactDocumentPreview, resolveArtifactDocumentPreviewEligibility } from './artifact-document-preview';
 import { recordArtifactEnrichmentEvent } from './artifact-enrichment-events';
 import { buildArtifactFileInspection, shouldInspectArtifactFile } from './artifact-file-inspection';
 import { buildArtifactPreviewPlan } from './artifact-preview-plan';
-import { buildArtifactThumbnail, resolveArtifactThumbnailEligibility } from './artifact-thumbnail';
+import {
+  buildArtifactFallbackThumbnail,
+  buildArtifactThumbnail,
+  resolveArtifactNativeThumbnailUnavailableReason,
+  resolveArtifactThumbnailEligibility,
+  shouldReadArtifactNativeThumbnail,
+} from './artifact-thumbnail';
 import { buildArtifactValueSummary, inferArtifactExternalFormat } from './artifact-value-summary';
 import {
   artifactVersionCreator,
@@ -160,91 +167,7 @@ export const artifactService = {
       htmlAudit: html === null ? undefined : auditArtifactHtml(html),
     };
     meta.versions = [createInitialArtifactVersion(meta)];
-    if (shouldInspectArtifactFile(meta)) {
-      meta.fileInspection = buildArtifactFileInspection(meta, now);
-    }
-    let savedMetaBeforeEnrichment = false;
-    const contentExtractEligibility = resolveArtifactContentExtractEligibility(meta);
-    if (contentExtractEligibility.eligible) {
-      try {
-        await artifactPersistence.saveMeta(id, meta);
-        savedMetaBeforeEnrichment = true;
-        const contentRead = await artifactPersistence.readImportedText(id);
-        meta.contentExtract = buildArtifactContentExtract(meta, contentRead, now);
-        recordEnrichment(meta, {
-          kind: 'content_extract',
-          status: 'succeeded',
-          format: meta.contentExtract.format,
-          attemptedAt: now,
-          resultSummary: meta.contentExtract.summary,
-        });
-      } catch (error) {
-        recordEnrichment(meta, {
-          kind: 'content_extract',
-          status: 'failed',
-          format: contentExtractEligibility.format,
-          attemptedAt: now,
-          error: errorMessage(error),
-        });
-        // Artifact creation should not fail just because content extraction is unavailable.
-      }
-    }
-    const contentFactsEligibility = resolveArtifactContentFactsEligibility(meta);
-    if (contentFactsEligibility.eligible) {
-      try {
-        if (!savedMetaBeforeEnrichment) {
-          await artifactPersistence.saveMeta(id, meta);
-          savedMetaBeforeEnrichment = true;
-        }
-        const contentFactsRead = await artifactPersistence.readImportedFileFacts(id);
-        meta.contentFacts = buildArtifactContentFacts(meta, contentFactsRead, now);
-        recordEnrichment(meta, {
-          kind: 'content_facts',
-          status: 'succeeded',
-          format: meta.contentFacts.format,
-          attemptedAt: now,
-          resultSummary: meta.contentFacts.summary,
-        });
-      } catch (error) {
-        recordEnrichment(meta, {
-          kind: 'content_facts',
-          status: 'failed',
-          format: contentFactsEligibility.format,
-          attemptedAt: now,
-          error: errorMessage(error),
-        });
-        // Artifact creation should not fail just because file fact extraction is unavailable.
-      }
-    }
-    const thumbnailEligibility = resolveArtifactThumbnailEligibility(meta);
-    if (thumbnailEligibility.eligible) {
-      try {
-        if (!savedMetaBeforeEnrichment) {
-          await artifactPersistence.saveMeta(id, meta);
-          savedMetaBeforeEnrichment = true;
-        }
-        const thumbnailRead = await artifactPersistence.readImportedImageThumbnail(id);
-        meta.thumbnail = buildArtifactThumbnail(meta, thumbnailRead);
-        recordEnrichment(meta, {
-          kind: 'thumbnail',
-          status: meta.thumbnail ? 'succeeded' : 'failed',
-          format: thumbnailEligibility.format,
-          attemptedAt: now,
-          resultSummary: meta.thumbnail ? 'thumbnail available' : undefined,
-          error: meta.thumbnail ? undefined : 'invalid image thumbnail data',
-        });
-      } catch (error) {
-        recordEnrichment(meta, {
-          kind: 'thumbnail',
-          status: 'failed',
-          format: thumbnailEligibility.format,
-          attemptedAt: now,
-          error: errorMessage(error),
-        });
-        // Artifact creation should not fail just because thumbnail extraction is unavailable.
-      }
-    }
-    meta.previewPlan = buildArtifactPreviewPlan(meta, now);
+    await enrichArtifactFileLikeMeta(id, meta, now);
 
     await artifactPersistence.saveMeta(id, meta);
     if (html !== null) {
@@ -291,10 +214,195 @@ export const artifactService = {
     await updateIndexEntry(meta);
   },
 
+  async importFileCopy(artifactId: string): Promise<ArtifactMeta> {
+    const meta = await artifactPersistence.loadMeta(artifactId);
+    if (!meta) throw new Error('产物不存在');
+    if (!meta.filePath) throw new Error('产物没有可导入的本地文件路径');
+    if (meta.originalFilePath) return meta;
+
+    const now = Date.now();
+    const originalFilePath = meta.filePath;
+    const importedFile = await artifactPersistence.importFile(artifactId, originalFilePath, meta.fileName);
+    const externalFormat = inferArtifactExternalFormat({
+      type: meta.type,
+      url: meta.url,
+      command: meta.command,
+      filePath: importedFile.filePath,
+      fileName: importedFile.fileName,
+      fileSize: importedFile.fileSize,
+      mimeType: importedFile.mimeType,
+    });
+    Object.assign(meta, {
+      filePath: importedFile.filePath,
+      originalFilePath,
+      fileName: importedFile.fileName,
+      fileSize: importedFile.fileSize,
+      mimeType: importedFile.mimeType,
+      externalFormat,
+      contentSummary: buildArtifactValueSummary({
+        type: meta.type,
+        url: meta.url,
+        command: meta.command,
+        filePath: importedFile.filePath,
+        fileName: importedFile.fileName,
+        fileSize: importedFile.fileSize,
+        mimeType: importedFile.mimeType,
+        externalFormat,
+      }),
+      contentExtract: undefined,
+      contentFacts: undefined,
+      thumbnail: undefined,
+      documentPreview: undefined,
+      fileInspection: undefined,
+      previewPlan: undefined,
+      updatedAt: now,
+    });
+    await enrichArtifactFileLikeMeta(artifactId, meta, now);
+    await artifactPersistence.saveMeta(artifactId, meta);
+    await updateIndexEntry(meta);
+    return meta;
+  },
+
   async list(): Promise<ArtifactMeta[]> {
     return artifactPersistence.list();
   },
 };
+
+async function enrichArtifactFileLikeMeta(id: string, meta: ArtifactMeta, now: number): Promise<void> {
+  if (shouldInspectArtifactFile(meta)) {
+    meta.fileInspection = buildArtifactFileInspection(meta, now);
+  }
+  let savedMetaBeforeEnrichment = false;
+  const contentExtractEligibility = resolveArtifactContentExtractEligibility(meta);
+  if (contentExtractEligibility.eligible) {
+    try {
+      await artifactPersistence.saveMeta(id, meta);
+      savedMetaBeforeEnrichment = true;
+      const contentRead = await artifactPersistence.readImportedText(id);
+      meta.contentExtract = buildArtifactContentExtract(meta, contentRead, now);
+      recordEnrichment(meta, {
+        kind: 'content_extract',
+        status: 'succeeded',
+        format: meta.contentExtract.format,
+        attemptedAt: now,
+        resultSummary: meta.contentExtract.summary,
+      });
+    } catch (error) {
+      recordEnrichment(meta, {
+        kind: 'content_extract',
+        status: 'failed',
+        format: contentExtractEligibility.format,
+        attemptedAt: now,
+        error: errorMessage(error),
+      });
+      // Artifact creation should not fail just because content extraction is unavailable.
+    }
+  }
+  const contentFactsEligibility = resolveArtifactContentFactsEligibility(meta);
+  if (contentFactsEligibility.eligible) {
+    try {
+      if (!savedMetaBeforeEnrichment) {
+        await artifactPersistence.saveMeta(id, meta);
+        savedMetaBeforeEnrichment = true;
+      }
+      const contentFactsRead = await artifactPersistence.readImportedFileFacts(id);
+      meta.contentFacts = buildArtifactContentFacts(meta, contentFactsRead, now);
+      recordEnrichment(meta, {
+        kind: 'content_facts',
+        status: 'succeeded',
+        format: meta.contentFacts.format,
+        attemptedAt: now,
+        resultSummary: meta.contentFacts.summary,
+      });
+    } catch (error) {
+      recordEnrichment(meta, {
+        kind: 'content_facts',
+        status: 'failed',
+        format: contentFactsEligibility.format,
+        attemptedAt: now,
+        error: errorMessage(error),
+      });
+      // Artifact creation should not fail just because file fact extraction is unavailable.
+    }
+  }
+  const thumbnailEligibility = resolveArtifactThumbnailEligibility(meta);
+  if (thumbnailEligibility.eligible) {
+    try {
+      if (!savedMetaBeforeEnrichment) {
+        await artifactPersistence.saveMeta(id, meta);
+        savedMetaBeforeEnrichment = true;
+      }
+      if (thumbnailEligibility.format === 'image') {
+        const thumbnailRead = await artifactPersistence.readImportedImageThumbnail(id);
+        meta.thumbnail = buildArtifactThumbnail(meta, thumbnailRead);
+      } else if (shouldReadArtifactNativeThumbnail(thumbnailEligibility.format)) {
+        const thumbnailRead = await artifactPersistence.readImportedNativeThumbnail(id);
+        meta.thumbnail = buildArtifactThumbnail(meta, thumbnailRead);
+      } else {
+        meta.thumbnail = buildArtifactFallbackThumbnail(meta, thumbnailEligibility.format);
+      }
+      recordEnrichment(meta, {
+        kind: 'thumbnail',
+        status: meta.thumbnail ? 'succeeded' : 'failed',
+        format: thumbnailEligibility.format,
+        attemptedAt: now,
+        resultSummary: meta.thumbnail
+          ? shouldReadArtifactNativeThumbnail(thumbnailEligibility.format) || thumbnailEligibility.format === 'image'
+            ? 'thumbnail available'
+            : 'fallback thumbnail available'
+          : undefined,
+        error: meta.thumbnail ? undefined : 'invalid image thumbnail data',
+      });
+    } catch (error) {
+      const unavailableReason = resolveArtifactNativeThumbnailUnavailableReason(error);
+      const fallbackThumbnail = unavailableReason
+        ? buildArtifactFallbackThumbnail(meta, thumbnailEligibility.format)
+        : undefined;
+      if (fallbackThumbnail) {
+        meta.thumbnail = fallbackThumbnail;
+      }
+      recordEnrichment(meta, {
+        kind: 'thumbnail',
+        status: unavailableReason ? 'unavailable' : 'failed',
+        format: thumbnailEligibility.format,
+        attemptedAt: now,
+        reason: unavailableReason,
+        resultSummary: fallbackThumbnail ? 'fallback thumbnail available' : undefined,
+        error: unavailableReason ? undefined : errorMessage(error),
+      });
+      // Artifact creation should not fail just because thumbnail extraction is unavailable.
+    }
+  }
+  const documentPreviewEligibility = resolveArtifactDocumentPreviewEligibility(meta);
+  if (documentPreviewEligibility.eligible) {
+    try {
+      if (!savedMetaBeforeEnrichment) {
+        await artifactPersistence.saveMeta(id, meta);
+        savedMetaBeforeEnrichment = true;
+      }
+      const documentPreviewRead = await artifactPersistence.readImportedDocumentPreview(id);
+      meta.documentPreview = buildArtifactDocumentPreview(meta, documentPreviewRead, now);
+      recordEnrichment(meta, {
+        kind: 'document_preview',
+        status: meta.documentPreview ? 'succeeded' : 'failed',
+        format: documentPreviewEligibility.format,
+        attemptedAt: now,
+        resultSummary: meta.documentPreview?.summary,
+        error: meta.documentPreview ? undefined : 'invalid document preview data',
+      });
+    } catch (error) {
+      recordEnrichment(meta, {
+        kind: 'document_preview',
+        status: 'failed',
+        format: documentPreviewEligibility.format,
+        attemptedAt: now,
+        error: errorMessage(error),
+      });
+      // Artifact creation should not fail just because document preview extraction is unavailable.
+    }
+  }
+  meta.previewPlan = buildArtifactPreviewPlan(meta, now);
+}
 
 async function loadTemplateContent(templateId: string): Promise<string> {
   const templates: Record<string, string> = {

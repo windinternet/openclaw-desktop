@@ -26,6 +26,10 @@ export interface ArtifactExecutionBoundary {
     | 'outputArtifactId'
     | 'repositoryOutputPath'
   >;
+  latestApprovalDecision?: Pick<
+    ArtifactExecutionEvent,
+    'id' | 'status' | 'approvalTitle' | 'approvalRisk' | 'approvalReason' | 'runner' | 'command' | 'resultSummary'
+  >;
   boundary: {
     recordOnly: true;
     desktopExecutes: false;
@@ -42,6 +46,9 @@ export function buildArtifactExecutionBoundary(artifact: ArtifactMeta): Artifact
 
   const executionEvents = artifact.executionEvents ?? [];
   const latestExecution = executionEvents[executionEvents.length - 1];
+  const latestApprovalDecision = [...executionEvents]
+    .reverse()
+    .find((event) => event.status === 'approved' || event.status === 'denied');
 
   return {
     reuseKind: artifact.reuseKind,
@@ -51,11 +58,29 @@ export function buildArtifactExecutionBoundary(artifact: ArtifactMeta): Artifact
     prepareCommand: ARTIFACT_EXECUTION_PREPARE_COMMAND,
     recordCommand: ARTIFACT_EXECUTION_RECORD_COMMAND,
     latestExecution: latestExecution ? pickExecutionBoundaryEvent(latestExecution) : undefined,
+    latestApprovalDecision: latestApprovalDecision
+      ? pickExecutionApprovalDecisionEvent(latestApprovalDecision)
+      : undefined,
     boundary: {
       recordOnly: true,
       desktopExecutes: false,
       grantsPermission: false,
     },
+  };
+}
+
+function pickExecutionApprovalDecisionEvent(
+  event: ArtifactExecutionEvent,
+): ArtifactExecutionBoundary['latestApprovalDecision'] {
+  return {
+    id: event.id,
+    status: event.status,
+    approvalTitle: event.approvalTitle,
+    approvalRisk: event.approvalRisk,
+    approvalReason: event.approvalReason,
+    runner: event.runner,
+    command: event.command,
+    resultSummary: event.resultSummary,
   };
 }
 

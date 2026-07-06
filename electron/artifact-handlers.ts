@@ -1,12 +1,16 @@
 import { app, BrowserWindow, dialog, ipcMain, Notification, protocol, shell } from 'electron';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import {
   readFileSync,
+  readdirSync,
   existsSync,
+  mkdtempSync,
   mkdirSync,
   writeFileSync,
   copyFileSync,
   statSync,
+  rmSync,
   openSync,
   readSync,
   closeSync,
@@ -19,11 +23,13 @@ import { decideArtifactOpenTarget } from '../src/lib/artifact-open-target';
 import { resolveArtifactExportRequest } from '../src/lib/artifact-export';
 import { extractOoxmlTextFromBuffer, type OoxmlTextExtractFormat } from './artifact-ooxml-text-extract';
 import { extractPdfTextFromBuffer } from './artifact-pdf-text-extract';
+import { extractLegacyBinaryOfficeTextFromBuffer, extractLegacyWordTextFromBuffer } from './legacy-office-text-extract';
 import {
   recordArtifactAuthDecision,
   recordArtifactBridgeCallResult,
   recordArtifactBridgeExecApprovalRequired,
 } from '../src/lib/artifact-runtime-auth';
+import { resolveArtifactFileRangeRequest } from '../src/lib/artifact-file-range';
 import { inferArtifactExternalFormat } from '../src/lib/artifact-value-summary';
 import type { ArtifactBridgeCallStatus, ArtifactMeta, ArtifactPdfFacts } from '../src/lib/artifact-types';
 
@@ -91,8 +97,11 @@ const MAX_IMPORTED_OOXML_TEXT_BYTES = 2 * 1024 * 1024;
 const MAX_FILE_FACT_HEADER_BYTES = 64 * 1024;
 const MAX_PDF_FACT_SCAN_BYTES = 2 * 1024 * 1024;
 const MAX_IMAGE_THUMBNAIL_BYTES = 512 * 1024;
+const MAX_NATIVE_THUMBNAIL_BYTES = 2 * 1024 * 1024;
+const MAX_IMPORTED_PDF_PREVIEW_BYTES = 1024 * 1024;
 const OOXML_TEXT_EXTRACT_FORMATS = new Set(['word', 'excel', 'powerpoint']);
 const TEXT_EXTRACT_FORMATS = new Set(['html', 'text', 'code', 'pdf', ...OOXML_TEXT_EXTRACT_FORMATS]);
+const NATIVE_THUMBNAIL_FORMATS = new Set(['pdf', 'word', 'excel', 'powerpoint', 'audio', 'video']);
 
 export function registerArtifactProtocol(): void {
   protocol.handle('artifact', (request) => {
@@ -118,6 +127,69 @@ export function registerArtifactProtocol(): void {
         'content-security-policy': CSP_HEADER,
       },
     });
+  });
+  protocol.handle('artifact-file', (request) => {
+    const url = new URL(request.url);
+    const artifactId = url.hostname;
+    if (url.pathname !== '/imported') {
+      return new Response('Invalid artifact file route', { status: 400 });
+    }
+
+    const meta = readMeta(artifactId);
+    if (!meta) return new Response('Artifact not found', { status: 404 });
+    const format = inferArtifactExternalFormat(meta);
+    if (format !== 'pdf' && format !== 'audio' && format !== 'video') {
+      return new Response('artifact-file protocol only serves imported PDF and media files', { status: 415 });
+    }
+
+    try {
+      const { targetPath, stat } = resolveImportedArtifactStorageFile(artifactId);
+      const fileName = meta.fileName ?? path.basename(targetPath);
+      const declaredMimeType = meta.mimeType?.toLowerCase();
+      const mimeType =
+        (format === 'audio' && declaredMimeType?.startsWith('audio/')) ||
+        (format === 'video' && declaredMimeType?.startsWith('video/')) ||
+        (format === 'pdf' && declaredMimeType === 'application/pdf')
+          ? declaredMimeType
+          : detectMimeType(fileName);
+      if (!mimeType) return new Response('Unsupported imported artifact file', { status: 415 });
+
+      const range = resolveArtifactFileRangeRequest(stat.size, request.headers.get('range'));
+      if (range.kind === 'unsatisfiable') {
+        return new Response(null, {
+          status: 416,
+          headers: {
+            'content-range': range.contentRange,
+            'accept-ranges': 'bytes',
+            'cache-control': 'no-store',
+          },
+        });
+      }
+
+      if (range.kind === 'range') {
+        return new Response(readImportedArtifactFileRange(targetPath, range.start, range.length), {
+          status: 206,
+          headers: {
+            'content-type': mimeType,
+            'content-range': range.contentRange,
+            'content-length': String(range.length),
+            'accept-ranges': 'bytes',
+            'cache-control': 'no-store',
+          },
+        });
+      }
+
+      return new Response(readFileSync(targetPath), {
+        headers: {
+          'content-type': mimeType,
+          'content-length': String(stat.size),
+          'accept-ranges': 'bytes',
+          'cache-control': 'no-store',
+        },
+      });
+    } catch (error) {
+      return new Response(error instanceof Error ? error.message : String(error), { status: 404 });
+    }
   });
 }
 
@@ -217,7 +289,25 @@ function resolveImportedArtifactStorageFile(artifactId: string): {
   return { targetPath, stat };
 }
 
-function readImportedArtifactText(artifactId: string): { text: string; bytesRead: number; truncated: boolean } {
+function readImportedArtifactFileRange(targetPath: string, start: number, length: number): Buffer {
+  const buffer = Buffer.alloc(length);
+  const fd = openSync(targetPath, 'r');
+  let bytesRead = 0;
+  try {
+    while (bytesRead < length) {
+      const read = readSync(fd, buffer, bytesRead, length - bytesRead, start + bytesRead);
+      if (read <= 0) break;
+      bytesRead += read;
+    }
+  } finally {
+    closeSync(fd);
+  }
+  return bytesRead === length ? buffer : buffer.subarray(0, bytesRead);
+}
+
+async function readImportedArtifactText(
+  artifactId: string,
+): Promise<{ text: string; bytesRead: number; truncated: boolean }> {
   const meta = readMeta(artifactId);
   if (!meta) throw new Error('Artifact not found');
   const format = inferArtifactExternalFormat(meta);
@@ -226,6 +316,12 @@ function readImportedArtifactText(artifactId: string): { text: string; bytesRead
   const { targetPath, stat } = resolveImportedArtifactStorageFile(artifactId);
   if (format === 'pdf') {
     return readImportedArtifactPdfText(targetPath, stat.size);
+  }
+  if (isLegacyWordArtifact(meta, format)) {
+    return readImportedArtifactLegacyWordText(targetPath, stat.size);
+  }
+  if (isLegacyBinarySpreadsheetOrPresentationArtifact(meta, format)) {
+    return readImportedArtifactLegacyBinaryOfficeText(targetPath, stat.size);
   }
   if (OOXML_TEXT_EXTRACT_FORMATS.has(format)) {
     return readImportedArtifactOoxmlText(targetPath, stat.size, format as OoxmlTextExtractFormat);
@@ -245,6 +341,48 @@ function readImportedArtifactText(artifactId: string): { text: string; bytesRead
     text: buffer.subarray(0, bytesRead).toString('utf-8'),
     bytesRead,
     truncated: stat.size > bytesRead,
+  };
+}
+
+async function readImportedArtifactLegacyWordText(
+  targetPath: string,
+  fileSize: number,
+): Promise<{ text: string; bytesRead: number; truncated: boolean }> {
+  const bytesToRead = Math.min(fileSize, MAX_IMPORTED_OOXML_TEXT_BYTES);
+  const buffer = Buffer.alloc(bytesToRead);
+  const fd = openSync(targetPath, 'r');
+  let bytesRead = 0;
+  try {
+    bytesRead = readSync(fd, buffer, 0, bytesToRead, 0);
+  } finally {
+    closeSync(fd);
+  }
+
+  const extracted = await extractLegacyWordTextFromBuffer(buffer.subarray(0, bytesRead));
+  return {
+    ...extracted,
+    truncated: extracted.truncated || fileSize > bytesRead,
+  };
+}
+
+function readImportedArtifactLegacyBinaryOfficeText(
+  targetPath: string,
+  fileSize: number,
+): { text: string; bytesRead: number; truncated: boolean } {
+  const bytesToRead = Math.min(fileSize, MAX_IMPORTED_OOXML_TEXT_BYTES);
+  const buffer = Buffer.alloc(bytesToRead);
+  const fd = openSync(targetPath, 'r');
+  let bytesRead = 0;
+  try {
+    bytesRead = readSync(fd, buffer, 0, bytesToRead, 0);
+  } finally {
+    closeSync(fd);
+  }
+
+  const extracted = extractLegacyBinaryOfficeTextFromBuffer(buffer.subarray(0, bytesRead));
+  return {
+    ...extracted,
+    truncated: extracted.truncated || fileSize > bytesRead,
   };
 }
 
@@ -286,6 +424,24 @@ function readImportedArtifactOoxmlText(
     format,
     sourceTruncated: fileSize > bytesRead,
   });
+}
+
+function isLegacyWordArtifact(meta: ArtifactMeta, format: string): boolean {
+  if (format !== 'word') return false;
+  const extension = path.extname(meta.fileName ?? meta.filePath ?? meta.originalFilePath ?? '').toLowerCase();
+  if (extension === '.doc') return true;
+
+  const mimeType = meta.mimeType?.trim().toLowerCase() ?? '';
+  return mimeType === 'application/msword';
+}
+
+function isLegacyBinarySpreadsheetOrPresentationArtifact(meta: ArtifactMeta, format: string): boolean {
+  if (format !== 'excel' && format !== 'powerpoint') return false;
+  const extension = path.extname(meta.fileName ?? meta.filePath ?? meta.originalFilePath ?? '').toLowerCase();
+  if (extension === '.xls' || extension === '.ppt') return true;
+
+  const mimeType = meta.mimeType?.trim().toLowerCase() ?? '';
+  return mimeType === 'application/vnd.ms-excel' || mimeType === 'application/vnd.ms-powerpoint';
 }
 
 function readImportedArtifactFileFacts(artifactId: string): {
@@ -360,6 +516,78 @@ function readImportedArtifactImageThumbnail(artifactId: string): {
     dataUrl: `data:${mimeType};base64,${buffer.toString('base64')}`,
     bytesRead: buffer.length,
     mimeType,
+  };
+}
+
+function readImportedArtifactNativeThumbnail(artifactId: string): {
+  dataUrl: string;
+  bytesRead: number;
+  mimeType: string;
+} {
+  const meta = readMeta(artifactId);
+  if (!meta) throw new Error('Artifact not found');
+  const format = inferArtifactExternalFormat(meta);
+  if (!NATIVE_THUMBNAIL_FORMATS.has(format)) {
+    throw new Error(`artifact format is not native-thumbnailable: ${format}`);
+  }
+  if (process.platform !== 'darwin') throw new Error('Native thumbnail extraction requires macOS Quick Look');
+
+  const { targetPath } = resolveImportedArtifactStorageFile(artifactId);
+  const outputDir = mkdtempSync(path.join(os.tmpdir(), 'openclaw-artifact-thumbnail-'));
+  try {
+    execFileSync('qlmanage', ['-t', '-s', '512', '-o', outputDir, targetPath], {
+      timeout: 15_000,
+      stdio: 'ignore',
+    });
+    const thumbnailPath = readdirSync(outputDir)
+      .map((entry) => path.join(outputDir, entry))
+      .find((entry) => {
+        try {
+          return statSync(entry).isFile();
+        } catch {
+          return false;
+        }
+      });
+    if (!thumbnailPath) throw new Error('Native thumbnail output was not generated');
+
+    const stat = statSync(thumbnailPath);
+    if (stat.size > MAX_NATIVE_THUMBNAIL_BYTES) throw new Error('Native thumbnail output is too large');
+    const mimeType = detectMimeType(thumbnailPath);
+    if (!mimeType?.startsWith('image/')) throw new Error('Native thumbnail output is not an image');
+    const buffer = readFileSync(thumbnailPath);
+    return {
+      dataUrl: `data:${mimeType};base64,${buffer.toString('base64')}`,
+      bytesRead: buffer.length,
+      mimeType,
+    };
+  } finally {
+    rmSync(outputDir, { recursive: true, force: true });
+  }
+}
+
+function readImportedArtifactDocumentPreview(artifactId: string): {
+  dataUrl: string;
+  bytesRead: number;
+  mimeType: string;
+} {
+  const meta = readMeta(artifactId);
+  if (!meta) throw new Error('Artifact not found');
+  const format = inferArtifactExternalFormat(meta);
+  if (format !== 'pdf') throw new Error(`Artifact format is not document-previewable: ${format}`);
+
+  const { targetPath, stat } = resolveImportedArtifactStorageFile(artifactId);
+  if (stat.size > MAX_IMPORTED_PDF_PREVIEW_BYTES) throw new Error('Imported PDF preview is too large');
+
+  const fileName = meta.fileName ?? path.basename(targetPath);
+  const declaredMimeType = meta.mimeType?.toLowerCase();
+  const mimeType = declaredMimeType === 'application/pdf' ? declaredMimeType : detectMimeType(fileName);
+  if (mimeType !== 'application/pdf') throw new Error('Imported artifact file is not a PDF');
+
+  const buffer = readFileSync(targetPath);
+  return {
+    dataUrl: `data:application/pdf;base64,${buffer.toString('base64')}`,
+    bytesRead: buffer.length,
+    mimeType: 'application/pdf',
   };
 }
 
@@ -868,7 +1096,7 @@ export function registerArtifactIpcHandlers(): void {
   );
 
   ipcMain.handle(ARTIFACT_IPC.READ_IMPORTED_TEXT, async (_event, artifactId: string) => {
-    return readImportedArtifactText(artifactId);
+    return await readImportedArtifactText(artifactId);
   });
 
   ipcMain.handle(ARTIFACT_IPC.READ_IMPORTED_FILE_FACTS, async (_event, artifactId: string) => {
@@ -877,6 +1105,14 @@ export function registerArtifactIpcHandlers(): void {
 
   ipcMain.handle(ARTIFACT_IPC.READ_IMPORTED_IMAGE_THUMBNAIL, async (_event, artifactId: string) => {
     return readImportedArtifactImageThumbnail(artifactId);
+  });
+
+  ipcMain.handle(ARTIFACT_IPC.READ_IMPORTED_NATIVE_THUMBNAIL, async (_event, artifactId: string) => {
+    return readImportedArtifactNativeThumbnail(artifactId);
+  });
+
+  ipcMain.handle(ARTIFACT_IPC.READ_IMPORTED_DOCUMENT_PREVIEW, async (_event, artifactId: string) => {
+    return readImportedArtifactDocumentPreview(artifactId);
   });
 
   ipcMain.handle(ARTIFACT_IPC.UPDATE_INDEX, async (_event, entries: unknown) => {

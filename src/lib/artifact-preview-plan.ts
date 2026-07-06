@@ -43,15 +43,23 @@ export function buildArtifactPreviewPlan(artifact: ArtifactMeta, plannedAt = Dat
     artifact.fileInspection ??
     (shouldInspectArtifactFile(artifact) ? buildArtifactFileInspection(artifact, plannedAt) : undefined);
   const format = inspection?.format ?? inferArtifactExternalFormat(artifact);
-  const primaryAction = inspection?.openBehavior ?? resolvePrimaryAction(artifact, format);
+  const inspectedPrimaryAction = inspection?.openBehavior ?? resolvePrimaryAction(artifact, format);
+  const primaryAction =
+    hasBrowserPdfViewer(artifact, format) ||
+    hasBrowserMediaControls(artifact, format) ||
+    hasContentExtractPreview(artifact)
+      ? 'view_detail'
+      : inspectedPrimaryAction;
   const limitations = resolveLimitations(artifact, format, primaryAction, inspection);
+  const strategy = resolveStrategy(primaryAction, artifact, format);
+  const surface = resolveSurface(primaryAction, artifact, format);
 
   return {
     plannedAt,
     format,
     sourceKind: inspection?.sourceKind ?? resolveSourceKind(artifact),
-    strategy: resolveStrategy(primaryAction),
-    surface: resolveSurface(primaryAction),
+    strategy,
+    surface,
     primaryAction,
     summary:
       inspection?.summary ??
@@ -59,9 +67,9 @@ export function buildArtifactPreviewPlan(artifact: ArtifactMeta, plannedAt = Dat
       buildArtifactValueSummary({ ...artifact, externalFormat: format }) ??
       artifact.description ??
       artifact.title,
-    safetyNote: resolveSafetyNote(primaryAction),
+    safetyNote: resolveSafetyNote(primaryAction, artifact, format),
     limitations,
-    nextSteps: resolveNextSteps(primaryAction, limitations),
+    nextSteps: resolveNextSteps(primaryAction, limitations, strategy),
   };
 }
 
@@ -80,6 +88,8 @@ function resolvePrimaryAction(
   }
   if (artifact.type === 'link' || format === 'link') return 'open_link';
   if (artifact.type === 'app' || format === 'app' || artifact.command) return 'copy_command';
+  if (hasBrowserPdfViewer(artifact, format) || hasBrowserMediaControls(artifact, format)) return 'view_detail';
+  if (hasContentExtractPreview(artifact)) return 'view_detail';
   if (FILE_LIKE_FORMATS.has(format) || ['file', 'audio', 'image', 'video'].includes(artifact.type)) return 'open_file';
   return 'view_detail';
 }
@@ -92,7 +102,14 @@ function resolveSourceKind(artifact: ArtifactMeta): ArtifactFileInspectionSource
   return 'metadata_only';
 }
 
-function resolveStrategy(primaryAction: ArtifactFileInspectionOpenBehavior): ArtifactPreviewPlanStrategy {
+function resolveStrategy(
+  primaryAction: ArtifactFileInspectionOpenBehavior,
+  artifact: ArtifactMeta,
+  format: ArtifactExternalFormat,
+): ArtifactPreviewPlanStrategy {
+  if (hasBrowserPdfViewer(artifact, format)) return 'browser_pdf_viewer';
+  if (hasBrowserMediaControls(artifact, format)) return 'browser_media_controls';
+  if (hasContentExtractPreview(artifact)) return 'content_extract_preview';
   if (primaryAction === 'preview_html') return 'artifact_html_preview';
   if (primaryAction === 'open_file') return 'system_file_handler';
   if (primaryAction === 'open_link') return 'external_link';
@@ -100,7 +117,14 @@ function resolveStrategy(primaryAction: ArtifactFileInspectionOpenBehavior): Art
   return 'metadata_detail';
 }
 
-function resolveSurface(primaryAction: ArtifactFileInspectionOpenBehavior): ArtifactPreviewPlanSurface {
+function resolveSurface(
+  primaryAction: ArtifactFileInspectionOpenBehavior,
+  artifact: ArtifactMeta,
+  format: ArtifactExternalFormat,
+): ArtifactPreviewPlanSurface {
+  if (hasBrowserPdfViewer(artifact, format)) return 'artifact_detail';
+  if (hasBrowserMediaControls(artifact, format)) return 'artifact_detail';
+  if (hasContentExtractPreview(artifact)) return 'artifact_detail';
   if (primaryAction === 'preview_html') return 'artifact_window';
   if (primaryAction === 'open_file') return 'system_default_app';
   if (primaryAction === 'open_link') return 'external_browser';
@@ -117,9 +141,16 @@ function resolveLimitations(
   const limitations = new Set(inspection?.limitations ?? []);
 
   if (MEDIA_FORMATS.has(format)) {
-    limitations.add('native-preview-missing');
+    if (hasBrowserMediaControls(artifact, format)) {
+      limitations.delete('native-preview-missing');
+    } else {
+      limitations.add('native-preview-missing');
+    }
     limitations.add('thumbnail-missing');
     limitations.add('content-extraction-missing');
+  }
+  if (format === 'pdf' && hasBrowserPdfViewer(artifact, format)) {
+    limitations.delete('native-preview-missing');
   }
   if (primaryAction === 'copy_command') {
     limitations.add('execution-requires-approval');
@@ -131,25 +162,68 @@ function resolveLimitations(
   if (artifact.thumbnail?.trim().startsWith('data:image/')) {
     limitations.delete('thumbnail-missing');
   }
+  if (
+    artifact.documentPreview?.format === 'pdf' &&
+    artifact.documentPreview.dataUrl.trim().startsWith('data:application/pdf')
+  ) {
+    limitations.delete('native-preview-missing');
+  }
 
   return [...limitations];
 }
 
-function resolveSafetyNote(primaryAction: ArtifactFileInspectionOpenBehavior): string | undefined {
+function resolveSafetyNote(
+  primaryAction: ArtifactFileInspectionOpenBehavior,
+  artifact: ArtifactMeta,
+  format: ArtifactExternalFormat,
+): string | undefined {
+  if (hasBrowserPdfViewer(artifact, format))
+    return '使用浏览器内建 PDF 查看器预览，不读取任意本机路径，不执行任何内容。';
+  if (hasBrowserMediaControls(artifact, format)) return '使用浏览器内建媒体控件预览，不自动播放，不执行任何内容。';
+  if (hasContentExtractPreview(artifact)) return '使用导入副本抽取的只读文本预览，不打开原始文件，也不会执行任何内容。';
   if (primaryAction === 'open_file') return '本地文件通过系统默认应用打开，不会在 Desktop 内静默执行。';
   if (primaryAction === 'copy_command') return '命令只会复制给用户确认，不会由 Desktop 静默执行。';
   return undefined;
 }
 
-function resolveNextSteps(primaryAction: ArtifactFileInspectionOpenBehavior, limitations: string[]): string[] {
+function resolveNextSteps(
+  primaryAction: ArtifactFileInspectionOpenBehavior,
+  limitations: string[],
+  strategy: ArtifactPreviewPlanStrategy,
+): string[] {
   if (primaryAction === 'preview_html') return ['open-preview-window'];
   if (primaryAction === 'open_link') return ['open-external-link'];
   if (primaryAction === 'copy_command') return ['copy-command-for-user-approval', 'record-execution-before-running'];
-  if (primaryAction === 'view_detail') return ['review-artifact-metadata'];
-
-  const steps = ['open-with-system-app'];
+  const steps =
+    strategy === 'browser_pdf_viewer' || strategy === 'browser_media_controls' || strategy === 'content_extract_preview'
+      ? ['open-artifact-detail']
+      : primaryAction === 'view_detail'
+        ? ['review-artifact-metadata']
+        : ['open-with-system-app'];
   if (limitations.includes('native-preview-missing')) steps.push('add-native-preview');
   if (limitations.includes('thumbnail-missing')) steps.push('add-thumbnail');
   if (limitations.includes('content-extraction-missing')) steps.push('add-content-extraction');
   return steps;
+}
+
+function hasBrowserMediaControls(artifact: ArtifactMeta, format: ArtifactExternalFormat): boolean {
+  if (!MEDIA_FORMATS.has(format) || format === 'image') return false;
+  if (artifact.url?.trim()) return true;
+  return Boolean(artifact.filePath && artifact.originalFilePath);
+}
+
+function hasContentExtractPreview(artifact: ArtifactMeta): boolean {
+  return Boolean(artifact.contentExtract?.snippet.trim());
+}
+
+function hasBrowserPdfViewer(artifact: ArtifactMeta, format: ArtifactExternalFormat): boolean {
+  if (format !== 'pdf') return false;
+  if (
+    artifact.documentPreview?.format === 'pdf' &&
+    artifact.documentPreview.dataUrl.trim().startsWith('data:application/pdf')
+  ) {
+    return true;
+  }
+  if (artifact.url?.trim()) return true;
+  return Boolean(artifact.filePath && artifact.originalFilePath);
 }

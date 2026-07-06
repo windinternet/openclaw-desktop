@@ -1,13 +1,25 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, Button, Input, Select, Tag, Card, Spin, Empty, Toast, Popconfirm } from '@douyinfe/semi-ui';
-import { IconArrowLeft, IconPlay, IconDeleteStroked, IconRefresh } from '@douyinfe/semi-icons';
+import {
+  IconArrowLeft,
+  IconChevronLeft,
+  IconChevronRight,
+  IconPlay,
+  IconDeleteStroked,
+  IconRefresh,
+} from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
 import type { ArtifactEnrichmentStatus, ArtifactMeta } from '../lib/artifact-types';
 import { buildArtifactReuseReference } from '../lib/artifact-reference';
 import { buildArtifactVersionHistory } from '../lib/artifact-version-history';
-import { buildArtifactNativePreviewPanel, buildArtifactPreviewCard } from '../lib/artifact-display';
+import {
+  buildArtifactNativePreviewPanel,
+  buildArtifactPreviewCard,
+  buildPdfViewerUrl,
+  type ArtifactPdfViewerZoom,
+} from '../lib/artifact-display';
 import { buildArtifactValueHealth, type ArtifactValueHealthStatus } from '../lib/artifact-value-health';
 import {
   ARTIFACT_EXECUTION_REVIEW_WRITE_COMMAND,
@@ -23,6 +35,13 @@ import { loadRepositoryBinding } from '../lib/agentic-repository-store';
 
 const { Text, Title } = Typography;
 
+const PDF_VIEWER_ZOOM_OPTIONS: Array<{ value: ArtifactPdfViewerZoom; label: string }> = [
+  { value: 'page-width', label: '适合宽度' },
+  { value: '100', label: '100%' },
+  { value: '150', label: '150%' },
+  { value: '200', label: '200%' },
+];
+
 export default function ArtifactDetailPage() {
   const { artifactId } = useParams<{ artifactId: string }>();
   const navigate = useNavigate();
@@ -36,6 +55,8 @@ export default function ArtifactDetailPage() {
   const [metaForm, setMetaForm] = useState<Partial<ArtifactMeta>>({});
   const [metaFormArtifactId, setMetaFormArtifactId] = useState<string | null>(null);
   const [reviewCommandRepoPath, setReviewCommandRepoPath] = useState<string | null>(null);
+  const [pdfViewerPage, setPdfViewerPage] = useState(1);
+  const [pdfViewerZoom, setPdfViewerZoom] = useState<ArtifactPdfViewerZoom>('page-width');
 
   const meta = artifacts.find((a) => a.id === artifactId);
 
@@ -73,6 +94,11 @@ export default function ArtifactDetailPage() {
     };
   }, [currentInstanceId]);
 
+  useEffect(() => {
+    setPdfViewerPage(1);
+    setPdfViewerZoom('page-width');
+  }, [artifactId]);
+
   if (!meta) {
     return (
       <div style={{ padding: 24, display: 'flex', justifyContent: 'center', paddingTop: 80 }}>
@@ -108,6 +134,16 @@ export default function ArtifactDetailPage() {
   const versions = buildArtifactVersionHistory(meta).slice().reverse();
   const previewCard = buildArtifactPreviewCard(meta);
   const nativePreviewPanel = buildArtifactNativePreviewPanel(meta);
+  const pdfViewerPageCount = nativePreviewPanel?.kind === 'document_embed' ? nativePreviewPanel.pageCount : undefined;
+  const pdfViewerCurrentPage = clampPdfViewerPage(pdfViewerPage, pdfViewerPageCount);
+  const pdfViewerDocumentUrl =
+    nativePreviewPanel?.kind === 'document_embed'
+      ? buildPdfViewerUrl(nativePreviewPanel.documentUrl, {
+          page: pdfViewerCurrentPage,
+          zoom: pdfViewerZoom,
+        })
+      : undefined;
+  const pdfViewerLabel = `第 ${pdfViewerCurrentPage} 页 · ${formatPdfViewerZoomLabel(pdfViewerZoom)}`;
   const valueHealth = buildArtifactValueHealth(meta);
   const enrichmentEvents = meta.enrichmentEvents ?? [];
   const lastEnrichmentEvent = enrichmentEvents[enrichmentEvents.length - 1];
@@ -121,6 +157,15 @@ export default function ArtifactDetailPage() {
     if (!executionReviewCommandText) return;
     await navigator.clipboard.writeText(executionReviewCommandText);
     Toast.success(t('artifact.executionReviewCommandCopied'));
+  };
+
+  const handlePdfViewerPageChange = (value: string) => {
+    const nextPage = Number.parseInt(value, 10);
+    setPdfViewerPage(clampPdfViewerPage(nextPage, pdfViewerPageCount));
+  };
+
+  const stepPdfViewerPage = (delta: number) => {
+    setPdfViewerPage((current) => clampPdfViewerPage(current + delta, pdfViewerPageCount));
   };
 
   return (
@@ -381,34 +426,228 @@ export default function ArtifactDetailPage() {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                     <Text strong>{nativePreviewPanel.title}</Text>
                     <Tag size="small" type="light">
-                      {previewCard.formatLabel}
+                      {nativePreviewPanel.kind === 'image_thumbnail'
+                        ? previewCard.formatLabel
+                        : nativePreviewPanel.formatLabel}
                     </Tag>
                   </div>
-                  <div
-                    style={{
-                      height: 260,
-                      minHeight: 180,
-                      borderRadius: 6,
-                      border: '1px solid var(--semi-color-border)',
-                      background: 'var(--semi-color-bg-0)',
-                      overflow: 'hidden',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <img
-                      src={nativePreviewPanel.imageUrl}
-                      alt={nativePreviewPanel.alt}
+                  {nativePreviewPanel.kind === 'image_thumbnail' ? (
+                    <div
                       style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'contain',
-                        display: 'block',
+                        height: 260,
+                        minHeight: 180,
+                        borderRadius: 6,
+                        border: '1px solid var(--semi-color-border)',
+                        background: 'var(--semi-color-bg-0)',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                       }}
-                    />
-                  </div>
+                    >
+                      <img
+                        src={nativePreviewPanel.imageUrl}
+                        alt={nativePreviewPanel.alt}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'contain',
+                          display: 'block',
+                        }}
+                      />
+                    </div>
+                  ) : nativePreviewPanel.kind === 'document_embed' ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: 8,
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <Button
+                            aria-label="上一页"
+                            icon={<IconChevronLeft />}
+                            size="small"
+                            disabled={pdfViewerCurrentPage <= 1}
+                            onClick={() => stepPdfViewerPage(-1)}
+                          />
+                          <input
+                            aria-label="PDF 页码"
+                            type="number"
+                            min={1}
+                            max={pdfViewerPageCount}
+                            value={pdfViewerCurrentPage}
+                            onChange={(event) => handlePdfViewerPageChange(event.currentTarget.value)}
+                            style={{
+                              width: 72,
+                              height: 28,
+                              boxSizing: 'border-box',
+                              border: '1px solid var(--semi-color-border)',
+                              borderRadius: 4,
+                              background: 'var(--semi-color-bg-0)',
+                              color: 'var(--semi-color-text-0)',
+                              padding: '0 8px',
+                              fontSize: 13,
+                            }}
+                          />
+                          {pdfViewerPageCount ? (
+                            <Text type="tertiary" size="small">
+                              / {pdfViewerPageCount}
+                            </Text>
+                          ) : null}
+                          <Button
+                            aria-label="下一页"
+                            icon={<IconChevronRight />}
+                            size="small"
+                            disabled={Boolean(pdfViewerPageCount && pdfViewerCurrentPage >= pdfViewerPageCount)}
+                            onClick={() => stepPdfViewerPage(1)}
+                          />
+                        </div>
+                        <Select
+                          aria-label="PDF 缩放"
+                          className="artifact-pdf-zoom-select"
+                          value={pdfViewerZoom}
+                          size="small"
+                          style={{ width: 120 }}
+                          onChange={(value) => setPdfViewerZoom(value as ArtifactPdfViewerZoom)}
+                        >
+                          {PDF_VIEWER_ZOOM_OPTIONS.map((option) => (
+                            <Select.Option key={option.value} value={option.value}>
+                              {option.label}
+                            </Select.Option>
+                          ))}
+                        </Select>
+                      </div>
+                      <div
+                        style={{
+                          height: 360,
+                          minHeight: 240,
+                          borderRadius: 6,
+                          border: '1px solid var(--semi-color-border)',
+                          background: 'var(--semi-color-bg-0)',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <iframe
+                          title={`${meta.title} PDF preview`}
+                          src={pdfViewerDocumentUrl}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            border: 0,
+                            display: 'block',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ) : nativePreviewPanel.kind === 'media_embed' ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div
+                        style={{
+                          borderRadius: 6,
+                          border: '1px solid var(--semi-color-border)',
+                          background: 'var(--semi-color-bg-0)',
+                          overflow: 'hidden',
+                          padding: nativePreviewPanel.mediaType === 'audio' ? 12 : 0,
+                        }}
+                      >
+                        {nativePreviewPanel.mediaType === 'audio' ? (
+                          <audio
+                            controls
+                            preload="metadata"
+                            src={nativePreviewPanel.mediaUrl}
+                            style={{ width: '100%' }}
+                          />
+                        ) : (
+                          <video
+                            controls
+                            preload="metadata"
+                            src={nativePreviewPanel.mediaUrl}
+                            style={{
+                              width: '100%',
+                              maxHeight: 320,
+                              display: 'block',
+                              background: 'black',
+                            }}
+                          />
+                        )}
+                      </div>
+                      {nativePreviewPanel.kind === 'media_embed' && nativePreviewPanel.facts?.length ? (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {nativePreviewPanel.facts.map((fact) => (
+                            <Tag key={fact} size="small" type="light">
+                              {fact}
+                            </Tag>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : nativePreviewPanel.kind === 'content_extract' ? (
+                    <div
+                      style={{
+                        height: 260,
+                        minHeight: 180,
+                        borderRadius: 6,
+                        border: '1px solid var(--semi-color-border)',
+                        background: 'var(--semi-color-bg-0)',
+                        overflow: 'auto',
+                        padding: 12,
+                      }}
+                    >
+                      <Text
+                        code
+                        copyable
+                        style={{
+                          display: 'block',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                          lineHeight: 1.6,
+                        }}
+                      >
+                        {nativePreviewPanel.snippet}
+                      </Text>
+                    </div>
+                  ) : nativePreviewPanel.kind === 'content_facts' ? (
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: 8,
+                        padding: 12,
+                        borderRadius: 6,
+                        border: '1px solid var(--semi-color-border)',
+                        background: 'var(--semi-color-bg-0)',
+                      }}
+                    >
+                      {nativePreviewPanel.facts.map((fact) => (
+                        <Tag key={fact} size="large" type="light">
+                          {fact}
+                        </Tag>
+                      ))}
+                    </div>
+                  ) : null}
                   <Text type="secondary">{nativePreviewPanel.summary}</Text>
+                  {nativePreviewPanel.kind === 'document_embed' ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      <Tag size="small" type="light">
+                        {pdfViewerLabel}
+                      </Tag>
+                      {nativePreviewPanel.pageSummary && (
+                        <Tag size="small" type="light">
+                          {nativePreviewPanel.pageSummary}
+                        </Tag>
+                      )}
+                    </div>
+                  ) : null}
+                  {nativePreviewPanel.kind === 'content_extract' ? (
+                    <Text type="tertiary" size="small">
+                      {nativePreviewPanel.stats}
+                    </Text>
+                  ) : null}
                   <Text type="tertiary" size="small">
                     {nativePreviewPanel.safetyNote}
                   </Text>
@@ -556,6 +795,42 @@ export default function ArtifactDetailPage() {
                   <Text type="secondary" size="small">
                     {t('artifact.executionBoundaryHint')}
                   </Text>
+                  {executionBoundary.latestApprovalDecision && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <Text size="small" type="tertiary">
+                          {t('artifact.executionApprovalDecision')}:
+                        </Text>
+                        <Tag
+                          size="small"
+                          color={executionBoundary.latestApprovalDecision.status === 'approved' ? 'green' : 'red'}
+                          type="light"
+                        >
+                          {executionBoundary.latestApprovalDecision.status === 'approved'
+                            ? t('artifact.executionApprovalApproved')
+                            : t('artifact.executionApprovalDenied')}
+                        </Tag>
+                        {executionBoundary.latestApprovalDecision.approvalRisk && (
+                          <Tag size="small" color="orange" type="light">
+                            {executionBoundary.latestApprovalDecision.approvalRisk}
+                          </Tag>
+                        )}
+                      </div>
+                      <Text size="small" type="secondary">
+                        {[
+                          executionBoundary.latestApprovalDecision.approvalTitle,
+                          executionBoundary.latestApprovalDecision.runner,
+                          executionBoundary.latestApprovalDecision.command,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </Text>
+                      <Text size="small" type="tertiary">
+                        {executionBoundary.latestApprovalDecision.resultSummary ??
+                          t('artifact.executionApprovalDecisionHint')}
+                      </Text>
+                    </div>
+                  )}
                   {executionBoundary.latestExecution && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       <Text size="small" type="secondary">
@@ -916,6 +1191,15 @@ function enrichmentStatusColor(status: ArtifactEnrichmentStatus): 'green' | 'ora
   if (status === 'succeeded') return 'green';
   if (status === 'unavailable') return 'orange';
   return 'red';
+}
+
+function clampPdfViewerPage(page: number, pageCount?: number): number {
+  const normalized = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
+  return pageCount ? Math.min(normalized, pageCount) : normalized;
+}
+
+function formatPdfViewerZoomLabel(zoom: ArtifactPdfViewerZoom): string {
+  return zoom === 'page-width' ? '适合宽度' : `${zoom}%`;
 }
 
 export { ArtifactDetailPage };

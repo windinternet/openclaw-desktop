@@ -1,6 +1,7 @@
 import type { ArtifactMeta } from './artifact-types';
 import type { ArtifactContentReadResult } from './artifact-content-extract';
 import type { ArtifactContentFactsReadResult } from './artifact-content-facts';
+import type { ArtifactDocumentPreviewReadResult } from './artifact-document-preview';
 import type { ArtifactThumbnailReadResult } from './artifact-thumbnail';
 
 interface ArtifactApi {
@@ -17,6 +18,8 @@ interface ArtifactApi {
   readImportedText: (artifactId: string) => Promise<ArtifactContentReadResult>;
   readImportedFileFacts: (artifactId: string) => Promise<ArtifactContentFactsReadResult>;
   readImportedImageThumbnail: (artifactId: string) => Promise<ArtifactThumbnailReadResult>;
+  readImportedNativeThumbnail: (artifactId: string) => Promise<ArtifactThumbnailReadResult>;
+  readImportedDocumentPreview: (artifactId: string) => Promise<ArtifactDocumentPreviewReadResult>;
   list: () => Promise<ArtifactMeta[]>;
   updateIndex: (entries: ArtifactMeta[]) => Promise<void>;
 }
@@ -62,6 +65,14 @@ export const artifactPersistence = {
 
   async readImportedImageThumbnail(artifactId: string): Promise<ArtifactThumbnailReadResult> {
     return getApi().readImportedImageThumbnail(artifactId);
+  },
+
+  async readImportedNativeThumbnail(artifactId: string): Promise<ArtifactThumbnailReadResult> {
+    return getApi().readImportedNativeThumbnail(artifactId);
+  },
+
+  async readImportedDocumentPreview(artifactId: string): Promise<ArtifactDocumentPreviewReadResult> {
+    return getApi().readImportedDocumentPreview(artifactId);
   },
 
   async loadHtml(artifactId: string, version?: number): Promise<string | null> {

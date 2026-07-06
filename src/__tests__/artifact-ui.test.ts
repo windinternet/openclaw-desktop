@@ -40,6 +40,11 @@ describe('artifact UI metadata', () => {
     expect(detailPage).toContain("t('artifact.executionBoundary')");
     expect(detailPage).toContain("t('artifact.executionRequiresApproval')");
     expect(detailPage).toContain("t('artifact.executionBoundaryHint')");
+    expect(detailPage).toContain('latestApprovalDecision');
+    expect(detailPage).toContain("t('artifact.executionApprovalDecision')");
+    expect(detailPage).toContain("t('artifact.executionApprovalApproved')");
+    expect(detailPage).toContain("t('artifact.executionApprovalDenied')");
+    expect(detailPage).toContain("t('artifact.executionApprovalDecisionHint')");
     expect(detailPage).toContain("t('artifact.executionPrepareCommand')");
     expect(detailPage).toContain("t('artifact.executionRecordCommand')");
     expect(detailPage).toContain("t('artifact.executionReviewWrite')");
@@ -74,6 +79,9 @@ describe('artifact UI metadata', () => {
     expect(listFilter).toContain('buildArtifactSearchText');
     expect(listPage).toContain('filterArtifactList');
     expect(listPage).toContain('formatArtifactSource');
+    expect(listPage).toContain('artifactTailActionOutputSourceId');
+    expect(listPage).toContain("id.startsWith('asset-run-output:')");
+    expect(listPage).toContain('actionRunOutputId: artifactTailActionOutputSourceId');
     expect(listPage).toContain('reuseKindFilter');
     expect(listPage).toContain('reuseKindOptions');
     expect(listPage).toContain("t('artifact.reuseKindAll')");
@@ -85,6 +93,7 @@ describe('artifact UI metadata', () => {
     expect(detailPage).toContain('buildArtifactPreviewCard');
     expect(detailPage).toContain('buildArtifactNativePreviewPanel');
     expect(detailPage).toContain('nativePreviewPanel');
+    expect(detailPage).toContain("nativePreviewPanel.kind === 'media_embed' && nativePreviewPanel.facts");
     expect(detailPage).toContain('previewCard.thumbnailUrl');
     expect(detailPage).toContain('<img');
     expect(detailPage).toContain('nativePreviewPanel.imageUrl');
@@ -114,6 +123,10 @@ describe('artifact UI metadata', () => {
     expect(zh.artifact.executionBoundary).toBeTruthy();
     expect(zh.artifact.executionRequiresApproval).toBeTruthy();
     expect(zh.artifact.executionBoundaryHint).toBeTruthy();
+    expect(zh.artifact.executionApprovalDecision).toBeTruthy();
+    expect(zh.artifact.executionApprovalApproved).toBeTruthy();
+    expect(zh.artifact.executionApprovalDenied).toBeTruthy();
+    expect(zh.artifact.executionApprovalDecisionHint).toBeTruthy();
     expect(zh.artifact.executionPrepareCommand).toBeTruthy();
     expect(zh.artifact.executionRecordCommand).toBeTruthy();
     expect(zh.artifact.executionReviewWrite).toBeTruthy();
@@ -157,6 +170,10 @@ describe('artifact UI metadata', () => {
     expect(en.artifact.executionBoundary).toBeTruthy();
     expect(en.artifact.executionRequiresApproval).toBeTruthy();
     expect(en.artifact.executionBoundaryHint).toBeTruthy();
+    expect(en.artifact.executionApprovalDecision).toBeTruthy();
+    expect(en.artifact.executionApprovalApproved).toBeTruthy();
+    expect(en.artifact.executionApprovalDenied).toBeTruthy();
+    expect(en.artifact.executionApprovalDecisionHint).toBeTruthy();
     expect(en.artifact.executionPrepareCommand).toBeTruthy();
     expect(en.artifact.executionRecordCommand).toBeTruthy();
     expect(en.artifact.executionReviewWrite).toBeTruthy();

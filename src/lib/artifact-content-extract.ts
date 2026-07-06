@@ -7,7 +7,10 @@ export interface ArtifactContentReadResult {
   truncated: boolean;
 }
 
-export type ArtifactContentExtractIneligibilityReason = 'not-imported-file' | 'unsupported-format';
+export type ArtifactContentExtractIneligibilityReason =
+  | 'not-imported-file'
+  | 'unsupported-format'
+  | 'legacy-binary-office';
 
 export type ArtifactContentExtractEligibility =
   | { eligible: true; format: ArtifactExternalFormat }
@@ -58,7 +61,7 @@ export function buildArtifactContentExtract(
     status: 'extracted',
     format,
     sourceKind: 'imported_file',
-    summary: buildSummary(format, fileName, textLength, truncated),
+    summary: buildSummary(format, fileName, artifact.mimeType, textLength, truncated),
     fileName,
     mimeType: artifact.mimeType,
     bytesRead: normalizeByteCount(read.bytesRead),
@@ -79,11 +82,12 @@ function normalizeByteCount(value: number): number {
 function buildSummary(
   format: ArtifactExternalFormat,
   fileName: string | undefined,
+  mimeType: string | undefined,
   textLength: number,
   truncated: boolean,
 ): string {
   return [
-    SUMMARY_LABELS[format] ?? 'Text extract',
+    resolveSummaryLabel(format, fileName, mimeType),
     fileName,
     `${textLength} chars`,
     truncated ? 'truncated' : undefined,
@@ -92,9 +96,33 @@ function buildSummary(
     .join(' · ');
 }
 
+function resolveSummaryLabel(
+  format: ArtifactExternalFormat,
+  fileName: string | undefined,
+  mimeType: string | undefined,
+): string {
+  const extension = fileExtension(fileName);
+  if (format === 'word' && (extension === 'doc' || mimeType === 'application/msword')) {
+    return 'Legacy Word textutil extract';
+  }
+  if (format === 'excel' && (extension === 'xls' || mimeType === 'application/vnd.ms-excel')) {
+    return 'Legacy Excel BIFF8/printable text extract';
+  }
+  if (format === 'powerpoint' && (extension === 'ppt' || mimeType === 'application/vnd.ms-powerpoint')) {
+    return 'Legacy PowerPoint text atom/printable extract';
+  }
+  return SUMMARY_LABELS[format] ?? 'Text extract';
+}
+
 function fileNameFromPath(value?: string): string | undefined {
   if (!value) return undefined;
   const normalized = value.replace(/\\/g, '/');
   const parts = normalized.split('/').filter(Boolean);
   return parts[parts.length - 1] || undefined;
+}
+
+function fileExtension(value?: string): string | undefined {
+  const fileName = fileNameFromPath(value);
+  const match = fileName?.toLowerCase().match(/\.([a-z0-9]+)$/);
+  return match?.[1];
 }

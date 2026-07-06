@@ -16,7 +16,12 @@ import {
 import { useTranslation } from 'react-i18next';
 import { IconAIFilledLevel1, IconRefresh } from '@douyinfe/semi-icons';
 import { useStore } from '../lib';
-import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway } from '../lib/ai-action-center';
+import { useSettingsStore } from '../lib/settings-store';
+import {
+  createAiActionRunWithWorkItemAssignment,
+  executeAiActionRunWithGateway,
+  syncAiActionRunWithGateway,
+} from '../lib/ai-action-center';
 import { buildArtifactCreatePrompt } from '../lib/ai-action-prompts';
 import { upsertAiActionRun } from '../lib/ai-action-run-store';
 import {
@@ -166,6 +171,7 @@ export function ArtifactAICreateDrawer({
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const notifyActionRunsChanged = useStore((s) => s.notifyActionRunsChanged);
   const agents = useStore((s) => s.agents);
+  const artifactWriteChannel = useSettingsStore((s) => s.settings.artifactWriteChannel);
   const [input, setInput] = useState(initialInput ?? '');
   const {
     createWorkItem,
@@ -184,6 +190,7 @@ export function ArtifactAICreateDrawer({
   const [selectedPreviewIndex, setSelectedPreviewIndex] = useState(0);
   const [selectedPreviewIndexes, setSelectedPreviewIndexes] = useState<number[]>([]);
   const [previewRun, setPreviewRun] = useState<AiActionRun | null>(null);
+  const [directCreatedArtifactIds, setDirectCreatedArtifactIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const isGeneratingRef = useRef(false);
   const preview = previews[selectedPreviewIndex] ?? null;
@@ -246,6 +253,7 @@ export function ArtifactAICreateDrawer({
     setSelectedPreviewIndex(0);
     setSelectedPreviewIndexes([]);
     setPreviewRun(null);
+    setDirectCreatedArtifactIds([]);
     setError(null);
 
     const defaultAgent = agents?.[0];
@@ -256,22 +264,21 @@ export function ArtifactAICreateDrawer({
       return;
     }
 
-    const resolvedWorkItemPath = workItemPath || selectedWorkItem?.path;
-    const resolvedWorkItemId = workItemId || selectedWorkItemId;
-
-    const actionRun = createAiActionRun({
+    const actionRun = createAiActionRunWithWorkItemAssignment({
       type: 'artifact_create',
       sourcePage,
       instanceId: currentInstanceId,
       agentId: defaultAgent.id,
       executionMode: 'isolated-session',
       input: input.trim(),
-      workItemId: resolvedWorkItemId,
-      workItemPath: resolvedWorkItemPath,
+      workItemId,
+      workItemPath,
+      selectedWorkItem,
+      selectedWorkItemId,
     });
 
     try {
-      const prompt = buildArtifactCreatePrompt({ input: input.trim() });
+      const prompt = buildArtifactCreatePrompt({ input: input.trim(), artifactWriteChannel });
       const runningRun = await executeAiActionRunWithGateway(activeClient, actionRun, {
         title: '产物创建',
         prompt,
@@ -286,15 +293,25 @@ export function ArtifactAICreateDrawer({
         if (latestRun.status === 'done' || latestRun.status === 'failed') break;
       }
 
-      if (latestRun.status === 'done' && latestRun.lastAssistantResponse) {
-        const parsed = parseArtifactAICreatePreviews(latestRun.lastAssistantResponse);
+      if (latestRun.status === 'done') {
+        const parsed = latestRun.lastAssistantResponse
+          ? parseArtifactAICreatePreviews(latestRun.lastAssistantResponse)
+          : [];
         if (parsed.length > 0) {
           setPreviews(parsed);
           setSelectedPreviewIndex(parsed.length - 1);
           setSelectedPreviewIndexes([parsed.length - 1]);
           setPreviewRun(latestRun);
+          setDirectCreatedArtifactIds([]);
         } else {
-          setError('AI 未能生成有效的产物结构，请尝试更具体的描述');
+          const directArtifactIds = latestRun.artifactIds ?? [];
+          if (directArtifactIds.length > 0) {
+            setPreviewRun(latestRun);
+            setDirectCreatedArtifactIds(directArtifactIds);
+            notifyActionRunsChanged();
+          } else {
+            setError('AI 未能生成有效的产物结构，请尝试更具体的描述');
+          }
         }
       } else if (latestRun.status === 'failed') {
         setError(latestRun.error || 'AI 处理失败');
@@ -317,6 +334,8 @@ export function ArtifactAICreateDrawer({
     workItemPath,
     selectedWorkItem,
     selectedWorkItemId,
+    artifactWriteChannel,
+    notifyActionRunsChanged,
   ]);
 
   const updateSelectedPreview = useCallback(
@@ -368,6 +387,7 @@ export function ArtifactAICreateDrawer({
       setSelectedPreviewIndex(0);
       setSelectedPreviewIndexes([]);
       setPreviewRun(null);
+      setDirectCreatedArtifactIds([]);
       onClose();
     } catch (e) {
       Toast.error(String(e));
@@ -391,6 +411,7 @@ export function ArtifactAICreateDrawer({
       setSelectedPreviewIndex(0);
       setSelectedPreviewIndexes([]);
       setPreviewRun(null);
+      setDirectCreatedArtifactIds([]);
       setError(null);
       if (!workItemPath) setSelectedWorkItemPath('');
     }
@@ -455,6 +476,37 @@ export function ArtifactAICreateDrawer({
         {error && (
           <div style={{ padding: 12, background: 'var(--semi-color-danger-light-default)', borderRadius: 8 }}>
             <Text type="danger">{error}</Text>
+          </div>
+        )}
+
+        {directCreatedArtifactIds.length > 0 && !generating && (
+          <div
+            style={{
+              padding: 12,
+              border: '1px solid var(--semi-color-success-light-active)',
+              borderRadius: 8,
+              background: 'var(--semi-color-success-light-default)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            }}
+          >
+            <Text strong>已通过直写创建产物</Text>
+            <Text type="secondary" size="small">
+              Desktop 已收到 Artifact id，无需再次保存；如果需要继续整理，请到 Artifacts 查看已创建产物。
+            </Text>
+            <Space wrap spacing={4}>
+              {directCreatedArtifactIds.map((artifactId) => (
+                <Tag key={artifactId} size="small" color="green" type="light">
+                  {artifactId}
+                </Tag>
+              ))}
+            </Space>
+            {previewRun?.resultSummary && (
+              <Text type="tertiary" size="small">
+                {previewRun.resultSummary}
+              </Text>
+            )}
           </div>
         )}
 

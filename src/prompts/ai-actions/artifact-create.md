@@ -24,7 +24,16 @@
 
 ## 输出要求
 
-请分析用户意图。优先输出可直接保存为 Artifact 的 `<artifact>` 块；只有简单链接、命令或仅有元数据的文件线索，也可以继续输出兼容的 ai-action JSON。
+请分析用户意图，并按当前可用写入通道输出。
+
+### 写入通道策略
+
+- 插件直写优先：如果运行环境明确暴露 Desktop/Gateway 插件命令，优先使用 `desktop.artifacts.create` 创建 Artifact；当结果还应沉淀到当前 Repository `outputs/` 时，优先使用 `desktop.outputs.create`。
+- 直写成功后，对话只返回简洁状态：Artifact id、标题、预览或打开入口、Repository output 路径，以及仍需用户处理的待确认事项。
+- 直写失败、插件不可用、版本不兼容、用户关闭直写，或当前流程要求用户显式保存/预览确认时，降级输出可保存的 `<artifact>` 块。
+- 直写不等于静默执行：导入任意本地文件、写 Repository output、执行命令、授予 Desktop Bridge 权限或越过审批边界，仍必须等待用户显式保存、确认或审批。
+
+请分析用户意图。不能直写时，优先输出可直接保存为 Artifact 的 `<artifact>` 块；只有简单链接、命令或仅有元数据的文件线索，也可以继续输出兼容的 ai-action JSON。
 
 ### 首选：Artifact 块
 

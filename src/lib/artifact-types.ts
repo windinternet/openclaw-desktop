@@ -66,6 +66,9 @@ export interface ArtifactFileInspection {
 
 export type ArtifactPreviewPlanStrategy =
   | 'artifact_html_preview'
+  | 'content_extract_preview'
+  | 'browser_pdf_viewer'
+  | 'browser_media_controls'
   | 'system_file_handler'
   | 'external_link'
   | 'command_copy'
@@ -120,6 +123,21 @@ export interface ArtifactImageDimensions {
 export interface ArtifactPdfFacts {
   version?: string;
   pageCount?: number;
+}
+
+export type ArtifactDocumentPreviewStatus = 'available';
+export type ArtifactDocumentPreviewSourceKind = 'imported_file';
+
+export interface ArtifactDocumentPreview {
+  extractedAt: number;
+  status: ArtifactDocumentPreviewStatus;
+  format: 'pdf';
+  sourceKind: ArtifactDocumentPreviewSourceKind;
+  summary: string;
+  fileName?: string;
+  mimeType?: string;
+  bytesRead: number;
+  dataUrl: string;
 }
 
 export interface ArtifactContentFacts {
@@ -210,7 +228,7 @@ export type ArtifactReuseContext =
   | 'action_run'
   | 'repository';
 export type ArtifactReuseStatus = 'used' | 'succeeded' | 'failed' | 'cancelled';
-export type ArtifactEnrichmentKind = 'content_extract' | 'content_facts' | 'thumbnail';
+export type ArtifactEnrichmentKind = 'content_extract' | 'content_facts' | 'thumbnail' | 'document_preview';
 export type ArtifactEnrichmentStatus = 'succeeded' | 'unavailable' | 'failed';
 export type ArtifactExecutionStatus =
   | 'approval_required'
@@ -294,6 +312,7 @@ export interface ArtifactMeta {
   previewPlan?: ArtifactPreviewPlan;
   contentExtract?: ArtifactContentExtract;
   contentFacts?: ArtifactContentFacts;
+  documentPreview?: ArtifactDocumentPreview;
   reuseKind?: ArtifactReuseKind;
   repositoryOutputPath?: string;
   repositoryPreviewPath?: string;

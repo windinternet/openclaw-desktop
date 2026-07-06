@@ -41,7 +41,42 @@ describe('artifact preview plan', () => {
     });
   });
 
-  it('marks media artifacts as externally opened until native previews exist', () => {
+  it('routes imported Office artifacts with extracted text to the detail text preview', () => {
+    expect(
+      buildArtifactPreviewPlan(
+        createArtifact({
+          contentExtract: {
+            extractedAt: 9,
+            status: 'extracted',
+            format: 'powerpoint',
+            sourceKind: 'imported_file',
+            summary: 'PowerPoint text extracted from roadmap.pptx',
+            fileName: 'roadmap.pptx',
+            mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            bytesRead: 4096,
+            textLength: 38,
+            truncated: false,
+            snippet: 'Q3 roadmap\nMilestone A\nMilestone B',
+          },
+        }),
+        11,
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        plannedAt: 11,
+        format: 'powerpoint',
+        sourceKind: 'imported_file',
+        strategy: 'content_extract_preview',
+        surface: 'artifact_detail',
+        primaryAction: 'view_detail',
+        safetyNote: '使用导入副本抽取的只读文本预览，不打开原始文件，也不会执行任何内容。',
+        limitations: ['native-preview-missing', 'thumbnail-missing'],
+        nextSteps: ['open-artifact-detail', 'add-native-preview', 'add-thumbnail'],
+      }),
+    );
+  });
+
+  it('records imported media as browser media controls instead of missing native preview', () => {
     expect(
       buildArtifactPreviewPlan(
         createArtifact({
@@ -58,6 +93,94 @@ describe('artifact preview plan', () => {
       expect.objectContaining({
         plannedAt: 20,
         format: 'video',
+        strategy: 'browser_media_controls',
+        surface: 'artifact_detail',
+        primaryAction: 'view_detail',
+        safetyNote: '使用浏览器内建媒体控件预览，不自动播放，不执行任何内容。',
+        limitations: ['thumbnail-missing', 'content-extraction-missing'],
+        nextSteps: ['open-artifact-detail', 'add-thumbnail', 'add-content-extraction'],
+      }),
+    );
+  });
+
+  it('records imported PDFs as browser PDF viewer previews instead of missing native preview', () => {
+    expect(
+      buildArtifactPreviewPlan(
+        createArtifact({
+          title: '导入大 PDF',
+          fileName: 'large.pdf',
+          mimeType: 'application/pdf',
+          externalFormat: 'pdf',
+          contentSummary: 'PDF · large.pdf · 8 MB',
+        }),
+        18,
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        plannedAt: 18,
+        format: 'pdf',
+        sourceKind: 'imported_file',
+        strategy: 'browser_pdf_viewer',
+        surface: 'artifact_detail',
+        primaryAction: 'view_detail',
+        safetyNote: '使用浏览器内建 PDF 查看器预览，不读取任意本机路径，不执行任何内容。',
+        limitations: ['thumbnail-missing', 'content-extraction-missing'],
+        nextSteps: ['open-artifact-detail', 'add-thumbnail', 'add-content-extraction'],
+      }),
+    );
+  });
+
+  it('records explicit media URLs as browser media controls', () => {
+    expect(
+      buildArtifactPreviewPlan(
+        createArtifact({
+          title: '访谈录音',
+          type: 'audio',
+          fileName: 'interview.mp3',
+          filePath: undefined,
+          originalFilePath: undefined,
+          mimeType: 'audio/mpeg',
+          externalFormat: 'audio',
+          url: 'https://example.com/interview.mp3',
+          contentSummary: 'Audio · interview.mp3',
+        }),
+        25,
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        plannedAt: 25,
+        format: 'audio',
+        sourceKind: 'external_url',
+        strategy: 'browser_media_controls',
+        surface: 'artifact_detail',
+        primaryAction: 'view_detail',
+        safetyNote: '使用浏览器内建媒体控件预览，不自动播放，不执行任何内容。',
+        limitations: ['thumbnail-missing', 'content-extraction-missing'],
+        nextSteps: ['open-artifact-detail', 'add-thumbnail', 'add-content-extraction'],
+      }),
+    );
+  });
+
+  it('keeps unimported local media on the system app boundary', () => {
+    expect(
+      buildArtifactPreviewPlan(
+        createArtifact({
+          title: '本地录音',
+          type: 'audio',
+          fileName: 'local.mp3',
+          filePath: '/Users/deepin/Music/local.mp3',
+          originalFilePath: undefined,
+          mimeType: 'audio/mpeg',
+          externalFormat: 'audio',
+          contentSummary: 'Audio · local.mp3',
+        }),
+        26,
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        plannedAt: 26,
+        format: 'audio',
+        sourceKind: 'local_file',
         strategy: 'system_file_handler',
         surface: 'system_default_app',
         primaryAction: 'open_file',

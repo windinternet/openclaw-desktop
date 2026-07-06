@@ -18,6 +18,8 @@ export const ARTIFACT_IPC = {
   READ_IMPORTED_TEXT: 'artifact:readImportedText',
   READ_IMPORTED_FILE_FACTS: 'artifact:readImportedFileFacts',
   READ_IMPORTED_IMAGE_THUMBNAIL: 'artifact:readImportedImageThumbnail',
+  READ_IMPORTED_NATIVE_THUMBNAIL: 'artifact:readImportedNativeThumbnail',
+  READ_IMPORTED_DOCUMENT_PREVIEW: 'artifact:readImportedDocumentPreview',
   UPDATE_INDEX: 'artifact:updateIndex',
   WRITE_SKILL: 'artifact:writeSkill',
 } as const;

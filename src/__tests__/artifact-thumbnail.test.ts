@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { ArtifactMeta } from '../lib/artifact-types';
-import { buildArtifactThumbnail, resolveArtifactThumbnailEligibility } from '../lib/artifact-thumbnail';
+import {
+  buildArtifactFallbackThumbnail,
+  buildArtifactThumbnail,
+  resolveArtifactThumbnailEligibility,
+} from '../lib/artifact-thumbnail';
 
 function createArtifact(overrides: Partial<ArtifactMeta> = {}): ArtifactMeta {
   return {
@@ -51,11 +55,51 @@ describe('artifact thumbnail', () => {
           mimeType: 'application/pdf',
         }),
       ),
-    ).toEqual({
-      eligible: false,
-      format: 'pdf',
-      reason: 'unsupported-format',
-    });
+    ).toEqual({ eligible: true, format: 'pdf' });
+
+    expect(
+      resolveArtifactThumbnailEligibility(
+        createArtifact({
+          externalFormat: 'powerpoint',
+          type: 'file',
+          fileName: 'roadmap.pptx',
+          mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        }),
+      ),
+    ).toEqual({ eligible: true, format: 'powerpoint' });
+
+    expect(
+      resolveArtifactThumbnailEligibility(
+        createArtifact({
+          externalFormat: 'video',
+          type: 'video',
+          fileName: 'demo.mp4',
+          mimeType: 'video/mp4',
+        }),
+      ),
+    ).toEqual({ eligible: true, format: 'video' });
+
+    expect(
+      resolveArtifactThumbnailEligibility(
+        createArtifact({
+          externalFormat: 'file',
+          type: 'file',
+          fileName: 'archive.bin',
+          mimeType: 'application/octet-stream',
+        }),
+      ),
+    ).toEqual({ eligible: true, format: 'file' });
+
+    expect(
+      resolveArtifactThumbnailEligibility(
+        createArtifact({
+          externalFormat: 'unknown',
+          type: 'file',
+          fileName: 'payload',
+          mimeType: 'application/x-custom',
+        }),
+      ),
+    ).toEqual({ eligible: true, format: 'unknown' });
 
     expect(
       resolveArtifactThumbnailEligibility(
@@ -68,5 +112,52 @@ describe('artifact thumbnail', () => {
       format: 'image',
       reason: 'not-imported-file',
     });
+  });
+
+  it('builds a deterministic fallback thumbnail for imported native formats', () => {
+    const thumbnail = buildArtifactFallbackThumbnail(
+      createArtifact({
+        type: 'file',
+        externalFormat: 'pdf',
+        fileName: 'brief.pdf',
+        mimeType: 'application/pdf',
+      }),
+      'pdf',
+    );
+
+    expect(thumbnail).toBeDefined();
+    const thumbnailDataUrl = thumbnail ?? '';
+    expect(thumbnailDataUrl).toMatch(/^data:image\/svg\+xml;base64,/);
+    expect(atob(thumbnailDataUrl.replace(/^data:image\/svg\+xml;base64,/, ''))).toContain('PDF');
+  });
+
+  it('builds fallback thumbnails for generic imported files', () => {
+    const thumbnail = buildArtifactFallbackThumbnail(
+      createArtifact({
+        type: 'file',
+        externalFormat: 'file',
+        fileName: 'archive.bin',
+        mimeType: 'application/octet-stream',
+      }),
+      'file',
+    );
+
+    expect(thumbnail).toBeDefined();
+    expect(atob((thumbnail ?? '').replace(/^data:image\/svg\+xml;base64,/, ''))).toContain('FILE');
+  });
+
+  it('builds fallback thumbnails for unknown imported file formats', () => {
+    const thumbnail = buildArtifactFallbackThumbnail(
+      createArtifact({
+        type: 'file',
+        externalFormat: 'unknown',
+        fileName: 'payload',
+        mimeType: 'application/x-custom',
+      }),
+      'unknown',
+    );
+
+    expect(thumbnail).toBeDefined();
+    expect(atob((thumbnail ?? '').replace(/^data:image\/svg\+xml;base64,/, ''))).toContain('ART');
   });
 });

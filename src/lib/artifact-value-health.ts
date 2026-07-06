@@ -1,4 +1,11 @@
-import type { ArtifactFileInspectionOpenBehavior, ArtifactMeta } from './artifact-types';
+import type {
+  ArtifactEnrichmentEvent,
+  ArtifactEnrichmentKind,
+  ArtifactFileInspectionOpenBehavior,
+  ArtifactMeta,
+  ArtifactPreviewPlanStrategy,
+} from './artifact-types';
+import { describeArtifactThumbnail, type ArtifactThumbnailKind } from './artifact-thumbnail';
 import { buildArtifactValueSummary } from './artifact-value-summary';
 
 export type ArtifactValueHealthStatus = 'ready' | 'usable_with_limits' | 'needs_attention';
@@ -30,8 +37,10 @@ export function buildArtifactValueHealth(artifact: ArtifactMeta): ArtifactValueH
 
 function resolveStrengths(artifact: ArtifactMeta): string[] {
   const strengths = [
-    primaryActionStrength(artifact.previewPlan?.primaryAction),
-    artifact.thumbnail?.trim().startsWith('data:image/') ? 'thumbnail-ready' : undefined,
+    previewStrategyStrength(artifact.previewPlan?.strategy) ??
+      primaryActionStrength(artifact.previewPlan?.primaryAction),
+    thumbnailStrength(describeArtifactThumbnail(artifact)?.kind),
+    artifact.documentPreview?.dataUrl.trim().startsWith('data:application/pdf') ? 'document-preview-ready' : undefined,
     artifact.contentExtract ? 'content-extract-ready' : undefined,
     artifact.contentFacts ? 'content-facts-ready' : undefined,
     artifact.repositoryOutputPath ? 'repository-output-recorded' : undefined,
@@ -42,7 +51,7 @@ function resolveStrengths(artifact: ArtifactMeta): string[] {
 }
 
 function resolveGaps(artifact: ArtifactMeta): string[] {
-  const gaps = [...(artifact.previewPlan?.limitations ?? [])];
+  const gaps = [...(artifact.previewPlan?.limitations ?? []), ...resolveEnrichmentReasonGaps(artifact)];
   if (!artifact.previewPlan) gaps.push('preview-plan-missing');
   if (!hasValueSummary(artifact)) gaps.push('value-summary-missing');
   return dedupe(gaps);
@@ -50,6 +59,12 @@ function resolveGaps(artifact: ArtifactMeta): string[] {
 
 function resolveNextActions(artifact: ArtifactMeta, gaps: string[]): string[] {
   const actions = [...(artifact.previewPlan?.nextSteps ?? [])];
+  if (gaps.includes('native-thumbnail-platform-unsupported')) {
+    actions.push('use-system-open-for-native-thumbnail-detail');
+  }
+  if (gaps.includes('legacy-binary-office')) {
+    actions.push('convert-legacy-office-or-open-with-system-app');
+  }
   if (gaps.includes('preview-plan-missing')) actions.push('inspect-artifact');
   if (gaps.includes('value-summary-missing')) actions.push('add-value-summary');
   return dedupe(actions);
@@ -66,6 +81,13 @@ function hasValueSummary(artifact: ArtifactMeta): boolean {
   return Boolean(inferred && !GENERIC_SUMMARIES.has(inferred));
 }
 
+function previewStrategyStrength(strategy: ArtifactPreviewPlanStrategy | undefined): string | undefined {
+  if (strategy === 'browser_pdf_viewer') return 'pdf-viewer-ready';
+  if (strategy === 'browser_media_controls') return 'media-controls-ready';
+  if (strategy === 'content_extract_preview') return 'content-extract-preview-ready';
+  return undefined;
+}
+
 function primaryActionStrength(primaryAction: ArtifactFileInspectionOpenBehavior | undefined): string | undefined {
   if (primaryAction === 'preview_html') return 'html-preview-ready';
   if (primaryAction === 'open_file') return 'file-open-ready';
@@ -73,6 +95,24 @@ function primaryActionStrength(primaryAction: ArtifactFileInspectionOpenBehavior
   if (primaryAction === 'copy_command') return 'command-copy-ready';
   if (primaryAction === 'view_detail') return 'metadata-detail-ready';
   return undefined;
+}
+
+function thumbnailStrength(kind: ArtifactThumbnailKind | undefined): string | undefined {
+  if (kind === 'image-preview') return 'image-thumbnail-ready';
+  if (kind === 'native-file') return 'native-thumbnail-ready';
+  if (kind === 'format-placeholder') return 'format-placeholder-thumbnail-ready';
+  return undefined;
+}
+
+function resolveEnrichmentReasonGaps(artifact: ArtifactMeta): string[] {
+  const latestEvents = new Map<ArtifactEnrichmentKind, ArtifactEnrichmentEvent>();
+  for (const event of artifact.enrichmentEvents ?? []) {
+    latestEvents.set(event.kind, event);
+  }
+
+  return Array.from(latestEvents.values())
+    .filter((event) => event.status === 'unavailable' && Boolean(event.reason?.trim()))
+    .map((event) => event.reason as string);
 }
 
 function summaryForStatus(status: ArtifactValueHealthStatus): string {

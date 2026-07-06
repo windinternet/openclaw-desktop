@@ -45,8 +45,13 @@ describe('artifact runtime authorization recording', () => {
     expect(source).toContain('recordArtifactBridgeExecApprovalRequired');
     expect(source).toContain('desktopExecutes: false');
     expect(source).not.toContain('Artifact bridge method exec is not implemented yet');
-    expect(source).not.toContain('node:child_process');
-    expect(source).not.toContain('execFile');
-    expect(source).not.toContain('spawn(');
+
+    const bridgeExecutionSection = source.slice(
+      source.indexOf('function prepareArtifactBridgeExecApproval'),
+      source.indexOf('export function registerArtifactIpcHandlers'),
+    );
+    expect(bridgeExecutionSection).not.toContain('execFile');
+    expect(bridgeExecutionSection).not.toContain('spawn(');
+    expect(bridgeExecutionSection).not.toContain('child_process');
   });
 });

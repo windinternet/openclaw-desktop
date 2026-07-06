@@ -11,10 +11,14 @@ import { buildArtifactValueHealth, type ArtifactValueHealthStatus } from '../lib
 import { ArtifactCreateDialog } from '../components/ArtifactCreateDialog';
 import { ArtifactAICreateDrawer } from '../components/ArtifactAICreateDrawer';
 import { loadRepositoryBinding } from '../lib/agentic-repository-store';
-import { loadAiActionRuns } from '../lib/ai-action-run-store';
+import {
+  findAiActionRunByLocalOrGatewayId,
+  loadAiActionRuns,
+  recordAiActionRunArtifactOutput,
+} from '../lib/ai-action-run-store';
 import { buildArtifactOutputPreservationPrompt } from '../lib/artifact-output-preservation';
 import { parseDashboardTailActionRoute } from '../lib/dashboard-tail-action-routing';
-import { preserveWorkbenchOutputFromTailAction } from '../lib/repository-workbench';
+import { preserveWorkbenchOutputFromTailAction, readWorkbenchMarkdown } from '../lib/repository-workbench';
 import type { AiActionRun } from '../lib/types';
 
 const { Text } = Typography;
@@ -31,34 +35,50 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
   const openArtifactWindow = useStore((s) => s.openArtifactWindow);
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const actionRunsVersion = useStore((s) => s.actionRunsVersion);
+  const notifyActionRunsChanged = useStore((s) => s.notifyActionRunsChanged);
   const navigate = useNavigate();
   const location = useLocation();
   const tailActionContext = useMemo(() => parseDashboardTailActionRoute(location.search), [location.search]);
   const artifactTailActionContext = tailActionContext?.kind === 'output' ? tailActionContext : null;
-  const artifactTailActionRunId = artifactTailActionContext?.id?.startsWith('action-run-output:')
-    ? artifactTailActionContext.id.slice('action-run-output:'.length)
+  const artifactTailActionOutputSourceId =
+    artifactTailActionContext?.id &&
+    (artifactTailActionContext.id.startsWith('action-run-output:') ||
+      artifactTailActionContext.id.startsWith('asset-run-output:'))
+      ? artifactTailActionContext.id
+      : undefined;
+  const artifactTailActionRunId = artifactTailActionOutputSourceId?.startsWith('action-run-output:')
+    ? artifactTailActionOutputSourceId.slice('action-run-output:'.length)
     : undefined;
   const [artifactTailActionRun, setArtifactTailActionRun] = useState<AiActionRun | null>(null);
+  const artifactTailActionRunMatchesSource = Boolean(
+    artifactTailActionRun &&
+    (artifactTailActionRun.id === artifactTailActionRunId ||
+      artifactTailActionRun.gatewayRunId === artifactTailActionRunId),
+  );
   const artifactTailActionRunResultSummary =
-    artifactTailActionRun && artifactTailActionRun.id === artifactTailActionRunId
-      ? artifactTailActionRun.resultSummary
-      : undefined;
+    artifactTailActionRunMatchesSource && artifactTailActionRun ? artifactTailActionRun.resultSummary : undefined;
   const artifactTailActionRunAssistantResponse =
-    artifactTailActionRun && artifactTailActionRun.id === artifactTailActionRunId
+    artifactTailActionRunMatchesSource && artifactTailActionRun
       ? artifactTailActionRun.lastAssistantResponse
       : undefined;
+  const [artifactTailActionAssetRunMarkdown, setArtifactTailActionAssetRunMarkdown] = useState<string | undefined>();
   const artifactTailActionInitialInput = useMemo(() => {
-    if (!artifactTailActionContext?.workItemPath) return undefined;
-    return buildArtifactOutputPreservationPrompt({
+    if (!artifactTailActionContext?.workItemPath && !artifactTailActionContext?.assetRunPath) return undefined;
+    const prompt = buildArtifactOutputPreservationPrompt({
       workItemPath: artifactTailActionContext.workItemPath,
-      actionRunOutputId: artifactTailActionRunId ? `action-run-output:${artifactTailActionRunId}` : undefined,
+      actionRunOutputId: artifactTailActionOutputSourceId,
+      assetRunPath: artifactTailActionContext.assetRunPath,
+      assetRunMarkdown: artifactTailActionAssetRunMarkdown,
       resultSummary: artifactTailActionRunResultSummary,
       assistantResponse: artifactTailActionRunAssistantResponse,
     });
+    return prompt;
   }, [
+    artifactTailActionAssetRunMarkdown,
+    artifactTailActionContext?.assetRunPath,
     artifactTailActionContext?.workItemPath,
+    artifactTailActionOutputSourceId,
     artifactTailActionRunAssistantResponse,
-    artifactTailActionRunId,
     artifactTailActionRunResultSummary,
   ]);
   const [search, setSearch] = useState('');
@@ -92,13 +112,36 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
     void (async () => {
       const runs = await loadAiActionRuns(currentInstanceId).catch(() => []);
       if (cancelled) return;
-      setArtifactTailActionRun(runs.find((run) => run.id === artifactTailActionRunId) ?? null);
+      setArtifactTailActionRun(findAiActionRunByLocalOrGatewayId(runs, artifactTailActionRunId) ?? null);
     })();
 
     return () => {
       cancelled = true;
     };
   }, [actionRunsVersion, artifactTailActionRunId, currentInstanceId]);
+
+  useEffect(() => {
+    if (!currentInstanceId || !artifactTailActionContext?.assetRunPath) {
+      setArtifactTailActionAssetRunMarkdown(undefined);
+      return undefined;
+    }
+
+    const assetRunPath = artifactTailActionContext.assetRunPath;
+    let cancelled = false;
+    void (async () => {
+      const binding = await loadRepositoryBinding(currentInstanceId).catch(() => null);
+      if (!binding) {
+        if (!cancelled) setArtifactTailActionAssetRunMarkdown(undefined);
+        return;
+      }
+      const markdown = await readWorkbenchMarkdown(binding, assetRunPath).catch(() => undefined);
+      if (!cancelled) setArtifactTailActionAssetRunMarkdown(markdown);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [artifactTailActionContext?.assetRunPath, currentInstanceId]);
 
   const typeOptions = useMemo(
     () => [
@@ -191,13 +234,26 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
           tailActionId: artifactTailActionContext.id,
           artifact,
         });
+        if (artifactTailActionRunId) {
+          const sourceRun = await recordAiActionRunArtifactOutput(currentInstanceId, artifactTailActionRunId, [
+            artifact.id,
+          ]);
+          if (sourceRun) notifyActionRunsChanged();
+        }
         if (updated) Toast.success(t('artifact.outputTailActionLinked'));
         else Toast.warning(t('artifact.outputTailActionUnavailable'));
       } catch (err) {
         Toast.error(err instanceof Error ? err.message : t('artifact.outputTailActionLinkFailed'));
       }
     },
-    [artifactTailActionContext?.id, artifactTailActionContext?.workItemPath, currentInstanceId, t],
+    [
+      artifactTailActionContext?.id,
+      artifactTailActionContext?.workItemPath,
+      artifactTailActionRunId,
+      currentInstanceId,
+      notifyActionRunsChanged,
+      t,
+    ],
   );
 
   const headerActions = useMemo(
@@ -259,7 +315,7 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
         </div>
       )}
 
-      {!embedded && artifactTailActionContext?.workItemPath ? (
+      {!embedded && artifactTailActionContext ? (
         <div
           style={{
             border: '1px solid var(--semi-color-border)',
@@ -272,14 +328,26 @@ export default function ArtifactsPage({ embedded = false, onHeaderActionsChange 
           <Tag color="green" size="small">
             {t('artifact.tailActionContextTitle')}
           </Tag>
-          <Text
-            type="tertiary"
-            size="small"
-            ellipsis={{ showTooltip: true }}
-            style={{ display: 'block', marginTop: 6 }}
-          >
-            {t('artifact.tailActionSource')}: {artifactTailActionContext.workItemPath}
-          </Text>
+          {artifactTailActionContext.workItemPath ? (
+            <Text
+              type="tertiary"
+              size="small"
+              ellipsis={{ showTooltip: true }}
+              style={{ display: 'block', marginTop: 6 }}
+            >
+              {t('artifact.tailActionSource')}: {artifactTailActionContext.workItemPath}
+            </Text>
+          ) : null}
+          {artifactTailActionContext.assetRunPath ? (
+            <Text
+              type="tertiary"
+              size="small"
+              ellipsis={{ showTooltip: true }}
+              style={{ display: 'block', marginTop: 4 }}
+            >
+              {t('artifact.tailActionAssetRunSource')}: {artifactTailActionContext.assetRunPath}
+            </Text>
+          ) : null}
         </div>
       ) : null}
 

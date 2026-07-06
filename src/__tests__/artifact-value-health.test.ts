@@ -89,9 +89,195 @@ describe('artifact value health', () => {
     );
 
     expect(health.status).toBe('usable_with_limits');
-    expect(health.strengths).toEqual(['file-open-ready', 'thumbnail-ready', 'content-facts-ready']);
+    expect(health.strengths).toEqual(['file-open-ready', 'image-thumbnail-ready', 'content-facts-ready']);
     expect(health.gaps).toEqual(['native-preview-missing']);
     expect(health.nextActions).toEqual(['open-with-system-app', 'add-native-preview']);
+  });
+
+  it('marks Quick Look thumbnails as native file thumbnail strengths', () => {
+    const health = buildArtifactValueHealth(
+      createArtifact({
+        type: 'file',
+        externalFormat: 'powerpoint',
+        contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+        thumbnail: 'data:image/png;base64,iVBORw0KGgo=',
+        previewPlan: {
+          plannedAt: 20,
+          format: 'powerpoint',
+          sourceKind: 'imported_file',
+          strategy: 'system_file_handler',
+          surface: 'system_default_app',
+          primaryAction: 'open_file',
+          summary: 'PowerPoint · roadmap.pptx · 4 KB',
+          safetyNote: '本地文件通过系统默认应用打开，不会在 Desktop 内静默执行。',
+          limitations: ['native-preview-missing'],
+          nextSteps: ['open-with-system-app', 'add-native-preview'],
+        },
+      }),
+    );
+
+    expect(health.strengths).toEqual(['file-open-ready', 'native-thumbnail-ready']);
+  });
+
+  it('marks SVG fallback thumbnails as format placeholder strengths', () => {
+    const health = buildArtifactValueHealth(
+      createArtifact({
+        type: 'file',
+        externalFormat: 'file',
+        contentSummary: 'File · archive.bin · 4 KB',
+        thumbnail: 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=',
+        previewPlan: {
+          plannedAt: 20,
+          format: 'file',
+          sourceKind: 'imported_file',
+          strategy: 'system_file_handler',
+          surface: 'system_default_app',
+          primaryAction: 'open_file',
+          summary: 'File · archive.bin · 4 KB',
+          safetyNote: '本地文件通过系统默认应用打开，不会在 Desktop 内静默执行。',
+          limitations: ['native-preview-missing'],
+          nextSteps: ['open-with-system-app', 'add-native-preview'],
+        },
+      }),
+    );
+
+    expect(health.strengths).toEqual(['file-open-ready', 'format-placeholder-thumbnail-ready']);
+  });
+
+  it('marks imported PDF browser viewer previews as a native detail strength', () => {
+    const health = buildArtifactValueHealth(
+      createArtifact({
+        type: 'file',
+        externalFormat: 'pdf',
+        contentSummary: 'PDF · large.pdf · 8 MB',
+        previewPlan: {
+          plannedAt: 20,
+          format: 'pdf',
+          sourceKind: 'imported_file',
+          strategy: 'browser_pdf_viewer',
+          surface: 'artifact_detail',
+          primaryAction: 'open_file',
+          summary: 'PDF · large.pdf · 8 MB',
+          safetyNote: '使用浏览器内建 PDF 查看器预览，不读取任意本机路径，不执行任何内容。',
+          limitations: ['thumbnail-missing', 'content-extraction-missing'],
+          nextSteps: ['open-with-system-app', 'add-thumbnail', 'add-content-extraction'],
+        },
+      }),
+    );
+
+    expect(health.strengths).toEqual(['pdf-viewer-ready']);
+    expect(health.gaps).toEqual(['thumbnail-missing', 'content-extraction-missing']);
+  });
+
+  it('marks extracted text detail previews as a dedicated preview strength', () => {
+    const health = buildArtifactValueHealth(
+      createArtifact({
+        type: 'file',
+        externalFormat: 'powerpoint',
+        contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+        previewPlan: {
+          plannedAt: 20,
+          format: 'powerpoint',
+          sourceKind: 'imported_file',
+          strategy: 'content_extract_preview',
+          surface: 'artifact_detail',
+          primaryAction: 'view_detail',
+          summary: 'PowerPoint · roadmap.pptx · 4 KB',
+          safetyNote: '使用导入副本抽取的只读文本预览，不打开原始文件，也不会执行任何内容。',
+          limitations: ['native-preview-missing'],
+          nextSteps: ['open-artifact-detail', 'add-native-preview'],
+        },
+        contentExtract: {
+          extractedAt: 30,
+          status: 'extracted',
+          format: 'powerpoint',
+          sourceKind: 'imported_file',
+          summary: 'PowerPoint text extract · roadmap.pptx · 32 chars',
+          bytesRead: 8192,
+          textLength: 32,
+          truncated: false,
+          snippet: 'Quarterly Roadmap Delivery risks',
+        },
+      }),
+    );
+
+    expect(health.strengths).toEqual(['content-extract-preview-ready', 'content-extract-ready']);
+    expect(health.gaps).toEqual(['native-preview-missing']);
+    expect(health.nextActions).toEqual(['open-artifact-detail', 'add-native-preview']);
+  });
+
+  it('surfaces native thumbnail platform gaps from enrichment events', () => {
+    const health = buildArtifactValueHealth(
+      createArtifact({
+        type: 'file',
+        externalFormat: 'powerpoint',
+        contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+        previewPlan: {
+          plannedAt: 20,
+          format: 'powerpoint',
+          sourceKind: 'imported_file',
+          strategy: 'system_file_handler',
+          surface: 'system_default_app',
+          primaryAction: 'open_file',
+          summary: 'PowerPoint · roadmap.pptx · 4 KB',
+          safetyNote: '本地文件通过系统默认应用打开，不会在 Desktop 内静默执行。',
+          limitations: ['thumbnail-missing'],
+          nextSteps: ['open-with-system-app', 'add-thumbnail'],
+        },
+        enrichmentEvents: [
+          {
+            id: 'enrich_thumbnail_1',
+            kind: 'thumbnail',
+            status: 'unavailable',
+            artifactVersion: 1,
+            format: 'powerpoint',
+            attemptedAt: 30,
+            reason: 'native-thumbnail-platform-unsupported',
+          },
+        ],
+      }),
+    );
+
+    expect(health.status).toBe('usable_with_limits');
+    expect(health.gaps).toContain('native-thumbnail-platform-unsupported');
+    expect(health.nextActions).toContain('use-system-open-for-native-thumbnail-detail');
+  });
+
+  it('surfaces legacy binary Office extraction gaps from enrichment events', () => {
+    const health = buildArtifactValueHealth(
+      createArtifact({
+        fileName: 'roadmap.ppt',
+        externalFormat: 'powerpoint',
+        contentSummary: 'PowerPoint · roadmap.ppt · 4 KB',
+        previewPlan: {
+          plannedAt: 20,
+          format: 'powerpoint',
+          sourceKind: 'imported_file',
+          strategy: 'system_file_handler',
+          surface: 'system_default_app',
+          primaryAction: 'open_file',
+          summary: 'PowerPoint · roadmap.ppt · 4 KB',
+          safetyNote: '本地文件通过系统默认应用打开，不会在 Desktop 内静默执行。',
+          limitations: ['content-extraction-missing'],
+          nextSteps: ['open-with-system-app', 'add-content-extraction'],
+        },
+        enrichmentEvents: [
+          {
+            id: 'enrich_extract_1',
+            kind: 'content_extract',
+            status: 'unavailable',
+            artifactVersion: 1,
+            format: 'powerpoint',
+            attemptedAt: 30,
+            reason: 'legacy-binary-office',
+          },
+        ],
+      }),
+    );
+
+    expect(health.status).toBe('usable_with_limits');
+    expect(health.gaps).toContain('legacy-binary-office');
+    expect(health.nextActions).toContain('convert-legacy-office-or-open-with-system-app');
   });
 
   it('marks file artifacts with missing preview and extraction as usable with explicit gaps', () => {

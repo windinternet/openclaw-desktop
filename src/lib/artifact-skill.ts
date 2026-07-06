@@ -73,10 +73,10 @@ export async function writeArtifactSkill(client: GatewayClient): Promise<void> {
   if (api) {
     try {
       await api.writeSkill('_', SKILL_CONTENT);
-      console.log('[Artifact Skill] Written locally');
+      window.electronAPI?.log?.send('INFO', '[Artifact Skill] Written locally');
       return;
     } catch (e) {
-      console.warn('[Artifact Skill] Local write failed, trying RPC:', e);
+      window.electronAPI?.log?.send('WARN', '[Artifact Skill] Local write failed, trying RPC:', e);
     }
   }
 
@@ -87,8 +87,8 @@ export async function writeArtifactSkill(client: GatewayClient): Promise<void> {
       name: 'skills/artifact-generator/SKILL.md',
       content: SKILL_CONTENT,
     });
-    console.log('[Artifact Skill] Written via RPC:', result);
+    window.electronAPI?.log?.send('INFO', '[Artifact Skill] Written via RPC:', result);
   } catch (e) {
-    console.error('[Artifact Skill] RPC also failed:', e);
+    window.electronAPI?.log?.send('ERROR', '[Artifact Skill] RPC also failed:', e);
   }
 }

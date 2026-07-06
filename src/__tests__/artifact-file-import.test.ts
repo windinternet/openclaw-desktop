@@ -8,6 +8,9 @@ vi.mock('../lib/artifact-persistence', () => ({
     readImportedText: vi.fn(),
     readImportedFileFacts: vi.fn(),
     readImportedImageThumbnail: vi.fn(),
+    readImportedNativeThumbnail: vi.fn(),
+    readImportedDocumentPreview: vi.fn(),
+    loadMeta: vi.fn(),
     saveMeta: vi.fn(),
     saveHtml: vi.fn(),
     list: vi.fn(),
@@ -38,6 +41,16 @@ describe('artifact file import', () => {
       dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
       bytesRead: 2048,
       mimeType: 'image/png',
+    });
+    mockedPersistence.readImportedNativeThumbnail.mockResolvedValue({
+      dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+      bytesRead: 2048,
+      mimeType: 'image/png',
+    });
+    mockedPersistence.readImportedDocumentPreview.mockResolvedValue({
+      dataUrl: 'data:application/pdf;base64,JVBERi0xLjE=',
+      bytesRead: 2048,
+      mimeType: 'application/pdf',
     });
     mockedPersistence.importFile.mockResolvedValue({
       filePath: '/user-data/storage/artifacts/art_1/files/roadmap.pptx',
@@ -71,6 +84,7 @@ describe('artifact file import', () => {
     expect(mockedPersistence.readImportedText).toHaveBeenCalledWith(artifact.id);
     expect(mockedPersistence.readImportedFileFacts).toHaveBeenCalledWith(artifact.id);
     expect(mockedPersistence.readImportedImageThumbnail).not.toHaveBeenCalled();
+    expect(mockedPersistence.readImportedNativeThumbnail).toHaveBeenCalledWith(artifact.id);
     expect(artifact).toEqual(
       expect.objectContaining({
         filePath: '/user-data/storage/artifacts/art_1/files/roadmap.pptx',
@@ -110,6 +124,12 @@ describe('artifact file import', () => {
             format: 'powerpoint',
             resultSummary: 'PowerPoint facts · roadmap.pptx · 4 KB · sha256 aaaaaaaaaaaa',
           }),
+          expect.objectContaining({
+            kind: 'thumbnail',
+            status: 'succeeded',
+            format: 'powerpoint',
+            resultSummary: 'thumbnail available',
+          }),
         ]),
         fileInspection: expect.objectContaining({
           format: 'powerpoint',
@@ -121,11 +141,13 @@ describe('artifact file import', () => {
           originalPath: '/Users/deepin/Documents/roadmap.pptx',
           limitations: ['native-preview-missing', 'thumbnail-missing', 'content-extraction-missing'],
         }),
+        thumbnail: 'data:image/png;base64,iVBORw0KGgo=',
         previewPlan: expect.objectContaining({
-          strategy: 'system_file_handler',
-          surface: 'system_default_app',
-          primaryAction: 'open_file',
-          limitations: ['native-preview-missing', 'thumbnail-missing'],
+          strategy: 'content_extract_preview',
+          surface: 'artifact_detail',
+          primaryAction: 'view_detail',
+          limitations: ['native-preview-missing'],
+          nextSteps: ['open-artifact-detail', 'add-native-preview'],
         }),
       }),
     );
@@ -144,6 +166,7 @@ describe('artifact file import', () => {
           status: 'extracted',
           format: 'powerpoint',
         }),
+        thumbnail: 'data:image/png;base64,iVBORw0KGgo=',
         enrichmentEvents: expect.arrayContaining([
           expect.objectContaining({
             kind: 'content_extract',
@@ -153,6 +176,12 @@ describe('artifact file import', () => {
             kind: 'content_facts',
             status: 'succeeded',
           }),
+          expect.objectContaining({
+            kind: 'thumbnail',
+            status: 'succeeded',
+            format: 'powerpoint',
+            resultSummary: 'thumbnail available',
+          }),
         ]),
         fileInspection: expect.objectContaining({
           format: 'powerpoint',
@@ -160,9 +189,10 @@ describe('artifact file import', () => {
           previewStatus: 'external_app',
         }),
         previewPlan: expect.objectContaining({
-          strategy: 'system_file_handler',
-          primaryAction: 'open_file',
-          limitations: ['native-preview-missing', 'thumbnail-missing'],
+          strategy: 'content_extract_preview',
+          primaryAction: 'view_detail',
+          limitations: ['native-preview-missing'],
+          nextSteps: ['open-artifact-detail', 'add-native-preview'],
         }),
       }),
     );
@@ -194,9 +224,11 @@ describe('artifact file import', () => {
         originalFilePath: '/Users/deepin/Documents/plan.md',
         externalFormat: 'text',
         previewPlan: expect.objectContaining({
-          strategy: 'system_file_handler',
-          surface: 'system_default_app',
-          primaryAction: 'open_file',
+          strategy: 'content_extract_preview',
+          surface: 'artifact_detail',
+          primaryAction: 'view_detail',
+          limitations: ['native-preview-missing'],
+          nextSteps: ['open-artifact-detail', 'add-native-preview'],
         }),
         contentExtract: expect.objectContaining({
           status: 'extracted',
@@ -266,6 +298,8 @@ describe('artifact file import', () => {
 
     expect(mockedPersistence.readImportedText).toHaveBeenCalledWith(artifact.id);
     expect(mockedPersistence.readImportedFileFacts).toHaveBeenCalledWith(artifact.id);
+    expect(mockedPersistence.readImportedNativeThumbnail).toHaveBeenCalledWith(artifact.id);
+    expect(mockedPersistence.readImportedDocumentPreview).toHaveBeenCalledWith(artifact.id);
     expect(artifact).toEqual(
       expect.objectContaining({
         externalFormat: 'pdf',
@@ -280,6 +314,14 @@ describe('artifact file import', () => {
           format: 'pdf',
           pdfInfo: { version: '1.7', pageCount: 3 },
         }),
+        documentPreview: expect.objectContaining({
+          status: 'available',
+          format: 'pdf',
+          sourceKind: 'imported_file',
+          summary: 'PDF preview · brief.pdf · 2048 B',
+          dataUrl: 'data:application/pdf;base64,JVBERi0xLjE=',
+        }),
+        thumbnail: 'data:image/png;base64,iVBORw0KGgo=',
         enrichmentEvents: expect.arrayContaining([
           expect.objectContaining({
             kind: 'content_extract',
@@ -291,13 +333,262 @@ describe('artifact file import', () => {
             status: 'succeeded',
             format: 'pdf',
           }),
+          expect.objectContaining({
+            kind: 'document_preview',
+            status: 'succeeded',
+            format: 'pdf',
+            resultSummary: 'PDF preview · brief.pdf · 2048 B',
+          }),
+          expect.objectContaining({
+            kind: 'thumbnail',
+            status: 'succeeded',
+            format: 'pdf',
+            resultSummary: 'thumbnail available',
+          }),
         ]),
         previewPlan: expect.objectContaining({
-          limitations: ['native-preview-missing', 'thumbnail-missing'],
-          nextSteps: ['open-with-system-app', 'add-native-preview', 'add-thumbnail'],
+          strategy: 'browser_pdf_viewer',
+          surface: 'artifact_detail',
+          primaryAction: 'view_detail',
+          limitations: [],
+          nextSteps: ['open-artifact-detail'],
         }),
       }),
     );
+  });
+
+  it('automatically stores native thumbnails for imported video artifacts', async () => {
+    mockedPersistence.importFile.mockResolvedValue({
+      filePath: '/user-data/storage/artifacts/art_1/files/demo.mp4',
+      fileName: 'demo.mp4',
+      fileSize: 8192,
+      mimeType: 'video/mp4',
+    });
+
+    const artifact = await artifactService.generate({
+      title: '演示视频',
+      type: 'video',
+      filePath: '/Users/deepin/Movies/demo.mp4',
+      fileName: 'demo.mp4',
+      mimeType: 'video/mp4',
+      importFile: true,
+    });
+
+    expect(mockedPersistence.readImportedImageThumbnail).not.toHaveBeenCalled();
+    expect(mockedPersistence.readImportedNativeThumbnail).toHaveBeenCalledWith(artifact.id);
+    expect(artifact).toEqual(
+      expect.objectContaining({
+        externalFormat: 'video',
+        thumbnail: 'data:image/png;base64,iVBORw0KGgo=',
+        enrichmentEvents: expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'thumbnail',
+            status: 'succeeded',
+            format: 'video',
+            resultSummary: 'thumbnail available',
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it('uses a fallback thumbnail for native thumbnail platform gaps during imported file enrichment', async () => {
+    mockedPersistence.importFile.mockResolvedValue({
+      filePath: '/user-data/storage/artifacts/art_1/files/brief.pdf',
+      fileName: 'brief.pdf',
+      fileSize: 4096,
+      mimeType: 'application/pdf',
+    });
+    mockedPersistence.readImportedText.mockResolvedValue({
+      text: 'Quarterly roadmap and delivery risks.',
+      bytesRead: 2048,
+      truncated: false,
+    });
+    mockedPersistence.readImportedFileFacts.mockResolvedValue({
+      fileSize: 4096,
+      bytesRead: 4096,
+      sha256: 'c'.repeat(64),
+      signatureHex: '255044462d312e37',
+      pdfInfo: { version: '1.7', pageCount: 3 },
+    });
+    mockedPersistence.readImportedNativeThumbnail.mockRejectedValue(
+      new Error('Native thumbnail extraction requires macOS Quick Look'),
+    );
+
+    const artifact = await artifactService.generate({
+      title: '路线图 PDF',
+      type: 'file',
+      filePath: '/Users/deepin/Documents/brief.pdf',
+      fileName: 'brief.pdf',
+      mimeType: 'application/pdf',
+      importFile: true,
+    });
+
+    expect(mockedPersistence.readImportedNativeThumbnail).toHaveBeenCalledWith(artifact.id);
+    expect(artifact.thumbnail).toMatch(/^data:image\/svg\+xml;base64,/);
+    expect(artifact).toEqual(
+      expect.objectContaining({
+        externalFormat: 'pdf',
+        previewPlan: expect.objectContaining({
+          limitations: expect.not.arrayContaining(['thumbnail-missing']),
+        }),
+        enrichmentEvents: expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'thumbnail',
+            status: 'unavailable',
+            format: 'pdf',
+            reason: 'native-thumbnail-platform-unsupported',
+            resultSummary: 'fallback thumbnail available',
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it('generates a fallback thumbnail for generic imported files', async () => {
+    mockedPersistence.importFile.mockResolvedValue({
+      filePath: '/user-data/storage/artifacts/art_1/files/archive.bin',
+      fileName: 'archive.bin',
+      fileSize: 4096,
+      mimeType: 'application/octet-stream',
+    });
+
+    const artifact = await artifactService.generate({
+      title: '二进制附件',
+      type: 'file',
+      filePath: '/Users/deepin/Documents/archive.bin',
+      fileName: 'archive.bin',
+      mimeType: 'application/octet-stream',
+      importFile: true,
+    });
+
+    expect(mockedPersistence.readImportedImageThumbnail).not.toHaveBeenCalled();
+    expect(mockedPersistence.readImportedNativeThumbnail).not.toHaveBeenCalled();
+    expect(artifact.thumbnail).toMatch(/^data:image\/svg\+xml;base64,/);
+    expect(artifact).toEqual(
+      expect.objectContaining({
+        externalFormat: 'file',
+        previewPlan: expect.objectContaining({
+          limitations: expect.not.arrayContaining(['thumbnail-missing']),
+        }),
+        enrichmentEvents: expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'thumbnail',
+            status: 'succeeded',
+            format: 'file',
+            resultSummary: 'fallback thumbnail available',
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it('imports an existing local PDF artifact copy and reuses the enrichment pipeline', async () => {
+    mockedPersistence.loadMeta.mockResolvedValue({
+      id: 'art_pdf',
+      title: '本地路线图 PDF',
+      icon: '📎',
+      type: 'file',
+      source: { type: 'manual' },
+      tags: ['roadmap'],
+      currentVersion: 1,
+      status: 'draft',
+      createdAt: 1,
+      updatedAt: 2,
+      filePath: '/Users/deepin/Documents/local-brief.pdf',
+      fileName: 'local-brief.pdf',
+      mimeType: 'application/pdf',
+      externalFormat: 'pdf',
+      contentSummary: 'PDF · local-brief.pdf',
+    });
+    mockedPersistence.importFile.mockResolvedValue({
+      filePath: '/user-data/storage/artifacts/art_pdf/files/local-brief.pdf',
+      fileName: 'local-brief.pdf',
+      fileSize: 2048,
+      mimeType: 'application/pdf',
+    });
+    mockedPersistence.readImportedText.mockResolvedValue({
+      text: 'Local PDF roadmap evidence.',
+      bytesRead: 1024,
+      truncated: false,
+    });
+    mockedPersistence.readImportedFileFacts.mockResolvedValue({
+      fileSize: 2048,
+      bytesRead: 2048,
+      sha256: 'd'.repeat(64),
+      signatureHex: '255044462d312e37',
+      pdfInfo: { version: '1.7', pageCount: 2 },
+    });
+
+    const artifact = await artifactService.importFileCopy('art_pdf');
+
+    expect(mockedPersistence.importFile).toHaveBeenCalledWith(
+      'art_pdf',
+      '/Users/deepin/Documents/local-brief.pdf',
+      'local-brief.pdf',
+    );
+    expect(mockedPersistence.readImportedText).toHaveBeenCalledWith('art_pdf');
+    expect(mockedPersistence.readImportedFileFacts).toHaveBeenCalledWith('art_pdf');
+    expect(mockedPersistence.readImportedNativeThumbnail).toHaveBeenCalledWith('art_pdf');
+    expect(mockedPersistence.readImportedDocumentPreview).toHaveBeenCalledWith('art_pdf');
+    expect(artifact).toEqual(
+      expect.objectContaining({
+        id: 'art_pdf',
+        filePath: '/user-data/storage/artifacts/art_pdf/files/local-brief.pdf',
+        originalFilePath: '/Users/deepin/Documents/local-brief.pdf',
+        fileName: 'local-brief.pdf',
+        fileSize: 2048,
+        mimeType: 'application/pdf',
+        externalFormat: 'pdf',
+        contentSummary: 'PDF · local-brief.pdf · 2 KB',
+        contentExtract: expect.objectContaining({
+          status: 'extracted',
+          format: 'pdf',
+          snippet: 'Local PDF roadmap evidence.',
+        }),
+        contentFacts: expect.objectContaining({
+          status: 'recorded',
+          format: 'pdf',
+          sha256: 'd'.repeat(64),
+          pdfInfo: { version: '1.7', pageCount: 2 },
+        }),
+        documentPreview: expect.objectContaining({
+          status: 'available',
+          format: 'pdf',
+          summary: 'PDF preview · local-brief.pdf · 2048 B',
+        }),
+        thumbnail: 'data:image/png;base64,iVBORw0KGgo=',
+        previewPlan: expect.objectContaining({
+          limitations: [],
+        }),
+        enrichmentEvents: expect.arrayContaining([
+          expect.objectContaining({ kind: 'content_extract', status: 'succeeded' }),
+          expect.objectContaining({ kind: 'content_facts', status: 'succeeded' }),
+          expect.objectContaining({
+            kind: 'thumbnail',
+            status: 'succeeded',
+            format: 'pdf',
+            resultSummary: 'thumbnail available',
+          }),
+          expect.objectContaining({ kind: 'document_preview', status: 'succeeded' }),
+        ]),
+      }),
+    );
+    expect(mockedPersistence.saveMeta).toHaveBeenCalledWith(
+      'art_pdf',
+      expect.objectContaining({
+        originalFilePath: '/Users/deepin/Documents/local-brief.pdf',
+        documentPreview: expect.objectContaining({
+          status: 'available',
+        }),
+      }),
+    );
+    expect(mockedPersistence.updateIndex).toHaveBeenCalledWith([
+      expect.objectContaining({
+        id: 'art_pdf',
+        originalFilePath: '/Users/deepin/Documents/local-brief.pdf',
+      }),
+    ]);
   });
 
   it('keeps external file references when import is not requested', async () => {
@@ -340,6 +631,7 @@ describe('artifact file import', () => {
     });
 
     expect(mockedPersistence.readImportedImageThumbnail).toHaveBeenCalledWith(artifact.id);
+    expect(mockedPersistence.readImportedNativeThumbnail).not.toHaveBeenCalled();
     expect(artifact).toEqual(
       expect.objectContaining({
         externalFormat: 'image',

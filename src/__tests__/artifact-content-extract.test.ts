@@ -90,6 +90,45 @@ describe('artifact content extract', () => {
     expect(
       resolveArtifactContentExtractEligibility(
         createArtifact({
+          externalFormat: 'powerpoint',
+          fileName: 'legacy-roadmap.ppt',
+          mimeType: 'application/vnd.ms-powerpoint',
+        }),
+      ),
+    ).toEqual({
+      eligible: true,
+      format: 'powerpoint',
+    });
+
+    expect(
+      resolveArtifactContentExtractEligibility(
+        createArtifact({
+          externalFormat: 'excel',
+          fileName: 'legacy-budget.xls',
+          mimeType: 'application/vnd.ms-excel',
+        }),
+      ),
+    ).toEqual({
+      eligible: true,
+      format: 'excel',
+    });
+
+    expect(
+      resolveArtifactContentExtractEligibility(
+        createArtifact({
+          externalFormat: 'word',
+          fileName: 'legacy-brief.doc',
+          mimeType: 'application/msword',
+        }),
+      ),
+    ).toEqual({
+      eligible: true,
+      format: 'word',
+    });
+
+    expect(
+      resolveArtifactContentExtractEligibility(
+        createArtifact({
           externalFormat: 'audio',
           fileName: 'meeting.mp3',
           mimeType: 'audio/mpeg',
@@ -163,6 +202,80 @@ describe('artifact content extract', () => {
         fileName: 'roadmap.pptx',
         summary: `PowerPoint text extract · roadmap.pptx · ${text.length} chars`,
         snippet: text,
+      }),
+    );
+  });
+
+  it('labels legacy Office extracts with their best-effort extraction boundary', () => {
+    const tabularText = 'Name\tAmount\nAlpha\t42';
+    const excelExtract = buildArtifactContentExtract(
+      createArtifact({
+        externalFormat: 'excel',
+        fileName: 'legacy-budget.xls',
+        mimeType: 'application/vnd.ms-excel',
+      }),
+      {
+        text: tabularText,
+        bytesRead: 2048,
+        truncated: false,
+      },
+      80,
+    );
+
+    expect(excelExtract).toEqual(
+      expect.objectContaining({
+        format: 'excel',
+        fileName: 'legacy-budget.xls',
+        summary: `Legacy Excel BIFF8/printable text extract · legacy-budget.xls · ${tabularText.length} chars`,
+        snippet: tabularText,
+      }),
+    );
+
+    const powerpointText = 'Launch Plan\nQ3 Goals';
+    const powerpointExtract = buildArtifactContentExtract(
+      createArtifact({
+        externalFormat: 'powerpoint',
+        fileName: 'legacy-roadmap.ppt',
+        mimeType: 'application/vnd.ms-powerpoint',
+      }),
+      {
+        text: powerpointText,
+        bytesRead: 2048,
+        truncated: false,
+      },
+      82,
+    );
+
+    expect(powerpointExtract).toEqual(
+      expect.objectContaining({
+        format: 'powerpoint',
+        fileName: 'legacy-roadmap.ppt',
+        summary: `Legacy PowerPoint text atom/printable extract · legacy-roadmap.ppt · ${powerpointText.length} chars`,
+        snippet: powerpointText,
+      }),
+    );
+
+    const wordText = 'Legacy Word body';
+    const wordExtract = buildArtifactContentExtract(
+      createArtifact({
+        externalFormat: 'word',
+        fileName: 'legacy-brief.doc',
+        mimeType: 'application/msword',
+      }),
+      {
+        text: wordText,
+        bytesRead: 1024,
+        truncated: false,
+      },
+      81,
+    );
+
+    expect(wordExtract).toEqual(
+      expect.objectContaining({
+        format: 'word',
+        fileName: 'legacy-brief.doc',
+        summary: `Legacy Word textutil extract · legacy-brief.doc · ${wordText.length} chars`,
+        snippet: wordText,
       }),
     );
   });

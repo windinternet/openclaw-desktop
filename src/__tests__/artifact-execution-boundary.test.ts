@@ -105,4 +105,62 @@ describe('artifact execution boundary', () => {
       },
     });
   });
+
+  it('surfaces the latest approval decision without treating it as execution success', () => {
+    const boundary = buildArtifactExecutionBoundary(
+      createArtifact({
+        reuseKind: 'script',
+        executionEvents: [
+          {
+            id: 'exec_waiting',
+            status: 'approval_required',
+            artifactVersion: 3,
+            requestedAt: 20,
+            approvalTitle: '执行发布脚本',
+            approvalRisk: 'high',
+            approvalReason: '会把构建结果交给外部 runner。',
+            runner: 'external-runner',
+            command: 'npm run release',
+            resultSummary: '等待用户审批。',
+          },
+          {
+            id: 'exec_approved',
+            status: 'approved',
+            artifactVersion: 3,
+            requestedAt: 30,
+            approvalTitle: '执行发布脚本',
+            approvalRisk: 'high',
+            approvalReason: '会把构建结果交给外部 runner。',
+            runner: 'external-runner',
+            command: 'npm run release',
+            resultSummary:
+              'User approved external runner handoff for Artifact execution; Desktop did not execute the command or grant permission.',
+          },
+        ],
+      }),
+    );
+
+    expect(boundary).toMatchObject({
+      executionEventCount: 2,
+      latestExecution: {
+        id: 'exec_approved',
+        status: 'approved',
+        resultSummary:
+          'User approved external runner handoff for Artifact execution; Desktop did not execute the command or grant permission.',
+      },
+      latestApprovalDecision: {
+        id: 'exec_approved',
+        status: 'approved',
+        runner: 'external-runner',
+        command: 'npm run release',
+        approvalTitle: '执行发布脚本',
+        approvalRisk: 'high',
+      },
+      boundary: {
+        recordOnly: true,
+        desktopExecutes: false,
+        grantsPermission: false,
+      },
+    });
+  });
 });
