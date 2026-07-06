@@ -11,6 +11,7 @@ import {
 } from '../lib/new-session';
 import { buildModelOptions, fetchGatewayDefaultModel, resolvePreferredModel } from '../lib/model-selection';
 import { extractDraftText } from '../lib/new-session-draft';
+import type { WorkSystemOnboardingSessionState } from '../lib/work-system-onboarding';
 import AgentSelectOption from './AgentSelectOption';
 
 const { Configure } = AIChatInput;
@@ -54,6 +55,7 @@ interface NewSessionComposerProps {
   dragOverlay?: boolean;
   initialMessage?: string;
   initialMessageKey?: string | number;
+  onboardingSessionState?: WorkSystemOnboardingSessionState;
 }
 
 export default function NewSessionComposer({
@@ -63,6 +65,7 @@ export default function NewSessionComposer({
   dragOverlay = true,
   initialMessage = '',
   initialMessageKey = 0,
+  onboardingSessionState,
 }: NewSessionComposerProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -85,7 +88,7 @@ export default function NewSessionComposer({
 
   const initialInputText = useMemo(
     () => (initialMessage.trim() ? initialMessage : loadNewSessionDraft()),
-    [initialMessage, initialMessageKey],
+    [initialMessage],
   );
 
   const defaultContent = useMemo(() => {
@@ -194,6 +197,7 @@ export default function NewSessionComposer({
           content,
           model: selectedModel || resolvedDefaultModel,
           thinking: thinkingLevel,
+          onboardingSessionState,
         });
         useStore.getState().fetchSessions();
         Toast.success(t('chat.sessionCreated'));
@@ -215,6 +219,7 @@ export default function NewSessionComposer({
       selectedModel,
       resolvedDefaultModel,
       thinkingLevel,
+      onboardingSessionState,
       navigate,
       t,
     ],

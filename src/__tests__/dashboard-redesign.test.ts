@@ -115,7 +115,7 @@ describe('dashboard redesign', () => {
     expect(dashboard).toContain("t('dashboard.onboardingRepositoryNext')");
     expect(dashboard).toContain("t('dashboard.onboardingFirstThingNext')");
     expect(dashboard).toContain('repositorySetupNeeded');
-    expect(dashboard).toContain('<RepositoryGate area="workbench"');
+    expect(dashboard).toContain('<WorkSystemWorkspaceChoice');
     expect(dashboard.indexOf('{renderWorkSystemOnboarding()}')).toBeLessThan(
       dashboard.indexOf('{renderGatewayStatusSection()}'),
     );

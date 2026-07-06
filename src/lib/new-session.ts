@@ -1,6 +1,7 @@
 import { extractSessionMessageText } from './session-content';
 import type { RepositoryMarkdownFile } from './repository-knowledge';
 import type { WorkbenchSnapshot, WorkbenchTaskGroup } from './repository-workbench';
+import type { WorkSystemOnboardingSessionState } from './work-system-onboarding';
 
 export interface NewSessionCreateParams {
   request: {
@@ -25,6 +26,7 @@ export interface NewSessionNavigationTarget {
   to: string;
   state?: {
     initialMessage: NewSessionInitialMessage;
+    onboardingSessionState?: WorkSystemOnboardingSessionState;
   };
 }
 
@@ -87,19 +89,23 @@ export function buildNewSessionNavigationTarget(options: {
   content: unknown;
   model?: string;
   thinking?: string;
+  onboardingSessionState?: WorkSystemOnboardingSessionState;
 }): NewSessionNavigationTarget {
   const message = extractSessionMessageText(options.content).trim();
   if (!message) return { to: getChatRoute(options.sessionKey) };
 
+  const state: NonNullable<NewSessionNavigationTarget['state']> = {
+    initialMessage: {
+      content: options.content,
+      model: options.model,
+      thinking: options.thinking,
+    },
+  };
+  if (options.onboardingSessionState?.initialMessage) state.onboardingSessionState = options.onboardingSessionState;
+
   return {
     to: getChatRoute(options.sessionKey),
-    state: {
-      initialMessage: {
-        content: options.content,
-        model: options.model,
-        thinking: options.thinking,
-      },
-    },
+    state,
   };
 }
 

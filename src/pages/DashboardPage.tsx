@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Badge, Button, Input, Tag, Toast, Typography } from '@douyinfe/semi-ui';
+import { Badge, Button, Tag, Toast, Typography } from '@douyinfe/semi-ui';
 import {
   IconAppCenter,
   IconBolt,
@@ -43,8 +43,12 @@ import {
   loadWorkbenchSnapshot,
   type WorkbenchSnapshot,
 } from '../lib/repository-workbench';
-import RepositoryGate from '../components/RepositoryGate';
-import { isWorkSystemOnboardingSearch, WORK_SYSTEM_ONBOARDING_ANCHOR } from '../lib/work-system-onboarding';
+import WorkSystemWorkspaceChoice from '../components/WorkSystemWorkspaceChoice';
+import {
+  buildSkippedWorkspaceSessionState,
+  isWorkSystemOnboardingSearch,
+  WORK_SYSTEM_ONBOARDING_ANCHOR,
+} from '../lib/work-system-onboarding';
 import { createFirstWorkbenchMatter } from '../lib/workbench-first-matter';
 
 const { Title, Text } = Typography;
@@ -348,7 +352,7 @@ export default function DashboardPage() {
   }, [currentInstanceId, actionRunsVersion, refreshTick]);
 
   useEffect(() => {
-    if (!onboardingRequested || !repositorySetupNeeded) return;
+    if (!onboardingRequested) return;
     window.requestAnimationFrame(() => {
       document.getElementById(WORK_SYSTEM_ONBOARDING_ANCHOR)?.scrollIntoView({ block: 'start' });
     });
@@ -503,6 +507,13 @@ export default function DashboardPage() {
     }
   };
 
+  const handleSkipWorkspaceSetup = () => {
+    Toast.info(t('dashboard.workspaceChoiceSkipToast'));
+    navigate('/new-session', {
+      state: buildSkippedWorkspaceSessionState(firstMatterDraft, t('dashboard.workspaceChoiceSkip')),
+    });
+  };
+
   const handleCompleteTailAction = async (item: DashboardWorkSystemSummaryItem) => {
     if (!repositoryBinding || !item.status?.startsWith('tail-action') || !item.path) {
       Toast.warning(t('dashboard.tailActionCompleteUnavailable'));
@@ -641,7 +652,7 @@ export default function DashboardPage() {
   );
 
   const renderWorkSystemOnboarding = () => {
-    if (!repositorySetupNeeded || (!isConnected && !onboardingRequested)) return null;
+    if (!onboardingRequested && (!repositorySetupNeeded || !isConnected)) return null;
 
     return (
       <DashboardSection
@@ -684,42 +695,15 @@ export default function DashboardPage() {
             </span>
           </div>
         </div>
-        <div className="dashboard-onboarding-repository">
-          <RepositoryGate area="workbench">
-            {(binding) => (
-              <div className="dashboard-onboarding-ready">
-                <div>
-                  <Text strong>{t('dashboard.onboardingRepositoryReady')}</Text>
-                  <Text type="tertiary" size="small">
-                    {t('dashboard.onboardingRepositoryReadyDesc')}
-                  </Text>
-                </div>
-                <div className="dashboard-first-matter-form">
-                  <Input
-                    value={firstMatterDraft}
-                    placeholder={t('dashboard.firstMatterPlaceholder')}
-                    onChange={setFirstMatterDraft}
-                    onEnterPress={() => {
-                      void handleCreateFirstMatter(binding);
-                    }}
-                    disabled={firstMatterCreating}
-                  />
-                  <Button
-                    theme="solid"
-                    type="primary"
-                    loading={firstMatterCreating}
-                    disabled={!firstMatterDraft.trim()}
-                    onClick={() => {
-                      void handleCreateFirstMatter(binding);
-                    }}
-                  >
-                    {t('dashboard.createFirstMatter')}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </RepositoryGate>
-        </div>
+        <WorkSystemWorkspaceChoice
+          firstMatterDraft={firstMatterDraft}
+          firstMatterCreating={firstMatterCreating}
+          onFirstMatterDraftChange={setFirstMatterDraft}
+          onCreateFirstMatter={(binding) => {
+            void handleCreateFirstMatter(binding);
+          }}
+          onSkipWorkspace={handleSkipWorkspaceSetup}
+        />
       </DashboardSection>
     );
   };

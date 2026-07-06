@@ -7,6 +7,7 @@ import {
   getChatRoute,
   resolveCreatedSessionKey,
 } from '../lib/new-session';
+import { buildSkippedWorkspaceSessionState } from '../lib/work-system-onboarding';
 import { extractDraftText } from '../lib/new-session-draft';
 
 describe('new session creation params', () => {
@@ -67,6 +68,22 @@ describe('new session creation params', () => {
           thinking: 'high',
         },
       },
+    });
+  });
+
+  it('can carry skipped workspace onboarding context to the destination chat page', () => {
+    const onboardingSessionState = buildSkippedWorkspaceSessionState('整理家庭账单', '继续体验');
+    const target = buildNewSessionNavigationTarget({
+      sessionKey: 'agent:main:dashboard:new',
+      content: { inputContents: [{ type: 'text', text: '第一条消息' }] },
+      model: 'gpt-4.1',
+      thinking: 'high',
+      onboardingSessionState,
+    });
+
+    expect(target.state?.onboardingSessionState).toMatchObject({
+      firstThingTitle: '整理家庭账单',
+      starterLabel: '继续体验',
     });
   });
 
@@ -156,6 +173,15 @@ describe('new session creation params', () => {
     expect(source).toContain("window.addEventListener('drop', handlePageDrop)");
     expect(source).toContain('showUploadFile');
     expect(source).toContain('showUploadButton');
+  });
+
+  it('keeps initialMessageKey out of initial input memo dependencies', () => {
+    const source = readFileSync('src/components/NewSessionComposer.tsx', 'utf8');
+    const initialInputMemo = source.match(/const initialInputText = useMemo\([\s\S]*?\n {2}\);/)?.[0] ?? '';
+
+    expect(initialInputMemo).toContain('[initialMessage]');
+    expect(initialInputMemo).not.toContain('initialMessageKey');
+    expect(source).toContain('key={`${inputKeyPrefix}:${initialMessageKey}:');
   });
 
   it('turns workbench task groups into continuation prompts for the new session page', () => {

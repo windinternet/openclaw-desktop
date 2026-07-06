@@ -1,13 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Typography } from '@douyinfe/semi-ui';
+import { Button, Toast, Typography } from '@douyinfe/semi-ui';
 import { IconBolt, IconCalendarClock, IconCheckList, IconClock, IconFile, IconFolderOpen } from '@douyinfe/semi-icons';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../lib';
 import NewSessionComposer from '../components/NewSessionComposer';
 import ChatComposerFrame from '../components/ChatComposerFrame';
+import type { RepositoryBinding } from '../lib/agentic-repository';
 import { loadRepositoryBinding } from '../lib/agentic-repository-store';
 import { buildNewSessionWorkbenchContinuations, type NewSessionWorkbenchContinuation } from '../lib/new-session';
 import { loadWorkbenchSnapshot, type WorkbenchSnapshot } from '../lib/repository-workbench';
+import {
+  buildSkippedWorkspaceMatterCarryover,
+  getWorkSystemOnboardingSessionState,
+  WORK_SYSTEM_ONBOARDING_ROUTE,
+} from '../lib/work-system-onboarding';
+import { createFirstWorkbenchMatter } from '../lib/workbench-first-matter';
 
 const { Title, Text } = Typography;
 
@@ -28,19 +36,25 @@ interface LaunchCard extends StarterPrompt {
 
 export default function NewSessionPage() {
   const { t } = useTranslation();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const onboardingSessionState = useMemo(() => getWorkSystemOnboardingSessionState(location.state), [location.state]);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const actionRunsVersion = useStore((s) => s.actionRunsVersion);
 
   const [workbenchSnapshot, setWorkbenchSnapshot] = useState<WorkbenchSnapshot | null>(null);
+  const [repositoryBinding, setRepositoryBinding] = useState<RepositoryBinding | null>(null);
   const [workbenchLoading, setWorkbenchLoading] = useState(false);
-  const [starterMessage, setStarterMessage] = useState('');
+  const [starterMessage, setStarterMessage] = useState(onboardingSessionState.initialMessage);
   const [starterMessageKey, setStarterMessageKey] = useState(0);
-  const [starterLabel, setStarterLabel] = useState('');
+  const [starterLabel, setStarterLabel] = useState(onboardingSessionState.starterLabel);
+  const [temporaryMatterPreserving, setTemporaryMatterPreserving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setWorkbenchSnapshot(null);
+    setRepositoryBinding(null);
 
     if (!currentInstanceId) {
       return () => {
@@ -50,7 +64,10 @@ export default function NewSessionPage() {
 
     setWorkbenchLoading(true);
     void loadRepositoryBinding(currentInstanceId)
-      .then((binding) => (binding ? loadWorkbenchSnapshot(binding) : null))
+      .then((binding) => {
+        if (!cancelled) setRepositoryBinding(binding?.status === 'repo_ready' ? binding : null);
+        return binding ? loadWorkbenchSnapshot(binding) : null;
+      })
       .then((snapshot) => {
         if (cancelled) return;
         setWorkbenchSnapshot(snapshot);
@@ -138,6 +155,57 @@ export default function NewSessionPage() {
     setStarterMessageKey((value) => value + 1);
   };
 
+  const handlePreserveTemporaryMatter = async () => {
+    if (!repositoryBinding || !onboardingSessionState.firstThingTitle.trim()) return;
+    setTemporaryMatterPreserving(true);
+    try {
+      const matter = await createFirstWorkbenchMatter(repositoryBinding, onboardingSessionState.firstThingTitle, {
+        source: 'desktop-onboarding-skip',
+        carryover: buildSkippedWorkspaceMatterCarryover(onboardingSessionState),
+      });
+      Toast.success(t('dashboard.temporaryMatterPreserved'));
+      navigate(`/workbench?view=tasks&workItemPath=${encodeURIComponent(matter.path)}`);
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('dashboard.temporaryMatterPreserveFailed'));
+    } finally {
+      setTemporaryMatterPreserving(false);
+    }
+  };
+
+  const renderTemporaryMatterCard = () => {
+    if (!onboardingSessionState.initialMessage) return null;
+    const canPreserve = Boolean(repositoryBinding && onboardingSessionState.firstThingTitle.trim());
+    return (
+      <div className="new-session-temporary-matter">
+        <div>
+          <Text strong>{t('dashboard.temporaryMatterTitle')}</Text>
+          <Text type="tertiary" size="small">
+            {t('dashboard.temporaryMatterDesc')}
+          </Text>
+          {onboardingSessionState.firstThingTitle ? (
+            <Text type="tertiary" size="small">
+              {onboardingSessionState.firstThingTitle}
+            </Text>
+          ) : null}
+        </div>
+        <Button
+          size="small"
+          type={canPreserve ? 'primary' : 'tertiary'}
+          loading={temporaryMatterPreserving}
+          onClick={() => {
+            if (canPreserve) {
+              void handlePreserveTemporaryMatter();
+              return;
+            }
+            navigate(WORK_SYSTEM_ONBOARDING_ROUTE);
+          }}
+        >
+          {canPreserve ? t('dashboard.preserveTemporaryMatter') : t('dashboard.chooseWorkspaceForTemporaryMatter')}
+        </Button>
+      </div>
+    );
+  };
+
   const renderLaunchCard = (card: LaunchCard) => (
     <button
       key={card.id}
@@ -197,6 +265,7 @@ export default function NewSessionPage() {
           }
           after={<Text className="new-session-disclaimer">{t('newSessionPage.disclaimer')}</Text>}
         >
+          {renderTemporaryMatterCard()}
           {starterLabel || workbenchLoading ? (
             <div className="new-session-composer-hint">
               {starterLabel
@@ -208,6 +277,7 @@ export default function NewSessionPage() {
             inputKeyPrefix="new-session-page"
             initialMessage={starterMessage}
             initialMessageKey={starterMessageKey}
+            onboardingSessionState={onboardingSessionState}
             style={{
               width: '100%',
               borderRadius: 16,

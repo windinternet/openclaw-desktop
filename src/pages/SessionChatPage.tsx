@@ -6,9 +6,12 @@ import {
   AIChatInput,
   Button,
   Empty,
+  Input,
   Progress,
+  Select,
   Tabs,
   Tag,
+  TextArea,
   Tooltip,
   Toast,
   Typography,
@@ -30,11 +33,14 @@ import type {
 import { useStore } from '../lib';
 import ChatComposerFrame from '../components/ChatComposerFrame';
 import { buildArtifactGenerateParamsFromParsedArtifact } from '../lib/artifact-parser';
+import { buildArtifactDisplayLine } from '../lib/artifact-display';
 import { collectChatArtifactCandidates, filterArtifactsForSessionKeys } from '../lib/session-artifacts';
 import { stripGeneratedSessionLabelSuffix } from '../lib/session-label';
 import type { ArtifactMeta } from '../lib/artifact-types';
 import type { EventFrame } from '../lib/types';
 import {
+  buildDesktopCardArtifactImportParams,
+  buildDesktopCardAuthorizationApprovalParams,
   decodeSessionKeyParam,
   deriveSessionInsight,
   extractSessionMessageText,
@@ -49,9 +55,19 @@ import {
   mergeVisibleHistoryWithLiveChats,
   mergeRealtimeToolChatIntoRun,
   parseSessionContextSnapshot,
+  buildDesktopCardActionUserMessage,
+  getDesktopCardActionArtifactId,
+  parseDesktopMessageCards,
+  resolveDesktopCardActionInteraction,
   summarizeToolResultForDisplay,
 } from '../lib/session-content';
-import type { ChatContentItem, SessionContextSnapshot, SessionMessageDisplaySettings } from '../lib/session-content';
+import type {
+  ChatContentItem,
+  DesktopMessageCard,
+  DesktopMessageCardAction,
+  SessionContextSnapshot,
+  SessionMessageDisplaySettings,
+} from '../lib/session-content';
 import { isAssistantCompletionEvent } from '../lib/assistant-completion-notifier';
 import AgentSelectOption from '../components/AgentSelectOption';
 import ContextSummary from '../components/ContextSummary';
@@ -79,6 +95,18 @@ import {
 } from '../lib/agent-switching';
 import { buildNewSessionCreateParams, getChatRoute, resolveCreatedSessionKey } from '../lib/new-session';
 import { buildModelOptions, fetchGatewayDefaultModel, resolvePreferredModel } from '../lib/model-selection';
+import type { RepositoryBinding } from '../lib/agentic-repository';
+import { loadRepositoryBinding } from '../lib/agentic-repository-store';
+import { loadWorkbenchSnapshot } from '../lib/repository-workbench';
+import {
+  archiveSkippedWorkspaceSessionSource,
+  buildSkippedWorkspaceMatterCarryover,
+  getWorkSystemOnboardingSessionState,
+  loadSkippedWorkspaceSessionArchiveMessages,
+  WORK_SYSTEM_ONBOARDING_ROUTE,
+} from '../lib/work-system-onboarding';
+import { createFirstWorkbenchMatter } from '../lib/workbench-first-matter';
+import { useWorkbenchWorkItemOptions } from '../lib/workbench-work-items';
 import {
   buildGatewayChatSendPayload,
   buildSemiMessageContent,
@@ -222,6 +250,7 @@ interface ChatLocationState {
     model?: string;
     thinking?: string;
   };
+  onboardingSessionState?: unknown;
 }
 
 interface DisplayChat {
@@ -237,6 +266,7 @@ interface DisplayChat {
   usage?: unknown;
   model?: string;
   localOnly?: boolean;
+  desktopCards?: DesktopMessageCard[];
 }
 
 interface SelectedToolCall {
@@ -268,7 +298,8 @@ function buildDisplayChat(
   const parsedContext = record.role === 'user' ? parseContextualUserMessage(record) : null;
   const contentSource = parsedContext ? { ...record, content: parsedContext.userMessage } : record;
   const content = parseHistoryMessageToContentItems(contentSource, displaySettings);
-  if (content.length === 0) return null;
+  const desktopCards = parseDesktopMessageCards(contentSource);
+  if (content.length === 0 && desktopCards.length === 0) return null;
   const agentId = getAgentIdFromSessionKey(sessionKey);
   return {
     id: getHistoryMessageDisplayId(sessionKey, record, index, displaySettings),
@@ -284,6 +315,7 @@ function buildDisplayChat(
     contextSummary: parsedContext?.summary,
     usage: record.usage,
     model: typeof record.model === 'string' ? record.model : undefined,
+    desktopCards,
   };
 }
 
@@ -456,6 +488,32 @@ function DetailCodeBlock({ value, t }: { value: unknown; t?: TFunc }) {
 function isPendingDialogueMessage(message?: { content?: unknown; output_text?: unknown; status?: string }): boolean {
   if (!message || message.status !== 'in_progress' || message.output_text) return false;
   return Array.isArray(message.content) && message.content.length === 0;
+}
+
+function desktopCardKindLabel(kind: DesktopMessageCard['kind']): string {
+  switch (kind) {
+    case 'authorization':
+      return '授权';
+    case 'inquiry':
+      return '问询';
+    case 'artifact':
+      return '产物';
+    case 'action-run-result':
+      return 'ActionRun';
+    default:
+      return kind;
+  }
+}
+
+function desktopCardTone(kind: DesktopMessageCard['kind']): 'orange' | 'blue' | 'green' | 'grey' {
+  if (kind === 'authorization') return 'orange';
+  if (kind === 'artifact') return 'green';
+  if (kind === 'action-run-result') return 'blue';
+  return 'grey';
+}
+
+function getDesktopCardFieldKey(card: DesktopMessageCard, field: DesktopMessageCard['fields'][number]): string {
+  return `${card.id ?? card.title}:${card.kind}:${field.id}`;
 }
 
 function PendingDialogueLoading() {
@@ -961,9 +1019,17 @@ export default function SessionChatPage() {
   const artifacts = useStore((s) => s.artifacts);
   const fetchArtifacts = useStore((s) => s.fetchArtifacts);
   const generateArtifact = useStore((s) => s.generateArtifact);
+  const resolveDesktopCardAuthorizationApproval = useStore((s) => s.resolveDesktopCardAuthorizationApproval);
+  const publishArtifact = useStore((s) => s.publishArtifact);
+  const importArtifactFromFile = useStore((s) => s.importArtifactFromFile);
+  const mirrorArtifactToRepository = useStore((s) => s.mirrorArtifactToRepository);
   const openArtifactWindow = useStore((s) => s.openArtifactWindow);
   const currentInstanceId = useStore((s) => s.currentInstanceId);
   const currentInstance = useStore((s) => s.instances.find((instance) => instance.id === s.currentInstanceId) ?? null);
+  const incomingOnboardingSessionState = useMemo(
+    () => getWorkSystemOnboardingSessionState((location.state as ChatLocationState | null)?.onboardingSessionState),
+    [location.state],
+  );
   const globalAgentSwitchStrategy = useSettingsStore((s) => s.settings.agentSwitchStrategy);
   const sessionToolCallDisplay = useSettingsStore((s) => s.settings.sessionToolCallDisplay);
   const sessionReasoningDisplay = useSettingsStore((s) => s.settings.sessionReasoningDisplay);
@@ -987,6 +1053,9 @@ export default function SessionChatPage() {
   const [chatModel, setChatModel] = useState('');
   const [gatewayDefaultModel, setGatewayDefaultModel] = useState<string | undefined>();
   const [chatThinking, setChatThinking] = useState('medium');
+  const [repositoryBinding, setRepositoryBinding] = useState<RepositoryBinding | null>(null);
+  const [chatOnboardingSessionState, setChatOnboardingSessionState] = useState(incomingOnboardingSessionState);
+  const [temporaryMatterPreserving, setTemporaryMatterPreserving] = useState(false);
 
   const PAGE_SIZE = 30;
   const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
@@ -997,6 +1066,7 @@ export default function SessionChatPage() {
   const [sidePanelPinned, setSidePanelPinned] = useState(false);
   const [sessionContextSnapshot, setSessionContextSnapshot] = useState<SessionContextSnapshot | null>(null);
   const [pageDragActive, setPageDragActive] = useState(false);
+  const [desktopCardFieldDrafts, setDesktopCardFieldDrafts] = useState<Record<string, string>>({});
 
   const streamingIdRef = useRef<string | null>(null);
   const patchAppliedRef = useRef(false);
@@ -1028,6 +1098,133 @@ export default function SessionChatPage() {
     if (!currentInstanceId) return;
     void fetchArtifacts();
   }, [currentInstanceId, fetchArtifacts]);
+
+  useEffect(() => {
+    if (incomingOnboardingSessionState.initialMessage) {
+      setChatOnboardingSessionState(incomingOnboardingSessionState);
+    }
+  }, [incomingOnboardingSessionState]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setRepositoryBinding(null);
+
+    if (!currentInstanceId) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void loadRepositoryBinding(currentInstanceId)
+      .then((binding) => {
+        if (!cancelled) setRepositoryBinding(binding?.status === 'repo_ready' ? binding : null);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentInstanceId]);
+
+  const desktopCardsNeedWorkItemOptions = useMemo(
+    () =>
+      chats.some((chat) =>
+        chat.desktopCards?.some((card) => card.fields.some((field) => field.optionsSource === 'work-items')),
+      ),
+    [chats],
+  );
+  const desktopCardsNeedPlanOptions = useMemo(
+    () =>
+      chats.some((chat) =>
+        chat.desktopCards?.some((card) => card.fields.some((field) => field.optionsSource === 'plans')),
+      ),
+    [chats],
+  );
+  const desktopCardsNeedArtifactOptions = useMemo(
+    () =>
+      chats.some((chat) =>
+        chat.desktopCards?.some((card) => card.fields.some((field) => field.optionsSource === 'artifacts')),
+      ),
+    [chats],
+  );
+  const { options: desktopCardWorkItemOptions, loading: desktopCardWorkItemOptionsLoading } =
+    useWorkbenchWorkItemOptions({
+      binding: repositoryBinding,
+      instanceId: currentInstanceId,
+      enabled: desktopCardsNeedWorkItemOptions,
+    });
+  const [desktopCardPlanOptions, setDesktopCardPlanOptions] = useState<DesktopMessageCard['fields'][number]['options']>(
+    [],
+  );
+  const [desktopCardPlanOptionsLoading, setDesktopCardPlanOptionsLoading] = useState(false);
+  useEffect(() => {
+    if (!desktopCardsNeedPlanOptions || !repositoryBinding) {
+      setDesktopCardPlanOptions([]);
+      setDesktopCardPlanOptionsLoading(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setDesktopCardPlanOptionsLoading(true);
+    void loadWorkbenchSnapshot(repositoryBinding)
+      .then((snapshot) => {
+        if (cancelled) return;
+        setDesktopCardPlanOptions(
+          snapshot.activePlans.map((plan) => ({
+            label: `${plan.name} · ${plan.path}`,
+            value: plan.path,
+          })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setDesktopCardPlanOptions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setDesktopCardPlanOptionsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [desktopCardsNeedPlanOptions, repositoryBinding]);
+  const desktopCardArtifactOptions = useMemo(() => {
+    if (!desktopCardsNeedArtifactOptions) return [];
+    return artifacts.map((artifact) => {
+      const detail = buildArtifactDisplayLine(artifact);
+      return {
+        label: detail ? `${artifact.title} · ${detail}` : artifact.title,
+        value: `artifact://${artifact.id}`,
+      };
+    });
+  }, [artifacts, desktopCardsNeedArtifactOptions]);
+  const getDesktopCardFieldOptions = useCallback(
+    (field: DesktopMessageCard['fields'][number]) => {
+      const options = [...(field.options ?? [])];
+      if (field.optionsSource === 'work-items') {
+        for (const item of desktopCardWorkItemOptions) {
+          if (options.some((option) => option.value === item.path)) continue;
+          options.push({
+            label: `${item.name} · ${item.path}`,
+            value: item.path,
+          });
+        }
+      }
+      if (field.optionsSource === 'plans') {
+        for (const option of desktopCardPlanOptions ?? []) {
+          if (options.some((existing) => existing.value === option.value)) continue;
+          options.push(option);
+        }
+      }
+      if (field.optionsSource === 'artifacts') {
+        for (const option of desktopCardArtifactOptions) {
+          if (options.some((existing) => existing.value === option.value)) continue;
+          options.push(option);
+        }
+      }
+      return options;
+    },
+    [desktopCardArtifactOptions, desktopCardPlanOptions, desktopCardWorkItemOptions],
+  );
 
   useEffect(() => {
     if (prevRootSessionKeyRef.current !== rootSessionKey) {
@@ -1427,6 +1624,7 @@ export default function SessionChatPage() {
                 content: contentItems,
                 usage: completeRecord.usage,
                 model: typeof completeRecord.model === 'string' ? completeRecord.model : next[existingIndex].model,
+                desktopCards: parseDesktopMessageCards(completeMessage),
               };
               return next;
             }
@@ -1443,6 +1641,7 @@ export default function SessionChatPage() {
                 agentId: getAgentIdFromSessionKey(sourceSessionKey),
                 usage: completeRecord.usage,
                 model: typeof completeRecord.model === 'string' ? completeRecord.model : undefined,
+                desktopCards: parseDesktopMessageCards(completeMessage),
               },
             ];
           });
@@ -1828,13 +2027,324 @@ export default function SessionChatPage() {
       activeClient,
       activeSessionKey,
       chatModel,
-      chatThinking,
       chats.length,
       currentInstanceId,
       defaultChatModel,
       endGeneration,
       patchSessionConfig,
       rootSessionKey,
+      saveDraft,
+      t,
+    ],
+  );
+
+  const handleDesktopCardAction = useCallback(
+    (card: DesktopMessageCard, action: DesktopMessageCardAction) => {
+      const fieldDraftValues = Object.fromEntries(
+        card.fields.map((field) => [field.id, desktopCardFieldDrafts[getDesktopCardFieldKey(card, field)] ?? '']),
+      );
+      const interaction = resolveDesktopCardActionInteraction(card, action, fieldDraftValues);
+      if (interaction.missingRequiredFields.length > 0) {
+        Toast.warning(`请先填写：${interaction.missingRequiredFields.map((field) => field.label).join('、')}`);
+        return;
+      }
+      if (interaction.navigationTarget) {
+        navigate(interaction.navigationTarget);
+        return;
+      }
+      const { actionValues, handlerRoute } = interaction;
+      if (handlerRoute?.handler === 'authorization-approval') {
+        const approvalParams = buildDesktopCardAuthorizationApprovalParams(card, action, actionValues);
+        if (approvalParams) {
+          void resolveDesktopCardAuthorizationApproval(approvalParams)
+            .then((result) => {
+              if (!result) {
+                Toast.warning('未找到待处理审批');
+                return;
+              }
+              if (result.repositoryResult?.kind === 'work-matter-plan') {
+                Toast.success(`已批准并写入计划：${result.repositoryResult.planPath}`);
+                return;
+              }
+              if (result.repositoryResult?.kind === 'knowledge-rewrite') {
+                Toast.success(`已批准并写入知识库：${result.repositoryResult.writtenPaths.length} 项`);
+                return;
+              }
+              if (result.repositoryResult?.kind === 'repository-asset-approval') {
+                Toast.success(`已记录资产审批决定：${result.repositoryResult.status}`);
+                return;
+              }
+              if (result.repositoryResult?.kind === 'artifact-execution-approval') {
+                Toast.success(`已记录 Artifact 执行审批决定：${result.repositoryResult.status}`);
+                return;
+              }
+              Toast.success(approvalParams.decision === 'approved' ? '已批准，AI 将继续执行' : '已拒绝审批');
+            })
+            .catch((error) => {
+              Toast.error(error instanceof Error ? error.message : '提交审批决定失败');
+            });
+        } else {
+          Toast.warning('缺少 ActionRun 审批 ID 或仓库资产线索，无法提交审批决定');
+        }
+      }
+      if (handlerRoute?.handler === 'artifact-save') {
+        const artifactId = getDesktopCardActionArtifactId(card, action);
+        if (artifactId) {
+          void publishArtifact(artifactId)
+            .then((saved) => {
+              if (saved) Toast.success('产物已保存');
+              else Toast.warning('未找到产物，无法保存');
+            })
+            .catch((error) => {
+              Toast.error(error instanceof Error ? error.message : '保存产物失败');
+            });
+        } else {
+          Toast.warning('缺少产物 ID，无法保存');
+        }
+      }
+      if (handlerRoute?.handler === 'artifact-import') {
+        const importParams = buildDesktopCardArtifactImportParams(card, actionValues);
+        if (importParams) {
+          void importArtifactFromFile(importParams)
+            .then((artifact) => {
+              if (artifact) Toast.success(`已导入产物：${artifact.title}`);
+              else Toast.warning('缺少文件路径，无法导入产物');
+            })
+            .catch((error) => {
+              Toast.error(error instanceof Error ? error.message : '导入产物失败');
+            });
+        } else {
+          Toast.warning('缺少文件路径，无法导入产物');
+        }
+      }
+      if (handlerRoute?.handler === 'artifact-mirror') {
+        const artifactId = getDesktopCardActionArtifactId(card, action);
+        if (artifactId) {
+          void mirrorArtifactToRepository(artifactId)
+            .then((output) => {
+              if (output) Toast.success(`已镜像到 ${output.outputPath}`);
+              else Toast.warning('当前工作空间尚未就绪，无法镜像产物');
+            })
+            .catch((error) => {
+              Toast.error(error instanceof Error ? error.message : '镜像产物失败');
+            });
+        } else {
+          Toast.warning('缺少产物 ID，无法镜像');
+        }
+      }
+      if (interaction.shouldSendCallback) {
+        void handleSend(
+          buildDesktopCardActionUserMessage({
+            cardId: card.id,
+            kind: card.kind,
+            actionId: action.id,
+            actionKind: action.kind,
+            artifact: card.artifact,
+            actionRun: card.actionRun,
+            handlerRoute,
+            values: actionValues,
+          }),
+        );
+      }
+    },
+    [
+      desktopCardFieldDrafts,
+      handleSend,
+      importArtifactFromFile,
+      mirrorArtifactToRepository,
+      navigate,
+      publishArtifact,
+      resolveDesktopCardAuthorizationApproval,
+    ],
+  );
+
+  const renderDesktopMessageCards = useCallback(
+    (cards?: DesktopMessageCard[]) => {
+      if (!cards || cards.length === 0) return null;
+      return (
+        <div className="desktop-message-card-list">
+          {cards.map((card, index) => (
+            <div className="desktop-message-card" key={card.id ?? `${card.kind}-${index}`}>
+              <div className="desktop-message-card__header">
+                <Text strong>{card.title}</Text>
+                <Tag color={desktopCardTone(card.kind)} size="small">
+                  {desktopCardKindLabel(card.kind)}
+                </Tag>
+              </div>
+              {card.body ? (
+                <Text type="tertiary" size="small">
+                  {card.body}
+                </Text>
+              ) : null}
+              {card.fields.length > 0 ? (
+                <div className="desktop-message-card__fields">
+                  {card.fields.map((field) => (
+                    <span className="desktop-message-card__field" key={field.id}>
+                      <Text size="small" strong>
+                        {field.label}
+                        {field.required ? ' *' : ''}
+                      </Text>
+                      {field.value ? (
+                        <Text type="tertiary" size="small">
+                          {field.value}
+                        </Text>
+                      ) : card.kind === 'inquiry' ? (
+                        (() => {
+                          const fieldKey = getDesktopCardFieldKey(card, field);
+                          const value = desktopCardFieldDrafts[fieldKey] ?? '';
+                          const onChange = (nextValue: string) => {
+                            setDesktopCardFieldDrafts((prev) => ({ ...prev, [fieldKey]: nextValue }));
+                          };
+                          const fieldOptions = getDesktopCardFieldOptions(field);
+                          return fieldOptions.length > 0 ? (
+                            <Select
+                              size="small"
+                              placeholder={field.placeholder}
+                              value={value || undefined}
+                              onChange={(value) => onChange(String(value))}
+                              loading={
+                                (field.optionsSource === 'work-items' && desktopCardWorkItemOptionsLoading) ||
+                                (field.optionsSource === 'plans' && desktopCardPlanOptionsLoading)
+                              }
+                              style={{ width: '100%' }}
+                            >
+                              {fieldOptions.map((option) => (
+                                <Select.Option key={option.value} value={option.value}>
+                                  {option.label}
+                                </Select.Option>
+                              ))}
+                            </Select>
+                          ) : field.multiline ? (
+                            <TextArea
+                              autosize={{ minRows: 2, maxRows: 5 }}
+                              placeholder={field.placeholder}
+                              value={value}
+                              onChange={(value) => onChange(value)}
+                            />
+                          ) : (
+                            <Input
+                              size="small"
+                              placeholder={field.placeholder}
+                              value={value}
+                              onChange={(value) => onChange(value)}
+                            />
+                          );
+                        })()
+                      ) : null}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              {card.artifact?.id || card.artifact?.type || card.artifact?.uri ? (
+                <Text type="tertiary" size="small">
+                  Artifact: {[card.artifact.id, card.artifact.type, card.artifact.uri].filter(Boolean).join(' · ')}
+                </Text>
+              ) : null}
+              {card.actionRun?.id || card.actionRun?.status ? (
+                <Text type="tertiary" size="small">
+                  ActionRun: {[card.actionRun.id, card.actionRun.status].filter(Boolean).join(' · ')}
+                </Text>
+              ) : null}
+              {card.unsupportedActionCount ? (
+                <Text type="tertiary" size="small">
+                  {t('session.desktopCardUnsupportedActionsIgnored', { count: card.unsupportedActionCount })}
+                </Text>
+              ) : null}
+              {card.unsupportedActionDefinitionCount ? (
+                <Text type="tertiary" size="small">
+                  {t('session.desktopCardUnsupportedActionDefinitionsIgnored', {
+                    count: card.unsupportedActionDefinitionCount,
+                  })}
+                </Text>
+              ) : null}
+              {card.unsupportedActionValueCount ? (
+                <Text type="tertiary" size="small">
+                  {t('session.desktopCardUnsupportedActionValuesIgnored', {
+                    count: card.unsupportedActionValueCount,
+                  })}
+                </Text>
+              ) : null}
+              {card.unsupportedActionListCount ? (
+                <Text type="tertiary" size="small">
+                  {t('session.desktopCardUnsupportedActionListsIgnored', {
+                    count: card.unsupportedActionListCount,
+                  })}
+                </Text>
+              ) : null}
+              {card.unsupportedOptionsSourceCount ? (
+                <Text type="tertiary" size="small">
+                  {t('session.desktopCardUnsupportedOptionsSourcesIgnored', {
+                    count: card.unsupportedOptionsSourceCount,
+                  })}
+                </Text>
+              ) : null}
+              {card.unsupportedFieldOptionCount ? (
+                <Text type="tertiary" size="small">
+                  {t('session.desktopCardUnsupportedFieldOptionsIgnored', {
+                    count: card.unsupportedFieldOptionCount,
+                  })}
+                </Text>
+              ) : null}
+              {card.unsupportedFieldOptionListCount ? (
+                <Text type="tertiary" size="small">
+                  {t('session.desktopCardUnsupportedFieldOptionListsIgnored', {
+                    count: card.unsupportedFieldOptionListCount,
+                  })}
+                </Text>
+              ) : null}
+              {card.unsupportedFieldCount ? (
+                <Text type="tertiary" size="small">
+                  {t('session.desktopCardUnsupportedFieldsIgnored', {
+                    count: card.unsupportedFieldCount,
+                  })}
+                </Text>
+              ) : null}
+              {card.unsupportedFieldListCount ? (
+                <Text type="tertiary" size="small">
+                  {t('session.desktopCardUnsupportedFieldListsIgnored', {
+                    count: card.unsupportedFieldListCount,
+                  })}
+                </Text>
+              ) : null}
+              {card.unsupportedArtifactClueCount ? (
+                <Text type="tertiary" size="small">
+                  {t('session.desktopCardUnsupportedArtifactCluesIgnored', {
+                    count: card.unsupportedArtifactClueCount,
+                  })}
+                </Text>
+              ) : null}
+              {card.unsupportedActionRunClueCount ? (
+                <Text type="tertiary" size="small">
+                  {t('session.desktopCardUnsupportedActionRunCluesIgnored', {
+                    count: card.unsupportedActionRunClueCount,
+                  })}
+                </Text>
+              ) : null}
+              {card.actions.length > 0 ? (
+                <div className="desktop-message-card__actions">
+                  {card.actions.map((action) => (
+                    <Button
+                      key={action.id}
+                      size="small"
+                      type={action.kind === 'approve' || action.kind === 'submit' ? 'primary' : 'tertiary'}
+                      onClick={() => handleDesktopCardAction(card, action)}
+                    >
+                      {action.label}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      );
+    },
+    [
+      desktopCardFieldDrafts,
+      desktopCardPlanOptionsLoading,
+      desktopCardWorkItemOptionsLoading,
+      getDesktopCardFieldOptions,
+      handleDesktopCardAction,
       t,
     ],
   );
@@ -1876,6 +2386,67 @@ export default function SessionChatPage() {
     location.state,
     navigate,
   ]);
+
+  const handlePreserveTemporaryMatter = useCallback(async () => {
+    if (!repositoryBinding || !chatOnboardingSessionState.firstThingTitle.trim()) return;
+    setTemporaryMatterPreserving(true);
+    try {
+      const archiveMessages = await loadSkippedWorkspaceSessionArchiveMessages(activeClient, activeSessionKey, chats);
+      const archive = await archiveSkippedWorkspaceSessionSource(
+        repositoryBinding,
+        chatOnboardingSessionState,
+        archiveMessages,
+        {
+          sessionKey: activeSessionKey,
+        },
+      );
+      const matter = await createFirstWorkbenchMatter(repositoryBinding, chatOnboardingSessionState.firstThingTitle, {
+        source: 'desktop-onboarding-skip',
+        carryover: buildSkippedWorkspaceMatterCarryover(chatOnboardingSessionState, archiveMessages),
+        linkedSources: [archive],
+      });
+      Toast.success(t('dashboard.temporaryMatterPreserved'));
+      navigate(`/workbench?view=tasks&workItemPath=${encodeURIComponent(matter.path)}`);
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('dashboard.temporaryMatterPreserveFailed'));
+    } finally {
+      setTemporaryMatterPreserving(false);
+    }
+  }, [activeClient, activeSessionKey, chatOnboardingSessionState, chats, navigate, repositoryBinding, t]);
+
+  const renderTemporaryMatterCard = () => {
+    if (!chatOnboardingSessionState.initialMessage) return null;
+    const canPreserve = Boolean(repositoryBinding && chatOnboardingSessionState.firstThingTitle.trim());
+    return (
+      <div className="new-session-temporary-matter session-temporary-matter">
+        <div>
+          <Text strong>{t('dashboard.temporaryMatterTitle')}</Text>
+          <Text type="tertiary" size="small">
+            {t('dashboard.temporaryMatterDesc')}
+          </Text>
+          {chatOnboardingSessionState.firstThingTitle ? (
+            <Text type="tertiary" size="small">
+              {chatOnboardingSessionState.firstThingTitle}
+            </Text>
+          ) : null}
+        </div>
+        <Button
+          size="small"
+          type={canPreserve ? 'primary' : 'tertiary'}
+          loading={temporaryMatterPreserving}
+          onClick={() => {
+            if (canPreserve) {
+              void handlePreserveTemporaryMatter();
+              return;
+            }
+            navigate(WORK_SYSTEM_ONBOARDING_ROUTE);
+          }}
+        >
+          {canPreserve ? t('dashboard.preserveTemporaryMatter') : t('dashboard.chooseWorkspaceForTemporaryMatter')}
+        </Button>
+      </div>
+    );
+  };
 
   const handleStop = useCallback(async () => {
     if (!activeClient || !activeSessionKey) return;
@@ -2098,7 +2669,6 @@ export default function SessionChatPage() {
       currentInstanceId,
       generating,
       globalAgentSwitchStrategy,
-      models,
       defaultChatModel,
       navigate,
       rootSessionKey,
@@ -2298,6 +2868,7 @@ export default function SessionChatPage() {
           dashboardOpen={sidePanelVisible}
           onOpenDashboard={handleToggleDashboard}
         />
+        {renderTemporaryMatterCard()}
         <div ref={chatContainerRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: '12px 16px 0' }}>
           <AIChatDialogue
             chats={displayChats}
@@ -2310,6 +2881,7 @@ export default function SessionChatPage() {
                       <ContextSummary summary={message.contextSummary} />
                     )}
                     {defaultContent}
+                    {renderDesktopMessageCards(message?.desktopCards)}
                     {isPendingDialogueMessage(message) && <PendingDialogueLoading />}
                   </>
                 );

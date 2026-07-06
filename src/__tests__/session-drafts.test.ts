@@ -27,4 +27,24 @@ describe('session chat drafts', () => {
     expect(css).toContain('.chat-composer-frame__card .semi-aiChatInput');
     expect(css).toContain('.chat-composer-frame--session-chat');
   });
+
+  it('keeps agent switch callback dependencies limited to referenced state', () => {
+    const source = readFileSync('src/pages/SessionChatPage.tsx', 'utf8');
+    const handleAgentSwitch = source.match(/const handleAgentSwitch = useCallback\([\s\S]*?\n {4}\],\n {2}\);/)?.[0];
+
+    expect(handleAgentSwitch).toBeTruthy();
+    expect(handleAgentSwitch).toContain('chatModel');
+    expect(handleAgentSwitch).toContain('defaultChatModel');
+    expect(handleAgentSwitch).not.toContain('models');
+  });
+
+  it('keeps send callback dependencies aligned with draft clearing', () => {
+    const source = readFileSync('src/pages/SessionChatPage.tsx', 'utf8');
+    const handleSend = source.match(/const handleSend = useCallback\([\s\S]*?\n {4}\],\n {2}\);/)?.[0] ?? '';
+    const dependencyList = handleSend.match(/,\n {4}\[\n([\s\S]*?)\n {4}\],\n {2}\);$/)?.[1] ?? '';
+
+    expect(handleSend).toContain("saveDraft(activeSessionKey, '', [])");
+    expect(dependencyList).toContain('saveDraft');
+    expect(dependencyList).not.toContain('chatThinking');
+  });
 });
