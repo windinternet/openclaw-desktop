@@ -1,4 +1,4 @@
-import { type DragEvent, useEffect, useRef, useState } from 'react';
+import { type DragEvent, useCallback, useEffect, useRef, useState } from 'react';
 import {
   Button,
   Card,
@@ -16,19 +16,28 @@ import {
 import { IconBolt, IconFile, IconLink, IconPlus, IconSearch, IconTickCircle, IconUpload } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway, useStore } from '../lib';
-import { upsertAiActionRun } from '../lib/ai-action-run-store';
+import {
+  createAiActionRunWithWorkItemAssignment,
+  executeAiActionRunWithGateway,
+  syncAiActionRunWithGateway,
+  useStore,
+} from '../lib';
+import { findAiActionRunByLocalOrGatewayId, loadAiActionRuns, upsertAiActionRun } from '../lib/ai-action-run-store';
 import type { RepositoryBinding } from '../lib/agentic-repository';
 import type { DashboardTailActionRouteContext } from '../lib/dashboard-tail-action-routing';
+import { buildDashboardTailActionTarget } from '../lib/dashboard-tail-action-routing';
+import type { AiActionRun } from '../lib/types';
 import type {
   KnowledgeDocument,
   KnowledgeFileExtractionMetadata,
   KnowledgeSnapshot,
+  KnowledgeUrlFetchMetadata,
   RepositoryGitLogEntry,
   RepositoryMarkdownFile,
   RepositorySearchResult,
 } from '../lib/repository-knowledge';
 import {
+  buildKnowledgeRewriteActionInput,
   buildKnowledgeRewritePrompt,
   buildKnowledgeTailActionRewriteInstruction,
   importKnowledgeFileSource,
@@ -42,7 +51,7 @@ import {
   writeKnowledgeHealthReview,
 } from '../lib/repository-knowledge';
 import { KNOWLEDGE_IMPORT_ACCEPT, resolveKnowledgeImportFileKind } from '../lib/knowledge-file-import';
-import { confirmWorkbenchKnowledgeTailAction } from '../lib/repository-workbench';
+import { confirmWorkbenchKnowledgeTailAction, readWorkbenchMarkdown } from '../lib/repository-workbench';
 import { useWorkbenchWorkItemOptions } from '../lib/workbench-work-items';
 import { ActionRunWorkItemPicker } from './ActionRunWorkItemPicker';
 import MarkdownView from './MarkdownView';
@@ -71,6 +80,7 @@ interface KnowledgeRewriteOptions {
   userInstruction?: string;
   workItemId?: string;
   workItemPath?: string;
+  assetRunPath?: string;
   tailActionId?: string;
 }
 
@@ -78,10 +88,12 @@ export default function KnowledgeRepositoryPanel({
   binding,
   section,
   tailActionContext,
+  initialKnowledgePath,
 }: {
   binding: RepositoryBinding;
   section?: KnowledgeSection;
   tailActionContext?: DashboardTailActionRouteContext | null;
+  initialKnowledgePath?: string | null;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -104,6 +116,7 @@ export default function KnowledgeRepositoryPanel({
   const [healthReviewLoading, setHealthReviewLoading] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<KnowledgeDocument | null>(null);
   const [documentHistory, setDocumentHistory] = useState<RepositoryGitLogEntry[]>([]);
+  const [openedInitialKnowledgePath, setOpenedInitialKnowledgePath] = useState('');
   const [activeSection, setActiveSection] = useState<KnowledgeSection>(section ?? 'wiki');
   const [showImportText, setShowImportText] = useState(false);
   const [showImportUrl, setShowImportUrl] = useState(false);
@@ -114,7 +127,12 @@ export default function KnowledgeRepositoryPanel({
   const [importUrlTitle, setImportUrlTitle] = useState('');
   const [importUrlNote, setImportUrlNote] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [knowledgeTailActionRun, setKnowledgeTailActionRun] = useState<AiActionRun | null>(null);
+  const [knowledgeTailActionAssetRunMarkdown, setKnowledgeTailActionAssetRunMarkdown] = useState<string | null>(null);
   const knowledgeTailActionContext = tailActionContext?.kind === 'knowledge' ? tailActionContext : null;
+  const knowledgeTailActionCanRewrite = Boolean(
+    knowledgeTailActionContext?.workItemPath || knowledgeTailActionContext?.assetRunPath,
+  );
   const knowledgeTailActionCanConfirm = Boolean(
     knowledgeTailActionContext?.id && knowledgeTailActionContext.id.includes(':tail-action:'),
   );
@@ -138,6 +156,48 @@ export default function KnowledgeRepositoryPanel({
   useEffect(() => {
     setTailActionConfirmed(false);
   }, [knowledgeTailActionContext?.id, knowledgeTailActionContext?.workItemPath]);
+
+  useEffect(() => {
+    const sourceRunId = knowledgeTailActionRunId?.replace(/^action-run-knowledge:/, '');
+    if (!currentInstanceId || !sourceRunId) {
+      setKnowledgeTailActionRun(null);
+      return;
+    }
+
+    let cancelled = false;
+    loadAiActionRuns(currentInstanceId)
+      .then((runs) => {
+        if (cancelled) return;
+        setKnowledgeTailActionRun(findAiActionRunByLocalOrGatewayId(runs, sourceRunId) ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setKnowledgeTailActionRun(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentInstanceId, knowledgeTailActionRunId]);
+
+  useEffect(() => {
+    if (!knowledgeTailActionContext?.assetRunPath) {
+      setKnowledgeTailActionAssetRunMarkdown(null);
+      return;
+    }
+
+    let cancelled = false;
+    readWorkbenchMarkdown(binding, knowledgeTailActionContext.assetRunPath)
+      .then((markdown) => {
+        if (!cancelled) setKnowledgeTailActionAssetRunMarkdown(markdown);
+      })
+      .catch(() => {
+        if (!cancelled) setKnowledgeTailActionAssetRunMarkdown(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [binding, knowledgeTailActionContext?.assetRunPath]);
 
   useEffect(() => {
     if (section) setActiveSection(section);
@@ -175,24 +235,38 @@ export default function KnowledgeRepositoryPanel({
     }
   };
 
-  const openDocument = async (path: string) => {
-    setDocumentLoading(true);
-    setHistoryLoading(true);
-    setError(null);
-    try {
-      const [document, history] = await Promise.all([
-        readKnowledgeDocument(binding, path),
-        loadKnowledgeDocumentHistory(binding, path, 8),
-      ]);
-      setSelectedDocument(document);
-      setDocumentHistory(history);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setDocumentLoading(false);
-      setHistoryLoading(false);
-    }
-  };
+  const openDocument = useCallback(
+    async (path: string) => {
+      setDocumentLoading(true);
+      setHistoryLoading(true);
+      setError(null);
+      try {
+        const [document, history] = await Promise.all([
+          readKnowledgeDocument(binding, path),
+          loadKnowledgeDocumentHistory(binding, path, 8),
+        ]);
+        setSelectedDocument(document);
+        setDocumentHistory(history);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setDocumentLoading(false);
+        setHistoryLoading(false);
+      }
+    },
+    [binding],
+  );
+
+  useEffect(() => {
+    if (!initialKnowledgePath || !snapshot) return;
+    if (openedInitialKnowledgePath === initialKnowledgePath) return;
+    const hasInitialKnowledgeDocument =
+      snapshot.sources.some((file) => file.path === initialKnowledgePath) ||
+      snapshot.wiki.some((file) => file.path === initialKnowledgePath);
+    if (!hasInitialKnowledgeDocument) return;
+    setOpenedInitialKnowledgePath(initialKnowledgePath);
+    void openDocument(initialKnowledgePath);
+  }, [initialKnowledgePath, openDocument, openedInitialKnowledgePath, snapshot]);
 
   const openFile = (file: RepositoryMarkdownFile) => {
     void openDocument(file.path);
@@ -233,10 +307,23 @@ export default function KnowledgeRepositoryPanel({
     setImportLoading(true);
     setError(null);
     try {
+      let fetchedUrlContent: KnowledgeUrlFetchMetadata | undefined;
+      const fetchKnowledgeUrl = window.electronAPI.repository?.fetchKnowledgeUrl;
+      if (!importUrlNote.trim() && fetchKnowledgeUrl) {
+        try {
+          fetchedUrlContent = await fetchKnowledgeUrl({ url: importUrl });
+        } catch (err) {
+          fetchedUrlContent = {
+            status: 'failed',
+            error: err instanceof Error ? err.message : String(err),
+          };
+        }
+      }
       const imported = await importKnowledgeUrlSource(binding, {
         title: importUrlTitle,
         url: importUrl,
         note: importUrlNote,
+        fetched: fetchedUrlContent,
       });
       const nextSnapshot = await loadKnowledgeSnapshot(binding);
       setSnapshot(nextSnapshot);
@@ -318,6 +405,66 @@ export default function KnowledgeRepositoryPanel({
     if (fileKind.kind === 'unsupported') {
       throw new Error(t('knowledge.importUnsupportedFile', { name: file.name }));
     }
+    if (fileKind.kind === 'legacy-binary-office') {
+      const extracted = await extractLegacyKnowledgeOfficeText(file, fileKind.format, mimeType);
+      if (extracted.text.trim()) {
+        return {
+          body: extracted.text,
+          mimeType,
+          extracted: {
+            format: extracted.format,
+            status: 'best_effort',
+            bytesRead: extracted.bytesRead,
+            truncated: extracted.truncated,
+            limitations: [
+              t(
+                fileKind.format === 'word'
+                  ? 'knowledge.importLegacyWordBestEffortLimit'
+                  : 'knowledge.importLegacyBinaryOfficeBestEffortLimit',
+              ),
+            ],
+          },
+        };
+      }
+      return {
+        body: t('knowledge.importLegacyOfficeUnavailableBody'),
+        mimeType,
+        extracted: {
+          format: fileKind.format,
+          status: 'unavailable',
+          reason: 'legacy-binary-office',
+          bytesRead: 0,
+          truncated: false,
+          limitations: [t('knowledge.importLegacyOfficeUnavailableLimit')],
+        },
+      };
+    }
+    if (fileKind.kind === 'unavailable-extraction') {
+      const body =
+        fileKind.format === 'image'
+          ? t('knowledge.importUnavailableExtractionBody.image')
+          : fileKind.format === 'audio'
+            ? t('knowledge.importUnavailableExtractionBody.audio')
+            : t('knowledge.importUnavailableExtractionBody.video');
+      const limitation =
+        fileKind.format === 'image'
+          ? t('knowledge.importUnavailableExtractionLimit.image')
+          : fileKind.format === 'audio'
+            ? t('knowledge.importUnavailableExtractionLimit.audio')
+            : t('knowledge.importUnavailableExtractionLimit.video');
+      return {
+        body,
+        mimeType,
+        extracted: {
+          format: fileKind.format,
+          status: 'unavailable',
+          reason: fileKind.reason,
+          bytesRead: 0,
+          truncated: false,
+          limitations: [limitation],
+        },
+      };
+    }
 
     const extractKnowledgeFileText = window.electronAPI.repository?.extractKnowledgeFileText;
     if (!extractKnowledgeFileText) {
@@ -329,6 +476,20 @@ export default function KnowledgeRepositoryPanel({
       mimeType,
       bytes: await file.arrayBuffer(),
     });
+    if (extracted.format === 'image' && !extracted.text.trim()) {
+      return {
+        body: t('knowledge.importUnavailableExtractionBody.image'),
+        mimeType,
+        extracted: {
+          format: 'image',
+          status: 'unavailable',
+          reason: 'image-ocr-unavailable',
+          bytesRead: extracted.bytesRead,
+          truncated: extracted.truncated,
+          limitations: [t('knowledge.importUnavailableExtractionLimit.image')],
+        },
+      };
+    }
     if (!extracted.text.trim()) {
       throw new Error(t('knowledge.importExtractedFileEmpty', { name: file.name }));
     }
@@ -341,9 +502,39 @@ export default function KnowledgeRepositoryPanel({
         status: 'best_effort',
         bytesRead: extracted.bytesRead,
         truncated: extracted.truncated,
-        limitations: ['PDF/Office 文本抽取为 best-effort：会保留可读取文字，复杂版式、图片和公式可能丢失。'],
+        limitations: [
+          extracted.format === 'image'
+            ? t('knowledge.importSvgTextBestEffortLimit')
+            : 'PDF/Office 文本抽取为 best-effort：会保留可读取文字，复杂版式、图片和公式可能丢失。',
+        ],
       },
     };
+  };
+
+  const extractLegacyKnowledgeOfficeText = async (
+    file: File,
+    format: KnowledgeFileExtractionMetadata['format'],
+    mimeType?: string,
+  ): Promise<{
+    format: KnowledgeFileExtractionMetadata['format'];
+    text: string;
+    bytesRead: number;
+    truncated: boolean;
+  }> => {
+    const extractKnowledgeFileText = window.electronAPI.repository?.extractKnowledgeFileText;
+    if (!extractKnowledgeFileText) {
+      return { format, text: '', bytesRead: 0, truncated: false };
+    }
+
+    try {
+      return await extractKnowledgeFileText({
+        fileName: file.name,
+        mimeType,
+        bytes: await file.arrayBuffer(),
+      });
+    } catch {
+      return { format, text: '', bytesRead: 0, truncated: false };
+    }
   };
 
   const handleImportDragOver = (event: DragEvent<HTMLDivElement>) => {
@@ -405,31 +596,26 @@ export default function KnowledgeRepositoryPanel({
         : selectedDocument?.sourceType === 'sources'
           ? selectedDocument.path
           : undefined;
-    const resolvedWorkItemPath = options.workItemPath || selectedKnowledgeWorkItem?.path;
-    const resolvedWorkItemId = options.workItemId || selectedKnowledgeWorkItemId;
     setRewriteLoading(true);
     try {
-      const input = [
-        intent === 'digest-source'
-          ? t('knowledge.digestSource')
-          : intent === 'update-selected'
-            ? t('knowledge.updateSelected')
-            : t('knowledge.refreshIndexLog'),
-        selectedPath ? `path: ${selectedPath}` : '',
-        resolvedWorkItemPath ? `${t('knowledge.tailActionSource')}: ${resolvedWorkItemPath}` : '',
-        options.tailActionId ? `tailActionId: ${options.tailActionId}` : '',
-      ]
-        .filter(Boolean)
-        .join('\n');
-      const actionRun = createAiActionRun({
+      const actionRun = createAiActionRunWithWorkItemAssignment({
         type: 'knowledge_rewrite',
         sourcePage: 'knowledge',
         instanceId: currentInstanceId,
         agentId: agent.id,
         executionMode: 'isolated-session',
-        input,
-        workItemId: resolvedWorkItemId,
-        workItemPath: resolvedWorkItemPath,
+        input: ({ workItemPath }) =>
+          buildKnowledgeRewriteActionInput({
+            intent,
+            selectedPath,
+            workItemPath,
+            assetRunPath: knowledgeTailActionContext?.assetRunPath,
+            tailActionId: options.tailActionId,
+          }),
+        workItemId: options.workItemId,
+        workItemPath: options.workItemPath,
+        selectedWorkItem: selectedKnowledgeWorkItem,
+        selectedWorkItemId: selectedKnowledgeWorkItemId,
       });
       await upsertAiActionRun(currentInstanceId, { ...actionRun, status: 'planning', updatedAt: Date.now() });
       const runningRun = await executeAiActionRunWithGateway(activeClient, actionRun, {
@@ -463,18 +649,29 @@ export default function KnowledgeRepositoryPanel({
   };
 
   const handleKnowledgeTailActionRewrite = () => {
-    if (!knowledgeTailActionContext?.workItemPath) {
+    if (!knowledgeTailActionCanRewrite) {
+      Toast.warning(t('knowledge.tailActionRewriteUnavailable'));
+      return;
+    }
+
+    const tailActionContext = knowledgeTailActionContext;
+    if (!tailActionContext) {
       Toast.warning(t('knowledge.tailActionRewriteUnavailable'));
       return;
     }
 
     void handleKnowledgeRewrite('refresh-index', undefined, {
       userInstruction: buildKnowledgeTailActionRewriteInstruction({
-        workItemPath: knowledgeTailActionContext.workItemPath,
-        tailActionId: knowledgeTailActionContext.id,
+        workItemPath: tailActionContext.workItemPath,
+        assetRunPath: tailActionContext.assetRunPath,
+        tailActionId: tailActionContext.id,
+        sourceAssetRunMarkdown: knowledgeTailActionAssetRunMarkdown ?? undefined,
+        sourceRunAssistantResponse: knowledgeTailActionRun?.lastAssistantResponse,
+        sourceRunResultSummary: knowledgeTailActionRun?.resultSummary,
       }),
-      workItemPath: knowledgeTailActionContext.workItemPath,
-      tailActionId: knowledgeTailActionContext.id,
+      workItemPath: tailActionContext.workItemPath,
+      assetRunPath: tailActionContext.assetRunPath,
+      tailActionId: tailActionContext.id,
     });
   };
 
@@ -503,6 +700,22 @@ export default function KnowledgeRepositoryPanel({
     } finally {
       setTailActionConfirming(false);
     }
+  };
+
+  const handleReviewKnowledgeTailAction = () => {
+    if (!knowledgeTailActionContext?.workItemPath) {
+      Toast.warning(t('knowledge.reviewAfterKnowledgeTailActionUnavailable'));
+      return;
+    }
+
+    navigate(
+      buildDashboardTailActionTarget('/workbench', {
+        kind: 'review',
+        id: knowledgeTailActionContext.id,
+        workItemPath: knowledgeTailActionContext.workItemPath,
+        assetRunPath: knowledgeTailActionContext.assetRunPath,
+      }),
+    );
   };
 
   const renderFileButton = (file: RepositoryMarkdownFile) => (
@@ -1048,13 +1261,23 @@ export default function KnowledgeRepositoryPanel({
                     {t('knowledge.tailActionRunSource')}: {knowledgeTailActionRunId}
                   </Text>
                 ) : null}
+                {knowledgeTailActionContext.assetRunPath ? (
+                  <Text
+                    type="tertiary"
+                    size="small"
+                    ellipsis={{ showTooltip: true }}
+                    style={{ display: 'block', marginTop: 4 }}
+                  >
+                    {t('knowledge.tailActionAssetRunSource')}: {knowledgeTailActionContext.assetRunPath}
+                  </Text>
+                ) : null}
               </div>
               <Space wrap>
                 <Button
                   type="primary"
                   icon={<IconBolt />}
                   loading={rewriteLoading}
-                  disabled={!knowledgeTailActionContext.workItemPath}
+                  disabled={!knowledgeTailActionCanRewrite}
                   onClick={handleKnowledgeTailActionRewrite}
                 >
                   {t('knowledge.startTailActionRewrite')}
@@ -1072,6 +1295,14 @@ export default function KnowledgeRepositoryPanel({
                     {tailActionConfirmed ? t('knowledge.tailActionConfirmed') : t('knowledge.confirmTailAction')}
                   </Button>
                 ) : null}
+                <Button
+                  type="tertiary"
+                  icon={<IconFile />}
+                  disabled={!knowledgeTailActionContext.workItemPath}
+                  onClick={handleReviewKnowledgeTailAction}
+                >
+                  {t('knowledge.writeReviewAfterKnowledgeTailAction')}
+                </Button>
               </Space>
             </Space>
           </div>

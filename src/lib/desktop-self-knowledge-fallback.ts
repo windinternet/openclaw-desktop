@@ -11,6 +11,7 @@ export interface DesktopSelfKnowledgeFallbackResult {
   updated: number;
   unchanged: number;
   failed: Array<{ agentId: string; message: string }>;
+  agents: Array<{ agentId: string; status: 'updated' | 'unchanged' | 'failed'; message?: string }>;
 }
 
 export async function syncDesktopSelfKnowledgeToAgentFiles(
@@ -23,6 +24,7 @@ export async function syncDesktopSelfKnowledgeToAgentFiles(
     updated: 0,
     unchanged: 0,
     failed: [],
+    agents: [],
   };
 
   for (const agent of agents) {
@@ -30,13 +32,17 @@ export async function syncDesktopSelfKnowledgeToAgentFiles(
       const file = await fetchGatewayAgentFileContent(client, agent.id, DESKTOP_SELF_KNOWLEDGE_SKILL_PATH);
       if (file.content === payload.skillContent) {
         result.unchanged += 1;
+        result.agents.push({ agentId: agent.id, status: 'unchanged' });
         continue;
       }
 
       await saveGatewayAgentFileContent(client, agent.id, DESKTOP_SELF_KNOWLEDGE_SKILL_PATH, payload.skillContent);
       result.updated += 1;
+      result.agents.push({ agentId: agent.id, status: 'updated' });
     } catch (error) {
-      result.failed.push({ agentId: agent.id, message: getErrorMessage(error) });
+      const message = getErrorMessage(error);
+      result.failed.push({ agentId: agent.id, message });
+      result.agents.push({ agentId: agent.id, status: 'failed', message });
     }
   }
 

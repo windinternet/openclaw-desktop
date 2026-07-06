@@ -26,6 +26,10 @@ describe('desktop self-knowledge fallback synchronization', () => {
       updated: 2,
       unchanged: 0,
       failed: [],
+      agents: [
+        { agentId: 'main', status: 'updated' },
+        { agentId: 'designer', status: 'updated' },
+      ],
     });
     expect(client.files.main).toBe(payload.skillContent);
     expect(client.files.designer).toBe(payload.skillContent);
@@ -62,6 +66,7 @@ describe('desktop self-knowledge fallback synchronization', () => {
       updated: 0,
       unchanged: 1,
       failed: [],
+      agents: [{ agentId: 'main', status: 'unchanged' }],
     });
     expect(client.calls.filter((call) => call.method === 'agents.files.set')).toHaveLength(0);
   });
@@ -87,6 +92,11 @@ describe('desktop self-knowledge fallback synchronization', () => {
     expect(result.failed).toEqual([
       { agentId: 'brokenGet', message: 'get failed for brokenGet' },
       { agentId: 'brokenSet', message: 'set failed for brokenSet' },
+    ]);
+    expect(result.agents).toEqual([
+      { agentId: 'main', status: 'updated' },
+      { agentId: 'brokenGet', status: 'failed', message: 'get failed for brokenGet' },
+      { agentId: 'brokenSet', status: 'failed', message: 'set failed for brokenSet' },
     ]);
     expect(client.files.main).toBe(payload.skillContent);
     expect(client.files.brokenSet).toBe('# Broken set');

@@ -5,6 +5,7 @@ import { useLocation } from 'react-router-dom';
 import RepositoryGate from '../components/RepositoryGate';
 import KnowledgeRepositoryPanel, { type KnowledgeSection } from '../components/KnowledgeRepositoryPanel';
 import { getKnowledgeTailActionTab, parseDashboardTailActionRoute } from '../lib/dashboard-tail-action-routing';
+import { isSafeWorkbenchMarkdownPath } from '../lib/workbench-matter';
 
 const { Title, Text } = Typography;
 
@@ -14,11 +15,17 @@ function getRequestedKnowledgeSection(search: string): KnowledgeSection | undefi
   return section === 'health' ? 'health' : undefined;
 }
 
+function getRequestedKnowledgePath(search: string): string | null {
+  const knowledgePath = new URLSearchParams(search).get('knowledgePath') ?? '';
+  return isSafeWorkbenchMarkdownPath(knowledgePath) ? knowledgePath : null;
+}
+
 export default function KnowledgeBasePage() {
   const { t } = useTranslation();
   const location = useLocation();
   const tailActionContext = useMemo(() => parseDashboardTailActionRoute(location.search), [location.search]);
   const requestedSection = useMemo(() => getRequestedKnowledgeSection(location.search), [location.search]);
+  const requestedKnowledgePath = useMemo(() => getRequestedKnowledgePath(location.search), [location.search]);
   const [activeTab, setActiveTab] = useState<KnowledgeSection | 'repository'>(
     (getKnowledgeTailActionTab(tailActionContext) as KnowledgeSection | undefined) ?? requestedSection ?? 'dashboard',
   );
@@ -39,7 +46,12 @@ export default function KnowledgeBasePage() {
   const renderKnowledgeSection = (section: KnowledgeSection) => (
     <RepositoryGate area="knowledge" setupVisible={false} fallback={repositoryFallback}>
       {(binding) => (
-        <KnowledgeRepositoryPanel binding={binding} section={section} tailActionContext={tailActionContext} />
+        <KnowledgeRepositoryPanel
+          binding={binding}
+          section={section}
+          tailActionContext={tailActionContext}
+          initialKnowledgePath={requestedKnowledgePath}
+        />
       )}
     </RepositoryGate>
   );

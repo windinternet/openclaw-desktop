@@ -1,6 +1,6 @@
 import knowledgeSemanticMappingTemplate from '../prompts/repository/knowledge-semantic-mapping.md?raw';
 import type { KnowledgeRepositoryMapping, RepositoryBinding } from './agentic-repository';
-import type { KnowledgeExtractedFileFormat } from './knowledge-file-import';
+import type { KnowledgeExtractedFileFormat, KnowledgeUnavailableExtractionReason } from './knowledge-file-import';
 import { renderPromptTemplate } from './prompt-template';
 import type { AiActionRepositoryWrite, AiActionRepositoryWriteEntry } from './types';
 
@@ -186,6 +186,7 @@ export async function loadKnowledgeSnapshot(
     markdown: indexMarkdown,
   });
   const indexedKnowledgePaths = new Set(indexEntries.map((entry) => entry.path));
+  const digestedSourcePaths = extractDigestedSourcePathsFromKnowledgeLog(logMarkdown, sources);
   const backlinks: RepositoryBacklink[] = [];
   const relatedRepositoryLinks: RepositoryRelatedLink[] = [];
   const linkedKnowledgePaths = new Set<string>();
@@ -225,7 +226,12 @@ export async function loadKnowledgeSnapshot(
     sources,
     wiki,
     undigestedSources: sources
-      .filter((source) => !indexedKnowledgePaths.has(source.path) && !linkedKnowledgePaths.has(source.path))
+      .filter(
+        (source) =>
+          !indexedKnowledgePaths.has(source.path) &&
+          !linkedKnowledgePaths.has(source.path) &&
+          !digestedSourcePaths.has(source.path),
+      )
       .sort((a, b) => b.updatedAt - a.updatedAt),
     indexEntries,
     indexMarkdown,
@@ -240,6 +246,7 @@ export async function loadKnowledgeSnapshot(
       wikiContents,
       indexEntries,
       linkedKnowledgePaths,
+      digestedSourcePaths,
       brokenKnowledgeLinks,
       contradictionContents: [
         ...wikiContents.map((file) => ({
@@ -291,8 +298,19 @@ export interface KnowledgeUrlSourceImportInput {
   title?: string;
   url: string;
   note?: string;
+  fetched?: KnowledgeUrlFetchMetadata;
   now?: Date;
   sourceRoot?: string;
+}
+
+export interface KnowledgeUrlFetchMetadata {
+  status: 'succeeded' | 'unavailable' | 'failed';
+  title?: string;
+  text?: string;
+  bytesRead?: number;
+  truncated?: boolean;
+  error?: string;
+  limitations?: string[];
 }
 
 export interface KnowledgeFileSourceImportInput {
@@ -306,10 +324,20 @@ export interface KnowledgeFileSourceImportInput {
 
 export interface KnowledgeFileExtractionMetadata {
   format: KnowledgeExtractedFileFormat;
-  status?: 'best_effort';
+  status?: 'best_effort' | 'unavailable';
+  reason?: KnowledgeUnavailableExtractionReason;
   bytesRead?: number;
   truncated?: boolean;
   limitations?: string[];
+}
+
+interface NormalizedKnowledgeFileExtraction {
+  format: KnowledgeFileExtractionMetadata['format'];
+  status: NonNullable<KnowledgeFileExtractionMetadata['status']>;
+  reason: KnowledgeFileExtractionMetadata['reason'];
+  bytesRead: number;
+  truncated: boolean;
+  limitations: string[];
 }
 
 export interface KnowledgeFolderSourceImportInput extends KnowledgeFileSourceImportInput {
@@ -345,7 +373,8 @@ export function buildKnowledgeTextSourceImport(input: KnowledgeTextSourceImportI
 export function buildKnowledgeUrlSourceImport(input: KnowledgeUrlSourceImportInput): KnowledgeTextSourceImport {
   const url = normalizeSourceUrl(input.url);
   const note = input.note?.replace(/\r\n/g, '\n').trim();
-  const title = normalizeSourceTitle(input.title, `${url.hostname}${url.pathname}`);
+  const fetched = normalizeKnowledgeUrlFetch(input.fetched);
+  const title = normalizeSourceTitle(input.title, fetched?.title || `${url.hostname}${url.pathname}`);
   const now = input.now ?? new Date();
   const date = now.toISOString().slice(0, 10);
   const time = now.toISOString().slice(11, 19).replace(/:/g, '');
@@ -357,6 +386,7 @@ export function buildKnowledgeUrlSourceImport(input: KnowledgeUrlSourceImportInp
     `title: ${JSON.stringify(title)}`,
     'source: desktop-url',
     `url: ${JSON.stringify(href)}`,
+    ...formatKnowledgeUrlFetchFrontmatter(fetched),
     `importedAt: ${now.toISOString()}`,
     '---',
     '',
@@ -370,6 +400,7 @@ export function buildKnowledgeUrlSourceImport(input: KnowledgeUrlSourceImportInp
     '',
     note || '暂无',
     '',
+    ...formatKnowledgeUrlFetchSections(fetched),
   ].join('\n');
 
   return { title, path, markdown };
@@ -404,7 +435,7 @@ export function buildKnowledgeFileSourceImport(input: KnowledgeFileSourceImportI
     ...formatKnowledgeExtractionSourceFacts(extracted),
     '',
     ...formatKnowledgeExtractionLimitations(extracted),
-    extracted ? '## 抽取文本' : '## 原始内容',
+    formatKnowledgeFileBodyHeading(extracted),
     '',
     body,
     '',
@@ -445,7 +476,7 @@ export function buildKnowledgeFolderSourceImport(input: KnowledgeFolderSourceImp
     ...formatKnowledgeExtractionSourceFacts(extracted),
     '',
     ...formatKnowledgeExtractionLimitations(extracted),
-    extracted ? '## 抽取文本' : '## 原始内容',
+    formatKnowledgeFileBodyHeading(extracted),
     '',
     body,
     '',
@@ -610,18 +641,73 @@ export async function loadKnowledgeDocumentHistory(
 }
 
 export function buildKnowledgeTailActionRewriteInstruction(options: {
-  workItemPath: string;
+  workItemPath?: string;
+  assetRunPath?: string;
+  tailActionId?: string;
+  sourceAssetRunMarkdown?: string;
+  sourceRunAssistantResponse?: string;
+  sourceRunResultSummary?: string;
+}): string {
+  const sourceExecutionId =
+    options.tailActionId?.startsWith('action-run-knowledge:') ||
+    options.tailActionId?.startsWith('asset-run-knowledge:')
+      ? options.tailActionId
+      : undefined;
+  const sourceIntro = options.workItemPath
+    ? sourceExecutionId
+      ? `根据来源事项 ${options.workItemPath} 和来源执行记录 ${sourceExecutionId}，检查本次执行中是否有需要写入 Wiki、更新 wiki/index.md 或追加 wiki/log.md 的知识。`
+      : `根据来源事项 ${options.workItemPath} 的知识库收尾动作，检查本次事项中是否有需要写入 Wiki、更新 wiki/index.md 或追加 wiki/log.md 的知识。`
+    : sourceExecutionId
+      ? `根据来源资产运行 ${options.assetRunPath} 和来源执行记录 ${sourceExecutionId}，检查本次执行中是否有需要写入 Wiki、更新 wiki/index.md 或追加 wiki/log.md 的知识。`
+      : `根据来源资产运行 ${options.assetRunPath} 的知识库后续动作，检查本次资产运行中是否有需要写入 Wiki、更新 wiki/index.md 或追加 wiki/log.md 的知识。`;
+  const sourceReadInstruction = options.workItemPath
+    ? '请先读取来源事项、关联执行记录、关联成果和现有知识库，再提出需要审批的写入计划；没有必要写入时输出 no_write_needed。'
+    : '请先读取来源资产运行、相关执行结果和现有知识库，再提出需要审批的写入计划；没有必要写入时输出 no_write_needed。';
+  return [
+    sourceIntro,
+    options.sourceAssetRunMarkdown?.trim() ? `来源资产运行内容：\n${options.sourceAssetRunMarkdown.trim()}` : undefined,
+    options.sourceRunResultSummary?.trim() ? `来源执行结果摘要：\n${options.sourceRunResultSummary.trim()}` : undefined,
+    options.sourceRunAssistantResponse?.trim()
+      ? `来源执行助手回复：\n${options.sourceRunAssistantResponse.trim()}`
+      : undefined,
+    options.tailActionId && !sourceExecutionId ? `来源尾动作 ID：${options.tailActionId}` : undefined,
+    sourceReadInstruction,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+export function buildKnowledgeRewriteActionInput(options: {
+  intent: 'digest-source' | 'refresh-index' | 'update-selected';
+  selectedPath?: string;
+  workItemPath?: string;
+  assetRunPath?: string;
   tailActionId?: string;
 }): string {
-  const actionRunKnowledgeId = options.tailActionId?.startsWith('action-run-knowledge:')
-    ? options.tailActionId
-    : undefined;
+  const title =
+    options.intent === 'digest-source'
+      ? '消化资料'
+      : options.intent === 'update-selected'
+        ? '改写选中知识'
+        : '刷新索引日志';
+  const digestPlanInput =
+    options.intent === 'digest-source'
+      ? [
+          '消化计划:',
+          '- 读取资料源，确认原始事实和不可抽取边界。',
+          '- 提取可复用事实、决策、流程、约束和待确认问题。',
+          '- 对照现有 Wiki/index/log，避免重复或自相矛盾。',
+          '- 输出 approval_required 或 no_write_needed。',
+        ]
+      : [];
+
   return [
-    actionRunKnowledgeId
-      ? `根据来源事项 ${options.workItemPath} 和来源执行记录 ${actionRunKnowledgeId}，检查本次执行中是否有需要写入 Wiki、更新 wiki/index.md 或追加 wiki/log.md 的知识。`
-      : `根据来源事项 ${options.workItemPath} 的知识库收尾动作，检查本次事项中是否有需要写入 Wiki、更新 wiki/index.md 或追加 wiki/log.md 的知识。`,
-    options.tailActionId && !actionRunKnowledgeId ? `来源尾动作 ID：${options.tailActionId}` : undefined,
-    '请先读取来源事项、关联执行记录、关联成果和现有知识库，再提出需要审批的写入计划；没有必要写入时输出 no_write_needed。',
+    title,
+    options.selectedPath ? `path: ${options.selectedPath}` : '',
+    options.workItemPath ? `来源事项: ${options.workItemPath}` : '',
+    options.assetRunPath ? `来源资产运行: ${options.assetRunPath}` : '',
+    options.tailActionId ? `tailActionId: ${options.tailActionId}` : '',
+    ...digestPlanInput,
   ]
     .filter(Boolean)
     .join('\n');
@@ -676,6 +762,7 @@ function buildKnowledgeHealthReport(options: {
   wikiContents: Array<{ path: string; content: string }>;
   indexEntries: KnowledgeIndexEntry[];
   linkedKnowledgePaths: Set<string>;
+  digestedSourcePaths: Set<string>;
   brokenKnowledgeLinks: KnowledgeHealthIssue[];
   contradictionContents: Array<{ path: string; content: string; updatedAt?: number }>;
   workItems: RepositoryMarkdownFile[];
@@ -692,7 +779,13 @@ function buildKnowledgeHealthReport(options: {
   const issues: KnowledgeHealthIssue[] = [];
 
   for (const source of options.sources) {
-    if (indexedPaths.has(source.path) || options.linkedKnowledgePaths.has(source.path)) continue;
+    if (
+      indexedPaths.has(source.path) ||
+      options.linkedKnowledgePaths.has(source.path) ||
+      options.digestedSourcePaths.has(source.path)
+    ) {
+      continue;
+    }
     issues.push({
       id: `orphan-source:${source.path}`,
       kind: 'orphan_source',
@@ -733,6 +826,8 @@ function buildKnowledgeHealthReport(options: {
 
   issues.push(...dedupeKnowledgeHealthIssues(options.brokenKnowledgeLinks));
   issues.push(...buildContradictionIssues(options.binding, options.contradictionContents));
+  issues.push(...buildStructuredFactContradictionIssues(options.contradictionContents));
+  issues.push(...buildSemanticSupportContradictionIssues(options.contradictionContents));
 
   for (const file of options.wikiContents) {
     if (file.path === mapping.indexPath || file.path === mapping.logPath) continue;
@@ -827,6 +922,411 @@ function buildContradictionIssues(
   return issues;
 }
 
+interface StructuredKnowledgeFact {
+  key: string;
+  value: string;
+  normalizedValue: string;
+  path: string;
+  line: number;
+  updatedAt?: number;
+}
+
+interface SemanticSupportFact {
+  subject: string;
+  normalizedSubject: string;
+  supportState: 'supported' | 'unsupported';
+  path: string;
+  line: number;
+  updatedAt?: number;
+}
+
+function buildStructuredFactContradictionIssues(
+  contents: Array<{ path: string; content: string; updatedAt?: number }>,
+): KnowledgeHealthIssue[] {
+  const firstFactByKey = new Map<string, StructuredKnowledgeFact>();
+  const issues: KnowledgeHealthIssue[] = [];
+
+  for (const file of contents) {
+    file.content.split(/\r?\n/).forEach((line, index) => {
+      const fact = extractStructuredKnowledgeFact(line);
+      if (!fact) return;
+
+      const current: StructuredKnowledgeFact = {
+        ...fact,
+        path: file.path,
+        line: index + 1,
+        updatedAt: file.updatedAt,
+      };
+      const first = firstFactByKey.get(current.key);
+      if (!first) {
+        firstFactByKey.set(current.key, current);
+        return;
+      }
+      if (first.normalizedValue === current.normalizedValue) return;
+
+      issues.push({
+        id: `structured-contradiction:${current.key}:${current.path}:${current.line}`,
+        kind: 'contradictory_knowledge_record',
+        severity: 'warning',
+        title: '结构化事实矛盾',
+        detail: `结构化事实 ${current.key} 同时记录了 ${first.value} 和 ${current.value}。`,
+        path: current.path,
+        targetPath: first.path,
+        updatedAt: current.updatedAt,
+      });
+    });
+  }
+
+  return issues;
+}
+
+function extractStructuredKnowledgeFact(
+  line: string,
+): Pick<StructuredKnowledgeFact, 'key' | 'value' | 'normalizedValue'> | null {
+  const normalized = line
+    .replace(/^\s*(?:[-*+]|\d+\.)\s+/, '')
+    .replace(/^>\s*/, '')
+    .trim();
+  const match =
+    normalized.match(/^(?:fact|事实)\s*[:：]\s*([^=]+?)\s*=\s*(.+)$/i) ??
+    normalized.match(/^(?:fact|事实)\s*[:：]\s*([^:：]+?)\s*[:：]\s*(.+)$/i);
+  const key = match?.[1]?.trim();
+  const value = match?.[2]?.trim();
+  if (!key || !value) return null;
+
+  return {
+    key,
+    value: stripFactValueDelimiters(value),
+    normalizedValue: normalizeStructuredFactValue(value),
+  };
+}
+
+function normalizeStructuredFactValue(value: string): string {
+  return stripFactValueDelimiters(value).replace(/\s+/g, ' ').toLowerCase();
+}
+
+function stripFactValueDelimiters(value: string): string {
+  return value.trim().replace(/^["'`“”]+|["'`“”]+$/g, '');
+}
+
+function buildSemanticSupportContradictionIssues(
+  contents: Array<{ path: string; content: string; updatedAt?: number }>,
+): KnowledgeHealthIssue[] {
+  const firstFactBySubject = new Map<string, SemanticSupportFact>();
+  const issues: KnowledgeHealthIssue[] = [];
+
+  for (const file of contents) {
+    file.content.split(/\r?\n/).forEach((line, index) => {
+      const fact = extractSemanticSupportFact(line);
+      if (!fact) return;
+
+      const current: SemanticSupportFact = {
+        ...fact,
+        path: file.path,
+        line: index + 1,
+        updatedAt: file.updatedAt,
+      };
+      const first = firstFactBySubject.get(current.normalizedSubject);
+      if (!first) {
+        firstFactBySubject.set(current.normalizedSubject, current);
+        return;
+      }
+      if (first.supportState === current.supportState) return;
+
+      issues.push({
+        id: `semantic-support-contradiction:${slugifySemanticSubject(current.normalizedSubject)}:${current.path}:${current.line}`,
+        kind: 'contradictory_knowledge_record',
+        severity: 'warning',
+        title: '自由文本能力矛盾',
+        detail: `自由文本同时记录了支持 ${current.subject} 和不支持 ${current.subject}。`,
+        path: current.path,
+        targetPath: first.path,
+        updatedAt: current.updatedAt,
+      });
+    });
+  }
+
+  return issues;
+}
+
+function extractSemanticSupportFact(
+  line: string,
+): Pick<SemanticSupportFact, 'subject' | 'normalizedSubject' | 'supportState'> | null {
+  const normalized = line
+    .replace(/^\s*(?:[-*+]|\d+\.)\s+/, '')
+    .replace(/^>\s*/, '')
+    .trim();
+  const unsupportedMatch =
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+unsupported\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+not\s+supported\s*[.!。]?$/i) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+no\s+longer\s+supported\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+incompatible\s+with\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+no\s+longer\s+supports\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+stopped\s+supporting\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+discontinued\s+support\s+for\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+support\s+for\s+(.+?)\s+(?:was|has\s+been)\s+(?:removed|discontinued)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+support\s+for\s+(.+?)\s+(?:has\s+)?ended\s*[.!。]?$/i,
+    ) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+unavailable\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+not\s+available\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+disabled\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+is\s+deactivated\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+disallowed\s*[.!。]?$/i) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+not\s+allowed\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+not\s+permitted\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+forbidden\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+forbidden\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+unauthorized\s*[.!。]?$/i) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+not\s+authorized\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+revoked\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+denied\s*[.!。]?$/i) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+not\s+approved\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+have\s+access\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:has|have)\s+no\s+access\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+lacks\s+access\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+prohibited\s+from\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+restricted\s+from\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+blocked\s+from\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+barred\s+from\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+prevented\s+from\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+precluded\s+from\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+prohibited\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+is\s+turned\s+off\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+is\s+switched\s+off\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+optional\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+not\s+required\s*[.!。]?$/i) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+require\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+use\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+rely\s+on\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+depend\s+on\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+integrate\s+with\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+connect\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+communicate\s+with\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+route\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+send\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+receive\s+from\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+listen\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+subscribe\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+publish\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+emit\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+broadcast\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+forward\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+deliver\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+write\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+save\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+store\s+in\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+persist\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+not\s+recommended\s*[.!。]?$/i,
+    ) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+must\s+not\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+shall\s+not\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+may\s+not\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+should\s+not\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+not\s+able\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+unable\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+not\s+capable\s+of\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+incapable\s+of\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+not\s+equipped\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+not\s+ready\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+not\s+prepared\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+lacks\s+(?:the\s+)?ability\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:(?:does|do)\s+not|doesn't|don't)\s+have\s+(?:the\s+)?ability\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(?:cannot|can't)\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)?\s*(?:does\s+not|doesn't|cannot|can't)\s+support\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(/^(?:产品|系统|应用|desktop|小龙虾)\s*(?:可选|非必须|无需|不需要)\s*(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:产品|系统|应用|desktop|小龙虾)\s*不得\s*(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:产品|系统|应用|desktop|小龙虾)\s*不建议\s*(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:产品|系统|应用|desktop|小龙虾)\s*不应该\s*(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:产品|系统|应用|desktop|小龙虾)\s*(?:已禁用|禁用|停用)\s*(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:产品|系统|应用|desktop|小龙虾)\s*(?:已关闭|关闭)\s*(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:产品|系统|应用|desktop|小龙虾)\s*(?:禁止|不允许)\s*(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:产品|系统|应用|desktop|小龙虾)\s*(?:不能|无法|不可)\s*(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:产品|系统|应用|desktop|小龙虾)\s*(.+?)\s*不可用\s*[.!。]?$/i) ??
+    normalized.match(/^(?:产品|系统|应用|desktop|小龙虾)\s*(.+?)\s*不可使用\s*[.!。]?$/i) ??
+    normalized.match(/^(?:产品|系统|应用|desktop|小龙虾)?\s*(?:不支持|无法支持)\s*(.+?)\s*[.!。]?$/i);
+  const supportedMatch =
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+supported\s*[.!。]?$/i) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+compatible\s+with\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+available\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+enabled\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+is\s+activated\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+allowed\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+allowed\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+permitted\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+permitted\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+authorized\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+authorized\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+granted\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+approved\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+approved\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:has|have|has\s+got|have\s+got)\s+access\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+is\s+turned\s+on\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+is\s+switched\s+on\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+required\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+requires\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+uses\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+relies\s+on\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+depends\s+on\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+integrates\s+with\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+connects\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+communicates\s+with\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+routes\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+sends\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+receives\s+from\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+listens\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+subscribes\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+publishes\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+emits\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+broadcasts\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+forwards\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+delivers\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+writes\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+saves\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+stores\s+in\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+persists\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+(?:mandatory|compulsory)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(.+?)\s+(?:is|are)\s+recommended\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+must\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+shall\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+may\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+should\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+able\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+capable\s+of\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+equipped\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+ready\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+(?:is|are)\s+prepared\s+to\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(
+      /^(?:the\s+)?(?:product|system|app|desktop)\s+(?:has|have|has\s+got|have\s+got)\s+(?:the\s+)?ability\s+to\s+(.+?)\s*[.!。]?$/i,
+    ) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)\s+can\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:the\s+)?(?:product|system|app|desktop)?\s*(?:supports|can\s+support)\s+(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:产品|系统|应用|desktop|小龙虾)\s*(?:必须|需|需要)\s*(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:产品|系统|应用|desktop|小龙虾)\s*建议\s*(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:产品|系统|应用|desktop|小龙虾)\s*应该\s*(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:产品|系统|应用|desktop|小龙虾)\s*(?:已启用|启用)\s*(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:产品|系统|应用|desktop|小龙虾)\s*(?:已开启|开启)\s*(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:产品|系统|应用|desktop|小龙虾)\s*允许\s*(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:产品|系统|应用|desktop|小龙虾)\s*(?:可以|能够|可)\s*(.+?)\s*[.!。]?$/i) ??
+    normalized.match(/^(?:产品|系统|应用|desktop|小龙虾)\s*(.+?)\s*可用\s*[.!。]?$/i) ??
+    normalized.match(/^(?:产品|系统|应用|desktop|小龙虾)\s*(.+?)\s*可以使用\s*[.!。]?$/i) ??
+    normalized.match(/^(?:产品|系统|应用|desktop|小龙虾)?\s*支持\s*(.+?)\s*[.!。]?$/i);
+  const subject = unsupportedMatch?.[1]?.trim() ?? supportedMatch?.[1]?.trim();
+  if (!subject) return null;
+
+  return {
+    subject: stripSemanticSubjectDelimiters(subject),
+    normalizedSubject: normalizeSemanticSubject(subject),
+    supportState: unsupportedMatch ? 'unsupported' : 'supported',
+  };
+}
+
+function normalizeSemanticSubject(subject: string): string {
+  return stripSemanticSubjectDelimiters(subject).replace(/\s+/g, ' ').toLowerCase();
+}
+
+function stripSemanticSubjectDelimiters(subject: string): string {
+  return subject.trim().replace(/^["'`“”]+|["'`“”.,，。!！?？:：;；]+$/g, '');
+}
+
+function slugifySemanticSubject(subject: string): string {
+  return (
+    subject
+      .replace(/[^a-z0-9._-]+/gi, '-')
+      .replace(/^-+|-+$/g, '')
+      .toLowerCase() || 'subject'
+  );
+}
+
 function extractContradictionMarker(line: string): string | null {
   const normalized = line
     .replace(/^\s*(?:[-*+]|\d+\.)\s+/, '')
@@ -859,10 +1359,29 @@ function reviewReferencesWorkItem(
   review: { file: RepositoryMarkdownFile; content: string },
   workItemPath: string,
 ): boolean {
-  if (review.content.includes(workItemPath)) return true;
+  if (getMarkdownFrontmatterValue(review.content, 'workItemPath') === workItemPath) return true;
   return extractMarkdownLinks(review.content)
     .map((href) => normalizeRepositoryLink(review.file.path, href))
     .some((path) => path === workItemPath);
+}
+
+function getMarkdownFrontmatterValue(markdown: string, key: string): string | undefined {
+  const frontmatter = extractMarkdownFrontmatter(markdown);
+  if (!frontmatter) return undefined;
+  const match = new RegExp(`^${escapeRegExp(key)}:\\s*(.+?)\\s*$`, 'm').exec(frontmatter);
+  return match?.[1]?.trim();
+}
+
+function extractMarkdownFrontmatter(markdown: string): string | undefined {
+  if (!/^---\r?\n/.test(markdown)) return undefined;
+  const lines = markdown.split(/\r?\n/);
+  const endIndex = lines.findIndex((line, index) => index > 0 && line.trim() === '---');
+  if (endIndex === -1) return undefined;
+  return lines.slice(1, endIndex).join('\n');
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function dedupeKnowledgeHealthIssues(issues: KnowledgeHealthIssue[]): KnowledgeHealthIssue[] {
@@ -921,6 +1440,17 @@ export function buildKnowledgeRewritePrompt(options: {
       : options.intent === 'update-selected'
         ? '改写或补全选中的 Wiki 条目，并同步索引与日志。'
         : '巡检并刷新知识库索引与维护日志。');
+  const digestPlan =
+    options.intent === 'digest-source'
+      ? [
+          '',
+          '消化计划：',
+          `1. 读取资料源 \`${selected || `${binding.knowledge.sourceRoot}/...`}\`，确认原始事实、来源边界和抽取限制。`,
+          '2. 提取可复用事实、决策、流程、约束和待确认问题，忽略不能由资料源支持的推断。',
+          '3. 对照现有 Wiki、index 和 log，避免重复或自相矛盾。',
+          '4. 输出 approval_required 或 no_write_needed；需要写入时同时给出 Wiki 条目、index 和 log 的完整内容。',
+        ]
+      : [];
 
   return [
     '你是 OpenClaw Desktop 知识库自动改写助手，目标是维护绑定仓库中的 LLM Wiki。',
@@ -935,6 +1465,7 @@ export function buildKnowledgeRewritePrompt(options: {
     '',
     '用户意图：',
     instruction,
+    ...digestPlan,
     '',
     '必须遵守：',
     '1. 先使用 desktop.repository.read / desktop.repository.search 读取资料源、现有 Wiki、index 和 log，不要臆造。',
@@ -1046,6 +1577,20 @@ function classifyKnowledgeEntryKind(binding: RepositoryBinding, path: string): K
   return null;
 }
 
+function extractDigestedSourcePathsFromKnowledgeLog(
+  logMarkdown: string,
+  sources: RepositoryMarkdownFile[],
+): Set<string> {
+  const digested = new Set<string>();
+  for (const line of logMarkdown.split(/\r?\n/)) {
+    if (!/(?:已?消化|digested)/i.test(line)) continue;
+    for (const source of sources) {
+      if (line.includes(source.path)) digested.add(source.path);
+    }
+  }
+  return digested;
+}
+
 export function extractMarkdownLinks(markdown: string): string[] {
   const links: string[] = [];
   const pattern = /\[[^\]]+\]\(([^)]+)\)/g;
@@ -1125,46 +1670,134 @@ function normalizeSourceFileTitle(fileName: string, body: string): string {
 const DEFAULT_KNOWLEDGE_EXTRACTION_LIMITATION =
   'PDF/Office 文本抽取为 best-effort：会保留可读取文字，复杂版式、图片和公式可能丢失。';
 
+const DEFAULT_LEGACY_BINARY_OFFICE_LIMITATION =
+  '旧版二进制 Office 正文抽取暂不可用：请转换为 .docx/.xlsx/.pptx 后重新导入，或手动粘贴摘录。';
+
+const DEFAULT_IMAGE_OCR_LIMITATION = '图片 OCR 暂不可用：当前只记录文件来源，不读取图片文字。';
+
+const DEFAULT_AUDIO_TRANSCRIPTION_LIMITATION = '音频转写暂不可用：当前只记录文件来源，不读取音频正文。';
+
+const DEFAULT_VIDEO_TRANSCRIPTION_LIMITATION = '视频转写暂不可用：当前只记录文件来源，不读取视频正文。';
+
+const DEFAULT_KNOWLEDGE_URL_FETCH_LIMITATION =
+  '网页抓取为 best-effort：会保留可读取标题和正文片段，动态内容、登录内容、脚本渲染内容和反爬限制可能丢失。';
+
+interface NormalizedKnowledgeUrlFetch {
+  status: KnowledgeUrlFetchMetadata['status'];
+  title: string;
+  text: string;
+  bytesRead: number;
+  truncated: boolean;
+  error: string;
+  limitations: string[];
+}
+
+function normalizeKnowledgeUrlFetch(
+  fetched: KnowledgeUrlFetchMetadata | undefined,
+): NormalizedKnowledgeUrlFetch | null {
+  if (!fetched) return null;
+  const limitations = fetched.limitations?.map((item) => item.trim()).filter(Boolean) ?? [];
+  return {
+    status: fetched.status,
+    title: fetched.title?.replace(/\s+/g, ' ').trim() ?? '',
+    text: fetched.text?.replace(/\r\n/g, '\n').trim() ?? '',
+    bytesRead:
+      typeof fetched.bytesRead === 'number' && Number.isFinite(fetched.bytesRead)
+        ? Math.max(0, Math.trunc(fetched.bytesRead))
+        : 0,
+    truncated: Boolean(fetched.truncated),
+    error: fetched.error?.replace(/\s+/g, ' ').trim() ?? '',
+    limitations: limitations.length > 0 ? limitations : [DEFAULT_KNOWLEDGE_URL_FETCH_LIMITATION],
+  };
+}
+
+function formatKnowledgeUrlFetchFrontmatter(fetched: NormalizedKnowledgeUrlFetch | null): string[] {
+  if (!fetched) return [];
+  return [
+    `urlFetchStatus: ${fetched.status}`,
+    ...(fetched.title ? [`urlFetchTitle: ${JSON.stringify(fetched.title)}`] : []),
+    `urlFetchBytesRead: ${fetched.bytesRead}`,
+    `urlFetchTruncated: ${fetched.truncated}`,
+    ...(fetched.error ? [`urlFetchError: ${JSON.stringify(fetched.error)}`] : []),
+  ];
+}
+
+function formatKnowledgeUrlFetchSections(fetched: NormalizedKnowledgeUrlFetch | null): string[] {
+  if (!fetched) return [];
+  return [
+    ...(fetched.text ? ['## 网页抓取内容', '', fetched.text, ''] : []),
+    '## 抓取边界',
+    '',
+    `- status: ${fetched.status}`,
+    `- bytesRead: ${fetched.bytesRead}`,
+    `- truncated: ${fetched.truncated}`,
+    ...(fetched.error ? [`- error: ${fetched.error}`] : []),
+    ...fetched.limitations.map((item) => `- ${item}`),
+    '',
+  ];
+}
+
 function normalizeKnowledgeFileExtraction(
   extracted: KnowledgeFileExtractionMetadata | undefined,
-): Required<KnowledgeFileExtractionMetadata> | null {
+): NormalizedKnowledgeFileExtraction | null {
   if (!extracted) return null;
   const limitations = extracted.limitations?.map((item) => item.trim()).filter(Boolean) ?? [];
+  const status = extracted.status ?? 'best_effort';
   return {
     format: extracted.format,
-    status: extracted.status ?? 'best_effort',
+    status,
+    reason: extracted.reason,
     bytesRead:
       typeof extracted.bytesRead === 'number' && Number.isFinite(extracted.bytesRead)
         ? Math.max(0, Math.trunc(extracted.bytesRead))
         : 0,
     truncated: Boolean(extracted.truncated),
-    limitations: limitations.length > 0 ? limitations : [DEFAULT_KNOWLEDGE_EXTRACTION_LIMITATION],
+    limitations:
+      limitations.length > 0 ? limitations : [resolveDefaultKnowledgeExtractionLimitation(status, extracted.reason)],
   };
 }
 
-function formatKnowledgeExtractionFrontmatter(extracted: Required<KnowledgeFileExtractionMetadata> | null): string[] {
+function resolveDefaultKnowledgeExtractionLimitation(
+  status: NormalizedKnowledgeFileExtraction['status'],
+  reason: NormalizedKnowledgeFileExtraction['reason'],
+): string {
+  if (status !== 'unavailable') return DEFAULT_KNOWLEDGE_EXTRACTION_LIMITATION;
+  if (reason === 'image-ocr-unavailable') return DEFAULT_IMAGE_OCR_LIMITATION;
+  if (reason === 'audio-transcription-unavailable') return DEFAULT_AUDIO_TRANSCRIPTION_LIMITATION;
+  if (reason === 'video-transcription-unavailable') return DEFAULT_VIDEO_TRANSCRIPTION_LIMITATION;
+  return DEFAULT_LEGACY_BINARY_OFFICE_LIMITATION;
+}
+
+function formatKnowledgeExtractionFrontmatter(extracted: NormalizedKnowledgeFileExtraction | null): string[] {
   if (!extracted) return [];
   return [
     `extractedFormat: ${extracted.format}`,
     `extractionStatus: ${extracted.status}`,
+    ...(extracted.reason ? [`extractionReason: ${extracted.reason}`] : []),
     `extractedBytesRead: ${extracted.bytesRead}`,
     `extractedTruncated: ${extracted.truncated}`,
   ];
 }
 
-function formatKnowledgeExtractionSourceFacts(extracted: Required<KnowledgeFileExtractionMetadata> | null): string[] {
+function formatKnowledgeExtractionSourceFacts(extracted: NormalizedKnowledgeFileExtraction | null): string[] {
   if (!extracted) return [];
   return [
     `- format: ${extracted.format}`,
     `- extraction: ${extracted.status}`,
+    ...(extracted.reason ? [`- reason: ${extracted.reason}`] : []),
     `- bytesRead: ${extracted.bytesRead}`,
     `- truncated: ${extracted.truncated}`,
   ];
 }
 
-function formatKnowledgeExtractionLimitations(extracted: Required<KnowledgeFileExtractionMetadata> | null): string[] {
+function formatKnowledgeExtractionLimitations(extracted: NormalizedKnowledgeFileExtraction | null): string[] {
   if (!extracted) return [];
   return ['## 抽取限制', '', ...extracted.limitations.map((item) => `- ${item}`), ''];
+}
+
+function formatKnowledgeFileBodyHeading(extracted: NormalizedKnowledgeFileExtraction | null): string {
+  if (!extracted) return '## 原始内容';
+  return extracted.status === 'unavailable' ? '## 抽取状态' : '## 抽取文本';
 }
 
 function slugifyKnowledgeTitle(value: string): string {

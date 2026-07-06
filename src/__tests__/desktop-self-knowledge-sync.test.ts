@@ -90,6 +90,10 @@ describe('desktop self-knowledge companion sync', () => {
       updated: 2,
       unchanged: 0,
       failed: [],
+      agents: [
+        { agentId: 'main', status: 'updated' },
+        { agentId: 'designer', status: 'updated' },
+      ],
     });
 
     const result = await syncDesktopSelfKnowledgeWithCompanion(client);
@@ -123,6 +127,7 @@ describe('desktop self-knowledge companion sync', () => {
       updated: 0,
       unchanged: 1,
       failed: [],
+      agents: [{ agentId: 'main', status: 'unchanged' }],
     });
 
     await expect(syncDesktopSelfKnowledgeWithCompanion(client)).resolves.toMatchObject({
@@ -149,6 +154,10 @@ describe('desktop self-knowledge companion sync', () => {
       updated: 1,
       unchanged: 0,
       failed: [{ agentId: 'broken', message: 'set failed' }],
+      agents: [
+        { agentId: 'main', status: 'updated' },
+        { agentId: 'broken', status: 'failed', message: 'set failed' },
+      ],
     });
 
     await expect(syncDesktopSelfKnowledgeWithCompanion(client)).resolves.toMatchObject({
