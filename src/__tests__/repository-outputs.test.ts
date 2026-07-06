@@ -247,6 +247,44 @@ describe('repository outputs', () => {
     expect(markdown).not.toContain('data:image/png;base64');
   });
 
+  it('records fallback thumbnail placeholder summaries without embedding data urls', () => {
+    const markdown = buildOutputMarkdown({
+      ...createArtifact(),
+      type: 'file',
+      externalFormat: 'powerpoint',
+      contentSummary: 'PowerPoint · roadmap.pptx · 4 KB',
+      thumbnail: 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=',
+    });
+
+    expect(markdown).toContain('thumbnail: available');
+    expect(markdown).toContain('thumbnailKind: format-placeholder');
+    expect(markdown).toContain('thumbnailSummary: Safe format placeholder thumbnail');
+    expect(markdown).not.toContain('data:image/svg+xml;base64');
+  });
+
+  it('records document preview availability without embedding PDF data urls in repository output markdown', () => {
+    const markdown = buildOutputMarkdown({
+      ...createArtifact(),
+      externalFormat: 'pdf',
+      contentSummary: 'PDF · brief.pdf · 2 KB',
+      documentPreview: {
+        extractedAt: 60,
+        status: 'available',
+        format: 'pdf',
+        sourceKind: 'imported_file',
+        summary: 'PDF preview · brief.pdf · 2048 B',
+        fileName: 'brief.pdf',
+        mimeType: 'application/pdf',
+        bytesRead: 2048,
+        dataUrl: 'data:application/pdf;base64,JVBERi0xLjE=',
+      },
+    });
+
+    expect(markdown).toContain('documentPreview: available');
+    expect(markdown).toContain('documentPreviewSummary: PDF preview · brief.pdf · 2048 B');
+    expect(markdown).not.toContain('data:application/pdf;base64');
+  });
+
   it('includes Desktop Bridge call summaries in repository output markdown', () => {
     const markdown = buildOutputMarkdown({
       ...createArtifact(),
@@ -466,6 +504,10 @@ describe('repository outputs', () => {
     expect(indexWrite).toContain('  - contentFacts: recorded, sha256 aaaaaaaaaaaa');
     expect(indexWrite).toContain('  - enrichment: content_facts, succeeded');
     expect(indexWrite).toContain('  - valueHealth: usable_with_limits');
+    expect(indexWrite).toContain('  - valueHealthStrengths: file-open-ready, content-facts-ready, reuse-classified');
+    expect(indexWrite).toContain(
+      '  - valueHealthNextActions: open-with-system-app, add-native-preview, add-thumbnail, add-content-extraction',
+    );
     expect(indexWrite).toContain('  - previewPlan: system_file_handler, open_file');
     expect(indexWrite).toContain('  - reuseKind: template');
     expect(indexWrite).toContain('- [Other](outputs/reports/art_other.md)');
@@ -789,6 +831,10 @@ describe('repository outputs', () => {
       status: 'succeeded',
       runner: 'Gateway Agent',
       command: 'bash tools/release-check.sh',
+      approvalTitle: '运行发布检查',
+      approvalRisk: 'high',
+      approvalReason: '会调用本地脚本，需要用户审批',
+      sourceApprovalRunPath: 'runs/assets/20260629-000102-tools-release-check-sh.md',
       resultSummary: '发布检查通过',
       repositoryOutputPath: 'outputs/reports/release-check.md',
       workItemPath: 'work/active/release.md',
@@ -819,8 +865,14 @@ describe('repository outputs', () => {
     expect(runWrite).toContain('assetId: tools-release-check-sh');
     expect(runWrite).toContain('assetPath: tools/release-check.sh');
     expect(runWrite).toContain('status: succeeded');
+    expect(runWrite).toContain('approvalTitle: 运行发布检查');
+    expect(runWrite).toContain('approvalRisk: high');
+    expect(runWrite).toContain('approvalReason: 会调用本地脚本，需要用户审批');
+    expect(runWrite).toContain('sourceApprovalRunPath: runs/assets/20260629-000102-tools-release-check-sh.md');
     expect(runWrite).toContain('- 运行器：Gateway Agent');
     expect(runWrite).toContain('- 命令：`bash tools/release-check.sh`');
+    expect(runWrite).toContain('- 审批：运行发布检查（high）');
+    expect(runWrite).toContain('- 审批原因：会调用本地脚本，需要用户审批');
     expect(runWrite).toContain('- 执行结果：发布检查通过');
     expect(runWrite).toContain('- Desktop 只记录仓库资产执行事实，不执行资产。');
 
@@ -840,6 +892,10 @@ describe('repository outputs', () => {
     expect(runIndexWrite).toContain('  - executedAt: 2026-06-29T01:02:03.000Z');
     expect(runIndexWrite).toContain('  - runner: Gateway Agent');
     expect(runIndexWrite).toContain('  - command: bash tools/release-check.sh');
+    expect(runIndexWrite).toContain('  - approvalTitle: 运行发布检查');
+    expect(runIndexWrite).toContain('  - approvalRisk: high');
+    expect(runIndexWrite).toContain('  - approvalReason: 会调用本地脚本，需要用户审批');
+    expect(runIndexWrite).toContain('  - sourceApprovalRunPath: runs/assets/20260629-000102-tools-release-check-sh.md');
     expect(runIndexWrite).toContain('  - result: 发布检查通过');
     expect(runIndexWrite).toContain('  - output: outputs/reports/release-check.md');
     expect(runIndexWrite).toContain('  - workItem: work/active/release.md');
@@ -853,9 +909,93 @@ describe('repository outputs', () => {
     expect(workItemWrite).toContain(
       '- [ ] 根据 [runs/assets/20260629-010203-tools-release-check-sh.md](../../runs/assets/20260629-010203-tools-release-check-sh.md) 更新事项状态。',
     );
-    expect(workItemWrite).toContain('- [ ] 判断是否需要把本次执行结果沉淀为成果，并关联到事项。');
-    expect(workItemWrite).toContain('- [ ] 判断是否需要更新知识库。');
-    expect(workItemWrite).toContain('- [ ] 判断是否需要写入复盘。');
+    expect(workItemWrite).toContain(
+      '- [ ] 判断是否需要把 [runs/assets/20260629-010203-tools-release-check-sh.md](../../runs/assets/20260629-010203-tools-release-check-sh.md) 的执行结果沉淀为成果，并关联到事项。',
+    );
+    expect(workItemWrite).toContain(
+      '- [ ] 判断是否需要基于 [runs/assets/20260629-010203-tools-release-check-sh.md](../../runs/assets/20260629-010203-tools-release-check-sh.md) 更新知识库。',
+    );
+    expect(workItemWrite).toContain(
+      '- [ ] 判断是否需要为 [runs/assets/20260629-010203-tools-release-check-sh.md](../../runs/assets/20260629-010203-tools-release-check-sh.md) 写入复盘。',
+    );
+  });
+
+  it('records repository asset executions back to semantic mapped work roots', async () => {
+    const writeText = vi.fn();
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'outputs/assets/index.md') {
+        return [
+          '# Reusable Assets',
+          '- [发布检查脚本](../../tools/release-check.sh) (`tools-release-check-sh`, script, repository-manual)',
+          '  - source: repository-manual',
+          '  - path: tools/release-check.sh',
+          '  - boundary: recordOnly, desktopExecutes=false, grantsPermission=false',
+          '',
+        ].join('\n');
+      }
+      if (relativePath === 'runs/assets/index.md') return '# Asset Runs\n';
+      if (relativePath === '10-ops/tasks/active/release.md') {
+        return [
+          '---',
+          'id: mapped-release',
+          'status: active',
+          '---',
+          '# 映射发布事项',
+          '',
+          '## 执行记录',
+          '',
+          '- 暂无',
+          '',
+          '## 收尾动作',
+          '',
+          '- 暂无',
+          '',
+        ].join('\n');
+      }
+      return '';
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: {
+          writeText,
+          readText,
+        },
+      },
+    });
+    const binding = createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' });
+    binding.paths.work = '10-ops/tasks';
+    binding.paths.plans = '10-ops/plans';
+
+    const result = await recordRepositoryAssetExecution({
+      binding,
+      assetId: 'tools-release-check-sh',
+      status: 'succeeded',
+      runner: 'Gateway Agent',
+      command: 'bash tools/release-check.sh',
+      resultSummary: '映射仓库发布检查通过',
+      workItemPath: '10-ops/tasks/active/release.md',
+      executedAt: new Date('2026-06-29T01:02:03.000Z'),
+    });
+
+    const workItemWrite = writeText.mock.calls.find((call) => call[1] === '10-ops/tasks/active/release.md')?.[2] as
+      | string
+      | undefined;
+    expect(workItemWrite).toContain(
+      '- 2026-06-29T01:02:03.000Z · asset:script · succeeded · [runs/assets/20260629-010203-tools-release-check-sh.md](../../../runs/assets/20260629-010203-tools-release-check-sh.md) · 映射仓库发布检查通过',
+    );
+    expect(workItemWrite).toContain(
+      '- [ ] 根据 [runs/assets/20260629-010203-tools-release-check-sh.md](../../../runs/assets/20260629-010203-tools-release-check-sh.md) 更新事项状态。',
+    );
+    expect(workItemWrite).toContain(
+      '- [ ] 判断是否需要把 [runs/assets/20260629-010203-tools-release-check-sh.md](../../../runs/assets/20260629-010203-tools-release-check-sh.md) 的执行结果沉淀为成果，并关联到事项。',
+    );
+    expect(workItemWrite).toContain(
+      '- [ ] 判断是否需要基于 [runs/assets/20260629-010203-tools-release-check-sh.md](../../../runs/assets/20260629-010203-tools-release-check-sh.md) 更新知识库。',
+    );
+    expect(workItemWrite).toContain(
+      '- [ ] 判断是否需要为 [runs/assets/20260629-010203-tools-release-check-sh.md](../../../runs/assets/20260629-010203-tools-release-check-sh.md) 写入复盘。',
+    );
+    expect(result.runPath).toBe('runs/assets/20260629-010203-tools-release-check-sh.md');
   });
 
   it('writes file artifacts into the repository files output bucket', async () => {

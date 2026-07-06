@@ -75,7 +75,11 @@ export async function startRepositoryAgentsFileSyncWatcher(options: {
   try {
     return await watchAgentsFile(options.repoPath, () => options.onChanged());
   } catch (error) {
-    console.warn('[startRepositoryAgentsFileSyncWatcher] watchAgentsFile failed; falling back to interval', error);
+    window.electronAPI?.log?.send(
+      'WARN',
+      '[startRepositoryAgentsFileSyncWatcher] watchAgentsFile failed; falling back to interval',
+      error,
+    );
     return fallbackToInterval();
   }
 }

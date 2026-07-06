@@ -1,7 +1,77 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import {
+  buildDashboardTailActionTarget,
+  isRepositoryAssetRunPathLike,
+  isSafeRepositoryAssetRunPath,
+  parseDashboardTailActionRoute,
+} from '../lib/dashboard-tail-action-routing';
 
 describe('dashboard tail action routing', () => {
+  it('round-trips repository asset run context through tail action URLs', () => {
+    const target = buildDashboardTailActionTarget('/artifacts', {
+      kind: 'output',
+      id: 'work/active/release.md:tail-action:1',
+      workItemPath: 'work/active/release.md',
+      assetRunPath: 'runs/assets/20260629-010203-tools-release-check-sh.md',
+    });
+
+    expect(target).toBe(
+      '/artifacts?tailAction=output&tailActionId=work%2Factive%2Frelease.md%3Atail-action%3A1&workItemPath=work%2Factive%2Frelease.md&assetRunPath=runs%2Fassets%2F20260629-010203-tools-release-check-sh.md',
+    );
+    expect(parseDashboardTailActionRoute(target.slice('/artifacts'.length))).toEqual({
+      kind: 'output',
+      id: 'work/active/release.md:tail-action:1',
+      workItemPath: 'work/active/release.md',
+      assetRunPath: 'runs/assets/20260629-010203-tools-release-check-sh.md',
+    });
+  });
+
+  it('drops unsafe tail action route paths from URL context', () => {
+    expect(
+      parseDashboardTailActionRoute(
+        '?tailAction=output&tailActionId=unsafe&workItemPath=../secret.md&assetRunPath=runs/assets/../secret.md',
+      ),
+    ).toEqual({
+      kind: 'output',
+      id: 'unsafe',
+      workItemPath: undefined,
+      assetRunPath: undefined,
+    });
+
+    expect(
+      parseDashboardTailActionRoute(
+        '?tailAction=knowledge&workItemPath=plans/active/release.md&assetRunPath=/runs/assets/release.md',
+      ),
+    ).toEqual({
+      kind: 'knowledge',
+      id: undefined,
+      workItemPath: undefined,
+      assetRunPath: undefined,
+    });
+  });
+
+  it('shares safe repository asset run path parsing with Workbench asset preview routes', () => {
+    const workbench = readFileSync('src/pages/WorkbenchPage.tsx', 'utf8');
+
+    expect(isSafeRepositoryAssetRunPath('runs/assets/20260629-010203-release.md')).toBe(true);
+    expect(isSafeRepositoryAssetRunPath('runs/assets/../secret.md')).toBe(false);
+    expect(isSafeRepositoryAssetRunPath('/runs/assets/20260629-010203-release.md')).toBe(false);
+    expect(workbench).toContain('isSafeRepositoryAssetRunPath(assetRunPath ?? undefined)');
+  });
+
+  it('shares repository asset run path classification with Desktop card approval routing', () => {
+    const sessionContent = readFileSync('src/lib/session-content.ts', 'utf8');
+
+    expect(isRepositoryAssetRunPathLike('runs/assets/20260629-010203-release.md')).toBe(true);
+    expect(isRepositoryAssetRunPathLike('runs/assets/../secret.md')).toBe(true);
+    expect(isRepositoryAssetRunPathLike('/runs/assets/20260629-010203-release.md')).toBe(true);
+    expect(isRepositoryAssetRunPathLike('tools/release-check.sh')).toBe(false);
+    expect(sessionContent).toContain('getDesktopCardRepositoryAssetPath');
+    expect(sessionContent).toContain('!isRepositoryAssetRunPathLike(text)');
+    expect(sessionContent).not.toContain("assetPath.startsWith('runs/assets/')");
+  });
+
   it('makes target pages consume Dashboard tail action context from the URL', () => {
     const workbench = readFileSync('src/pages/WorkbenchPage.tsx', 'utf8');
     const workbenchPanel = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
@@ -36,6 +106,8 @@ describe('dashboard tail action routing', () => {
     expect(workbenchPanel).toContain('workbench.reviewSourceDraftConfirmed');
     expect(workbenchPanel).toContain('desktop.artifacts.execution.review.write');
     expect(workbenchPanel).toContain('reviews/weekly/');
+    expect(workbenchPanel).toContain('openedInitialAssetRunPath');
+    expect(workbenchPanel).toContain('readWorkbenchMarkdown(binding, assetRunPath)');
     expect(workbenchPanel).toContain('reviewTailActionCanConfirm');
     expect(workbenchPanel).toContain("reviewTailActionContext.id.includes(':tail-action:')");
     expect(workbenchPanel).toContain('reviewSourceExecutionCanConfirm');
@@ -51,7 +123,9 @@ describe('dashboard tail action routing', () => {
 
     expect(artifacts).toContain('parseDashboardTailActionRoute(location.search)');
     expect(artifacts).toContain("tailActionContext?.kind === 'output'");
+    expect(artifacts).toContain('!embedded && artifactTailActionContext ?');
     expect(artifacts).toContain('workItemPath={artifactTailActionContext?.workItemPath}');
+    expect(artifacts).toContain('artifactTailActionContext.assetRunPath');
 
     expect(knowledge).toContain('parseDashboardTailActionRoute(location.search)');
     expect(knowledge).toContain('getKnowledgeTailActionTab(tailActionContext)');
@@ -64,11 +138,22 @@ describe('dashboard tail action routing', () => {
     expect(knowledgePanel).toContain('confirmWorkbenchKnowledgeTailAction');
     expect(knowledgePanel).toContain("t('knowledge.startTailActionRewrite')");
     expect(knowledgePanel).toContain("t('knowledge.confirmTailAction')");
-    expect(knowledgePanel).toContain('workItemPath: knowledgeTailActionContext.workItemPath');
-    expect(knowledgePanel).toContain('tailActionId: knowledgeTailActionContext.id');
+    expect(knowledgePanel).toContain('knowledgeTailActionCanRewrite');
+    expect(knowledgePanel).toContain('disabled={!knowledgeTailActionCanRewrite}');
+    expect(knowledgePanel).toContain('workItemPath: tailActionContext.workItemPath');
+    expect(knowledgePanel).toContain('assetRunPath: tailActionContext.assetRunPath');
+    expect(knowledgePanel).toContain('tailActionId: tailActionContext.id');
+    expect(knowledgePanel).toContain('knowledgeTailActionContext.assetRunPath');
     expect(knowledgePanel).toContain('knowledgeTailActionCanConfirm');
     expect(knowledgePanel).toContain("knowledgeTailActionContext.id.includes(':tail-action:')");
     expect(knowledgePanel).toContain('knowledgeTailActionRunId');
     expect(knowledgePanel).toContain('action-run-knowledge:');
+    expect(knowledgePanel).toContain('findAiActionRunByLocalOrGatewayId');
+    expect(knowledgePanel).toContain('loadAiActionRuns');
+    expect(knowledgePanel).toContain('readWorkbenchMarkdown(binding, knowledgeTailActionContext.assetRunPath)');
+    expect(knowledgePanel).toContain('knowledgeTailActionAssetRunMarkdown');
+    expect(knowledgePanel).toContain('sourceAssetRunMarkdown: knowledgeTailActionAssetRunMarkdown ?? undefined');
+    expect(knowledgePanel).toContain('sourceRunResultSummary: knowledgeTailActionRun?.resultSummary');
+    expect(knowledgePanel).toContain('sourceRunAssistantResponse: knowledgeTailActionRun?.lastAssistantResponse');
   });
 });

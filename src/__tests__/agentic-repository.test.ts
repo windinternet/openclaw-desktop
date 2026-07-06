@@ -584,20 +584,17 @@ describe('agentic repository storage and templates', () => {
 
   it('passes only Workbench structure signals to semantic mapping', () => {
     const source = readFileSync('src/components/RepositoryGate.tsx', 'utf8');
-    const signalBuilder = source.slice(
-      source.indexOf('const buildWorkbenchStructureSignals'),
-      source.indexOf('const isSafeMapping'),
-    );
+    const mapping = readFileSync('src/lib/repository-workbench-mapping.ts', 'utf8');
 
     expect(source).toContain('buildWorkbenchStructureSignals');
-    expect(source).toContain('current-work');
-    expect(source).toContain('next-work');
-    expect(source).toContain('done-work');
-    expect(source).toContain('project-system');
-    expect(source).toContain('initiative|initiatives|client|clients');
-    expect(source).toContain('reusable-tool');
+    expect(mapping).toContain('current-work');
+    expect(mapping).toContain('next-work');
+    expect(mapping).toContain('done-work');
+    expect(mapping).toContain('project-system');
+    expect(mapping).toContain('initiative|initiatives|client|clients');
+    expect(mapping).toContain('reusable-tool');
     expect(source).toContain('structureSignals');
-    expect(signalBuilder).not.toContain("filter((entry) => !entry.endsWith('/'))");
+    expect(mapping).not.toContain("filter((entry) => !entry.endsWith('/'))");
     expect(source).not.toContain('readWorkbenchMappingExcerpts');
   });
 
@@ -633,7 +630,47 @@ describe('agentic repository storage and templates', () => {
 
     expect(source).toContain('repositoryGate.workbenchMappingSaved');
     expect(zh.repositoryGate.workbenchMappingSaved).toContain('工作台');
+    expect(zh.repositoryGate.workbenchMappingSaved).toContain('第一件事');
     expect(en.repositoryGate.workbenchMappingSaved.toLowerCase()).toContain('workbench');
+    expect(en.repositoryGate.workbenchMappingSaved.toLowerCase()).toContain('first thing');
+  });
+
+  it('keeps the semantic-mapped setup feedback pointed at the first thing next step', () => {
+    const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
+    const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
+
+    expect(zh.repositoryGate.setupFeedback['semantic-mapped'].desc).toContain('第一件事');
+    expect(zh.repositoryGate.setupFeedback['semantic-mapped'].desc).toContain('工作台');
+    expect(en.repositoryGate.setupFeedback['semantic-mapped'].desc.toLowerCase()).toContain('first thing');
+    expect(en.repositoryGate.setupFeedback['semantic-mapped'].desc.toLowerCase()).toContain('workbench');
+  });
+
+  it('wires onboarding repository setup feedback and approved safe adaptation', () => {
+    const gate = readFileSync('src/components/RepositoryGate.tsx', 'utf8');
+    const store = readFileSync('src/lib/agentic-repository-store.ts', 'utf8');
+    const preload = readFileSync('electron/preload.ts', 'utf8');
+    const handlers = readFileSync('electron/repository-handlers.ts', 'utf8');
+    const types = readFileSync('src/vite-env.d.ts', 'utf8');
+    const zh = JSON.parse(readFileSync('src/locales/zh.json', 'utf8'));
+    const en = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
+
+    expect(gate).toContain('buildWorkbenchRepositorySetupFeedback');
+    expect(gate).toContain('setupFeedback');
+    expect(gate).toContain('handleApproveRepositoryAdaptation');
+    expect(gate).toContain('Modal.confirm');
+    expect(gate).toContain('adaptRepositoryBinding(binding)');
+    expect(gate).toContain('setupFeedback.missingRecommendedEntries');
+    expect(store).toContain('adaptRepositoryBinding');
+    expect(store).toContain('repository.adapt(binding.repoPath)');
+    expect(preload).toContain("ipcRenderer.invoke('repository:adapt'");
+    expect(handlers).toContain("ipcMain.handle('repository:adapt'");
+    expect(handlers).toContain('adaptExistingRepository');
+    expect(handlers).toContain('force: false');
+    expect(handlers).toContain('errorOnExist: false');
+    expect(types).toContain('adapt: (repoPath: string)');
+    expect(zh.repositoryGate.setupFeedback).toBeTruthy();
+    expect(zh.repositoryGate.approveAdaptation).toContain('审批');
+    expect(en.repositoryGate.approveAdaptation.toLowerCase()).toContain('approve');
   });
 
   it('saves Workbench semantic mappings without a manual confirmation step', () => {
@@ -678,7 +715,7 @@ describe('agentic repository storage and templates', () => {
     expect(store).toContain('syncRepositoryContextWithCompanion(target.client, target.instanceId)');
     expect(store).toContain('syncRepositoryContextForInstance(instance.id)');
     expect(connectedBranch).toContain('syncRepositoryContextForInstance(instance.id)');
-    expect(store).toContain("console.warn('[syncRepositoryContextForInstance]'");
+    expect(store).toContain("logStore('WARN', '[syncRepositoryContextForInstance]'");
     expect(mainPage).toContain('syncRepositoryContextForInstance(currentId)');
     expect(beforeDetection).not.toContain('companionInstallDismissedRef.current');
     expect(detectionThen).toContain("if (info.status === 'ready')");

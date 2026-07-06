@@ -48,13 +48,14 @@ export function ActionRunWorkItemPicker({
     if (!trimmedTitle || disabled || creating || !showCreate) return;
 
     try {
-      await createWorkItem(trimmedTitle);
+      const created = await createWorkItem(trimmedTitle);
+      onSelectedPathChange(created.path);
       setNewWorkItemTitle('');
       Toast.success(createSuccessMessage);
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : String(error));
     }
-  }, [createSuccessMessage, createWorkItem, creating, disabled, showCreate, trimmedTitle]);
+  }, [createSuccessMessage, createWorkItem, creating, disabled, onSelectedPathChange, showCreate, trimmedTitle]);
 
   if (options.length === 0 && !showCreate) return null;
 

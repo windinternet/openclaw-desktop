@@ -25,6 +25,7 @@ export interface RepositoryInspectDetails {
   detectedProfile?: string;
   suggestedPaths?: Partial<RepositoryPaths>;
   suggestedKnowledge?: Partial<KnowledgeRepositoryMapping>;
+  missingTemplateEntries?: string[];
 }
 
 export interface RepositoryInspectResult {
@@ -122,6 +123,26 @@ export async function bootstrapRepositoryBinding(binding: RepositoryBinding): Pr
   }
 
   const details = await repository.bootstrap(binding.repoPath);
+  const status = getRepositoryGateStatus({
+    binding,
+    gitAvailable: true,
+    ...details,
+  });
+
+  return {
+    binding: { ...binding, status },
+    status,
+    details,
+  };
+}
+
+export async function adaptRepositoryBinding(binding: RepositoryBinding): Promise<RepositoryInspectResult> {
+  const repository = typeof window !== 'undefined' ? window.electronAPI?.repository : undefined;
+  if (!repository || binding.location !== 'desktop-local') {
+    return inspectRepositoryBinding(binding);
+  }
+
+  const details = await repository.adapt(binding.repoPath);
   const status = getRepositoryGateStatus({
     binding,
     gitAvailable: true,

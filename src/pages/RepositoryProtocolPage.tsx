@@ -8,6 +8,7 @@ import {
   type RepositoryProtocolDocument,
   type RepositoryProtocolSnapshot,
 } from '../lib/repository-protocol';
+import type { DesktopSelfKnowledgeSyncResult } from '../lib/desktop-self-knowledge-sync';
 import { useStore } from '../lib/store';
 
 const { Title, Text } = Typography;
@@ -17,6 +18,11 @@ interface EmbeddedPageProps {
   onHeaderActionsChange?: (actions: ReactNode | null) => void;
 }
 
+interface SelfKnowledgeSyncStatus {
+  result: DesktopSelfKnowledgeSyncResult;
+  syncedAt: string;
+}
+
 export default function RepositoryProtocolPage({ embedded = false, onHeaderActionsChange }: EmbeddedPageProps = {}) {
   const { t } = useTranslation();
   const currentInstanceId = useStore((state) => state.currentInstanceId);
@@ -24,6 +30,7 @@ export default function RepositoryProtocolPage({ embedded = false, onHeaderActio
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'empty' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [syncingSelfKnowledge, setSyncingSelfKnowledge] = useState(false);
+  const [selfKnowledgeSyncStatus, setSelfKnowledgeSyncStatus] = useState<SelfKnowledgeSyncStatus | null>(null);
 
   const permissionItems = useMemo(
     () => [
@@ -77,6 +84,7 @@ export default function RepositoryProtocolPage({ embedded = false, onHeaderActio
         Toast.warning(t('connection.notConnected'));
         return;
       }
+      setSelfKnowledgeSyncStatus({ result, syncedAt: new Date().toLocaleString() });
       if (result.status === 'failed') {
         Toast.error(result.message || t('controlCenter.desktopSelfKnowledgeSyncFailed'));
         return;
@@ -163,6 +171,18 @@ export default function RepositoryProtocolPage({ embedded = false, onHeaderActio
             </Space>
           </Space>
         </Card>
+        <Card>
+          <Space vertical align="start" style={{ width: '100%' }}>
+            <Text strong>{t('controlCenter.desktopSelfKnowledgeStatus')}</Text>
+            {selfKnowledgeSyncStatus ? (
+              <DesktopSelfKnowledgeSyncStatusView status={selfKnowledgeSyncStatus} />
+            ) : (
+              <Text type="tertiary" size="small">
+                {t('controlCenter.desktopSelfKnowledgeNotSynced')}
+              </Text>
+            )}
+          </Space>
+        </Card>
       </div>
 
       {status === 'loading' && <Spin />}
@@ -202,6 +222,70 @@ export default function RepositoryProtocolPage({ embedded = false, onHeaderActio
       )}
     </div>
   );
+}
+
+function DesktopSelfKnowledgeSyncStatusView({ status }: { status: SelfKnowledgeSyncStatus }) {
+  const { t } = useTranslation();
+  const result = status.result;
+  const payload = result.status === 'failed' ? null : result.payload;
+  const tagColor = result.status === 'failed' ? 'red' : result.status === 'fallback_partial' ? 'orange' : 'green';
+
+  return (
+    <Space vertical align="start" style={{ width: '100%' }}>
+      <Tag color={tagColor}>{describeDesktopSelfKnowledgeSyncStatus(result, t)}</Tag>
+      <Text type="tertiary" size="small">
+        {t('controlCenter.desktopSelfKnowledgeLastSync')}: {status.syncedAt}
+      </Text>
+      {payload && (
+        <>
+          <Text size="small">
+            {t('controlCenter.desktopSelfKnowledgeHash')}: <Text code>{payload.skillContentHash}</Text>
+          </Text>
+          <Text type="tertiary" size="small">
+            {t('controlCenter.desktopSelfKnowledgeSkillPath')}: {payload.skillPath}
+          </Text>
+        </>
+      )}
+      {result.status === 'failed' && (
+        <Text type="danger" size="small">
+          {result.message}
+        </Text>
+      )}
+      {(result.status === 'fallback_synced' || result.status === 'fallback_partial') && (
+        <>
+          <Text type="tertiary" size="small">
+            {t('controlCenter.desktopSelfKnowledgeFallbackAgents', {
+              total: result.fallback.total,
+              updated: result.fallback.updated,
+              unchanged: result.fallback.unchanged,
+              failed: result.fallback.failed.length,
+            })}
+          </Text>
+          <Text strong size="small">
+            {t('controlCenter.desktopSelfKnowledgeAgentStatuses')}
+          </Text>
+          <Space wrap>
+            {result.fallback.agents.map((agent) => (
+              <Tag key={agent.agentId} color={agent.status === 'failed' ? 'red' : 'blue'}>
+                {agent.agentId}: {agent.status}
+                {agent.message ? ` - ${agent.message}` : ''}
+              </Tag>
+            ))}
+          </Space>
+        </>
+      )}
+    </Space>
+  );
+}
+
+function describeDesktopSelfKnowledgeSyncStatus(
+  result: DesktopSelfKnowledgeSyncResult,
+  t: ReturnType<typeof useTranslation>['t'],
+): string {
+  if (result.status === 'synced') return t('controlCenter.desktopSelfKnowledgeChannelCompanion');
+  if (result.status === 'fallback_synced') return t('controlCenter.desktopSelfKnowledgeChannelAgentFiles');
+  if (result.status === 'fallback_partial') return t('controlCenter.desktopSelfKnowledgeChannelPartial');
+  return t('controlCenter.desktopSelfKnowledgeChannelFailed');
 }
 
 function ProtocolDocumentView({ document }: { document: RepositoryProtocolDocument }) {

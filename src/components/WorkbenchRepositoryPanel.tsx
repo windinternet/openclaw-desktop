@@ -3,9 +3,14 @@ import { Button, Card, Checkbox, Empty, Select, Space, Tag, Toast, Typography } 
 import { IconBolt, IconBox, IconCheckList, IconFile } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway, useStore } from '../lib';
+import {
+  createAiActionRunWithWorkItemAssignment,
+  executeAiActionRunWithGateway,
+  syncAiActionRunWithGateway,
+  useStore,
+} from '../lib';
 import type { RepositoryBinding } from '../lib/agentic-repository';
-import { loadAiActionRuns, upsertAiActionRun } from '../lib/ai-action-run-store';
+import { findAiActionRunByLocalOrGatewayId, loadAiActionRuns, upsertAiActionRun } from '../lib/ai-action-run-store';
 import { buildPlanExecutePrompt, buildWorkMatterPlanPrompt } from '../lib/ai-action-prompts';
 import { buildArtifactOutputDescription } from '../lib/artifact-display';
 import type { ArtifactMeta } from '../lib/artifact-types';
@@ -14,20 +19,41 @@ import {
   type DashboardTailActionRouteContext,
 } from '../lib/dashboard-tail-action-routing';
 import type { RepositoryMarkdownFile } from '../lib/repository-knowledge';
-import type { WorkbenchSnapshot } from '../lib/repository-workbench';
+import type { RepositoryAssetRunIndexLink, WorkbenchSnapshot } from '../lib/repository-workbench';
 import {
   archiveCompletedWorkbenchMatter,
+  buildRepositoryAssetExecutionApprovalCommand,
+  buildRepositoryAssetRunApprovalDecisionCommands,
   confirmWorkbenchAssetRunReviewDraft,
   confirmWorkbenchReviewDraft,
+  findRepositoryAssetRunKnowledgeUpdateState,
+  findRepositoryAssetPendingApprovalState,
+  findRepositoryAssetResolvedRunState,
+  findRepositoryAssetRunApprovalDecisionState,
+  findRepositoryAssetRunExecutionState,
+  findRepositoryAssetRunFollowUpState,
+  findRepositoryAssetRunReviewState,
+  getRepositoryAssetResolvedRunFollowUpActions,
+  getRepositoryAssetRunEffectiveApprovalState,
+  getRepositoryAssetRunEffectiveOutputState,
+  getRepositoryAssetRunEffectiveReviewState,
+  getRepositoryAssetRunListFollowUpState,
+  getRepositoryAssetRunOutputState,
+  isRepositoryAssetRunReviewDraftForRun,
+  isWorkbenchSnapshotMatterPath,
   loadWorkbenchSnapshot,
+  parseRepositoryAssetRunIndexLinks,
+  parseRepositoryAssetPermissionBoundary,
+  parseRepositoryAssetRunDetails,
   readWorkbenchMarkdown,
   updateWorkbenchMatterStatusFromTailAction,
   writeWorkbenchAssetRunReviewDraft,
   writeWorkbenchReviewDraft,
 } from '../lib/repository-workbench';
 import type { AiActionRun, AiActionRunStatus } from '../lib/types';
-import { extractWorkbenchMatterId, isWorkbenchMatterPath } from '../lib/workbench-matter';
+import { extractWorkbenchMatterId } from '../lib/workbench-matter';
 import {
+  buildWorkbenchMatterGoldenPathState,
   findPlanExecutionKnowledgeFollowUpRuns,
   findPlanExecutionKnowledgeUpdateState,
   findLatestPlanExecutionRun,
@@ -38,6 +64,10 @@ import {
   shouldOfferPlanExecutionOutputPreservation,
   shouldOfferPlanExecutionReview,
   type PlanExecutionKnowledgeUpdateState,
+  type WorkbenchMatterGoldenPathActionKey,
+  type WorkbenchMatterGoldenPathReasonKey,
+  type WorkbenchMatterGoldenPathStepKey,
+  type WorkbenchMatterGoldenPathStepStatus,
 } from '../lib/workbench-plan-execution';
 import { ArtifactAICreateDrawer } from './ArtifactAICreateDrawer';
 import MarkdownView from './MarkdownView';
@@ -46,6 +76,11 @@ const { Text, Title } = Typography;
 
 export type WorkbenchPanelView = 'dashboard' | 'projects' | 'tasks' | 'plans' | 'activity' | 'outputs' | 'reviews';
 type OutputGroupBy = 'none' | 'source' | 'type';
+type ActivityRunFilter = 'all' | 'asset-runs';
+type AssetRunReviewFilter = 'all' | 'pending' | 'draft' | 'confirmed';
+type AssetRunOutputFilter = 'all' | 'pending' | 'preserved';
+type AssetRunApprovalFilter = 'all' | 'pending' | 'approved' | 'denied';
+type AssetRunKnowledgeFilter = 'all' | PlanExecutionKnowledgeUpdateState['status'];
 const WORKBENCH_STATUS_OPTIONS = ['active', 'blocked', 'done', 'paused'] as const;
 
 interface ProjectDeliverable {
@@ -75,6 +110,54 @@ const PLAN_EXECUTION_KNOWLEDGE_STATUS_LABEL_KEYS: Record<PlanExecutionKnowledgeU
   cancelled: 'workbench.planExecutionKnowledgeCancelled',
 };
 
+const ASSET_RUN_EXECUTION_STATUS_LABEL_KEYS = {
+  succeeded: 'workbench.assetRunExecutionSucceeded',
+  failed: 'workbench.assetRunExecutionFailed',
+  cancelled: 'workbench.assetRunExecutionCancelled',
+} as const;
+
+const GOLDEN_PATH_STEP_LABEL_KEYS: Record<WorkbenchMatterGoldenPathStepKey, string> = {
+  plan: 'workbench.goldenPathPlan',
+  execution: 'workbench.goldenPathExecution',
+  output: 'workbench.goldenPathOutput',
+  knowledge: 'workbench.goldenPathKnowledge',
+  review: 'workbench.goldenPathReview',
+};
+
+const GOLDEN_PATH_STATUS_LABEL_KEYS: Record<WorkbenchMatterGoldenPathStepStatus, string> = {
+  blocked: 'workbench.goldenPathBlocked',
+  pending: 'workbench.goldenPathPending',
+  active: 'workbench.goldenPathActive',
+  done: 'workbench.goldenPathDone',
+  failed: 'workbench.goldenPathFailed',
+  cancelled: 'workbench.goldenPathCancelled',
+};
+
+const GOLDEN_PATH_ACTION_LABEL_KEYS: Record<WorkbenchMatterGoldenPathActionKey, string> = {
+  'generate-plan': 'workbench.goldenPathGeneratePlan',
+  'open-plan': 'workbench.goldenPathOpenPlan',
+  'open-execution': 'workbench.goldenPathOpenExecution',
+  'preserve-output': 'workbench.goldenPathPreserveOutput',
+  'update-knowledge': 'workbench.goldenPathUpdateKnowledge',
+  'write-review': 'workbench.goldenPathWriteReview',
+  complete: 'workbench.goldenPathComplete',
+};
+
+const GOLDEN_PATH_REASON_LABEL_KEYS: Record<WorkbenchMatterGoldenPathReasonKey, string> = {
+  'plan-missing': 'workbench.goldenPathReasonPlanMissing',
+  'execution-missing': 'workbench.goldenPathReasonExecutionMissing',
+  'execution-running': 'workbench.goldenPathReasonExecutionRunning',
+  'execution-summary-missing': 'workbench.goldenPathReasonExecutionSummaryMissing',
+  'execution-failed': 'workbench.goldenPathReasonExecutionFailed',
+  'execution-cancelled': 'workbench.goldenPathReasonExecutionCancelled',
+  'output-missing': 'workbench.goldenPathReasonOutputMissing',
+  'knowledge-missing': 'workbench.goldenPathReasonKnowledgeMissing',
+  'knowledge-retry': 'workbench.goldenPathReasonKnowledgeRetry',
+  'review-missing': 'workbench.goldenPathReasonReviewMissing',
+  'review-draft': 'workbench.goldenPathReasonReviewDraft',
+  complete: 'workbench.goldenPathReasonComplete',
+};
+
 function actionStatusColor(status: AiActionRunStatus): 'blue' | 'green' | 'orange' | 'red' | 'grey' {
   if (status === 'done') return 'green';
   if (status === 'failed') return 'red';
@@ -91,6 +174,22 @@ function knowledgeUpdateStatusColor(
   if (status === 'cancelled') return 'grey';
   if (status === 'awaiting_approval') return 'orange';
   return 'blue';
+}
+
+function assetRunExecutionStatusColor(status: 'succeeded' | 'failed' | 'cancelled'): 'green' | 'red' | 'grey' {
+  if (status === 'succeeded') return 'green';
+  if (status === 'failed') return 'red';
+  return 'grey';
+}
+
+function goldenPathStatusColor(
+  status: WorkbenchMatterGoldenPathStepStatus,
+): 'blue' | 'green' | 'orange' | 'red' | 'grey' {
+  if (status === 'done') return 'green';
+  if (status === 'failed') return 'red';
+  if (status === 'cancelled' || status === 'blocked') return 'grey';
+  if (status === 'active') return 'blue';
+  return 'orange';
 }
 
 function formatTimestamp(value: number): string {
@@ -180,6 +279,8 @@ export default function WorkbenchRepositoryPanel({
   assetRunPath,
   initialWorkItemPath,
   initialPlanPath,
+  initialOutputPath,
+  initialReviewPath,
 }: {
   binding: RepositoryBinding;
   panelView?: WorkbenchPanelView;
@@ -187,6 +288,8 @@ export default function WorkbenchRepositoryPanel({
   assetRunPath?: string | null;
   initialWorkItemPath?: string | null;
   initialPlanPath?: string | null;
+  initialOutputPath?: string | null;
+  initialReviewPath?: string | null;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -203,10 +306,19 @@ export default function WorkbenchRepositoryPanel({
   const [selectedPreviewContent, setSelectedPreviewContent] = useState('');
   const [openedInitialWorkItemPath, setOpenedInitialWorkItemPath] = useState('');
   const [openedInitialPlanPath, setOpenedInitialPlanPath] = useState('');
+  const [openedInitialAssetRunPath, setOpenedInitialAssetRunPath] = useState('');
+  const [openedInitialOutputPath, setOpenedInitialOutputPath] = useState('');
+  const [openedInitialReviewPath, setOpenedInitialReviewPath] = useState('');
   const [selectedProjectDocumentPath, setSelectedProjectDocumentPath] = useState('');
   const [outputSourceFilters, setOutputSourceFilters] = useState<string[]>([]);
   const [outputTypeFilters, setOutputTypeFilters] = useState<string[]>([]);
   const [outputGroupBy, setOutputGroupBy] = useState<OutputGroupBy>('none');
+  const [activityRunFilter, setActivityRunFilter] = useState<ActivityRunFilter>('all');
+  const [assetRunStatusFilter, setAssetRunStatusFilter] = useState('all');
+  const [assetRunReviewFilter, setAssetRunReviewFilter] = useState<AssetRunReviewFilter>('all');
+  const [assetRunOutputFilter, setAssetRunOutputFilter] = useState<AssetRunOutputFilter>('all');
+  const [assetRunApprovalFilter, setAssetRunApprovalFilter] = useState<AssetRunApprovalFilter>('all');
+  const [assetRunKnowledgeFilter, setAssetRunKnowledgeFilter] = useState<AssetRunKnowledgeFilter>('all');
   const [showMatterArtifactDrawer, setShowMatterArtifactDrawer] = useState(false);
   const [planActionSubmitting, setPlanActionSubmitting] = useState(false);
   const [planExecutionSubmitting, setPlanExecutionSubmitting] = useState(false);
@@ -280,8 +392,11 @@ export default function WorkbenchRepositoryPanel({
 
   useEffect(() => {
     if (panelView !== 'tasks' || !initialWorkItemPath || !snapshot) return;
-    if (openedInitialWorkItemPath === initialWorkItemPath) return;
-    if (selectedPreviewPath === initialWorkItemPath) return;
+    const hasInitialWorkItemPreviewContent = Boolean(
+      selectedPreviewPath === initialWorkItemPath && selectedPreviewContent.trim(),
+    );
+    if (openedInitialWorkItemPath === initialWorkItemPath && hasInitialWorkItemPreviewContent) return;
+    if (hasInitialWorkItemPreviewContent) return;
     const workItems = [...snapshot.activeWork, ...snapshot.completedWork, ...snapshot.somedayWork];
     if (!workItems.some((item) => item.path === initialWorkItemPath)) return;
 
@@ -294,12 +409,23 @@ export default function WorkbenchRepositoryPanel({
     return () => {
       cancelled = true;
     };
-  }, [binding, initialWorkItemPath, openedInitialWorkItemPath, panelView, selectedPreviewPath, snapshot]);
+  }, [
+    binding,
+    initialWorkItemPath,
+    openedInitialWorkItemPath,
+    panelView,
+    selectedPreviewContent,
+    selectedPreviewPath,
+    snapshot,
+  ]);
 
   useEffect(() => {
     if (panelView !== 'plans' || !initialPlanPath || !snapshot) return;
-    if (openedInitialPlanPath === initialPlanPath) return;
-    if (selectedPreviewPath === initialPlanPath) return;
+    const hasInitialPlanPreviewContent = Boolean(
+      selectedPreviewPath === initialPlanPath && selectedPreviewContent.trim(),
+    );
+    if (openedInitialPlanPath === initialPlanPath && hasInitialPlanPreviewContent) return;
+    if (hasInitialPlanPreviewContent) return;
     if (!snapshot.activePlans.some((plan) => plan.path === initialPlanPath)) return;
 
     let cancelled = false;
@@ -311,7 +437,103 @@ export default function WorkbenchRepositoryPanel({
     return () => {
       cancelled = true;
     };
-  }, [binding, initialPlanPath, openedInitialPlanPath, panelView, selectedPreviewPath, snapshot]);
+  }, [
+    binding,
+    initialPlanPath,
+    openedInitialPlanPath,
+    panelView,
+    selectedPreviewContent,
+    selectedPreviewPath,
+    snapshot,
+  ]);
+
+  useEffect(() => {
+    if (!assetRunPath) return;
+    const hasInitialAssetRunPreviewContent = Boolean(
+      selectedPreviewPath === assetRunPath && selectedPreviewContent.trim(),
+    );
+    if (openedInitialAssetRunPath === assetRunPath) {
+      if (selectedPreviewPath !== assetRunPath) return;
+      if (selectedPreviewContent.trim()) return;
+    }
+    if (hasInitialAssetRunPreviewContent) return;
+
+    let cancelled = false;
+    setSelectedPreviewPath(assetRunPath);
+    setOpenedInitialAssetRunPath(assetRunPath);
+    readWorkbenchMarkdown(binding, assetRunPath)
+      .then((content) => {
+        if (!cancelled) setSelectedPreviewContent(content);
+      })
+      .catch(() => {
+        if (!cancelled) setSelectedPreviewContent('');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [assetRunPath, binding, openedInitialAssetRunPath, selectedPreviewContent, selectedPreviewPath]);
+
+  useEffect(() => {
+    if (panelView !== 'outputs' || !initialOutputPath || !snapshot) return;
+    const hasInitialOutputPreviewContent = Boolean(
+      selectedPreviewPath === initialOutputPath && selectedPreviewContent.trim(),
+    );
+    if (openedInitialOutputPath === initialOutputPath && hasInitialOutputPreviewContent) return;
+    if (hasInitialOutputPreviewContent) return;
+
+    const openableOutputPaths = new Set(
+      snapshot.semanticSections
+        .filter((section) => ['outputs', 'tools', 'plans.completed'].includes(section.key))
+        .flatMap((section) => section.files.map((file) => file.path)),
+    );
+    if (!openableOutputPaths.has(initialOutputPath)) return;
+
+    let cancelled = false;
+    setSelectedPreviewPath(initialOutputPath);
+    setOpenedInitialOutputPath(initialOutputPath);
+    readWorkbenchMarkdown(binding, initialOutputPath).then((content) => {
+      if (!cancelled) setSelectedPreviewContent(content);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    binding,
+    initialOutputPath,
+    openedInitialOutputPath,
+    panelView,
+    selectedPreviewContent,
+    selectedPreviewPath,
+    snapshot,
+  ]);
+
+  useEffect(() => {
+    if (panelView !== 'reviews' || !initialReviewPath || !snapshot) return;
+    const hasInitialReviewPreviewContent = Boolean(
+      selectedPreviewPath === initialReviewPath && selectedPreviewContent.trim(),
+    );
+    if (openedInitialReviewPath === initialReviewPath && hasInitialReviewPreviewContent) return;
+    if (hasInitialReviewPreviewContent) return;
+    if (!snapshot.reviews.some((review) => review.path === initialReviewPath)) return;
+
+    let cancelled = false;
+    setSelectedPreviewPath(initialReviewPath);
+    setOpenedInitialReviewPath(initialReviewPath);
+    readWorkbenchMarkdown(binding, initialReviewPath).then((content) => {
+      if (!cancelled) setSelectedPreviewContent(content);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    binding,
+    initialReviewPath,
+    openedInitialReviewPath,
+    panelView,
+    selectedPreviewContent,
+    selectedPreviewPath,
+    snapshot,
+  ]);
 
   const openPreview = async (file: RepositoryMarkdownFile) => {
     setSelectedPreviewPath(file.path);
@@ -339,6 +561,11 @@ export default function WorkbenchRepositoryPanel({
     window.open(encodeURI(`file://${filePath}`), '_blank');
   };
 
+  const openAssetRunLink = async (run: RepositoryAssetRunIndexLink) => {
+    setSelectedPreviewPath(run.path);
+    setSelectedPreviewContent(await readWorkbenchMarkdown(binding, run.path));
+  };
+
   const handleCreateReviewDraft = async (context: DashboardTailActionRouteContext) => {
     if (!context.workItemPath) {
       Toast.warning(t('workbench.reviewDraftMissingSource'));
@@ -348,7 +575,7 @@ export default function WorkbenchRepositoryPanel({
     setReviewDraftWriting(true);
     try {
       const sourceRun = context.id?.startsWith('action-run-review:')
-        ? activityRuns.find((run) => run.id === context.id?.replace(/^action-run-review:/, ''))
+        ? findAiActionRunByLocalOrGatewayId(activityRuns, context.id.replace(/^action-run-review:/, ''))
         : undefined;
       const relatedKnowledgeRuns = findPlanExecutionKnowledgeFollowUpRuns(sourceRun, {
         actionRuns: activityRuns,
@@ -523,7 +750,7 @@ export default function WorkbenchRepositoryPanel({
 
     setPlanActionSubmitting(true);
     const input = [t('workbench.generatePlanActionTitle'), `workItemPath: ${selectedWorkItemPath}`].join('\n');
-    const actionRun = createAiActionRun({
+    const actionRun = createAiActionRunWithWorkItemAssignment({
       type: 'work_matter_plan',
       sourcePage: 'workbench',
       instanceId: binding.gatewayInstanceId,
@@ -541,6 +768,7 @@ export default function WorkbenchRepositoryPanel({
         prompt: buildWorkMatterPlanPrompt({
           workItemPath: selectedWorkItemPath,
           workItemContent: selectedPreviewContent,
+          planRoot: binding.paths.plans,
         }),
       });
       await upsertAiActionRun(binding.gatewayInstanceId, runningRun);
@@ -605,7 +833,7 @@ export default function WorkbenchRepositoryPanel({
     ]
       .filter(Boolean)
       .join('\n');
-    const actionRun = createAiActionRun({
+    const actionRun = createAiActionRunWithWorkItemAssignment({
       type: 'plan_execute',
       sourcePage: 'workbench',
       instanceId: binding.gatewayInstanceId,
@@ -1022,8 +1250,10 @@ export default function WorkbenchRepositoryPanel({
   const renderStatusTailActionCard = () => {
     const statusTailActionContext = tailActionContext?.kind === 'status' ? tailActionContext : null;
     if (!statusTailActionContext) return null;
+    const activeWorkRoot = `${binding.paths.work.replace(/^\/+|\/+$/g, '')}/active/`;
+    const activeWorkRootLabel = activeWorkRoot.replace(/active\/$/, '');
     const canArchiveCompletedMatter =
-      statusTailActionValue === 'done' && Boolean(statusTailActionContext.workItemPath?.startsWith('work/active/'));
+      statusTailActionValue === 'done' && Boolean(statusTailActionContext.workItemPath?.startsWith(activeWorkRoot));
     return (
       <div
         style={{
@@ -1037,7 +1267,7 @@ export default function WorkbenchRepositoryPanel({
         <Space vertical align="start" style={{ width: '100%' }}>
           <Space align="center" wrap>
             <Tag color="orange">{t('workbench.statusTailActionTitle')}</Tag>
-            <Tag color="blue">work/</Tag>
+            <Tag color="blue">{activeWorkRootLabel}</Tag>
           </Space>
           <Text size="small">{t('workbench.statusTailActionDesc')}</Text>
           {statusTailActionContext.workItemPath ? (
@@ -1233,50 +1463,339 @@ export default function WorkbenchRepositoryPanel({
     </div>
   );
 
-  const renderActivityView = () => (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(260px, 0.85fr) minmax(280px, 1.15fr)',
-        gap: 12,
-        width: '100%',
-      }}
-    >
-      <div style={sectionStyle}>
-        <Title heading={6} style={{ marginTop: 0 }}>
-          {t('workbench.runs')}
-        </Title>
-        <MarkdownView content={snapshot?.runsMarkdown ?? ''} />
-      </div>
-      <div style={sectionStyle}>
-        <Space align="center" style={{ justifyContent: 'space-between', width: '100%', marginBottom: 8 }}>
-          <Title heading={6} style={{ margin: 0 }}>
-            {t('workbench.activityRuns')}
-          </Title>
-          <Button size="small" type="tertiary" onClick={() => navigate('/actions')}>
-            {t('nav.actions')}
-          </Button>
-        </Space>
-        {activityRuns.length > 0 ? (
-          <Space vertical align="start" style={{ width: '100%' }}>
-            {activityRuns.map((run) => (
-              <div key={run.id} style={{ ...sectionStyle, width: '100%' }}>
-                <Space align="center" wrap>
-                  <Tag color={actionStatusColor(run.status)}>{t(ACTION_STATUS_LABEL_KEYS[run.status])}</Tag>
-                  <Text strong>{run.input || run.type}</Text>
-                </Space>
-                <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>
-                  {run.resultSummary || run.error || run.gatewaySessionKey || run.type}
-                </Text>
-              </div>
-            ))}
+  const renderActivityView = () => {
+    const repositoryAssetRunLinks = parseRepositoryAssetRunIndexLinks(snapshot?.runsMarkdown);
+    const assetRunFollowUpByPath = new Map(
+      repositoryAssetRunLinks.map((run) => [
+        run.path,
+        getRepositoryAssetRunListFollowUpState(run, repositoryAssetRunLinks, {
+          actionRuns: activityRuns,
+          reviewDocuments: snapshot?.reviewDocuments,
+        }),
+      ]),
+    );
+    const assetRunEffectiveApprovalStateByPath = new Map(
+      repositoryAssetRunLinks.map((run) => [
+        run.path,
+        getRepositoryAssetRunEffectiveApprovalState(run, repositoryAssetRunLinks),
+      ]),
+    );
+    const assetRunEffectiveOutputStateByPath = new Map(
+      repositoryAssetRunLinks.map((run) => [
+        run.path,
+        getRepositoryAssetRunEffectiveOutputState(run, repositoryAssetRunLinks),
+      ]),
+    );
+    const assetRunEffectiveReviewStateByPath = new Map(
+      repositoryAssetRunLinks.map((run) => {
+        const listFollowUp = assetRunFollowUpByPath.get(run.path);
+        return [
+          run.path,
+          listFollowUp?.reviewState?.status ??
+            getRepositoryAssetRunEffectiveReviewState(run, snapshot?.reviewDocuments ?? []),
+        ];
+      }),
+    );
+    const assetRunKnowledgeStatusOptions = Array.from(
+      new Set(
+        [...assetRunFollowUpByPath.values()]
+          .map((state) => state?.knowledgeUpdateState?.status)
+          .filter((status): status is PlanExecutionKnowledgeUpdateState['status'] => Boolean(status)),
+      ),
+    );
+    const assetRunStatusOptions = Array.from(
+      new Set(repositoryAssetRunLinks.map((run) => run.status).filter((status): status is string => Boolean(status))),
+    );
+    const filteredRepositoryAssetRunLinks = repositoryAssetRunLinks.filter((run) => {
+      const statusMatches = assetRunStatusFilter === 'all' || run.status === assetRunStatusFilter;
+      const effectiveReviewState = assetRunEffectiveReviewStateByPath.get(run.path);
+      const reviewMatches = assetRunReviewFilter === 'all' || effectiveReviewState === assetRunReviewFilter;
+      const effectiveOutputState = assetRunEffectiveOutputStateByPath.get(run.path);
+      const outputMatches = assetRunOutputFilter === 'all' || effectiveOutputState === assetRunOutputFilter;
+      const effectiveApprovalState = assetRunEffectiveApprovalStateByPath.get(run.path);
+      const approvalMatches = assetRunApprovalFilter === 'all' || effectiveApprovalState === assetRunApprovalFilter;
+      const listFollowUp = assetRunFollowUpByPath.get(run.path);
+      const knowledgeUpdateState = listFollowUp?.knowledgeUpdateState;
+      const knowledgeMatches =
+        assetRunKnowledgeFilter === 'all' || knowledgeUpdateState?.status === assetRunKnowledgeFilter;
+      return statusMatches && reviewMatches && outputMatches && approvalMatches && knowledgeMatches;
+    });
+    return (
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(260px, 0.85fr) minmax(280px, 1.15fr)',
+          gap: 12,
+          width: '100%',
+        }}
+      >
+        <div style={sectionStyle}>
+          <Space align="center" wrap style={{ justifyContent: 'space-between', width: '100%', marginBottom: 8 }}>
+            <Title heading={6} style={{ margin: 0 }}>
+              {t('workbench.runs')}
+            </Title>
+            <Select
+              size="small"
+              value={activityRunFilter}
+              onChange={(value) => setActivityRunFilter(value as ActivityRunFilter)}
+              style={{ width: 150 }}
+            >
+              <Select.Option value="all">{t('workbench.activityFilterAll')}</Select.Option>
+              <Select.Option value="asset-runs">{t('workbench.activityFilterAssetRuns')}</Select.Option>
+            </Select>
           </Space>
-        ) : (
-          <Empty description={t('workbench.emptyActivityRuns')} />
-        )}
+          {activityRunFilter === 'asset-runs' ? (
+            repositoryAssetRunLinks.length > 0 ? (
+              <Space vertical align="start" style={{ width: '100%' }}>
+                <Space align="center" wrap>
+                  <Text type="tertiary" size="small">
+                    {t('workbench.repositoryAssetRuns')}
+                  </Text>
+                  <Select
+                    size="small"
+                    value={assetRunStatusFilter}
+                    onChange={(value) => setAssetRunStatusFilter(value as string)}
+                    style={{ width: 140 }}
+                  >
+                    <Select.Option value="all">{t('workbench.assetRunStatusAll')}</Select.Option>
+                    {assetRunStatusOptions.map((status) => (
+                      <Select.Option key={status} value={status}>
+                        {status}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                  <Select
+                    size="small"
+                    value={assetRunReviewFilter}
+                    onChange={(value) => setAssetRunReviewFilter(value as AssetRunReviewFilter)}
+                    style={{ width: 150 }}
+                  >
+                    <Select.Option value="all">{t('workbench.assetRunReviewAll')}</Select.Option>
+                    <Select.Option value="pending">{t('workbench.assetRunReviewPendingOnly')}</Select.Option>
+                    <Select.Option value="draft">{t('workbench.assetRunReviewDraftOnly')}</Select.Option>
+                    <Select.Option value="confirmed">{t('workbench.assetRunReviewConfirmedOnly')}</Select.Option>
+                  </Select>
+                  <Select
+                    size="small"
+                    value={assetRunOutputFilter}
+                    onChange={(value) => setAssetRunOutputFilter(value as AssetRunOutputFilter)}
+                    style={{ width: 150 }}
+                  >
+                    <Select.Option value="all">{t('workbench.assetRunOutputAll')}</Select.Option>
+                    <Select.Option value="pending">{t('workbench.assetRunOutputPendingOnly')}</Select.Option>
+                    <Select.Option value="preserved">{t('workbench.assetRunOutputPreservedOnly')}</Select.Option>
+                  </Select>
+                  <Select
+                    size="small"
+                    value={assetRunApprovalFilter}
+                    onChange={(value) => setAssetRunApprovalFilter(value as AssetRunApprovalFilter)}
+                    style={{ width: 150 }}
+                  >
+                    <Select.Option value="all">{t('workbench.assetRunApprovalAll')}</Select.Option>
+                    <Select.Option value="pending">{t('workbench.assetRunApprovalPendingOnly')}</Select.Option>
+                    <Select.Option value="approved">{t('workbench.assetRunApprovalApprovedOnly')}</Select.Option>
+                    <Select.Option value="denied">{t('workbench.assetRunApprovalDeniedOnly')}</Select.Option>
+                  </Select>
+                  <Select
+                    size="small"
+                    value={assetRunKnowledgeFilter}
+                    onChange={(value) => setAssetRunKnowledgeFilter(value as AssetRunKnowledgeFilter)}
+                    style={{ width: 150 }}
+                  >
+                    <Select.Option value="all">{t('workbench.assetRunKnowledgeAll')}</Select.Option>
+                    {assetRunKnowledgeStatusOptions.map((status) => (
+                      <Select.Option key={status} value={status}>
+                        {t(PLAN_EXECUTION_KNOWLEDGE_STATUS_LABEL_KEYS[status])}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </Space>
+                {filteredRepositoryAssetRunLinks.length > 0 ? (
+                  filteredRepositoryAssetRunLinks.map((run) => {
+                    const listFollowUp = assetRunFollowUpByPath.get(run.path);
+                    const effectiveApprovalState = assetRunEffectiveApprovalStateByPath.get(run.path);
+                    const effectiveOutputState = assetRunEffectiveOutputStateByPath.get(run.path);
+                    const effectiveReviewState = assetRunEffectiveReviewStateByPath.get(run.path);
+                    const knowledgeUpdateState = listFollowUp?.knowledgeUpdateState;
+                    return (
+                      <button
+                        key={run.path}
+                        type="button"
+                        onClick={() => void openAssetRunLink(run)}
+                        style={{
+                          width: '100%',
+                          border:
+                            selectedPreviewPath === run.path
+                              ? '1px solid var(--semi-color-primary)'
+                              : '1px solid var(--semi-color-border)',
+                          background:
+                            selectedPreviewPath === run.path
+                              ? 'var(--semi-color-primary-light-default)'
+                              : 'var(--semi-color-bg-0)',
+                          borderRadius: 6,
+                          padding: '8px 10px',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <Space align="center" wrap style={{ marginBottom: 4 }}>
+                          <Tag color="orange">runs/assets</Tag>
+                          {run.status ? <Tag color={run.status === 'failed' ? 'red' : 'blue'}>{run.status}</Tag> : null}
+                          {effectiveApprovalState ? (
+                            <Tag
+                              color={
+                                effectiveApprovalState === 'approved'
+                                  ? 'green'
+                                  : effectiveApprovalState === 'denied'
+                                    ? 'red'
+                                    : 'orange'
+                              }
+                            >
+                              {t(
+                                effectiveApprovalState === 'approved'
+                                  ? 'workbench.assetRunApprovalApproved'
+                                  : effectiveApprovalState === 'denied'
+                                    ? 'workbench.assetRunApprovalDenied'
+                                    : 'workbench.assetRunApprovalPending',
+                              )}
+                            </Tag>
+                          ) : null}
+                          {listFollowUp?.approvalDecisionState ? (
+                            <Tag color={listFollowUp.approvalDecisionState.status === 'approved' ? 'green' : 'red'}>
+                              {t(
+                                listFollowUp.approvalDecisionState.status === 'approved'
+                                  ? 'workbench.assetRunApprovalDecisionApproved'
+                                  : 'workbench.assetRunApprovalDecisionDenied',
+                              )}
+                            </Tag>
+                          ) : null}
+                          {listFollowUp?.executionState ? (
+                            <Tag color={assetRunExecutionStatusColor(listFollowUp.executionState.status)}>
+                              {t(ASSET_RUN_EXECUTION_STATUS_LABEL_KEYS[listFollowUp.executionState.status])}
+                            </Tag>
+                          ) : null}
+                          {effectiveReviewState ? (
+                            <Tag color={effectiveReviewState === 'confirmed' ? 'green' : 'orange'}>
+                              {t(
+                                effectiveReviewState === 'pending'
+                                  ? 'workbench.assetRunReviewPending'
+                                  : effectiveReviewState === 'draft'
+                                    ? 'workbench.assetRunReviewDraft'
+                                    : 'workbench.assetRunReviewConfirmed',
+                              )}
+                            </Tag>
+                          ) : null}
+                          {effectiveOutputState ? (
+                            <Tag color={effectiveOutputState === 'preserved' ? 'green' : 'orange'}>
+                              {t(
+                                effectiveOutputState === 'preserved'
+                                  ? 'workbench.assetRunOutputPreserved'
+                                  : 'workbench.assetRunOutputPending',
+                              )}
+                            </Tag>
+                          ) : null}
+                          {knowledgeUpdateState ? (
+                            <Tag color={knowledgeUpdateStatusColor(knowledgeUpdateState.status)}>
+                              {t(PLAN_EXECUTION_KNOWLEDGE_STATUS_LABEL_KEYS[knowledgeUpdateState.status])}
+                            </Tag>
+                          ) : null}
+                          <Text strong ellipsis={{ showTooltip: true }}>
+                            {run.title}
+                          </Text>
+                        </Space>
+                        <Text
+                          type="tertiary"
+                          size="small"
+                          ellipsis={{ showTooltip: true }}
+                          style={{ display: 'block' }}
+                        >
+                          {run.path}
+                        </Text>
+                        {run.approvalTitle || run.approvalRisk || run.approvalReason ? (
+                          <Text
+                            type="tertiary"
+                            size="small"
+                            ellipsis={{ showTooltip: true }}
+                            style={{ display: 'block', marginTop: 4 }}
+                          >
+                            {t('workbench.assetRunApprovalContext')}:{' '}
+                            {[run.approvalTitle, run.approvalRisk, run.approvalReason].filter(Boolean).join(' · ')}
+                          </Text>
+                        ) : null}
+                        {listFollowUp?.approvalDecisionState ? (
+                          <Text
+                            type="tertiary"
+                            size="small"
+                            ellipsis={{ showTooltip: true }}
+                            style={{ display: 'block', marginTop: 4 }}
+                          >
+                            {t('workbench.assetRunApprovalDecisionState')}:{' '}
+                            {[listFollowUp.approvalDecisionState.runPath, listFollowUp.approvalDecisionState.decidedAt]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </Text>
+                        ) : null}
+                        {listFollowUp?.executionState ? (
+                          <Text
+                            type="tertiary"
+                            size="small"
+                            ellipsis={{ showTooltip: true }}
+                            style={{ display: 'block', marginTop: 4 }}
+                          >
+                            {t('workbench.assetRunExecutionState')}:{' '}
+                            {[
+                              listFollowUp.executionState.runPath,
+                              listFollowUp.executionState.executedAt,
+                              listFollowUp.executionState.resultSummary,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </Text>
+                        ) : null}
+                      </button>
+                    );
+                  })
+                ) : (
+                  <Empty description={t('workbench.emptyFilteredAssetRuns')} />
+                )}
+              </Space>
+            ) : (
+              <Empty description={t('workbench.emptyRepositoryAssetRuns')} />
+            )
+          ) : (
+            <MarkdownView content={snapshot?.runsMarkdown ?? ''} />
+          )}
+        </div>
+        <div style={sectionStyle}>
+          <Space align="center" style={{ justifyContent: 'space-between', width: '100%', marginBottom: 8 }}>
+            <Title heading={6} style={{ margin: 0 }}>
+              {t('workbench.activityRuns')}
+            </Title>
+            <Button size="small" type="tertiary" onClick={() => navigate('/actions')}>
+              {t('nav.actions')}
+            </Button>
+          </Space>
+          {activityRuns.length > 0 ? (
+            <Space vertical align="start" style={{ width: '100%' }}>
+              {activityRuns.map((run) => (
+                <div key={run.id} style={{ ...sectionStyle, width: '100%' }}>
+                  <Space align="center" wrap>
+                    <Tag color={actionStatusColor(run.status)}>{t(ACTION_STATUS_LABEL_KEYS[run.status])}</Tag>
+                    <Text strong>{run.input || run.type}</Text>
+                  </Space>
+                  <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 4 }}>
+                    {run.resultSummary || run.error || run.gatewaySessionKey || run.type}
+                  </Text>
+                </div>
+              ))}
+            </Space>
+          ) : (
+            <Empty description={t('workbench.emptyActivityRuns')} />
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderOutputsView = () => {
     const dialogArtifacts = [...artifacts].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 12);
@@ -1527,11 +2046,7 @@ export default function WorkbenchRepositoryPanel({
     if (!assetRunPath) return null;
     const canConfirmAssetRunReviewDraft =
       selectedPreviewPath.startsWith('reviews/') &&
-      /^status:\s*draft\s*$/m.test(selectedPreviewContent) &&
-      /^source:\s*desktop-repository-asset-execution-review\s*$/m.test(selectedPreviewContent) &&
-      new RegExp(`^assetRunPath:\\s*${assetRunPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'm').test(
-        selectedPreviewContent,
-      );
+      isRepositoryAssetRunReviewDraftForRun(selectedPreviewContent, assetRunPath);
     return (
       <div
         style={{
@@ -1719,8 +2234,19 @@ export default function WorkbenchRepositoryPanel({
   };
 
   const selectedProject = snapshot?.projects.find((project) => project.path === selectedPreviewPath);
-  const selectedWorkItemPath = isWorkbenchMatterPath(selectedPreviewPath) ? selectedPreviewPath : undefined;
+  const selectedWorkItemPath = isWorkbenchSnapshotMatterPath(snapshot, selectedPreviewPath)
+    ? selectedPreviewPath
+    : undefined;
   const selectedWorkItemId = selectedWorkItemPath ? extractWorkbenchMatterId(selectedPreviewContent) : undefined;
+  const selectedMatterGoldenPathState = selectedWorkItemPath
+    ? buildWorkbenchMatterGoldenPathState({
+        workItemPath: selectedWorkItemPath,
+        plans: snapshot?.planMetadata ?? [],
+        actionRuns: activityRuns,
+        artifacts,
+        reviewDocuments: snapshot?.reviewDocuments,
+      })
+    : null;
   const selectedPlanPath = snapshot?.activePlans.some((plan) => plan.path === selectedPreviewPath)
     ? selectedPreviewPath
     : undefined;
@@ -1728,7 +2254,7 @@ export default function WorkbenchRepositoryPanel({
     ? snapshot?.planMetadata.find((item) => item.path === selectedPlanPath)
     : undefined;
   const safeSelectedPlanWorkItemPath =
-    selectedPlanMetadata?.workItemPath && isWorkbenchMatterPath(selectedPlanMetadata.workItemPath)
+    selectedPlanMetadata?.workItemPath && isWorkbenchSnapshotMatterPath(snapshot, selectedPlanMetadata.workItemPath)
       ? selectedPlanMetadata.workItemPath
       : undefined;
   const selectedPlanLatestRun = selectedPlanPath
@@ -1740,7 +2266,9 @@ export default function WorkbenchRepositoryPanel({
   const selectedPlanKnowledgeUpdateState = findPlanExecutionKnowledgeUpdateState(selectedPlanLatestRun, {
     actionRuns: activityRuns,
   });
-  const selectedPlanCanPreserveOutput = shouldOfferPlanExecutionOutputPreservation(selectedPlanLatestRun);
+  const selectedPlanCanPreserveOutput = shouldOfferPlanExecutionOutputPreservation(selectedPlanLatestRun, {
+    artifacts,
+  });
   const selectedPlanCanUpdateKnowledge = shouldOfferPlanExecutionKnowledgeUpdate(selectedPlanLatestRun, {
     actionRuns: activityRuns,
   });
@@ -1761,13 +2289,677 @@ export default function WorkbenchRepositoryPanel({
   );
   const previewTitle =
     panelView === 'projects' ? t('workbench.projectPreview') : selectedPreviewPath || t('workbench.preview');
-  const standaloneView = panelView === 'dashboard' || panelView === 'outputs';
+  const selectedAssetPermissionBoundary = parseRepositoryAssetPermissionBoundary(selectedPreviewContent);
+  const selectedAssetApprovalCommand = buildRepositoryAssetExecutionApprovalCommand(
+    binding.repoPath,
+    selectedPreviewPath,
+    selectedPreviewContent,
+  );
+  const selectedAssetRunIndexLinks = parseRepositoryAssetRunIndexLinks(snapshot?.runsMarkdown);
+  const selectedAssetPendingApprovalState = findRepositoryAssetPendingApprovalState(
+    selectedAssetApprovalCommand,
+    selectedAssetRunIndexLinks,
+  );
+  const selectedAssetResolvedRunState = findRepositoryAssetResolvedRunState(
+    selectedAssetApprovalCommand,
+    selectedAssetRunIndexLinks,
+    snapshot?.reviewDocuments ?? [],
+  );
+  const selectedAssetResolvedRunKnowledgeUpdateState = findRepositoryAssetRunKnowledgeUpdateState(
+    selectedAssetResolvedRunState?.runPath,
+    { actionRuns: activityRuns },
+  );
+  const selectedAssetResolvedRunFollowUpActions = getRepositoryAssetResolvedRunFollowUpActions(
+    selectedAssetResolvedRunState,
+    selectedAssetResolvedRunKnowledgeUpdateState,
+  );
+  const selectedAssetRunDetails = parseRepositoryAssetRunDetails(selectedPreviewPath, selectedPreviewContent);
+  const selectedAssetRunReviewState = selectedAssetRunDetails
+    ? findRepositoryAssetRunReviewState(selectedAssetRunDetails.assetRunPath, snapshot?.reviewDocuments ?? [])
+    : null;
+  const selectedAssetRunFollowUpState = selectedAssetRunDetails
+    ? findRepositoryAssetRunFollowUpState(selectedAssetRunDetails.assetRunPath, snapshot?.tailActions ?? [])
+    : [];
+  const selectedAssetRunOutputState = selectedAssetRunDetails
+    ? getRepositoryAssetRunOutputState(selectedAssetRunDetails)
+    : null;
+  const selectedAssetRunDetailsKnowledgeUpdateState = findRepositoryAssetRunKnowledgeUpdateState(
+    selectedAssetRunDetails?.assetRunPath,
+    { actionRuns: activityRuns },
+  );
+  const selectedAssetRunDetailsStatus = selectedAssetRunDetails?.status?.trim().toLowerCase();
+  const selectedAssetRunDetailsResolvedStatus =
+    selectedAssetRunDetailsStatus === 'succeeded' ||
+    selectedAssetRunDetailsStatus === 'failed' ||
+    selectedAssetRunDetailsStatus === 'cancelled'
+      ? selectedAssetRunDetailsStatus
+      : null;
+  const selectedAssetRunDetailsFollowUpActions = getRepositoryAssetResolvedRunFollowUpActions(
+    selectedAssetRunDetails && selectedAssetRunDetailsResolvedStatus
+      ? {
+          status: selectedAssetRunDetailsResolvedStatus,
+          runPath: selectedAssetRunDetails.assetRunPath,
+          ...(selectedAssetRunOutputState?.status ? { outputState: selectedAssetRunOutputState.status } : {}),
+          ...(selectedAssetRunReviewState?.status ? { reviewState: selectedAssetRunReviewState.status } : {}),
+        }
+      : null,
+    selectedAssetRunDetailsKnowledgeUpdateState,
+  );
+  const selectedAssetRunApprovalDecisionState = selectedAssetRunDetails
+    ? findRepositoryAssetRunApprovalDecisionState(selectedAssetRunDetails, selectedAssetRunIndexLinks)
+    : null;
+  const selectedAssetRunExecutionState = selectedAssetRunDetails
+    ? findRepositoryAssetRunExecutionState(selectedAssetRunDetails, selectedAssetRunIndexLinks)
+    : null;
+  const selectedAssetRunApprovalDecisionCommands =
+    selectedAssetRunDetails && !selectedAssetRunApprovalDecisionState && !selectedAssetRunExecutionState
+      ? buildRepositoryAssetRunApprovalDecisionCommands(binding.repoPath, selectedAssetRunDetails)
+      : null;
+  const hasSelectedAssetPermissionBoundary =
+    selectedAssetPermissionBoundary.recordOnly !== null ||
+    selectedAssetPermissionBoundary.desktopExecutes !== null ||
+    selectedAssetPermissionBoundary.grantsPermission !== null ||
+    selectedAssetPermissionBoundary.requiresApproval;
+  const standaloneView = panelView === 'dashboard' || (panelView === 'outputs' && !assetRunPath);
   const bareContentView = panelView === 'dashboard' || panelView === 'outputs' || panelView === 'projects';
   const contentGridColumns = standaloneView
     ? 'minmax(0, 1fr)'
     : panelView === 'projects'
       ? 'minmax(300px, 380px) minmax(460px, 1fr)'
       : 'minmax(0, 1fr) minmax(320px, 420px)';
+
+  const renderRepositoryAssetPermissionBoundary = () => {
+    if (!hasSelectedAssetPermissionBoundary) return null;
+    const boundaryTags = [
+      selectedAssetPermissionBoundary.recordOnly === true
+        ? { key: 'recordOnly', label: t('workbench.assetBoundaryRecordOnly'), color: 'blue' as const }
+        : selectedAssetPermissionBoundary.recordOnly === false
+          ? { key: 'notRecordOnly', label: t('workbench.assetBoundaryNotRecordOnly'), color: 'orange' as const }
+          : null,
+      selectedAssetPermissionBoundary.desktopExecutes === false
+        ? {
+            key: 'noDesktopExecution',
+            label: t('workbench.assetBoundaryNoDesktopExecution'),
+            color: 'grey' as const,
+          }
+        : selectedAssetPermissionBoundary.desktopExecutes === true
+          ? { key: 'desktopExecutes', label: t('workbench.assetBoundaryDesktopExecution'), color: 'orange' as const }
+          : null,
+      selectedAssetPermissionBoundary.grantsPermission === false
+        ? {
+            key: 'noPermissionGrant',
+            label: t('workbench.assetBoundaryNoPermissionGrant'),
+            color: 'grey' as const,
+          }
+        : selectedAssetPermissionBoundary.grantsPermission === true
+          ? { key: 'grantsPermission', label: t('workbench.assetBoundaryPermissionGrant'), color: 'red' as const }
+          : null,
+      selectedAssetPermissionBoundary.requiresApproval
+        ? { key: 'requiresApproval', label: t('workbench.assetBoundaryRequiresApproval'), color: 'orange' as const }
+        : null,
+    ].filter((item): item is { key: string; label: string; color: 'blue' | 'orange' | 'grey' | 'red' } =>
+      Boolean(item),
+    );
+
+    return (
+      <div style={{ ...sectionStyle, marginBottom: 12, background: 'var(--semi-color-bg-0)' }}>
+        <Title heading={6} style={{ marginTop: 0 }}>
+          {t('workbench.assetPermissionBoundary')}
+        </Title>
+        <Space align="center" wrap>
+          {boundaryTags.map((item) => (
+            <Tag key={item.key} color={item.color}>
+              {item.label}
+            </Tag>
+          ))}
+        </Space>
+        {selectedAssetResolvedRunState ? (
+          <Space vertical align="start" spacing={6} style={{ width: '100%', paddingTop: 10 }}>
+            <Space align="center" wrap>
+              <Text strong size="small">
+                {t('workbench.assetResolvedRun')}
+              </Text>
+              <Tag
+                color={
+                  selectedAssetResolvedRunState.status === 'approved' ||
+                  selectedAssetResolvedRunState.status === 'succeeded'
+                    ? 'green'
+                    : selectedAssetResolvedRunState.status === 'denied' ||
+                        selectedAssetResolvedRunState.status === 'failed'
+                      ? 'red'
+                      : 'grey'
+                }
+              >
+                {selectedAssetResolvedRunState.status === 'approved'
+                  ? t('workbench.assetRunApprovalDecisionApproved')
+                  : selectedAssetResolvedRunState.status === 'denied'
+                    ? t('workbench.assetRunApprovalDecisionDenied')
+                    : t(ASSET_RUN_EXECUTION_STATUS_LABEL_KEYS[selectedAssetResolvedRunState.status])}
+              </Tag>
+            </Space>
+            <Text type="tertiary" size="small">
+              {t('workbench.assetResolvedRunDesc')}
+            </Text>
+            <Text size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block', width: '100%' }}>
+              {t('workbench.assetResolvedRunPath')}: {selectedAssetResolvedRunState.runPath}
+            </Text>
+            {selectedAssetResolvedRunState.recordedAt ? (
+              <Text type="tertiary" size="small">
+                {selectedAssetResolvedRunState.recordedAt}
+              </Text>
+            ) : null}
+            {selectedAssetResolvedRunState.resultSummary ? (
+              <Text size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block', width: '100%' }}>
+                {selectedAssetResolvedRunState.resultSummary}
+              </Text>
+            ) : null}
+            {selectedAssetResolvedRunState.outputState ? (
+              <Tag color={selectedAssetResolvedRunState.outputState === 'preserved' ? 'green' : 'orange'}>
+                {t(
+                  selectedAssetResolvedRunState.outputState === 'preserved'
+                    ? 'workbench.assetRunOutputPreserved'
+                    : 'workbench.assetRunOutputPending',
+                )}
+              </Tag>
+            ) : null}
+            {selectedAssetResolvedRunState.reviewState ? (
+              <Tag color={selectedAssetResolvedRunState.reviewState === 'confirmed' ? 'green' : 'orange'}>
+                {t(
+                  selectedAssetResolvedRunState.reviewState === 'confirmed'
+                    ? 'workbench.assetRunReviewConfirmed'
+                    : selectedAssetResolvedRunState.reviewState === 'draft'
+                      ? 'workbench.assetRunReviewDraft'
+                      : 'workbench.assetRunReviewPending',
+                )}
+              </Tag>
+            ) : null}
+            {selectedAssetResolvedRunKnowledgeUpdateState ? (
+              <Tag color={knowledgeUpdateStatusColor(selectedAssetResolvedRunKnowledgeUpdateState.status)}>
+                {t(PLAN_EXECUTION_KNOWLEDGE_STATUS_LABEL_KEYS[selectedAssetResolvedRunKnowledgeUpdateState.status])}
+              </Tag>
+            ) : null}
+            {selectedAssetResolvedRunFollowUpActions.canPreserveOutput ||
+            selectedAssetResolvedRunFollowUpActions.canUpdateKnowledge ||
+            selectedAssetResolvedRunFollowUpActions.canWriteReview ? (
+              <Space align="center" wrap style={{ paddingTop: 4 }}>
+                {selectedAssetResolvedRunFollowUpActions.canPreserveOutput ? (
+                  <Button
+                    size="small"
+                    type="tertiary"
+                    icon={<IconBox />}
+                    onClick={() =>
+                      navigate(
+                        buildDashboardTailActionTarget('/artifacts', {
+                          kind: 'output',
+                          id: `asset-run-output:${selectedAssetResolvedRunState.runPath}`,
+                          workItemPath: selectedAssetResolvedRunState.workItemPath,
+                          assetRunPath: selectedAssetResolvedRunState.runPath,
+                        }),
+                      )
+                    }
+                  >
+                    {t('workbench.assetRunPreserveOutput')}
+                  </Button>
+                ) : null}
+                {selectedAssetResolvedRunFollowUpActions.canUpdateKnowledge ? (
+                  <Button
+                    size="small"
+                    type="tertiary"
+                    icon={<IconFile />}
+                    onClick={() =>
+                      navigate(
+                        buildDashboardTailActionTarget('/knowledge', {
+                          kind: 'knowledge',
+                          id: `asset-run-knowledge:${selectedAssetResolvedRunState.runPath}`,
+                          workItemPath: selectedAssetResolvedRunState.workItemPath,
+                          assetRunPath: selectedAssetResolvedRunState.runPath,
+                        }),
+                      )
+                    }
+                  >
+                    {t('workbench.assetRunUpdateKnowledge')}
+                  </Button>
+                ) : null}
+                {selectedAssetResolvedRunFollowUpActions.canWriteReview ? (
+                  <Button
+                    size="small"
+                    type="tertiary"
+                    icon={<IconCheckList />}
+                    onClick={() =>
+                      navigate(
+                        buildDashboardTailActionTarget('/workbench', {
+                          kind: 'review',
+                          id: `asset-run-review:${selectedAssetResolvedRunState.runPath}`,
+                          workItemPath: selectedAssetResolvedRunState.workItemPath,
+                          assetRunPath: selectedAssetResolvedRunState.runPath,
+                        }),
+                      )
+                    }
+                  >
+                    {t('workbench.assetRunWriteReview')}
+                  </Button>
+                ) : null}
+              </Space>
+            ) : null}
+          </Space>
+        ) : null}
+        {selectedAssetPendingApprovalState ? (
+          <Space vertical align="start" spacing={6} style={{ width: '100%', paddingTop: 10 }}>
+            <Space align="center" wrap>
+              <Text strong size="small">
+                {t('workbench.assetPendingApproval')}
+              </Text>
+              <Tag color="orange">{t('workbench.assetRunApprovalPending')}</Tag>
+            </Space>
+            <Text type="tertiary" size="small">
+              {t('workbench.assetPendingApprovalDesc')}
+            </Text>
+            <Text size="small" ellipsis={{ showTooltip: true }} style={{ display: 'block', width: '100%' }}>
+              {t('workbench.assetPendingApprovalRun')}: {selectedAssetPendingApprovalState.runPath}
+            </Text>
+            {selectedAssetPendingApprovalState.requestedAt ? (
+              <Text type="tertiary" size="small">
+                {selectedAssetPendingApprovalState.requestedAt}
+              </Text>
+            ) : null}
+            {selectedAssetPendingApprovalState.decisionCommands ? (
+              <Space vertical align="start" spacing={6} style={{ width: '100%', paddingTop: 4 }}>
+                <Text type="tertiary" size="small">
+                  {t('workbench.assetRunApproveCommand')}
+                </Text>
+                <Text code copyable style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {selectedAssetPendingApprovalState.decisionCommands.approve.text}
+                </Text>
+                <Text type="tertiary" size="small">
+                  {t('workbench.assetRunDenyCommand')}
+                </Text>
+                <Text code copyable style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {selectedAssetPendingApprovalState.decisionCommands.deny.text}
+                </Text>
+              </Space>
+            ) : null}
+          </Space>
+        ) : null}
+        {selectedAssetApprovalCommand && !selectedAssetPendingApprovalState ? (
+          <Space vertical align="start" spacing={6} style={{ width: '100%', paddingTop: 10 }}>
+            <Text strong size="small">
+              {t('workbench.assetApprovalAction')}
+            </Text>
+            <Text type="tertiary" size="small">
+              {t('workbench.assetApprovalActionDesc')}
+            </Text>
+            <Text code copyable style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              {selectedAssetApprovalCommand.text}
+            </Text>
+            <Text type="tertiary" size="small">
+              {t('workbench.assetApprovalRecordCommand')}: desktop.repository.assets.execution.record
+            </Text>
+          </Space>
+        ) : null}
+      </div>
+    );
+  };
+
+  const handleMatterGoldenPathAction = () => {
+    if (!selectedWorkItemPath || !selectedMatterGoldenPathState) return;
+    const action = selectedMatterGoldenPathState.nextAction;
+    if (action.key === 'generate-plan') {
+      void handleCreateMatterPlanActionRun();
+      return;
+    }
+    if (action.key === 'open-plan' && action.targetPath) {
+      void openPreview({ path: action.targetPath, name: fileNameFromPath(action.targetPath), size: 0, updatedAt: 0 });
+      return;
+    }
+    if (action.key === 'open-execution' && action.runId) {
+      navigate(`/actions?runId=${encodeURIComponent(action.runId)}`);
+      return;
+    }
+    if (action.key === 'preserve-output' && action.runId) {
+      navigate(
+        buildDashboardTailActionTarget('/artifacts', {
+          kind: 'output',
+          id: `action-run-output:${action.runId}`,
+          workItemPath: selectedWorkItemPath,
+        }),
+      );
+      return;
+    }
+    if (action.key === 'update-knowledge' && action.runId) {
+      navigate(
+        buildDashboardTailActionTarget('/knowledge', {
+          kind: 'knowledge',
+          id: `action-run-knowledge:${action.runId}`,
+          workItemPath: selectedWorkItemPath,
+        }),
+      );
+      return;
+    }
+    if (action.key === 'write-review' && action.runId) {
+      navigate(
+        buildDashboardTailActionTarget('/workbench', {
+          kind: 'review',
+          id: `action-run-review:${action.runId}`,
+          workItemPath: selectedWorkItemPath,
+        }),
+      );
+    }
+  };
+
+  const renderMatterGoldenPathCard = () => {
+    if (!selectedWorkItemPath || !selectedMatterGoldenPathState) return null;
+    const nextAction = selectedMatterGoldenPathState.nextAction;
+    return (
+      <div style={{ ...sectionStyle, marginBottom: 12, background: 'var(--semi-color-bg-0)' }}>
+        <Space vertical align="start" spacing={8} style={{ width: '100%' }}>
+          <Space align="center" wrap style={{ justifyContent: 'space-between', width: '100%' }}>
+            <Title heading={6} style={{ margin: 0 }}>
+              {t('workbench.firstMatterGoldenPath')}
+            </Title>
+            <Tag color="blue">{t('workbench.firstMatterGoldenPathTag')}</Tag>
+          </Space>
+          <Text type="tertiary" size="small">
+            {t('workbench.firstMatterGoldenPathDesc')}
+          </Text>
+          <Space align="center" wrap style={{ width: '100%' }}>
+            {selectedMatterGoldenPathState.steps.map((step) => (
+              <Tag key={step.key} color={goldenPathStatusColor(step.status)}>
+                {t(GOLDEN_PATH_STEP_LABEL_KEYS[step.key])}: {t(GOLDEN_PATH_STATUS_LABEL_KEYS[step.status])}
+              </Tag>
+            ))}
+          </Space>
+          <Text type="secondary" size="small">
+            {t(nextAction.hintKey ?? GOLDEN_PATH_REASON_LABEL_KEYS[nextAction.reasonKey])}
+          </Text>
+          {nextAction.key !== 'complete' ? (
+            <Button
+              size="small"
+              type="primary"
+              icon={<IconCheckList />}
+              loading={nextAction.key === 'generate-plan' ? planActionSubmitting : false}
+              onClick={handleMatterGoldenPathAction}
+            >
+              {t(nextAction.labelKey ?? GOLDEN_PATH_ACTION_LABEL_KEYS[nextAction.key])}
+            </Button>
+          ) : (
+            <Tag color="green">{t(GOLDEN_PATH_ACTION_LABEL_KEYS.complete)}</Tag>
+          )}
+        </Space>
+      </div>
+    );
+  };
+
+  const renderRepositoryAssetRunDetails = () => {
+    if (!selectedAssetRunDetails) return null;
+    const detailRows = [
+      selectedAssetRunDetails.status
+        ? { key: 'status', label: t('workbench.assetRunStatus'), value: selectedAssetRunDetails.status }
+        : null,
+      selectedAssetRunDetails.resultSummary
+        ? { key: 'result', label: t('workbench.assetRunResult'), value: selectedAssetRunDetails.resultSummary }
+        : null,
+      selectedAssetRunDetails.runner
+        ? { key: 'runner', label: t('workbench.assetRunRunner'), value: selectedAssetRunDetails.runner }
+        : null,
+      selectedAssetRunDetails.command
+        ? { key: 'command', label: t('workbench.assetRunCommand'), value: selectedAssetRunDetails.command }
+        : null,
+      selectedAssetRunDetails.approvalTitle ||
+      selectedAssetRunDetails.approvalRisk ||
+      selectedAssetRunDetails.approvalReason
+        ? {
+            key: 'approval',
+            label: t('workbench.assetRunApproval'),
+            value: [
+              selectedAssetRunDetails.approvalTitle,
+              selectedAssetRunDetails.approvalRisk,
+              selectedAssetRunDetails.approvalReason,
+            ]
+              .filter(Boolean)
+              .join(' · '),
+          }
+        : null,
+      selectedAssetRunDetails.repositoryOutputPath
+        ? {
+            key: 'repositoryOutput',
+            label: t('workbench.assetRunOutput'),
+            value: selectedAssetRunDetails.repositoryOutputPath,
+          }
+        : selectedAssetRunDetails.outputArtifactId
+          ? {
+              key: 'artifactOutput',
+              label: t('workbench.assetRunOutput'),
+              value: selectedAssetRunDetails.outputArtifactId,
+            }
+          : null,
+      selectedAssetRunOutputState
+        ? {
+            key: 'outputState',
+            label: t('workbench.assetRunOutputState'),
+            value: t(
+              selectedAssetRunOutputState.status === 'preserved'
+                ? 'workbench.assetRunOutputPreserved'
+                : 'workbench.assetRunOutputPending',
+            ),
+          }
+        : null,
+      selectedAssetRunApprovalDecisionState
+        ? {
+            key: 'approvalDecisionState',
+            label: t('workbench.assetRunApprovalDecisionState'),
+            value: [
+              t(
+                selectedAssetRunApprovalDecisionState.status === 'approved'
+                  ? 'workbench.assetRunApprovalDecisionApproved'
+                  : 'workbench.assetRunApprovalDecisionDenied',
+              ),
+              selectedAssetRunApprovalDecisionState.runPath,
+              selectedAssetRunApprovalDecisionState.decidedAt,
+            ]
+              .filter(Boolean)
+              .join(' · '),
+          }
+        : null,
+      selectedAssetRunExecutionState
+        ? {
+            key: 'executionState',
+            label: t('workbench.assetRunExecutionState'),
+            value: [
+              t(ASSET_RUN_EXECUTION_STATUS_LABEL_KEYS[selectedAssetRunExecutionState.status]),
+              selectedAssetRunExecutionState.runPath,
+              selectedAssetRunExecutionState.executedAt,
+              selectedAssetRunExecutionState.resultSummary,
+            ]
+              .filter(Boolean)
+              .join(' · '),
+          }
+        : null,
+      selectedAssetRunDetails.workItemPath
+        ? { key: 'workItem', label: t('workbench.assetRunWorkItem'), value: selectedAssetRunDetails.workItemPath }
+        : null,
+    ].filter((item): item is { key: string; label: string; value: string } => Boolean(item));
+
+    return (
+      <div style={{ ...sectionStyle, marginBottom: 12, background: 'var(--semi-color-bg-0)' }}>
+        <Space align="center" wrap style={{ justifyContent: 'space-between', width: '100%', marginBottom: 8 }}>
+          <Title heading={6} style={{ margin: 0 }}>
+            {t('workbench.assetRunDetails')}
+          </Title>
+          {selectedAssetRunDetails.assetReuseKind ? (
+            <Tag color="blue">{selectedAssetRunDetails.assetReuseKind}</Tag>
+          ) : null}
+          {selectedAssetRunReviewState ? (
+            <Tag color={selectedAssetRunReviewState.status === 'confirmed' ? 'green' : 'orange'}>
+              {t(
+                selectedAssetRunReviewState.status === 'confirmed'
+                  ? 'workbench.assetRunReviewConfirmed'
+                  : 'workbench.assetRunReviewDraft',
+              )}
+            </Tag>
+          ) : null}
+          {selectedAssetRunDetailsKnowledgeUpdateState ? (
+            <Tag color={knowledgeUpdateStatusColor(selectedAssetRunDetailsKnowledgeUpdateState.status)}>
+              {t(PLAN_EXECUTION_KNOWLEDGE_STATUS_LABEL_KEYS[selectedAssetRunDetailsKnowledgeUpdateState.status])}
+            </Tag>
+          ) : null}
+          {selectedAssetRunOutputState ? (
+            <Tag color={selectedAssetRunOutputState.status === 'preserved' ? 'green' : 'orange'}>
+              {t(
+                selectedAssetRunOutputState.status === 'preserved'
+                  ? 'workbench.assetRunOutputPreserved'
+                  : 'workbench.assetRunOutputPending',
+              )}
+            </Tag>
+          ) : null}
+          {selectedAssetRunApprovalDecisionState ? (
+            <Tag color={selectedAssetRunApprovalDecisionState.status === 'approved' ? 'green' : 'red'}>
+              {t(
+                selectedAssetRunApprovalDecisionState.status === 'approved'
+                  ? 'workbench.assetRunApprovalDecisionApproved'
+                  : 'workbench.assetRunApprovalDecisionDenied',
+              )}
+            </Tag>
+          ) : null}
+          {selectedAssetRunExecutionState ? (
+            <Tag color={assetRunExecutionStatusColor(selectedAssetRunExecutionState.status)}>
+              {t(ASSET_RUN_EXECUTION_STATUS_LABEL_KEYS[selectedAssetRunExecutionState.status])}
+            </Tag>
+          ) : null}
+        </Space>
+        <Space vertical align="start" spacing={6} style={{ width: '100%' }}>
+          <Text strong ellipsis={{ showTooltip: true }} style={{ display: 'block', width: '100%' }}>
+            {selectedAssetRunDetails.title}
+          </Text>
+          <Text
+            type="tertiary"
+            size="small"
+            ellipsis={{ showTooltip: true }}
+            style={{ display: 'block', width: '100%' }}
+          >
+            {selectedAssetRunDetails.assetPath ??
+              selectedAssetRunDetails.assetId ??
+              selectedAssetRunDetails.assetRunPath}
+          </Text>
+          {detailRows.map((item) => (
+            <Text
+              key={item.key}
+              size="small"
+              ellipsis={{ showTooltip: true }}
+              style={{ display: 'block', width: '100%' }}
+            >
+              {item.label}: {item.value}
+            </Text>
+          ))}
+          {selectedAssetRunApprovalDecisionCommands ? (
+            <Space vertical align="start" spacing={6} style={{ width: '100%', paddingTop: 4 }}>
+              <Text strong size="small">
+                {t('workbench.assetRunApprovalDecision')}
+              </Text>
+              <Text type="tertiary" size="small">
+                {t('workbench.assetRunApprovalDecisionDesc')}
+              </Text>
+              <Text type="tertiary" size="small">
+                {t('workbench.assetRunApproveCommand')}
+              </Text>
+              <Text code copyable style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                {selectedAssetRunApprovalDecisionCommands.approve.text}
+              </Text>
+              <Text type="tertiary" size="small">
+                {t('workbench.assetRunDenyCommand')}
+              </Text>
+              <Text code copyable style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                {selectedAssetRunApprovalDecisionCommands.deny.text}
+              </Text>
+            </Space>
+          ) : null}
+          {selectedAssetRunFollowUpState.length > 0 ? (
+            <Space vertical align="start" spacing={4} style={{ width: '100%', paddingTop: 4 }}>
+              <Text strong size="small">
+                {t('workbench.assetRunFollowUps')}
+              </Text>
+              {selectedAssetRunFollowUpState.map((item) => (
+                <Space key={`${item.sourcePath}:${item.text}`} align="center" wrap style={{ width: '100%', rowGap: 4 }}>
+                  <Tag color={item.completed ? 'green' : 'orange'}>
+                    {t(item.completed ? 'workbench.assetRunFollowUpDone' : 'workbench.assetRunFollowUpPending')}
+                  </Tag>
+                  <Text
+                    size="small"
+                    ellipsis={{ showTooltip: true }}
+                    style={{ display: 'block', minWidth: 0, flex: 1 }}
+                  >
+                    {item.text}
+                  </Text>
+                </Space>
+              ))}
+            </Space>
+          ) : null}
+          {selectedAssetRunDetailsFollowUpActions.canPreserveOutput ||
+          selectedAssetRunDetailsFollowUpActions.canUpdateKnowledge ||
+          selectedAssetRunDetailsFollowUpActions.canWriteReview ? (
+            <Space align="center" wrap style={{ paddingTop: 4 }}>
+              {selectedAssetRunDetailsFollowUpActions.canPreserveOutput ? (
+                <Button
+                  size="small"
+                  type="tertiary"
+                  icon={<IconBox />}
+                  onClick={() =>
+                    navigate(
+                      buildDashboardTailActionTarget('/artifacts', {
+                        kind: 'output',
+                        id: `asset-run-output:${selectedAssetRunDetails.assetRunPath}`,
+                        workItemPath: selectedAssetRunDetails.workItemPath,
+                        assetRunPath: selectedAssetRunDetails.assetRunPath,
+                      }),
+                    )
+                  }
+                >
+                  {t('workbench.assetRunPreserveOutput')}
+                </Button>
+              ) : null}
+              {selectedAssetRunDetailsFollowUpActions.canUpdateKnowledge ? (
+                <Button
+                  size="small"
+                  type="tertiary"
+                  icon={<IconFile />}
+                  onClick={() =>
+                    navigate(
+                      buildDashboardTailActionTarget('/knowledge', {
+                        kind: 'knowledge',
+                        id: `asset-run-knowledge:${selectedAssetRunDetails.assetRunPath}`,
+                        workItemPath: selectedAssetRunDetails.workItemPath,
+                        assetRunPath: selectedAssetRunDetails.assetRunPath,
+                      }),
+                    )
+                  }
+                >
+                  {t('workbench.assetRunUpdateKnowledge')}
+                </Button>
+              ) : null}
+              {selectedAssetRunDetailsFollowUpActions.canWriteReview ? (
+                <Button
+                  size="small"
+                  type="tertiary"
+                  icon={<IconCheckList />}
+                  onClick={() =>
+                    navigate(
+                      buildDashboardTailActionTarget('/workbench', {
+                        kind: 'review',
+                        id: `asset-run-review:${selectedAssetRunDetails.assetRunPath}`,
+                        workItemPath: selectedAssetRunDetails.workItemPath,
+                        assetRunPath: selectedAssetRunDetails.assetRunPath,
+                      }),
+                    )
+                  }
+                >
+                  {t('workbench.assetRunWriteReview')}
+                </Button>
+              ) : null}
+            </Space>
+          ) : null}
+        </Space>
+      </div>
+    );
+  };
 
   const renderPreviewContent = () => {
     if (panelView === 'projects') {
@@ -1884,7 +3076,12 @@ export default function WorkbenchRepositoryPanel({
     }
 
     return selectedPreviewContent ? (
-      <MarkdownView content={selectedPreviewContent} />
+      <>
+        {renderMatterGoldenPathCard()}
+        {renderRepositoryAssetRunDetails()}
+        {renderRepositoryAssetPermissionBoundary()}
+        <MarkdownView content={selectedPreviewContent} />
+      </>
     ) : (
       <Empty description={t('workbench.previewEmpty')} />
     );

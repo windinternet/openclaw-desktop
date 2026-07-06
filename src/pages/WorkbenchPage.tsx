@@ -8,10 +8,11 @@ import RepositoryWorkbenchKanban from '../components/RepositoryWorkbenchKanban';
 import ActionCenterPage from './ActionCenterPage';
 import {
   getWorkbenchTailActionTab,
+  isSafeRepositoryAssetRunPath,
   parseDashboardTailActionRoute,
   type DashboardTailActionRouteContext,
 } from '../lib/dashboard-tail-action-routing';
-import { isWorkbenchMatterPath } from '../lib/workbench-matter';
+import { isSafeWorkbenchMarkdownPath } from '../lib/workbench-matter';
 
 const { Title, Text } = Typography;
 const WORKBENCH_TAB_KEYS = [
@@ -41,21 +42,31 @@ function getWorkbenchSearchTab(search: string): WorkbenchTabKey | undefined {
 function getWorkbenchAssetRunPath(search: string): string | null {
   const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
   const assetRunPath = params.get('assetRunPath');
-  return assetRunPath?.startsWith('runs/assets/') && assetRunPath.endsWith('.md') ? assetRunPath : null;
+  return isSafeRepositoryAssetRunPath(assetRunPath ?? undefined) ? assetRunPath : null;
 }
 
 function getWorkbenchSearchWorkItemPath(search: string): string | null {
   const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
   const workItemPath = params.get('workItemPath') ?? '';
-  return isWorkbenchMatterPath(workItemPath) ? workItemPath : null;
+  return isSafeWorkbenchMarkdownPath(workItemPath) ? workItemPath : null;
 }
 
 function getWorkbenchSearchPlanPath(search: string): string | null {
   const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
   const planPath = params.get('planPath') ?? '';
-  if (!planPath.startsWith('plans/active/') || !planPath.endsWith('.md')) return null;
-  if (planPath.includes('..') || planPath.includes('//')) return null;
-  return planPath;
+  return isSafeWorkbenchMarkdownPath(planPath) ? planPath : null;
+}
+
+function getWorkbenchSearchOutputPath(search: string): string | null {
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  const outputPath = params.get('outputPath') ?? '';
+  return isSafeWorkbenchMarkdownPath(outputPath) ? outputPath : null;
+}
+
+function getWorkbenchSearchReviewPath(search: string): string | null {
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  const reviewPath = params.get('reviewPath') ?? '';
+  return isSafeWorkbenchMarkdownPath(reviewPath) && reviewPath.startsWith('reviews/') ? reviewPath : null;
 }
 
 function getWorkbenchInitialTab(context: DashboardTailActionRouteContext | null, search: string): WorkbenchTabKey {
@@ -71,6 +82,8 @@ export default function WorkbenchPage() {
   const assetRunPath = useMemo(() => getWorkbenchAssetRunPath(location.search), [location.search]);
   const searchWorkItemPath = useMemo(() => getWorkbenchSearchWorkItemPath(location.search), [location.search]);
   const searchPlanPath = useMemo(() => getWorkbenchSearchPlanPath(location.search), [location.search]);
+  const searchOutputPath = useMemo(() => getWorkbenchSearchOutputPath(location.search), [location.search]);
+  const searchReviewPath = useMemo(() => getWorkbenchSearchReviewPath(location.search), [location.search]);
   const searchTab = getWorkbenchSearchTab(location.search);
   const [activeTab, setActiveTab] = useState<WorkbenchTabKey>(() =>
     getWorkbenchInitialTab(tailActionContext, location.search),
@@ -161,6 +174,8 @@ export default function WorkbenchPage() {
           assetRunPath={assetRunPath}
           initialWorkItemPath={searchWorkItemPath}
           initialPlanPath={searchPlanPath}
+          initialOutputPath={searchOutputPath}
+          initialReviewPath={searchReviewPath}
         />
       )}
     </RepositoryGate>

@@ -329,6 +329,7 @@ describe('dashboard work system summary', () => {
       sessions: [],
       actionRuns: [],
       artifacts: [],
+      now,
       workbench: {
         activeWork: [],
         activePlans: [],
@@ -348,9 +349,14 @@ describe('dashboard work system summary', () => {
           '  - workItem: work/active/release.md',
           '  - review: pending, write reviews/weekly/ entry',
           '  - boundary: recordOnly, desktopExecutes=false, grantsPermission=false',
+          '- [越界资产运行](assets/../secret.md) (`secret`, script, succeeded)',
+          '  - runPath: runs/assets/../secret.md',
+          '  - executedAt: 2026-06-29T02:02:03.000Z',
+          '  - result: 不应进入摘要',
+          '  - output: outputs/reports/secret.md',
+          '  - review: pending',
         ].join('\n'),
       },
-      now,
       limit: 8,
     });
 
@@ -371,7 +377,8 @@ describe('dashboard work system summary', () => {
         id: 'asset-run-output:runs/assets/20260629-010203-tools-release-check-sh.md',
         kind: 'output',
         title: '发布检查脚本',
-        target: '/workbench?view=outputs',
+        target:
+          '/workbench?view=outputs&assetRunPath=runs%2Fassets%2F20260629-010203-tools-release-check-sh.md&workItemPath=work%2Factive%2Frelease.md',
         path: 'outputs/reports/release-check.md',
         detail: '资产运行 · script · succeeded · 发布检查通过',
         status: 'asset-run:succeeded',
@@ -379,6 +386,92 @@ describe('dashboard work system summary', () => {
     ]);
     expect(summary.weeklyOutputs.map((item) => item.id)).toEqual([
       'asset-run-output:runs/assets/20260629-010203-tools-release-check-sh.md',
+    ]);
+    expect(JSON.stringify(summary)).not.toContain('../secret');
+  });
+
+  it('carries repository asset run source paths through output and knowledge tail action targets', () => {
+    const assetRunPath = 'runs/assets/20260629-010203-tools-release-check-sh.md';
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [],
+      workbench: {
+        activeWork: [],
+        activePlans: [],
+        planMetadata: [],
+        tailActions: [
+          {
+            id: 'work/active/release.md:tail-action:1',
+            sourcePath: 'work/active/release.md',
+            text: `根据 [${assetRunPath}](../../${assetRunPath}) 沉淀成果。`,
+            completed: false,
+            updatedAt: 1782716400000,
+          },
+          {
+            id: 'work/active/release.md:tail-action:2',
+            sourcePath: 'work/active/release.md',
+            text: `根据 [${assetRunPath}](../../${assetRunPath}) 更新知识库。`,
+            completed: false,
+            updatedAt: 1782716300000,
+          },
+        ],
+        reviews: [],
+      },
+      limit: 8,
+      now: Date.parse('2026-06-29T12:00:00.000Z'),
+    });
+
+    expect(summary.pendingConfirmations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'work/active/release.md:tail-action:1',
+          target:
+            '/artifacts?tailAction=output&tailActionId=work%2Factive%2Frelease.md%3Atail-action%3A1&workItemPath=work%2Factive%2Frelease.md&assetRunPath=runs%2Fassets%2F20260629-010203-tools-release-check-sh.md',
+          status: 'tail-action:output',
+        }),
+        expect.objectContaining({
+          id: 'work/active/release.md:tail-action:2',
+          target:
+            '/knowledge?tailAction=knowledge&tailActionId=work%2Factive%2Frelease.md%3Atail-action%3A2&workItemPath=work%2Factive%2Frelease.md&assetRunPath=runs%2Fassets%2F20260629-010203-tools-release-check-sh.md',
+          status: 'tail-action:knowledge',
+        }),
+      ]),
+    );
+  });
+
+  it('does not infer repository asset run targets from copied suffix paths', () => {
+    const assetRunPath = 'runs/assets/20260629-010203-tools-release-check-sh.md';
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [],
+      workbench: {
+        activeWork: [],
+        activePlans: [],
+        planMetadata: [],
+        tailActions: [
+          {
+            id: 'work/active/release.md:tail-action:1',
+            sourcePath: 'work/active/release.md',
+            text: `根据备份路径 ${assetRunPath}.bak 沉淀成果。`,
+            completed: false,
+            updatedAt: 1782716400000,
+          },
+        ],
+        reviews: [],
+      },
+      limit: 8,
+      now: Date.parse('2026-06-29T12:00:00.000Z'),
+    });
+
+    expect(summary.pendingConfirmations).toEqual([
+      expect.objectContaining({
+        id: 'work/active/release.md:tail-action:1',
+        target:
+          '/artifacts?tailAction=output&tailActionId=work%2Factive%2Frelease.md%3Atail-action%3A1&workItemPath=work%2Factive%2Frelease.md',
+        status: 'tail-action:output',
+      }),
     ]);
   });
 
@@ -479,6 +572,37 @@ describe('dashboard work system summary', () => {
     expect(summary.recentOutputs.some((item) => item.id === 'action-run-output:run_artifact')).toBe(false);
   });
 
+  it('does not duplicate terminal ActionRun summaries when an Artifact points to the Gateway run id', () => {
+    const now = Date.parse('2026-06-28T12:00:00.000Z');
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [
+        createActionRun({
+          id: 'local_run_output',
+          gatewayRunId: 'gateway_run_output',
+          type: 'plan_execute',
+          status: 'done',
+          input: '执行发布计划',
+          resultSummary: '生成了发布计划执行摘要',
+          updatedAt: Date.parse('2026-06-27T11:00:00.000Z'),
+        }),
+      ],
+      artifacts: [
+        createArtifact({
+          id: 'art_from_gateway_run_output',
+          title: '发布计划执行摘要',
+          source: { type: 'action_run', id: 'gateway_run_output' },
+          createdAt: Date.parse('2026-06-27T11:00:00.000Z'),
+          updatedAt: Date.parse('2026-06-27T11:00:00.000Z'),
+        }),
+      ],
+      now,
+    });
+
+    expect(summary.recentOutputs.map((item) => item.id)).toEqual(['art_from_gateway_run_output']);
+    expect(summary.weeklyOutputs.map((item) => item.id)).toEqual(['art_from_gateway_run_output']);
+  });
+
   it('surfaces terminal work item ActionRuns missing from the repository run index as pending confirmations', () => {
     const summary = buildDashboardWorkSystemSummary({
       sessions: [],
@@ -526,6 +650,76 @@ describe('dashboard work system summary', () => {
         status: 'action-run:unarchived',
       }),
     ]);
+  });
+
+  it('does not treat prefixed run ids in the repository run index as archived ActionRuns', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [
+        createActionRun({
+          id: 'run_1',
+          type: 'artifact_create',
+          status: 'done',
+          input: '生成发布报告',
+          resultSummary: '发布报告已生成',
+          workItemPath: 'work/active/release.md',
+          updatedAt: 220,
+        }),
+      ],
+      artifacts: [],
+      workbench: {
+        activeWork: [],
+        activePlans: [],
+        planMetadata: [],
+        tailActions: [],
+        reviews: [],
+        runsMarkdown: ['# Action Runs', '', '- runId: run_10'].join('\n'),
+      },
+      limit: 8,
+    });
+
+    expect(summary.pendingConfirmations).toEqual([
+      expect.objectContaining({
+        id: 'unarchived-action-run:run_1',
+        status: 'action-run:unarchived',
+      }),
+    ]);
+  });
+
+  it('does not surface terminal ActionRuns as unarchived when the repository run index uses the Gateway run id', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [
+        createActionRun({
+          id: 'local_run_archived_by_gateway',
+          gatewayRunId: 'gateway_run_archived',
+          type: 'plan_execute',
+          status: 'done',
+          input: '执行发布计划',
+          resultSummary: '发布计划执行完成',
+          workItemPath: 'work/active/release.md',
+          updatedAt: 220,
+        }),
+      ],
+      artifacts: [],
+      workbench: {
+        activeWork: [],
+        activePlans: [],
+        planMetadata: [],
+        tailActions: [],
+        reviews: [],
+        runsMarkdown: ['# Action Runs', '', '- gatewayRunId: gateway_run_archived'].join('\n'),
+      },
+      limit: 8,
+    });
+
+    expect(summary.pendingConfirmations).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          status: 'action-run:unarchived',
+        }),
+      ]),
+    );
   });
 
   it('surfaces terminal ActionRuns without a work item as pending assignment confirmations', () => {
@@ -631,6 +825,49 @@ describe('dashboard work system summary', () => {
     ]);
   });
 
+  it('does not surface output preservation confirmations for unsafe ActionRun work item paths', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [
+        createActionRun({
+          id: 'run_unsafe_output',
+          type: 'artifact_create',
+          status: 'done',
+          input: '生成越界成果',
+          resultSummary: '成果已生成',
+          workItemPath: '/Users/example/private.md',
+          updatedAt: 220,
+        }),
+        createActionRun({
+          id: 'run_non_matter_output',
+          type: 'artifact_create',
+          status: 'done',
+          input: '生成输出页',
+          resultSummary: '成果已生成',
+          workItemPath: 'outputs/release.md',
+          updatedAt: 210,
+        }),
+      ],
+      artifacts: [],
+      workbench: {
+        activeWork: [],
+        activePlans: [],
+        planMetadata: [],
+        tailActions: [],
+        reviews: [],
+      },
+      limit: 8,
+    });
+
+    expect(summary.pendingConfirmations).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          status: 'action-run:output-unpreserved',
+        }),
+      ]),
+    );
+  });
+
   it('does not ask to preserve an ActionRun output again when an Artifact already points to that run', () => {
     const summary = buildDashboardWorkSystemSummary({
       sessions: [],
@@ -650,6 +887,42 @@ describe('dashboard work system summary', () => {
           id: 'art_from_run',
           title: '发布计划执行摘要',
           source: { type: 'action_run', id: 'run_preserved_by_source' },
+          updatedAt: 240,
+        }),
+      ],
+      workbench: {
+        activeWork: [],
+        activePlans: [],
+        planMetadata: [],
+        tailActions: [],
+        reviews: [],
+      },
+      limit: 8,
+    });
+
+    expect(summary.pendingConfirmations).toEqual([]);
+  });
+
+  it('does not ask to preserve an ActionRun output again when the Artifact points to the Gateway run id', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [
+        createActionRun({
+          id: 'local_run_preserved_by_gateway_source',
+          gatewayRunId: 'gateway_run_preserved_by_source',
+          type: 'plan_execute',
+          status: 'done',
+          input: '执行发布计划',
+          resultSummary: '生成了发布计划执行摘要',
+          workItemPath: 'work/active/release.md',
+          updatedAt: 230,
+        }),
+      ],
+      artifacts: [
+        createArtifact({
+          id: 'art_from_gateway_run',
+          title: '发布计划执行摘要',
+          source: { type: 'action_run', id: 'gateway_run_preserved_by_source' },
           updatedAt: 240,
         }),
       ],
@@ -798,7 +1071,7 @@ describe('dashboard work system summary', () => {
         id: 'plans/active/blocked.md',
         kind: 'plan',
         title: '发布阻塞计划',
-        target: '/workbench?view=plans',
+        target: '/workbench?view=plans&planPath=plans%2Factive%2Fblocked.md',
         path: 'plans/active/blocked.md',
         detail: 'blocked · 阻塞原因: 等待设计确认关键验收标准 · 负责人: @owner',
         status: 'blocked',
@@ -833,9 +1106,45 @@ describe('dashboard work system summary', () => {
         id: 'cross-work-risk:plans/active/cross-work.md',
         kind: 'plan',
         title: '跨事项发布计划',
-        target: '/workbench?view=plans',
+        target: '/workbench?view=plans&planPath=plans%2Factive%2Fcross-work.md',
         path: 'plans/active/cross-work.md',
         detail: '跨事项依赖 · work/active/design.md',
+        status: 'plan:cross-work-risk',
+      }),
+    ]);
+  });
+
+  it('preserves dependency metadata source labels in cross-work risk details', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [],
+      workbench: {
+        activeWork: [],
+        completedWork: [],
+        activePlans: [createMarkdownFile('plans/active/cross-work.md', '跨事项发布计划', 220)],
+        completedPlans: [],
+        planMetadata: [
+          {
+            path: 'plans/active/cross-work.md',
+            status: 'active',
+            dependencies: ['work/active/design.md', 'plans/active/api.md'],
+            dependencySources: {
+              'work/active/design.md': 'waitingOn',
+              'plans/active/api.md': 'dependencies',
+            },
+          },
+        ],
+        tailActions: [],
+        reviews: [],
+      },
+    });
+
+    expect(summary.stuckItems).toEqual([
+      expect.objectContaining({
+        id: 'cross-work-risk:plans/active/cross-work.md',
+        detail:
+          '跨事项依赖 · work/active/design.md (来源: waitingOn), plans/active/api.md (来源: dependencies，负责人未知)',
         status: 'plan:cross-work-risk',
       }),
     ]);
@@ -888,6 +1197,244 @@ describe('dashboard work system summary', () => {
     ]);
   });
 
+  it('surfaces owner clues from active work dependencies on cross-work risks', () => {
+    const now = Date.parse('2026-06-28T00:00:00.000Z');
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [],
+      now,
+      workbench: {
+        activeWork: [createMarkdownFile('work/active/design.md', '设计确认', Date.parse('2026-06-27T00:00:00.000Z'))],
+        completedWork: [],
+        activePlans: [createMarkdownFile('plans/active/cross-work.md', '跨事项发布计划', now)],
+        completedPlans: [],
+        planMetadata: [
+          {
+            path: 'plans/active/cross-work.md',
+            status: 'active',
+            dependencies: ['work/active/design.md'],
+          },
+        ],
+        workMetadata: [{ path: 'work/active/design.md', owner: '@design' }],
+        tailActions: [],
+        reviews: [],
+      },
+    });
+
+    expect(summary.stuckItems).toEqual([
+      expect.objectContaining({
+        id: 'cross-work-risk:plans/active/cross-work.md',
+        detail: '跨事项依赖 · work/active/design.md (负责人: @design)',
+        status: 'plan:cross-work-risk',
+      }),
+    ]);
+  });
+
+  it('deduplicates externally supplied plan dependencies before formatting cross-work risks', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [],
+      now: 230,
+      workbench: {
+        activeWork: [createMarkdownFile('work/active/design.md', '设计确认', 210)],
+        completedWork: [],
+        activePlans: [
+          createMarkdownFile('plans/active/cross-work.md', '跨事项发布计划', 220),
+          createMarkdownFile('plans/active/api.md', 'API 计划', 215),
+        ],
+        completedPlans: [],
+        planMetadata: [
+          {
+            path: 'plans/active/cross-work.md',
+            status: 'active',
+            dependencies: [
+              'work/active/design.md',
+              'work/active/design.md',
+              'plans/active/api.md',
+              'plans/active/api.md',
+            ],
+          },
+          {
+            path: 'plans/active/api.md',
+            status: 'active',
+          },
+        ],
+        tailActions: [],
+        reviews: [],
+      },
+    });
+
+    expect(summary.stuckItems).toEqual([
+      expect.objectContaining({
+        id: 'cross-work-risk:plans/active/cross-work.md',
+        detail: '跨事项依赖 · work/active/design.md, plans/active/api.md (负责人未知)',
+        status: 'plan:cross-work-risk',
+      }),
+    ]);
+  });
+
+  it('filters untrusted externally supplied plan dependencies before formatting cross-work risks', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [],
+      now: 230,
+      workbench: {
+        activeWork: [
+          createMarkdownFile('work/active/design.md', '设计确认', 210),
+          createMarkdownFile('10-ops/tasks/active/mapped-design.md', '映射设计确认', 215),
+        ],
+        completedWork: [],
+        activePlans: [createMarkdownFile('plans/active/cross-work.md', '跨事项发布计划', 220)],
+        completedPlans: [],
+        planMetadata: [
+          {
+            path: 'plans/active/cross-work.md',
+            status: 'active',
+            dependencies: [
+              'work/active/design.md',
+              '10-ops/tasks/active/mapped-design.md',
+              'https://example.com/spec',
+              '#local-anchor',
+              '/Users/example/private.md',
+              'docs/random-note.md',
+            ],
+          },
+        ],
+        tailActions: [],
+        reviews: [],
+      },
+    });
+
+    expect(summary.stuckItems).toEqual([
+      expect.objectContaining({
+        id: 'cross-work-risk:plans/active/cross-work.md',
+        detail: '跨事项依赖 · work/active/design.md, 10-ops/tasks/active/mapped-design.md',
+        status: 'plan:cross-work-risk',
+      }),
+    ]);
+  });
+
+  it('surfaces explicit work item dependencies as stuck risks', () => {
+    const now = Date.parse('2026-06-28T00:00:00.000Z');
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [],
+      now,
+      workbench: {
+        activeWork: [
+          createMarkdownFile('work/active/release.md', '发布推进', now),
+          createMarkdownFile('work/active/design.md', '设计确认', Date.parse('2026-06-01T00:00:00.000Z')),
+        ],
+        completedWork: [createMarkdownFile('work/completed/research.md', '资料调研', now)],
+        activePlans: [],
+        completedPlans: [],
+        planMetadata: [],
+        workMetadata: [
+          {
+            path: 'work/active/release.md',
+            dependencies: ['work/active/design.md', 'work/completed/research.md'],
+          },
+          { path: 'work/active/design.md', owner: '@design' },
+        ],
+        tailActions: [],
+        reviews: [],
+      },
+    });
+
+    expect(summary.stuckItems).toEqual([
+      expect.objectContaining({
+        id: 'cross-work-risk:work/active/release.md',
+        kind: 'work',
+        title: '发布推进',
+        target: '/workbench?view=tasks&workItemPath=work%2Factive%2Frelease.md',
+        path: 'work/active/release.md',
+        detail: '跨事项依赖 · work/active/design.md (停滞 27 天，负责人: @design)',
+        status: 'work:cross-work-risk',
+      }),
+    ]);
+  });
+
+  it('deduplicates externally supplied work item dependencies before formatting cross-work risks', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [],
+      now: 230,
+      workbench: {
+        activeWork: [
+          createMarkdownFile('work/active/release.md', '发布推进', 220),
+          createMarkdownFile('work/active/design.md', '设计确认', 210),
+        ],
+        completedWork: [],
+        activePlans: [],
+        completedPlans: [],
+        planMetadata: [],
+        workMetadata: [
+          {
+            path: 'work/active/release.md',
+            dependencies: ['work/active/design.md', 'work/active/design.md'],
+          },
+        ],
+        tailActions: [],
+        reviews: [],
+      },
+    });
+
+    expect(summary.stuckItems).toEqual([
+      expect.objectContaining({
+        id: 'cross-work-risk:work/active/release.md',
+        detail: '跨事项依赖 · work/active/design.md',
+        status: 'work:cross-work-risk',
+      }),
+    ]);
+  });
+
+  it('filters untrusted externally supplied work item dependencies before formatting cross-work risks', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [],
+      now: 230,
+      workbench: {
+        activeWork: [
+          createMarkdownFile('work/active/release.md', '发布推进', 220),
+          createMarkdownFile('work/active/design.md', '设计确认', 210),
+          createMarkdownFile('10-ops/tasks/active/mapped-design.md', '映射设计确认', 215),
+        ],
+        completedWork: [],
+        activePlans: [],
+        completedPlans: [],
+        planMetadata: [],
+        workMetadata: [
+          {
+            path: 'work/active/release.md',
+            dependencies: [
+              'work/active/design.md',
+              '10-ops/tasks/active/mapped-design.md',
+              'https://example.com/spec',
+              '#local-anchor',
+              '/tmp/private.md',
+            ],
+          },
+        ],
+        tailActions: [],
+        reviews: [],
+      },
+    });
+
+    expect(summary.stuckItems).toEqual([
+      expect.objectContaining({
+        id: 'cross-work-risk:work/active/release.md',
+        detail: '跨事项依赖 · work/active/design.md, 10-ops/tasks/active/mapped-design.md',
+        status: 'work:cross-work-risk',
+      }),
+    ]);
+  });
+
   it('does not surface cross-work risks whose dependencies are already completed', () => {
     const summary = buildDashboardWorkSystemSummary({
       sessions: [],
@@ -911,6 +1458,111 @@ describe('dashboard work system summary', () => {
     });
 
     expect(summary.stuckItems).toEqual([]);
+  });
+
+  it('filters completed dependencies after repository metadata normalizes relative links', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [],
+      workbench: {
+        activeWork: [],
+        completedWork: [],
+        activePlans: [createMarkdownFile('plans/active/relative-deps.md', '相对依赖计划', 220)],
+        completedPlans: [createMarkdownFile('plans/completed/research.md', '研究计划', 205)],
+        planMetadata: [
+          {
+            path: 'plans/active/relative-deps.md',
+            status: 'active',
+            dependencies: ['plans/active/api.md', 'plans/completed/research.md'],
+          },
+        ],
+        tailActions: [],
+        reviews: [],
+      },
+    });
+
+    expect(summary.stuckItems).toEqual([
+      expect.objectContaining({
+        id: 'cross-work-risk:plans/active/relative-deps.md',
+        detail: '跨事项依赖 · plans/active/api.md (负责人未知)',
+      }),
+    ]);
+  });
+
+  it('filters semantic-mapped completed dependency paths from cross-work risks', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [],
+      now: 230,
+      workbench: {
+        activeWork: [createMarkdownFile('10-ops/tasks/active/design.md', '映射设计确认', 220)],
+        completedWork: [],
+        activePlans: [createMarkdownFile('10-ops/plans/active/release.md', '映射发布计划', 225)],
+        completedPlans: [],
+        planMetadata: [
+          {
+            path: '10-ops/plans/active/release.md',
+            status: 'active',
+            dependencies: [
+              '10-ops/tasks/active/design.md',
+              '10-ops/tasks/completed/research.md',
+              '10-ops/plans/completed/api.md',
+            ],
+          },
+        ],
+        tailActions: [],
+        reviews: [],
+      },
+    });
+
+    expect(summary.stuckItems).toEqual([
+      expect.objectContaining({
+        id: 'cross-work-risk:10-ops/plans/active/release.md',
+        detail: '跨事项依赖 · 10-ops/tasks/active/design.md',
+        status: 'plan:cross-work-risk',
+      }),
+    ]);
+  });
+
+  it('marks semantic-mapped active plan dependencies without owners as missing owner risks', () => {
+    const summary = buildDashboardWorkSystemSummary({
+      sessions: [],
+      actionRuns: [],
+      artifacts: [],
+      now: 230,
+      workbench: {
+        activeWork: [],
+        completedWork: [],
+        activePlans: [
+          createMarkdownFile('10-ops/plans/active/release.md', '映射发布计划', 225),
+          createMarkdownFile('10-ops/plans/active/api.md', '映射 API 计划', 220),
+        ],
+        completedPlans: [],
+        planMetadata: [
+          {
+            path: '10-ops/plans/active/release.md',
+            status: 'active',
+            dependencies: ['10-ops/plans/active/api.md'],
+          },
+          {
+            path: '10-ops/plans/active/api.md',
+            status: 'active',
+          },
+        ],
+        tailActions: [],
+        reviews: [],
+      },
+    });
+
+    expect(summary.stuckItems).toEqual([
+      expect.objectContaining({
+        id: 'cross-work-risk:10-ops/plans/active/release.md',
+        detail: '跨事项依赖 · 10-ops/plans/active/api.md (负责人未知)',
+        status: 'plan:cross-work-risk',
+      }),
+    ]);
   });
 
   it('surfaces knowledge health issues as first-class dashboard knowledge updates', () => {

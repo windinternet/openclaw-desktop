@@ -1,9 +1,20 @@
 import type { RepositoryBinding, SemanticSlot } from './agentic-repository';
 import type { ArtifactMeta } from './artifact-types';
+import {
+  extractSafeRepositoryAssetRunPathFromText,
+  isRepositoryAssetRunPathLike,
+  isSafeRepositoryAssetRunPath,
+} from './dashboard-tail-action-routing';
 import type { RepositoryMarkdownFile } from './repository-knowledge';
-import type { AiActionRepositoryWrite } from './types';
+import type { AiActionRepositoryWrite, AiActionRun } from './types';
+import {
+  isSafeWorkbenchMarkdownPath,
+  isSafeWorkbenchMatterLikePath,
+  isSafeWorkbenchTailActionWorkItemPath,
+} from './workbench-matter';
 
 const WORKBENCH_MATTER_STATUSES = new Set(['active', 'blocked', 'done', 'paused']);
+const TERMINAL_REPOSITORY_ASSET_RUN_STATUSES = new Set(['succeeded', 'failed', 'cancelled']);
 
 export interface WorkbenchSemanticSection {
   key: string;
@@ -154,11 +165,24 @@ export interface WorkbenchSnapshot {
   reviews: RepositoryMarkdownFile[];
   reviewDocuments?: WorkbenchReviewDocument[];
   planMetadata: RepositoryPlanMetadata[];
+  workMetadata?: RepositoryWorkMetadata[];
   reviewGroups: RepositoryReviewGroup[];
   semanticSections: WorkbenchSemanticSection[];
   projects: WorkbenchProject[];
   taskGroups: WorkbenchTaskGroup[];
   tailActions: WorkbenchTailAction[];
+}
+
+export function isWorkbenchSnapshotMatterPath(
+  snapshot: Pick<WorkbenchSnapshot, 'activeWork' | 'completedWork' | 'somedayWork'> | null | undefined,
+  path: string | null | undefined,
+): boolean {
+  const value = path?.trim();
+  if (!snapshot || !value || value !== path || value.startsWith('/') || value.includes('\\')) return false;
+  if (value.split('/').includes('..')) return false;
+  return [...snapshot.activeWork, ...snapshot.completedWork, ...snapshot.somedayWork].some(
+    (item) => item.path === value,
+  );
 }
 
 export interface RepositoryPlanMetadata {
@@ -169,11 +193,191 @@ export interface RepositoryPlanMetadata {
   blockerOwner?: string;
   workItemPath?: string;
   dependencies?: string[];
+  dependencySources?: Record<string, string>;
+}
+
+export interface RepositoryWorkMetadata {
+  path: string;
+  owner?: string;
+  dependencies?: string[];
+  dependencySources?: Record<string, string>;
 }
 
 export interface RepositoryReviewGroup {
   group: string;
   files: RepositoryMarkdownFile[];
+}
+
+export interface RepositoryAssetPermissionBoundary {
+  recordOnly: boolean | null;
+  desktopExecutes: boolean | null;
+  grantsPermission: boolean | null;
+  requiresApproval: boolean;
+}
+
+export interface RepositoryAssetRunDetails {
+  assetRunPath: string;
+  title: string;
+  assetId?: string;
+  assetPath?: string;
+  assetReuseKind?: string;
+  status?: string;
+  approvalTitle?: string;
+  approvalRisk?: string;
+  approvalReason?: string;
+  sourceApprovalRunPath?: string;
+  runner?: string;
+  command?: string;
+  repositoryOutputPath?: string;
+  outputArtifactId?: string;
+  workItemPath?: string;
+  executedAt?: string;
+  resultSummary?: string;
+}
+
+export interface RepositoryAssetRunOutputState {
+  status: 'preserved' | 'pending';
+  outputPath?: string;
+  artifactId?: string;
+}
+
+export type RepositoryAssetRunApprovalState = 'pending' | 'approved' | 'denied';
+
+export interface RepositoryAssetRunApprovalDecisionState {
+  status: 'approved' | 'denied';
+  runPath: string;
+  decidedAt?: string;
+}
+
+export type RepositoryAssetRunExecutionStatus = 'succeeded' | 'failed' | 'cancelled';
+
+export interface RepositoryAssetRunExecutionState {
+  status: RepositoryAssetRunExecutionStatus;
+  runPath: string;
+  executedAt?: string;
+  resultSummary?: string;
+  outputState?: RepositoryAssetRunOutputState['status'];
+}
+
+export interface RepositoryAssetRunListFollowUpState {
+  approvalDecisionState?: RepositoryAssetRunApprovalDecisionState;
+  executionState?: RepositoryAssetRunExecutionState;
+  knowledgeUpdateState?: RepositoryAssetRunKnowledgeUpdateState;
+  reviewState?: RepositoryAssetRunReviewState;
+}
+
+export interface RepositoryAssetRunReviewState {
+  status: 'draft' | 'confirmed';
+  reviewPath: string;
+}
+
+export type RepositoryAssetRunEffectiveReviewState = 'pending' | RepositoryAssetRunReviewState['status'];
+
+export type RepositoryAssetRunFollowUpKind = 'status' | 'output' | 'knowledge' | 'review' | 'general';
+
+export interface RepositoryAssetRunFollowUpState {
+  kind: RepositoryAssetRunFollowUpKind;
+  text: string;
+  sourcePath: string;
+  completed: boolean;
+}
+
+export interface RepositoryAssetExecutionApprovalCommand {
+  command: 'desktop.repository.assets.execution.record';
+  params: {
+    repoPath: string;
+    assetId?: string;
+    path?: string;
+    status: 'approval_required';
+    approvalTitle?: string;
+    approvalRisk?: string;
+    approvalReason?: string;
+    runner: string;
+    command: string;
+    workItemPath?: string;
+  };
+  text: string;
+}
+
+export interface RepositoryAssetPendingApprovalState {
+  status: 'pending';
+  runPath: string;
+  title: string;
+  requestedAt?: string;
+  approvalTitle?: string;
+  approvalRisk?: string;
+  approvalReason?: string;
+  decisionCommands?: RepositoryAssetRunApprovalDecisionCommands;
+}
+
+export interface RepositoryAssetResolvedRunState {
+  status: 'approved' | 'denied' | RepositoryAssetRunExecutionStatus;
+  runPath: string;
+  recordedAt?: string;
+  resultSummary?: string;
+  outputState?: RepositoryAssetRunOutputState['status'];
+  workItemPath?: string;
+  reviewState?: 'pending' | RepositoryAssetRunReviewState['status'];
+}
+
+export interface RepositoryAssetResolvedRunFollowUpActions {
+  canPreserveOutput: boolean;
+  canUpdateKnowledge: boolean;
+  canWriteReview: boolean;
+}
+
+export interface RepositoryAssetRunKnowledgeUpdateState {
+  status: 'running' | 'awaiting_approval' | 'done' | 'no_write_needed' | 'failed' | 'cancelled';
+  runId: string;
+  summary?: string;
+  updatedAt: number;
+}
+
+export interface RepositoryAssetRunApprovalDecisionCommand {
+  command: 'desktop.repository.assets.execution.record';
+  params: {
+    repoPath: string;
+    assetId?: string;
+    path?: string;
+    status: 'approved' | 'denied';
+    approvalTitle?: string;
+    approvalRisk?: string;
+    approvalReason?: string;
+    sourceApprovalRunPath?: string;
+    runner?: string;
+    command?: string;
+    workItemPath?: string;
+  };
+  text: string;
+}
+
+export interface RepositoryAssetRunApprovalDecisionCommands {
+  approve: RepositoryAssetRunApprovalDecisionCommand & {
+    params: RepositoryAssetRunApprovalDecisionCommand['params'] & { status: 'approved' };
+  };
+  deny: RepositoryAssetRunApprovalDecisionCommand & {
+    params: RepositoryAssetRunApprovalDecisionCommand['params'] & { status: 'denied' };
+  };
+}
+
+export interface RepositoryAssetRunIndexLink {
+  path: string;
+  title: string;
+  assetId?: string;
+  assetPath?: string;
+  reuseKind?: string;
+  status?: string;
+  approvalTitle?: string;
+  approvalRisk?: string;
+  approvalReason?: string;
+  sourceApprovalRunPath?: string;
+  approvalState?: RepositoryAssetRunApprovalState;
+  approvalPending?: boolean;
+  outputState?: RepositoryAssetRunOutputState['status'];
+  executedAt?: string;
+  resultSummary?: string;
+  workItemPath?: string;
+  reviewPending: boolean;
 }
 
 export async function loadWorkbenchSnapshot(binding: RepositoryBinding): Promise<WorkbenchSnapshot> {
@@ -211,12 +415,13 @@ export async function loadWorkbenchSnapshot(binding: RepositoryBinding): Promise
     .filter((part) => part.trim())
     .join('\n\n');
 
-  const [planMetadata, tailActions, reviewDocuments] = await Promise.all([
+  const [planMetadata, workMetadata, tailActions, reviewDocuments] = await Promise.all([
     Promise.all(
       [...activePlans, ...completedPlans].map(async (file) =>
         parsePlanMetadata(file.path, await repository.readText(binding.repoPath, file.path)),
       ),
     ),
+    loadWorkbenchWorkMetadata(binding, [...activeWork, ...completedWork, ...somedayWork]),
     loadWorkbenchTailActions(binding, [...activeWork, ...completedWork, ...somedayWork]),
     loadWorkbenchReviewDocuments(binding, reviews),
   ]);
@@ -235,6 +440,7 @@ export async function loadWorkbenchSnapshot(binding: RepositoryBinding): Promise
     planMetadata: planMetadata.filter(
       (item) => item.status || item.approval || item.blockerOwner || item.workItemPath || item.dependencies?.length,
     ),
+    workMetadata,
     reviewGroups: groupReviewsByFolder(reviews),
     semanticSections: [],
     projects: [],
@@ -243,29 +449,102 @@ export async function loadWorkbenchSnapshot(binding: RepositoryBinding): Promise
   };
 }
 
+async function loadWorkbenchWorkMetadata(
+  binding: RepositoryBinding,
+  files: RepositoryMarkdownFile[],
+): Promise<RepositoryWorkMetadata[]> {
+  const repository = getWorkbenchReadApi();
+  const metadata = await Promise.all(
+    files.map(async (file) => parseWorkMetadata(file.path, await repository.readText(binding.repoPath, file.path))),
+  );
+  return metadata.filter(hasWorkbenchWorkMetadataFacts);
+}
+
+function parseSemanticWorkMetadata(documents: WorkbenchSemanticDocument[]): RepositoryWorkMetadata[] {
+  return documents
+    .map((document) => parseWorkMetadata(document.path, document.content))
+    .filter(hasWorkbenchWorkMetadataFacts);
+}
+
+function mergeWorkbenchWorkMetadata(
+  primary: RepositoryWorkMetadata[],
+  secondary: RepositoryWorkMetadata[],
+): RepositoryWorkMetadata[] {
+  const metadata = new Map<string, RepositoryWorkMetadata>();
+  for (const item of [...secondary, ...primary]) metadata.set(item.path, item);
+  return [...metadata.values()];
+}
+
+function parseWorkMetadata(path: string, markdown: string): RepositoryWorkMetadata {
+  const metadata: RepositoryWorkMetadata = { path };
+  for (const { key, value, source } of parseWorkbenchMetadataEntries(markdown)) {
+    if (['owner', 'blockerowner'].includes(key)) metadata.owner = value;
+    if (key === 'dependencies') {
+      const dependencies = parseDependencyReferences(value, path);
+      metadata.dependencies = appendUniqueDependencies(metadata.dependencies, dependencies);
+      metadata.dependencySources = appendDependencySources(metadata.dependencySources, dependencies, source);
+    }
+  }
+  return metadata;
+}
+
+function hasWorkbenchWorkMetadataFacts(metadata: RepositoryWorkMetadata): boolean {
+  return Boolean(metadata.owner || metadata.dependencies?.length);
+}
+
 async function loadSemanticWorkbenchSnapshot(binding: RepositoryBinding): Promise<WorkbenchSnapshot> {
   const semanticSections = await loadSemanticSections(binding);
   const sectionByKey = new Map(semanticSections.map((section) => [section.key, section]));
+  const mappedPathFiles = await loadMappedWorkbenchPathFiles(binding);
   const reviewSection = semanticSections.find((section) => section.key === 'reviews');
   const reviews = reviewSection?.files ?? [];
   const reviewDocuments = reviewSection?.documents ?? [];
-  const tailActions = semanticSections.flatMap((section) =>
+  const activeWork = mergeRepositoryMarkdownFiles(sectionByKey.get('current')?.files ?? [], mappedPathFiles.activeWork);
+  const completedWork = mergeRepositoryMarkdownFiles(
+    sectionByKey.get('done')?.files ?? [],
+    mappedPathFiles.completedWork,
+  );
+  const somedayWork = mergeRepositoryMarkdownFiles(sectionByKey.get('next')?.files ?? [], mappedPathFiles.somedayWork);
+  const activePlans = mergeRepositoryMarkdownFiles(
+    sectionByKey.get('plans.active')?.files ?? [],
+    mappedPathFiles.activePlans,
+  );
+  const completedPlans = mergeRepositoryMarkdownFiles(
+    sectionByKey.get('plans.completed')?.files ?? [],
+    mappedPathFiles.completedPlans,
+  );
+  const semanticTailActions = semanticSections.flatMap((section) =>
     section.documents.flatMap((document) =>
       parseWorkbenchTailActions(document.path, document.content, document.file.updatedAt),
     ),
   );
+  const semanticWorkMetadata = [
+    ...parseSemanticWorkMetadata(sectionByKey.get('current')?.documents ?? []),
+    ...parseSemanticWorkMetadata(sectionByKey.get('next')?.documents ?? []),
+    ...parseSemanticWorkMetadata(sectionByKey.get('done')?.documents ?? []),
+  ];
+  const [pathTailActions, planMetadata, pathWorkMetadata] = await Promise.all([
+    loadWorkbenchTailActions(binding, [...activeWork, ...completedWork, ...somedayWork]),
+    Promise.all(
+      [...activePlans, ...completedPlans].map(async (file) =>
+        parsePlanMetadata(file.path, await getWorkbenchReadApi().readText(binding.repoPath, file.path)),
+      ),
+    ),
+    loadWorkbenchWorkMetadata(binding, [...activeWork, ...completedWork, ...somedayWork]),
+  ]);
   return {
     inboxMarkdown: sectionByKey.get('inbox')?.markdown ?? '',
-    activeWork: sectionByKey.get('current')?.files ?? [],
-    completedWork: sectionByKey.get('done')?.files ?? [],
-    somedayWork: sectionByKey.get('next')?.files ?? [],
-    activePlans: sectionByKey.get('plans.active')?.files ?? [],
-    completedPlans: sectionByKey.get('plans.completed')?.files ?? [],
+    activeWork,
+    completedWork,
+    somedayWork,
+    activePlans,
+    completedPlans,
     runsMarkdown: sectionByKey.get('runs')?.markdown ?? '',
     outputsMarkdown: sectionByKey.get('outputs')?.markdown ?? '',
     reviews,
     reviewDocuments,
-    planMetadata: [],
+    planMetadata,
+    workMetadata: mergeWorkbenchWorkMetadata(semanticWorkMetadata, pathWorkMetadata),
     reviewGroups: groupReviewsByFolder(reviews),
     semanticSections,
     projects: deriveProjects(sectionByKey.get('projects')),
@@ -274,8 +553,44 @@ async function loadSemanticWorkbenchSnapshot(binding: RepositoryBinding): Promis
       deriveTaskGroup('next', sectionByKey.get('next')),
       deriveTaskGroup('done', sectionByKey.get('done')),
     ].filter((group): group is WorkbenchTaskGroup => Boolean(group)),
-    tailActions,
+    tailActions: mergeWorkbenchTailActions(semanticTailActions, pathTailActions),
   };
+}
+
+async function loadMappedWorkbenchPathFiles(binding: RepositoryBinding): Promise<{
+  activeWork: RepositoryMarkdownFile[];
+  completedWork: RepositoryMarkdownFile[];
+  somedayWork: RepositoryMarkdownFile[];
+  activePlans: RepositoryMarkdownFile[];
+  completedPlans: RepositoryMarkdownFile[];
+}> {
+  const repository = getWorkbenchReadApi();
+  const [activeWork, completedWork, somedayWork, activePlans, completedPlans] = await Promise.all([
+    repository.listMarkdown(binding.repoPath, `${binding.paths.work}/active`),
+    repository.listMarkdown(binding.repoPath, `${binding.paths.work}/completed`),
+    repository.listMarkdown(binding.repoPath, `${binding.paths.work}/someday`),
+    repository.listMarkdown(binding.repoPath, `${binding.paths.plans}/active`),
+    repository.listMarkdown(binding.repoPath, `${binding.paths.plans}/completed`),
+  ]);
+  return { activeWork, completedWork, somedayWork, activePlans, completedPlans };
+}
+
+function mergeRepositoryMarkdownFiles(
+  primary: RepositoryMarkdownFile[],
+  secondary: RepositoryMarkdownFile[],
+): RepositoryMarkdownFile[] {
+  const files = new Map<string, RepositoryMarkdownFile>();
+  for (const file of [...primary, ...secondary]) files.set(file.path, file);
+  return [...files.values()];
+}
+
+function mergeWorkbenchTailActions(
+  primary: WorkbenchTailAction[],
+  secondary: WorkbenchTailAction[],
+): WorkbenchTailAction[] {
+  const actions = new Map<string, WorkbenchTailAction>();
+  for (const action of [...primary, ...secondary]) actions.set(action.id, action);
+  return [...actions.values()];
 }
 
 async function loadSemanticSections(binding: RepositoryBinding): Promise<WorkbenchSemanticSection[]> {
@@ -351,6 +666,600 @@ export async function readWorkbenchMarkdown(binding: RepositoryBinding, relative
   return getWorkbenchTextApi().readText(binding.repoPath, relativePath);
 }
 
+export function parseRepositoryAssetPermissionBoundary(content: string): RepositoryAssetPermissionBoundary {
+  return {
+    recordOnly: readBooleanField(content, 'recordOnly'),
+    desktopExecutes: readBooleanField(content, 'desktopExecutes'),
+    grantsPermission: readBooleanField(content, 'grantsPermission'),
+    requiresApproval:
+      readBooleanField(content, 'requiresApproval') === true ||
+      readBooleanField(content, 'approvalRequired') === true ||
+      readBooleanField(content, 'requiresUserApproval') === true,
+  };
+}
+
+export function buildRepositoryAssetExecutionApprovalCommand(
+  repoPath: string,
+  previewPath: string,
+  content: string,
+): RepositoryAssetExecutionApprovalCommand | null {
+  const reuseKind =
+    readWorkbenchFrontmatterValue(content, 'assetReuseKind') ?? readWorkbenchFrontmatterValue(content, 'reuseKind');
+  if (!reuseKind || !isRepositoryExecutableAssetKind(reuseKind)) return null;
+
+  const assetId =
+    readWorkbenchFrontmatterValue(content, 'assetId') ?? readWorkbenchFrontmatterValue(content, 'id') ?? undefined;
+  const path =
+    readWorkbenchFrontmatterValue(content, 'assetPath') ??
+    readWorkbenchFrontmatterValue(content, 'path') ??
+    (isRepositoryAssetRunPathLike(previewPath) ? undefined : previewPath);
+  if (!assetId && !path) return null;
+
+  const workItemPath = readWorkbenchFrontmatterValue(content, 'workItemPath') ?? undefined;
+  const params = {
+    repoPath,
+    ...(assetId ? { assetId } : {}),
+    ...(path ? { path } : {}),
+    status: 'approval_required' as const,
+    ...(readWorkbenchFrontmatterValue(content, 'approvalTitle')
+      ? { approvalTitle: readWorkbenchFrontmatterValue(content, 'approvalTitle') as string }
+      : {}),
+    ...(readWorkbenchFrontmatterValue(content, 'approvalRisk')
+      ? { approvalRisk: readWorkbenchFrontmatterValue(content, 'approvalRisk') as string }
+      : {}),
+    ...(readWorkbenchFrontmatterValue(content, 'approvalReason')
+      ? { approvalReason: readWorkbenchFrontmatterValue(content, 'approvalReason') as string }
+      : {}),
+    runner: readWorkbenchFrontmatterValue(content, 'runner') ?? '<external-runner>',
+    command: readWorkbenchFrontmatterValue(content, 'command') ?? '<command>',
+    ...(workItemPath ? { workItemPath } : {}),
+  };
+
+  return {
+    command: 'desktop.repository.assets.execution.record',
+    params,
+    text: JSON.stringify(
+      {
+        command: 'desktop.repository.assets.execution.record',
+        params,
+      },
+      null,
+      2,
+    ),
+  };
+}
+
+export function findRepositoryAssetPendingApprovalState(
+  command: RepositoryAssetExecutionApprovalCommand | null,
+  runs: RepositoryAssetRunIndexLink[] = [],
+): RepositoryAssetPendingApprovalState | null {
+  if (!command) return null;
+  const assetId = command.params.assetId;
+  const assetPath = command.params.path;
+  if (!assetId && !assetPath) return null;
+
+  const pendingRuns = runs
+    .filter((run) => {
+      if (run.status?.trim().toLowerCase() !== 'approval_required') return false;
+      if (getRepositoryAssetRunEffectiveApprovalState(run, runs) !== 'pending') return false;
+      if (assetId && run.assetId === assetId) return true;
+      return Boolean(assetPath && run.assetPath === assetPath);
+    })
+    .sort((a, b) => {
+      const byTime = (b.executedAt ?? '').localeCompare(a.executedAt ?? '');
+      if (byTime !== 0) return byTime;
+      return b.path.localeCompare(a.path);
+    });
+
+  const latest = pendingRuns[0];
+  if (!latest) return null;
+  const decisionCommands = buildRepositoryAssetRunApprovalDecisionCommands(command.params.repoPath, {
+    assetRunPath: latest.path,
+    title: latest.title,
+    assetId: latest.assetId ?? assetId,
+    assetPath: latest.assetPath ?? assetPath,
+    status: 'approval_required',
+    approvalTitle: latest.approvalTitle ?? command.params.approvalTitle,
+    approvalRisk: latest.approvalRisk ?? command.params.approvalRisk,
+    approvalReason: latest.approvalReason ?? command.params.approvalReason,
+    runner: command.params.runner,
+    command: command.params.command,
+    workItemPath: command.params.workItemPath,
+  });
+  return {
+    status: 'pending',
+    runPath: latest.path,
+    title: latest.title,
+    ...(latest.executedAt ? { requestedAt: latest.executedAt } : {}),
+    ...(latest.approvalTitle ? { approvalTitle: latest.approvalTitle } : {}),
+    ...(latest.approvalRisk ? { approvalRisk: latest.approvalRisk } : {}),
+    ...(latest.approvalReason ? { approvalReason: latest.approvalReason } : {}),
+    ...(decisionCommands ? { decisionCommands } : {}),
+  };
+}
+
+export function findRepositoryAssetResolvedRunState(
+  command: RepositoryAssetExecutionApprovalCommand | null,
+  runs: RepositoryAssetRunIndexLink[] = [],
+  reviewDocuments: WorkbenchReviewDocument[] = [],
+): RepositoryAssetResolvedRunState | null {
+  if (!command) return null;
+  const assetId = command.params.assetId;
+  const assetPath = command.params.path;
+  if (!assetId && !assetPath) return null;
+
+  const resolvedRuns = runs
+    .filter((run) => {
+      if (assetId ? run.assetId !== assetId : run.assetPath !== assetPath) return false;
+      const status = run.status?.trim().toLowerCase();
+      return (
+        run.approvalState === 'approved' ||
+        run.approvalState === 'denied' ||
+        Boolean(status && TERMINAL_REPOSITORY_ASSET_RUN_STATUSES.has(status))
+      );
+    })
+    .sort((a, b) => {
+      const left = b.executedAt ?? b.path;
+      const right = a.executedAt ?? a.path;
+      return left.localeCompare(right);
+    });
+
+  const latest = resolvedRuns[0];
+  if (!latest) return null;
+  const status = latest.status?.trim().toLowerCase();
+  const resolvedStatus =
+    latest.approvalState === 'approved' || latest.approvalState === 'denied'
+      ? latest.approvalState
+      : status && TERMINAL_REPOSITORY_ASSET_RUN_STATUSES.has(status)
+        ? (status as RepositoryAssetRunExecutionStatus)
+        : null;
+  if (!resolvedStatus) return null;
+  const reviewState = findRepositoryAssetRunReviewState(latest.path, reviewDocuments);
+  const effectiveReviewState =
+    reviewState?.status ?? (isRepositoryAssetRunEffectivelyReviewPending(latest, reviewDocuments) ? 'pending' : null);
+
+  return {
+    status: resolvedStatus,
+    runPath: latest.path,
+    ...(latest.executedAt ? { recordedAt: latest.executedAt } : {}),
+    ...(latest.resultSummary ? { resultSummary: latest.resultSummary } : {}),
+    ...(latest.outputState ? { outputState: latest.outputState } : {}),
+    ...(latest.workItemPath ? { workItemPath: latest.workItemPath } : {}),
+    ...(effectiveReviewState ? { reviewState: effectiveReviewState } : {}),
+  };
+}
+
+export function getRepositoryAssetResolvedRunFollowUpActions(
+  state: RepositoryAssetResolvedRunState | null,
+  knowledgeUpdateState?: RepositoryAssetRunKnowledgeUpdateState,
+): RepositoryAssetResolvedRunFollowUpActions {
+  const isTerminalRun = Boolean(state && state.status !== 'approved' && state.status !== 'denied');
+  const hasActiveKnowledgeUpdate = Boolean(
+    knowledgeUpdateState && knowledgeUpdateState.status !== 'failed' && knowledgeUpdateState.status !== 'cancelled',
+  );
+  return {
+    canPreserveOutput: isTerminalRun && state?.outputState !== 'preserved',
+    canUpdateKnowledge: isTerminalRun && !hasActiveKnowledgeUpdate,
+    canWriteReview: isTerminalRun && state?.reviewState !== 'confirmed',
+  };
+}
+
+export function findRepositoryAssetRunKnowledgeUpdateState(
+  assetRunPath: string | undefined,
+  context: { actionRuns?: AiActionRun[] } = {},
+): RepositoryAssetRunKnowledgeUpdateState | undefined {
+  if (!assetRunPath || !isSafeRepositoryAssetRunPath(assetRunPath)) return undefined;
+  const sourceExecutionId = `asset-run-knowledge:${assetRunPath}`;
+  const latest = (context.actionRuns ?? [])
+    .filter((run) => run.type === 'knowledge_rewrite' && hasSourceExecutionReference(run.input, sourceExecutionId))
+    .sort((a, b) => b.updatedAt - a.updatedAt || b.createdAt - a.createdAt)[0];
+  if (!latest) return undefined;
+  return {
+    status: normalizeRepositoryAssetKnowledgeUpdateStatus(latest),
+    runId: latest.id,
+    ...(latest.resultSummary ? { summary: latest.resultSummary } : {}),
+    updatedAt: latest.updatedAt,
+  };
+}
+
+export function buildRepositoryAssetRunApprovalDecisionCommands(
+  repoPath: string,
+  details: RepositoryAssetRunDetails,
+): RepositoryAssetRunApprovalDecisionCommands | null {
+  if (details.status?.trim().toLowerCase() !== 'approval_required') return null;
+  if (!details.assetId && !details.assetPath) return null;
+
+  const buildCommand = <Status extends 'approved' | 'denied'>(
+    status: Status,
+  ): RepositoryAssetRunApprovalDecisionCommand & {
+    params: RepositoryAssetRunApprovalDecisionCommand['params'] & { status: Status };
+  } => {
+    const params = {
+      repoPath,
+      ...(details.assetId ? { assetId: details.assetId } : {}),
+      ...(details.assetPath ? { path: details.assetPath } : {}),
+      status,
+      ...(details.approvalTitle ? { approvalTitle: details.approvalTitle } : {}),
+      ...(details.approvalRisk ? { approvalRisk: details.approvalRisk } : {}),
+      ...(details.approvalReason ? { approvalReason: details.approvalReason } : {}),
+      ...(isSafeRepositoryAssetRunPath(details.assetRunPath) ? { sourceApprovalRunPath: details.assetRunPath } : {}),
+      ...(details.runner ? { runner: details.runner } : {}),
+      ...(details.command ? { command: details.command } : {}),
+      ...(details.workItemPath ? { workItemPath: details.workItemPath } : {}),
+    };
+    return {
+      command: 'desktop.repository.assets.execution.record',
+      params,
+      text: JSON.stringify(
+        {
+          command: 'desktop.repository.assets.execution.record',
+          params,
+        },
+        null,
+        2,
+      ),
+    };
+  };
+
+  return {
+    approve: buildCommand('approved'),
+    deny: buildCommand('denied'),
+  };
+}
+
+export function parseRepositoryAssetRunDetails(
+  assetRunPath: string,
+  content: string,
+): RepositoryAssetRunDetails | null {
+  if (!isSafeRepositoryAssetRunPath(assetRunPath)) return null;
+  try {
+    return {
+      assetRunPath,
+      ...parseWorkbenchAssetRunReviewFacts(assetRunPath, content),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function findRepositoryAssetRunReviewState(
+  assetRunPath: string,
+  documents: WorkbenchReviewDocument[] = [],
+): RepositoryAssetRunReviewState | null {
+  if (!isSafeRepositoryAssetRunPath(assetRunPath)) return null;
+
+  let draftState: RepositoryAssetRunReviewState | null = null;
+  for (const document of documents) {
+    if (readWorkbenchFrontmatterValue(document.content, 'source') !== 'desktop-repository-asset-execution-review') {
+      continue;
+    }
+    if (readWorkbenchFrontmatterValue(document.content, 'assetRunPath') !== assetRunPath) continue;
+
+    const status = readWorkbenchFrontmatterValue(document.content, 'status');
+    if (status === 'confirmed') {
+      return { status: 'confirmed', reviewPath: document.path };
+    }
+    if (status === 'draft' && !draftState) {
+      draftState = { status: 'draft', reviewPath: document.path };
+    }
+  }
+
+  return draftState;
+}
+
+export function isRepositoryAssetRunReviewDraftForRun(content: string, assetRunPath: string): boolean {
+  if (!isSafeRepositoryAssetRunPath(assetRunPath)) return false;
+  return (
+    readWorkbenchFrontmatterValue(content, 'source') === 'desktop-repository-asset-execution-review' &&
+    readWorkbenchFrontmatterValue(content, 'assetRunPath') === assetRunPath &&
+    readWorkbenchFrontmatterValue(content, 'status') === 'draft'
+  );
+}
+
+export function isRepositoryAssetRunEffectivelyReviewPending(
+  run: RepositoryAssetRunIndexLink,
+  documents: WorkbenchReviewDocument[] = [],
+): boolean {
+  const reviewState = getRepositoryAssetRunEffectiveReviewState(run, documents);
+  return Boolean(reviewState && reviewState !== 'confirmed');
+}
+
+export function getRepositoryAssetRunEffectiveReviewState(
+  run: RepositoryAssetRunIndexLink,
+  documents: WorkbenchReviewDocument[] = [],
+): RepositoryAssetRunEffectiveReviewState | null {
+  const reviewState = findRepositoryAssetRunReviewState(run.path, documents);
+  if (reviewState?.status) return reviewState.status;
+  return run.reviewPending ? 'pending' : null;
+}
+
+export function findRepositoryAssetRunApprovalDecisionState(
+  details: RepositoryAssetRunDetails,
+  runs: RepositoryAssetRunIndexLink[] = [],
+): RepositoryAssetRunApprovalDecisionState | null {
+  if (details.status?.trim().toLowerCase() !== 'approval_required') return null;
+  if (!details.assetId && !details.assetPath) return null;
+
+  const candidates = runs.filter((run) => {
+    if (run.path === details.assetRunPath) return false;
+    if (run.approvalState !== 'approved' && run.approvalState !== 'denied') return false;
+    if (run.sourceApprovalRunPath) return run.sourceApprovalRunPath === details.assetRunPath;
+    if (details.assetId && run.assetId === details.assetId) return true;
+    if (details.assetPath && run.assetPath === details.assetPath) return true;
+    return false;
+  });
+  if (candidates.length === 0) return null;
+
+  const latest = [...candidates].sort((left, right) => {
+    const leftKey = left.executedAt ?? left.path;
+    const rightKey = right.executedAt ?? right.path;
+    return rightKey.localeCompare(leftKey);
+  })[0];
+
+  return {
+    status: latest.approvalState as 'approved' | 'denied',
+    runPath: latest.path,
+    ...(latest.executedAt ? { decidedAt: latest.executedAt } : {}),
+  };
+}
+
+export function findRepositoryAssetRunExecutionState(
+  details: RepositoryAssetRunDetails,
+  runs: RepositoryAssetRunIndexLink[] = [],
+): RepositoryAssetRunExecutionState | null {
+  if (details.status?.trim().toLowerCase() !== 'approval_required') return null;
+  if (!details.assetId && !details.assetPath) return null;
+
+  const candidates = runs.filter((run) => {
+    if (run.path === details.assetRunPath) return false;
+    const status = run.status?.trim().toLowerCase();
+    if (!status || !TERMINAL_REPOSITORY_ASSET_RUN_STATUSES.has(status)) return false;
+    if (run.sourceApprovalRunPath) return run.sourceApprovalRunPath === details.assetRunPath;
+    if (details.assetId && run.assetId === details.assetId) return true;
+    if (details.assetPath && run.assetPath === details.assetPath) return true;
+    return false;
+  });
+  if (candidates.length === 0) return null;
+
+  const latest = [...candidates].sort((left, right) => {
+    const leftKey = left.executedAt ?? left.path;
+    const rightKey = right.executedAt ?? right.path;
+    return rightKey.localeCompare(leftKey);
+  })[0];
+
+  return {
+    status: latest.status?.trim().toLowerCase() as RepositoryAssetRunExecutionStatus,
+    runPath: latest.path,
+    ...(latest.executedAt ? { executedAt: latest.executedAt } : {}),
+    ...(latest.resultSummary ? { resultSummary: latest.resultSummary } : {}),
+    ...(latest.outputState ? { outputState: latest.outputState } : {}),
+  };
+}
+
+export function getRepositoryAssetRunListFollowUpState(
+  run: RepositoryAssetRunIndexLink,
+  runs: RepositoryAssetRunIndexLink[] = [],
+  context: { actionRuns?: AiActionRun[]; reviewDocuments?: WorkbenchReviewDocument[] } = {},
+): RepositoryAssetRunListFollowUpState | null {
+  const details: RepositoryAssetRunDetails = {
+    assetRunPath: run.path,
+    title: run.title,
+    ...(run.assetId ? { assetId: run.assetId } : {}),
+    ...(run.assetPath ? { assetPath: run.assetPath } : {}),
+    ...(run.reuseKind ? { assetReuseKind: run.reuseKind } : {}),
+    ...(run.status ? { status: run.status } : {}),
+  };
+  const approvalDecisionState = findRepositoryAssetRunApprovalDecisionState(details, runs) ?? undefined;
+  const executionState = findRepositoryAssetRunExecutionState(details, runs) ?? undefined;
+  const knowledgeUpdateState = findRepositoryAssetRunKnowledgeUpdateState(run.path, context);
+  const reviewState = findRepositoryAssetRunReviewState(run.path, context.reviewDocuments) ?? undefined;
+  if (!approvalDecisionState && !executionState && !knowledgeUpdateState && !reviewState) return null;
+  return {
+    ...(approvalDecisionState ? { approvalDecisionState } : {}),
+    ...(executionState ? { executionState } : {}),
+    ...(knowledgeUpdateState ? { knowledgeUpdateState } : {}),
+    ...(reviewState ? { reviewState } : {}),
+  };
+}
+
+export function getRepositoryAssetRunEffectiveApprovalState(
+  run: RepositoryAssetRunIndexLink,
+  runs: RepositoryAssetRunIndexLink[] = [],
+): RepositoryAssetRunApprovalState | null {
+  if (run.approvalState === 'approved' || run.approvalState === 'denied') return run.approvalState;
+  if (!run.approvalPending) return run.approvalState ?? null;
+
+  const followUpState = getRepositoryAssetRunListFollowUpState(run, runs);
+  if (followUpState?.approvalDecisionState) return followUpState.approvalDecisionState.status;
+  if (followUpState?.executionState) return null;
+  return 'pending';
+}
+
+export function getRepositoryAssetRunEffectiveOutputState(
+  run: RepositoryAssetRunIndexLink,
+  runs: RepositoryAssetRunIndexLink[] = [],
+): RepositoryAssetRunOutputState['status'] | null {
+  if (run.outputState) return run.outputState;
+  const followUpState = getRepositoryAssetRunListFollowUpState(run, runs);
+  return followUpState?.executionState?.outputState ?? null;
+}
+
+export function getRepositoryAssetRunOutputState(
+  details: RepositoryAssetRunDetails,
+): RepositoryAssetRunOutputState | null {
+  if (details.repositoryOutputPath) {
+    return {
+      status: 'preserved',
+      outputPath: details.repositoryOutputPath,
+    };
+  }
+  if (details.outputArtifactId) {
+    return {
+      status: 'preserved',
+      artifactId: details.outputArtifactId,
+    };
+  }
+  if (
+    details.status &&
+    TERMINAL_REPOSITORY_ASSET_RUN_STATUSES.has(details.status.trim().toLowerCase()) &&
+    details.resultSummary
+  ) {
+    return { status: 'pending' };
+  }
+  return null;
+}
+
+export function findRepositoryAssetRunFollowUpState(
+  assetRunPath: string,
+  tailActions: WorkbenchTailAction[] = [],
+): RepositoryAssetRunFollowUpState[] {
+  if (!isSafeRepositoryAssetRunPath(assetRunPath)) return [];
+
+  return tailActions
+    .filter((action) => extractSafeRepositoryAssetRunPathFromText(action.text, action.sourcePath) === assetRunPath)
+    .map((action) => ({
+      kind: classifyRepositoryAssetRunFollowUp(action.text),
+      text: action.text,
+      sourcePath: action.sourcePath,
+      completed: action.completed,
+    }));
+}
+
+export function parseRepositoryAssetRunIndexLinks(markdown = ''): RepositoryAssetRunIndexLink[] {
+  const links = new Map<string, RepositoryAssetRunIndexLink>();
+  let current: {
+    title: string;
+    href: string;
+    assetId?: string;
+    reuseKind?: string;
+    status?: string;
+    metadata: Record<string, string>;
+  } | null = null;
+
+  const pushCurrent = () => {
+    if (!current) return;
+    const path = current.metadata.runPath ? current.metadata.runPath : normalizeRepositoryAssetRunHref(current.href);
+    if (!isSafeRepositoryAssetRunPath(path)) return;
+    const outputState = deriveRepositoryAssetRunIndexOutputState(current.status, current.metadata);
+    const approvalState = deriveRepositoryAssetRunApprovalState(current.status);
+    links.set(path, {
+      path,
+      title: current.title,
+      assetId: current.assetId,
+      ...(current.metadata.assetPath ? { assetPath: current.metadata.assetPath } : {}),
+      reuseKind: current.reuseKind,
+      status: current.status,
+      ...(current.metadata.approvalTitle ? { approvalTitle: current.metadata.approvalTitle } : {}),
+      ...(current.metadata.approvalRisk ? { approvalRisk: current.metadata.approvalRisk } : {}),
+      ...(current.metadata.approvalReason ? { approvalReason: current.metadata.approvalReason } : {}),
+      ...(isSafeRepositoryAssetRunPath(current.metadata.sourceApprovalRunPath)
+        ? { sourceApprovalRunPath: current.metadata.sourceApprovalRunPath }
+        : {}),
+      ...(approvalState ? { approvalState } : {}),
+      ...(approvalState === 'pending' ? { approvalPending: true } : {}),
+      ...(outputState ? { outputState } : {}),
+      ...(current.metadata.executedAt ? { executedAt: current.metadata.executedAt } : {}),
+      ...(current.metadata.result ? { resultSummary: current.metadata.result } : {}),
+      ...(current.metadata.workItemPath && isSafeWorkbenchTailActionWorkItemPath(current.metadata.workItemPath)
+        ? { workItemPath: current.metadata.workItemPath }
+        : {}),
+      reviewPending: /\bpending\b/i.test(current.metadata.review ?? ''),
+    });
+  };
+
+  for (const line of markdown.split('\n')) {
+    const runMatch = line.match(/^- \[([^\]]+)]\(([^)]+)\)\s+\(`([^`]+)`,\s*([^,]+),\s*([^)]+)\)/);
+    if (runMatch) {
+      pushCurrent();
+      current = {
+        title: runMatch[1].trim(),
+        href: runMatch[2].trim(),
+        assetId: runMatch[3].trim(),
+        reuseKind: runMatch[4].trim(),
+        status: runMatch[5].trim(),
+        metadata: {},
+      };
+      continue;
+    }
+
+    const metadataMatch = line.match(/^\s+-\s+([^:]+):\s*(.*)$/);
+    if (current && metadataMatch) {
+      current.metadata[metadataMatch[1].trim()] = metadataMatch[2].trim();
+    }
+  }
+  pushCurrent();
+
+  const barePathPattern = /(^|\s)((?:runs\/assets\/)[^\s)\]]+\.md)(?=$|[\s)])/gm;
+  let match: RegExpExecArray | null;
+  while ((match = barePathPattern.exec(markdown)) !== null) {
+    const path = match[2].trim();
+    if (isSafeRepositoryAssetRunPath(path) && !links.has(path)) {
+      links.set(path, {
+        path,
+        title: fileNameFromRepositoryPath(path),
+        reviewPending: false,
+      });
+    }
+  }
+
+  return [...links.values()];
+}
+
+function deriveRepositoryAssetRunIndexOutputState(
+  status: string | undefined,
+  metadata: Record<string, string>,
+): RepositoryAssetRunOutputState['status'] | undefined {
+  if (metadata.output || metadata.outputArtifact || metadata.outputArtifactId || metadata.repositoryOutputPath) {
+    return 'preserved';
+  }
+  if (status && TERMINAL_REPOSITORY_ASSET_RUN_STATUSES.has(status.trim().toLowerCase()) && metadata.result) {
+    return 'pending';
+  }
+  return undefined;
+}
+
+function deriveRepositoryAssetRunApprovalState(
+  status: string | undefined,
+): RepositoryAssetRunApprovalState | undefined {
+  const normalized = status?.trim().toLowerCase();
+  if (normalized === 'approval_required') return 'pending';
+  if (normalized === 'approved') return 'approved';
+  if (normalized === 'denied') return 'denied';
+  return undefined;
+}
+
+function classifyRepositoryAssetRunFollowUp(text: string): RepositoryAssetRunFollowUpKind {
+  if (/状态|status/i.test(text)) return 'status';
+  if (/成果|产物|output|artifact/i.test(text)) return 'output';
+  if (/知识库|知识|wiki|knowledge/i.test(text)) return 'knowledge';
+  if (/复盘|review/i.test(text)) return 'review';
+  return 'general';
+}
+
+function normalizeRepositoryAssetRunHref(href: string): string | undefined {
+  const trimmed = href.trim().replace(/^\/+/, '');
+  if (trimmed.startsWith('assets/')) {
+    const runPath = `runs/${trimmed}`;
+    return isSafeRepositoryAssetRunPath(runPath) ? runPath : undefined;
+  }
+  if (isSafeRepositoryAssetRunPath(trimmed)) return trimmed;
+  return undefined;
+}
+
+function fileNameFromRepositoryPath(path: string): string {
+  return path.split('/').filter(Boolean).pop() ?? path;
+}
+
+function isRepositoryExecutableAssetKind(value: string): boolean {
+  return ['tool', 'script', 'workflow'].includes(value.trim().toLowerCase());
+}
+
+function readBooleanField(content: string, field: string): boolean | null {
+  const match = content.match(new RegExp(`^${field}:\\s*(true|false)\\s*$`, 'im'));
+  if (!match) return null;
+  return match[1] === 'true';
+}
+
 export async function completeWorkbenchTailAction(
   binding: RepositoryBinding,
   action: Pick<WorkbenchTailAction, 'id' | 'text' | 'sourcePath'>,
@@ -375,7 +1284,9 @@ export async function updateWorkbenchMatterStatusFromTailAction(
   const workItemPath = normalizeWritableWorkbenchMarkdownPath(input.workItemPath);
   const actionIndex = parseTailActionIndex(input.tailActionId);
   const status = normalizeWorkbenchMatterStatus(input.status);
-  if (!workItemPath || !workItemPath.startsWith('work/') || actionIndex === null || !status) return false;
+  if (!workItemPath || !isPathWithinWorkbenchWorkRoot(binding, workItemPath) || actionIndex === null || !status) {
+    return false;
+  }
 
   const repository = getWorkbenchWriteApi();
   const markdown = await repository.readText(binding.repoPath, workItemPath);
@@ -399,13 +1310,15 @@ export async function archiveCompletedWorkbenchMatter(
   input: WorkbenchMatterArchiveInput,
 ): Promise<WorkbenchMatterArchiveResult> {
   const workItemPath = normalizeWritableWorkbenchMarkdownPath(input.workItemPath);
-  if (!workItemPath || !workItemPath.startsWith('work/active/')) return { archived: false };
+  const activeRoot = `${normalizeWorkbenchRoot(binding.paths.work)}/active`;
+  const completedRoot = `${normalizeWorkbenchRoot(binding.paths.work)}/completed`;
+  if (!workItemPath || !isPathWithinRoot(workItemPath, activeRoot)) return { archived: false };
 
   const repository = getWorkbenchMoveApi();
   const markdown = await repository.readText(binding.repoPath, workItemPath);
   if (!isWorkbenchMatterDone(markdown)) return { archived: false };
 
-  const archivedPath = workItemPath.replace(/^work\/active\//, 'work/completed/');
+  const archivedPath = `${completedRoot}/${workItemPath.slice(`${activeRoot}/`.length)}`;
   if (archivedPath === workItemPath) return { archived: false };
 
   await repository.moveText(binding.repoPath, workItemPath, archivedPath);
@@ -418,7 +1331,7 @@ export async function confirmWorkbenchKnowledgeTailAction(
 ): Promise<boolean> {
   const workItemPath = normalizeWritableWorkbenchMarkdownPath(input.workItemPath);
   const actionIndex = parseTailActionIndex(input.tailActionId);
-  if (!workItemPath || !workItemPath.startsWith('work/') || actionIndex === null) return false;
+  if (!workItemPath || !isPathWithinWorkbenchWorkRoot(binding, workItemPath) || actionIndex === null) return false;
 
   const repository = getWorkbenchWriteApi();
   const markdown = await repository.readText(binding.repoPath, workItemPath);
@@ -439,7 +1352,7 @@ export async function preserveWorkbenchOutputFromTailAction(
   input: WorkbenchOutputPreservationInput,
 ): Promise<boolean> {
   const workItemPath = normalizeWritableWorkbenchMarkdownPath(input.workItemPath);
-  if (!workItemPath || !workItemPath.startsWith('work/')) return false;
+  if (!workItemPath || !isPathWithinWorkbenchWorkRoot(binding, workItemPath)) return false;
 
   const tailActionIndex = input.tailActionId ? parseTailActionIndex(input.tailActionId) : null;
   const mustCompleteTailAction = Boolean(input.tailActionId?.includes(':tail-action:'));
@@ -523,7 +1436,7 @@ export async function writeWorkbenchReviewDraft(
   input: WorkbenchReviewDraftInput,
 ): Promise<WorkbenchReviewDraftResult> {
   const workItemPath = normalizeWritableWorkbenchMarkdownPath(input.workItemPath);
-  if (!workItemPath || !workItemPath.startsWith('work/')) {
+  if (!workItemPath || !isPathWithinWorkbenchWorkRoot(binding, workItemPath)) {
     throw new Error('Review draft source must be a work item markdown path');
   }
 
@@ -560,9 +1473,9 @@ export async function writeWorkbenchAssetRunReviewDraft(
   binding: RepositoryBinding,
   input: WorkbenchAssetRunReviewDraftInput,
 ): Promise<WorkbenchReviewDraftResult> {
-  const assetRunPath = normalizeWritableWorkbenchMarkdownPath(input.assetRunPath);
-  if (!assetRunPath || !assetRunPath.startsWith('runs/assets/')) {
-    throw new Error('Asset execution review source must be a runs/assets markdown path');
+  const assetRunPath = input.assetRunPath;
+  if (!isSafeRepositoryAssetRunPath(assetRunPath)) {
+    throw new Error('Asset execution review source must be a safe runs/assets markdown path');
   }
 
   const repository = getWorkbenchWriteApi();
@@ -572,7 +1485,7 @@ export async function writeWorkbenchAssetRunReviewDraft(
   const date = createdAt.toISOString().slice(0, 10);
   const assetSlug = slugifyPathSegment(runFacts.assetId || assetRunPath.split('/').pop()?.replace(/\.md$/i, '') || '');
   const path = `reviews/weekly/${date}-asset-run-${assetSlug}-review.md`;
-  const workItemPath = normalizeWorkbenchReviewWorkItemPath(input.workItemPath ?? runFacts.workItemPath);
+  const workItemPath = normalizeWorkbenchReviewWorkItemPath(binding, input.workItemPath ?? runFacts.workItemPath);
   const content = buildWorkbenchAssetRunReviewDraftMarkdown({
     ...runFacts,
     assetRunPath,
@@ -611,7 +1524,12 @@ export async function confirmWorkbenchReviewDraft(
   const reviewPath = normalizeWritableWorkbenchMarkdownPath(input.reviewPath);
   const workItemPath = normalizeWritableWorkbenchMarkdownPath(input.workItemPath);
   const tailActionIndex = parseTailActionIndex(input.tailActionId);
-  if (!reviewPath || !reviewPath.startsWith('reviews/') || !workItemPath || !workItemPath.startsWith('work/')) {
+  if (
+    !reviewPath ||
+    !reviewPath.startsWith('reviews/') ||
+    !workItemPath ||
+    !isPathWithinWorkbenchWorkRoot(binding, workItemPath)
+  ) {
     return false;
   }
 
@@ -663,8 +1581,8 @@ export async function confirmWorkbenchAssetRunReviewDraft(
   input: WorkbenchAssetRunReviewConfirmInput,
 ): Promise<boolean> {
   const reviewPath = normalizeWritableWorkbenchMarkdownPath(input.reviewPath);
-  const assetRunPath = normalizeWritableWorkbenchMarkdownPath(input.assetRunPath);
-  if (!reviewPath || !reviewPath.startsWith('reviews/') || !assetRunPath || !assetRunPath.startsWith('runs/assets/')) {
+  const assetRunPath = input.assetRunPath;
+  if (!reviewPath || !reviewPath.startsWith('reviews/') || !isSafeRepositoryAssetRunPath(assetRunPath)) {
     return false;
   }
 
@@ -685,21 +1603,57 @@ export async function confirmWorkbenchAssetRunReviewDraft(
 
 export function parsePlanMetadata(path: string, markdown: string): RepositoryPlanMetadata {
   const metadata: RepositoryPlanMetadata = { path };
-  for (const line of markdown.split('\n').slice(0, 24)) {
-    const match = /^([^:：]+)[：:]\s*(.+)$/.exec(line.trim());
-    if (!match) continue;
-    const key = normalizePlanMetadataKey(match[1]);
-    const value = match[2].trim();
+  for (const { key, value, source } of parseWorkbenchMetadataEntries(markdown)) {
     if (key === 'status') metadata.status = value;
     if (key === 'approval') metadata.approval = value;
     if (key === 'blockedreason') metadata.blockedReason = value;
     if (key === 'blockerowner') metadata.blockerOwner = value;
-    if (key === 'workitempath') metadata.workItemPath = value;
+    if (key === 'workitempath') metadata.workItemPath = metadata.workItemPath ?? normalizePlanWorkItemPathValue(value);
     if (key === 'dependencies') {
-      metadata.dependencies = [...(metadata.dependencies ?? []), ...parseDependencyReferences(value)];
+      const dependencies = parseDependencyReferences(value, path);
+      metadata.dependencies = appendUniqueDependencies(metadata.dependencies, dependencies);
+      metadata.dependencySources = appendDependencySources(metadata.dependencySources, dependencies, source);
     }
   }
   return metadata;
+}
+
+function parseWorkbenchMetadataEntries(markdown: string): Array<{ key: string; value: string; source: string }> {
+  const entries: Array<{ key: string; value: string; source: string }> = [];
+  let listKey: { key: string; source: string } | null = null;
+
+  for (const line of markdown.split('\n').slice(0, 24)) {
+    const trimmed = line.trim();
+    const currentListKey = listKey;
+    if (currentListKey) {
+      const listItemMatch = /^\s*-\s+(.+)$/.exec(line);
+      if (listItemMatch) {
+        entries.push({ key: currentListKey.key, source: currentListKey.source, value: listItemMatch[1].trim() });
+        continue;
+      }
+    }
+
+    const match = /^([^:：]+)[：:]\s*(.*)$/.exec(trimmed);
+    if (!match) {
+      if (trimmed) listKey = null;
+      continue;
+    }
+
+    const key = normalizePlanMetadataKey(match[1]);
+    const value = match[2].trim();
+    const source = match[1].trim();
+    if (value) entries.push({ key, source, value });
+    listKey = !value && key === 'dependencies' ? { key, source } : null;
+  }
+
+  return entries;
+}
+
+function normalizePlanWorkItemPathValue(value: string): string {
+  return value
+    .trim()
+    .replace(/^`+|`+$/g, '')
+    .trim();
 }
 
 function normalizePlanMetadataKey(value: string): string {
@@ -725,6 +1679,11 @@ function normalizePlanMetadataKey(value: string): string {
       'requires',
       'relatedwork',
       'workdependencies',
+      'waitingon',
+      'waitingfor',
+      '等待',
+      '等待于',
+      '等待事项',
       '依赖',
       '依赖事项',
       '关联事项',
@@ -736,16 +1695,92 @@ function normalizePlanMetadataKey(value: string): string {
   return key;
 }
 
-function parseDependencyReferences(value: string): string[] {
-  return value
+function parseDependencyReferences(value: string, sourcePath: string): string[] {
+  const listValue = unwrapInlineDependencyList(value);
+  return listValue
     .split(/[,，;；]/)
     .map((part) => extractMarkdownLinkHref(part) ?? part)
     .map((part) => part.trim())
+    .map(extractDependencyObjectValue)
+    .map(stripDependencyReferenceQuotes)
+    .map((part) => normalizeDependencyReference(part, sourcePath))
+    .filter(isTrustedWorkbenchDependencyReference)
     .filter(Boolean);
+}
+
+function appendUniqueDependencies(existing: string[] | undefined, next: string[]): string[] {
+  const dependencies = [...(existing ?? [])];
+  const seen = new Set(dependencies);
+  for (const dependency of next) {
+    if (seen.has(dependency)) continue;
+    seen.add(dependency);
+    dependencies.push(dependency);
+  }
+  return dependencies;
+}
+
+function appendDependencySources(
+  existing: Record<string, string> | undefined,
+  dependencies: string[],
+  source: string,
+): Record<string, string> | undefined {
+  if (dependencies.length === 0) return existing;
+  const dependencySources = { ...(existing ?? {}) };
+  const normalizedSource = source.trim();
+  for (const dependency of dependencies) {
+    if (!normalizedSource || dependencySources[dependency]) continue;
+    dependencySources[dependency] = normalizedSource;
+  }
+  return dependencySources;
+}
+
+function unwrapInlineDependencyList(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.startsWith('[') && trimmed.endsWith(']') && !/\]\s*\(/.test(trimmed)) {
+    return trimmed.slice(1, -1);
+  }
+  return value;
+}
+
+function stripDependencyReferenceQuotes(value: string): string {
+  return value.replace(/^["'`]+|["'`]+$/g, '').trim();
+}
+
+function extractDependencyObjectValue(value: string): string {
+  const match = /^([^:：]+)[：:]\s*(.+)$/.exec(value.trim());
+  if (!match) return value;
+  const key = normalizePlanMetadataKey(match[1]);
+  if (['path', 'workitempath', 'planpath', 'workpath', '事项路径', '计划路径'].includes(key)) {
+    return match[2].trim();
+  }
+  return value;
 }
 
 function extractMarkdownLinkHref(value: string): string | undefined {
   return /\[[^\]]+]\(([^)]+)\)/.exec(value)?.[1]?.trim();
+}
+
+function normalizeDependencyReference(value: string, sourcePath: string): string {
+  if (!value || value.startsWith('#') || value.startsWith('/') || /^[a-z][a-z0-9+.-]*:/i.test(value)) return value;
+  if (!value.includes('/') && !value.startsWith('.')) return value;
+
+  const base = sourcePath.split('/').slice(0, -1);
+  const segments = (value.startsWith('.') ? [...base, ...value.split('/')] : value.split('/')).filter(Boolean);
+  const normalized: string[] = [];
+  for (const segment of segments) {
+    if (segment === '.') continue;
+    if (segment === '..') {
+      if (normalized.length === 0) return value;
+      normalized.pop();
+      continue;
+    }
+    normalized.push(segment);
+  }
+  return normalized.join('/');
+}
+
+function isTrustedWorkbenchDependencyReference(value: string): boolean {
+  return isSafeWorkbenchMarkdownPath(value) && isSafeWorkbenchMatterLikePath(value);
 }
 
 async function loadWorkbenchTailActions(
@@ -991,8 +2026,33 @@ function isPathWithinRoot(path: string, root: string): boolean {
   return Boolean(path && root && path === root) || path.startsWith(`${root}/`);
 }
 
+function isPathWithinWorkbenchWorkRoot(binding: RepositoryBinding, path: string): boolean {
+  const workRoot = normalizeWorkbenchRoot(binding.paths.work);
+  return isPathWithinRoot(path, workRoot);
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeRepositoryAssetKnowledgeUpdateStatus(
+  run: AiActionRun,
+): RepositoryAssetRunKnowledgeUpdateState['status'] {
+  if (run.status === 'failed') return 'failed';
+  if (run.status === 'cancelled') return 'cancelled';
+  if (run.status === 'awaiting_approval') return 'awaiting_approval';
+  if (run.status === 'done') return isNoWriteNeededKnowledgeRun(run) ? 'no_write_needed' : 'done';
+  return 'running';
+}
+
+function isNoWriteNeededKnowledgeRun(run: AiActionRun): boolean {
+  const text = [run.lastAssistantResponse, run.resultSummary].filter(Boolean).join('\n');
+  return /"kind"\s*:\s*"no_write_needed"|no_write_needed|无需写入|不需要写入|no write needed/i.test(text);
+}
+
+function hasSourceExecutionReference(text: string, sourceExecutionId: string): boolean {
+  const escapedSourceExecutionId = escapeRegExp(sourceExecutionId);
+  return new RegExp(`(^|[^A-Za-z0-9._~:/-])${escapedSourceExecutionId}($|[^A-Za-z0-9._~:/-])`).test(text);
 }
 
 function parseTailActionIndex(id: string): number | null {
@@ -1139,6 +2199,9 @@ interface WorkbenchAssetRunReviewFacts {
   assetPath?: string;
   assetReuseKind?: string;
   status?: string;
+  approvalTitle?: string;
+  approvalRisk?: string;
+  approvalReason?: string;
   runner?: string;
   command?: string;
   repositoryOutputPath?: string;
@@ -1163,6 +2226,9 @@ function parseWorkbenchAssetRunReviewFacts(
     assetPath: readWorkbenchFrontmatterValue(markdown, 'assetPath') ?? undefined,
     assetReuseKind: readWorkbenchFrontmatterValue(markdown, 'assetReuseKind') ?? undefined,
     status: readWorkbenchFrontmatterValue(markdown, 'status') ?? undefined,
+    approvalTitle: readWorkbenchFrontmatterValue(markdown, 'approvalTitle') ?? undefined,
+    approvalRisk: readWorkbenchFrontmatterValue(markdown, 'approvalRisk') ?? undefined,
+    approvalReason: readWorkbenchFrontmatterValue(markdown, 'approvalReason') ?? undefined,
     runner: readWorkbenchFrontmatterValue(markdown, 'runner') ?? undefined,
     command: readWorkbenchFrontmatterValue(markdown, 'command') ?? undefined,
     repositoryOutputPath: readWorkbenchFrontmatterValue(markdown, 'repositoryOutputPath') ?? undefined,
@@ -1248,10 +2314,10 @@ function buildWorkbenchAssetRunReviewDraftMarkdown(
     .join('\n');
 }
 
-function normalizeWorkbenchReviewWorkItemPath(value?: string): string | undefined {
+function normalizeWorkbenchReviewWorkItemPath(binding: RepositoryBinding, value?: string): string | undefined {
   if (!value) return undefined;
   const workItemPath = normalizeWritableWorkbenchMarkdownPath(value);
-  return workItemPath?.startsWith('work/') ? workItemPath : undefined;
+  return workItemPath && isPathWithinWorkbenchWorkRoot(binding, workItemPath) ? workItemPath : undefined;
 }
 
 function extractWorkbenchAssetRunTitle(markdown: string): string {

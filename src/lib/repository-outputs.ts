@@ -4,8 +4,10 @@ import { loadRepositoryBinding } from './agentic-repository-store';
 import { buildArtifactVersionHistory } from './artifact-version-history';
 import { buildArtifactPreviewCard } from './artifact-display';
 import { formatArtifactPdfFacts } from './artifact-content-facts';
+import { describeArtifactThumbnail } from './artifact-thumbnail';
 import { buildArtifactValueHealth } from './artifact-value-health';
 import { buildArtifactExecutionReviewSummary } from './artifact-review-clues';
+import { isSafeRepositoryAssetRunPath } from './dashboard-tail-action-routing';
 
 export interface CreateRepositoryOutputParams {
   binding: RepositoryBinding;
@@ -89,6 +91,10 @@ export interface RecordRepositoryAssetExecutionParams {
   path?: string;
   runner?: string;
   command?: string;
+  approvalTitle?: string;
+  approvalRisk?: string;
+  approvalReason?: string;
+  sourceApprovalRunPath?: string;
   resultSummary?: string;
   outputArtifactId?: string;
   repositoryOutputPath?: string;
@@ -150,6 +156,7 @@ export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string
   const latestVersion = versions[versions.length - 1];
   const previewCard = buildArtifactPreviewCard(artifact);
   const valueHealth = buildArtifactValueHealth(artifact);
+  const thumbnail = describeArtifactThumbnail(artifact);
 
   return [
     `# ${artifact.title}`,
@@ -170,6 +177,16 @@ export function buildOutputMarkdown(artifact: ArtifactMeta, previewPath?: string
     artifact.externalFormat ? `externalFormat: ${artifact.externalFormat}` : undefined,
     artifact.contentSummary ? `contentSummary: ${artifact.contentSummary}` : undefined,
     artifact.thumbnail ? 'thumbnail: available' : undefined,
+    thumbnail ? `thumbnailKind: ${thumbnail.kind}` : undefined,
+    thumbnail ? `thumbnailSummary: ${thumbnail.summary}` : undefined,
+    artifact.documentPreview ? 'documentPreview: available' : undefined,
+    artifact.documentPreview ? `documentPreviewSummary: ${artifact.documentPreview.summary}` : undefined,
+    artifact.documentPreview ? `documentPreviewFormat: ${artifact.documentPreview.format}` : undefined,
+    artifact.documentPreview ? `documentPreviewSource: ${artifact.documentPreview.sourceKind}` : undefined,
+    artifact.documentPreview ? `documentPreviewBytes: ${artifact.documentPreview.bytesRead}` : undefined,
+    artifact.documentPreview
+      ? `documentPreviewAt: ${new Date(artifact.documentPreview.extractedAt).toISOString()}`
+      : undefined,
     artifact.fileInspection ? `fileInspectionFormat: ${artifact.fileInspection.format}` : undefined,
     artifact.fileInspection ? `fileInspectionSource: ${artifact.fileInspection.sourceKind}` : undefined,
     artifact.fileInspection ? `fileInspectionOpen: ${artifact.fileInspection.openBehavior}` : undefined,
@@ -488,6 +505,7 @@ export async function mirrorArtifactToReadyRepositoryOutput(
 function buildOutputIndexEntry(artifact: ArtifactMeta, outputPath: string, previewPath?: string): string {
   const previewCard = buildArtifactPreviewCard(artifact);
   const valueHealth = buildArtifactValueHealth(artifact);
+  const thumbnail = describeArtifactThumbnail(artifact);
   const executionCount = artifact.executionEvents?.length ?? 0;
   const lastExecutionEvent = artifact.executionEvents?.[executionCount - 1];
   const enrichmentCount = artifact.enrichmentEvents?.length ?? 0;
@@ -502,6 +520,9 @@ function buildOutputIndexEntry(artifact: ArtifactMeta, outputPath: string, previ
     artifact.externalFormat ? `  - format: ${artifact.externalFormat}` : undefined,
     artifact.contentSummary ? `  - summary: ${artifact.contentSummary}` : undefined,
     artifact.thumbnail ? '  - thumbnail: available' : undefined,
+    thumbnail ? `  - thumbnailKind: ${thumbnail.kind}` : undefined,
+    thumbnail ? `  - thumbnailSummary: ${thumbnail.summary}` : undefined,
+    artifact.documentPreview ? '  - documentPreview: available' : undefined,
     artifact.contentExtract
       ? `  - contentExtract: ${artifact.contentExtract.status}, ${artifact.contentExtract.textLength} chars${
           artifact.contentExtract.truncated ? ', truncated' : ''
@@ -515,7 +536,9 @@ function buildOutputIndexEntry(artifact: ArtifactMeta, outputPath: string, previ
       : undefined,
     lastEnrichmentEvent ? `  - enrichment: ${lastEnrichmentEvent.kind}, ${lastEnrichmentEvent.status}` : undefined,
     `  - valueHealth: ${valueHealth.status}`,
+    valueHealth.strengths.length ? `  - valueHealthStrengths: ${valueHealth.strengths.join(', ')}` : undefined,
     valueHealth.gaps.length ? `  - valueHealthGaps: ${valueHealth.gaps.join(', ')}` : undefined,
+    valueHealth.nextActions.length ? `  - valueHealthNextActions: ${valueHealth.nextActions.join(', ')}` : undefined,
     artifact.fileInspection
       ? `  - inspection: ${artifact.fileInspection.sourceKind}, ${artifact.fileInspection.previewStatus}`
       : undefined,
@@ -661,6 +684,9 @@ function buildRepositoryAssetExecutionMarkdown(params: {
   reviewSuggested: boolean;
 }): string {
   const assetPath = params.asset.path ?? params.asset.output ?? params.asset.link;
+  const sourceApprovalRunPath = isSafeRepositoryAssetRunPath(params.params.sourceApprovalRunPath)
+    ? params.params.sourceApprovalRunPath
+    : undefined;
   const lines = [
     '---',
     `title: ${JSON.stringify(`仓库资产执行 - ${params.asset.title}`)}`,
@@ -669,6 +695,10 @@ function buildRepositoryAssetExecutionMarkdown(params: {
     `assetPath: ${assetPath}`,
     `assetReuseKind: ${params.asset.reuseKind}`,
     `status: ${params.params.status}`,
+    params.params.approvalTitle ? `approvalTitle: ${formatInlineText(params.params.approvalTitle)}` : undefined,
+    params.params.approvalRisk ? `approvalRisk: ${formatInlineText(params.params.approvalRisk)}` : undefined,
+    params.params.approvalReason ? `approvalReason: ${formatInlineText(params.params.approvalReason)}` : undefined,
+    sourceApprovalRunPath ? `sourceApprovalRunPath: ${sourceApprovalRunPath}` : undefined,
     params.params.runner ? `runner: ${formatInlineText(params.params.runner)}` : undefined,
     params.params.command ? `command: ${formatInlineText(params.params.command)}` : undefined,
     params.params.outputArtifactId ? `outputArtifactId: ${params.params.outputArtifactId}` : undefined,
@@ -689,6 +719,11 @@ function buildRepositoryAssetExecutionMarkdown(params: {
     `- 路径：${assetPath}`,
     `- 类型：${params.asset.reuseKind}`,
     `- 状态：${params.params.status}`,
+    params.params.approvalTitle
+      ? `- 审批：${params.params.approvalTitle}${params.params.approvalRisk ? `（${params.params.approvalRisk}）` : ''}`
+      : undefined,
+    params.params.approvalReason ? `- 审批原因：${params.params.approvalReason}` : undefined,
+    sourceApprovalRunPath ? `- 来源审批运行：${sourceApprovalRunPath}` : undefined,
     params.params.runner ? `- 运行器：${params.params.runner}` : undefined,
     params.params.command ? `- 命令：\`${params.params.command}\`` : undefined,
     params.params.resultSummary ? `- 执行结果：${params.params.resultSummary}` : undefined,
@@ -772,12 +807,19 @@ function buildRepositoryAssetExecutionIndexEntry(params: {
   reviewSuggested: boolean;
 }): string {
   const assetPath = params.asset.path ?? params.asset.output ?? params.asset.link;
+  const sourceApprovalRunPath = isSafeRepositoryAssetRunPath(params.params.sourceApprovalRunPath)
+    ? params.params.sourceApprovalRunPath
+    : undefined;
   const lines = [
     `- [${params.asset.title}](${buildRepositoryAssetIndexLink(params.runPath, params.runIndexPath)}) (` +
       `\`${params.asset.id}\`, ${params.asset.reuseKind}, ${params.params.status})`,
     `  - assetPath: ${assetPath}`,
     `  - runPath: ${params.runPath}`,
     `  - executedAt: ${params.executedAt.toISOString()}`,
+    params.params.approvalTitle ? `  - approvalTitle: ${formatInlineText(params.params.approvalTitle)}` : undefined,
+    params.params.approvalRisk ? `  - approvalRisk: ${formatInlineText(params.params.approvalRisk)}` : undefined,
+    params.params.approvalReason ? `  - approvalReason: ${formatInlineText(params.params.approvalReason)}` : undefined,
+    sourceApprovalRunPath ? `  - sourceApprovalRunPath: ${sourceApprovalRunPath}` : undefined,
     params.params.runner ? `  - runner: ${formatInlineText(params.params.runner)}` : undefined,
     params.params.command ? `  - command: ${formatInlineText(params.params.command)}` : undefined,
     params.params.resultSummary ? `  - result: ${formatInlineText(params.params.resultSummary)}` : undefined,
@@ -870,9 +912,9 @@ function buildRepositoryAssetExecutionRecordLine(
 function buildRepositoryAssetExecutionTailActionLines(runLink: string): string[] {
   return [
     `- [ ] 根据 ${runLink} 更新事项状态。`,
-    '- [ ] 判断是否需要把本次执行结果沉淀为成果，并关联到事项。',
-    '- [ ] 判断是否需要更新知识库。',
-    '- [ ] 判断是否需要写入复盘。',
+    `- [ ] 判断是否需要把 ${runLink} 的执行结果沉淀为成果，并关联到事项。`,
+    `- [ ] 判断是否需要基于 ${runLink} 更新知识库。`,
+    `- [ ] 判断是否需要为 ${runLink} 写入复盘。`,
   ];
 }
 

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
 import type { GatewayClient } from '../lib/gateway';
@@ -197,5 +198,13 @@ describe('repository context companion sync', () => {
         agentsMdContent: '仓库根目录 AGENTS.md 暂不可读。',
       }),
     });
+  });
+
+  it('routes watcher fallback failures through the preload log bridge', () => {
+    const source = readFileSync('src/lib/repository-context-sync.ts', 'utf8');
+
+    expect(source).toMatch(/window\.electronAPI\?\.log\?\.send\(\s*'WARN'/);
+    expect(source).toContain('falling back to interval');
+    expect(source).not.toContain('console.warn');
   });
 });

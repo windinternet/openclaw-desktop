@@ -2,7 +2,13 @@ import type { ArtifactMeta } from './artifact-types';
 import type { KnowledgeHealthReport, RepositoryMarkdownFile } from './repository-knowledge';
 import type { WorkbenchSnapshot } from './repository-workbench';
 import type { AiActionRun, SessionInfo } from './types';
-import { buildDashboardTailActionTarget, type DashboardTailActionRouteKind } from './dashboard-tail-action-routing';
+import {
+  buildDashboardTailActionTarget,
+  extractSafeRepositoryAssetRunPathFromText,
+  isSafeRepositoryAssetRunPath,
+  type DashboardTailActionRouteKind,
+} from './dashboard-tail-action-routing';
+import { isSafeWorkbenchMarkdownPath, isSafeWorkbenchMatterLikePath } from './workbench-matter';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const CROSS_WORK_STALE_AFTER_DAYS = 14;
@@ -57,6 +63,7 @@ export interface BuildDashboardWorkSystemSummaryParams {
         outputsMarkdown?: string;
         completedWork?: RepositoryMarkdownFile[];
         completedPlans?: RepositoryMarkdownFile[];
+        workMetadata?: WorkbenchSnapshot['workMetadata'];
       })
     | null;
   knowledge?: { recentFiles: RepositoryMarkdownFile[]; health?: KnowledgeHealthReport } | null;
@@ -121,6 +128,7 @@ export function buildDashboardWorkSystemSummary(
     .filter((action) => !action.completed)
     .map((action) => {
       const tailAction = classifyTailAction(action.text);
+      const assetRunPath = extractSafeRepositoryAssetRunPathFromText(action.text, action.sourcePath);
       return {
         id: action.id,
         kind: 'work' as const,
@@ -129,6 +137,7 @@ export function buildDashboardWorkSystemSummary(
           kind: tailAction.kind,
           id: action.id,
           workItemPath: action.sourcePath,
+          assetRunPath,
         }),
         updatedAt: action.updatedAt,
         path: action.sourcePath,
@@ -184,13 +193,16 @@ export function buildDashboardWorkSystemSummary(
   const planMetadataByPath = new Map(
     (params.workbench?.planMetadata ?? []).map((metadata) => [metadata.path, metadata]),
   );
+  const workMetadataByPath = new Map(
+    (params.workbench?.workMetadata ?? []).map((metadata) => [metadata.path, metadata]),
+  );
   const blockedPlanItems = (params.workbench?.planMetadata ?? []).filter(isBlockedPlanMetadata).map((metadata) => {
     const plan = params.workbench?.activePlans.find((file) => file.path === metadata.path);
     return {
       id: metadata.path,
       kind: 'plan' as const,
       title: plan ? markdownTitle(plan) : metadata.path,
-      target: '/workbench?view=plans',
+      target: buildWorkbenchPlanTarget(metadata.path),
       updatedAt: plan?.updatedAt,
       path: metadata.path,
       detail: formatBlockedPlanDetail(metadata),
@@ -202,7 +214,7 @@ export function buildDashboardWorkSystemSummary(
     .filter(hasCrossWorkDependencies)
     .map((metadata) => ({
       metadata,
-      unresolvedDependencies: metadata.dependencies.filter(
+      unresolvedDependencies: uniqueCrossWorkDependencies(metadata.dependencies).filter(
         (dependency) => !isCompletedCrossWorkDependency(dependency, completedCrossWorkDependencyPaths),
       ),
     }))
@@ -213,19 +225,53 @@ export function buildDashboardWorkSystemSummary(
         id: `cross-work-risk:${metadata.path}`,
         kind: 'plan' as const,
         title: plan ? markdownTitle(plan) : metadata.path,
-        target: '/workbench?view=plans',
+        target: buildWorkbenchPlanTarget(metadata.path),
         updatedAt: plan?.updatedAt,
         path: metadata.path,
         detail: formatCrossWorkRiskDetail(
           unresolvedDependencies.map((dependency) =>
             formatCrossWorkDependencyDetail(dependency, {
               activeFiles: activeCrossWorkDependencyFiles,
+              dependencySources: metadata.dependencySources,
               now,
               planMetadataByPath,
+              workMetadataByPath,
             }),
           ),
         ),
         status: 'plan:cross-work-risk',
+      };
+    });
+  const crossWorkRiskWorkItems = (params.workbench?.workMetadata ?? [])
+    .filter(hasWorkCrossWorkDependencies)
+    .map((metadata) => ({
+      metadata,
+      unresolvedDependencies: uniqueCrossWorkDependencies(metadata.dependencies).filter(
+        (dependency) => !isCompletedCrossWorkDependency(dependency, completedCrossWorkDependencyPaths),
+      ),
+    }))
+    .filter(({ unresolvedDependencies }) => unresolvedDependencies.length > 0)
+    .map(({ metadata, unresolvedDependencies }) => {
+      const work = params.workbench?.activeWork.find((file) => file.path === metadata.path);
+      return {
+        id: `cross-work-risk:${metadata.path}`,
+        kind: 'work' as const,
+        title: work ? markdownTitle(work) : metadata.path,
+        target: `/workbench?view=tasks&workItemPath=${encodeURIComponent(metadata.path)}`,
+        updatedAt: work?.updatedAt,
+        path: metadata.path,
+        detail: formatCrossWorkRiskDetail(
+          unresolvedDependencies.map((dependency) =>
+            formatCrossWorkDependencyDetail(dependency, {
+              activeFiles: activeCrossWorkDependencyFiles,
+              dependencySources: metadata.dependencySources,
+              now,
+              planMetadataByPath,
+              workMetadataByPath,
+            }),
+          ),
+        ),
+        status: 'work:cross-work-risk',
       };
     });
 
@@ -295,7 +341,7 @@ export function buildDashboardWorkSystemSummary(
         title: run.title,
         target: run.outputArtifactId
           ? `/artifacts/${encodeURIComponent(run.outputArtifactId)}`
-          : '/workbench?view=outputs',
+          : buildRepositoryAssetRunOutputTarget(run),
         updatedAt: run.executedAt,
         path: run.outputPath ?? run.runPath,
         detail: ['资产运行', run.reuseKind, run.status, run.result].filter(Boolean).join(' · '),
@@ -327,6 +373,7 @@ export function buildDashboardWorkSystemSummary(
   const actionRunOutputItems = params.actionRuns
     .filter((run) => run.status === 'done' && Boolean(run.resultSummary))
     .filter((run) => !(run.artifactIds ?? []).some((artifactId) => knownOutputArtifactIds.has(artifactId)))
+    .filter((run) => getActionRunSourceIds(run).every((runId) => !preservedActionRunOutputIds.has(runId)))
     .map((run) => ({
       run,
       item: {
@@ -343,9 +390,9 @@ export function buildDashboardWorkSystemSummary(
   const unpreservedActionRunOutputItems = params.workbench
     ? params.actionRuns
         .filter((run) => run.status === 'done' && Boolean(run.resultSummary))
-        .filter(hasWorkItemPath)
+        .filter(hasSafeWorkItemPath)
         .filter((run) => (run.artifactIds ?? []).length === 0)
-        .filter((run) => !preservedActionRunOutputIds.has(run.id))
+        .filter((run) => getActionRunSourceIds(run).every((runId) => !preservedActionRunOutputIds.has(runId)))
         .filter((run) => !pendingOutputTailActionWorkItemPaths.has(run.workItemPath))
         .filter((run) =>
           params.workbench?.runsMarkdown === undefined
@@ -407,7 +454,12 @@ export function buildDashboardWorkSystemSummary(
     ...unpreservedActionRunOutputItems,
     ...pendingAssetRunReviewItems,
   ]).slice(0, limit);
-  const stuckItems = sortItems([...failedRunItems, ...blockedPlanItems, ...crossWorkRiskPlanItems]).slice(0, limit);
+  const stuckItems = sortItems([
+    ...failedRunItems,
+    ...blockedPlanItems,
+    ...crossWorkRiskPlanItems,
+    ...crossWorkRiskWorkItems,
+  ]).slice(0, limit);
   const recentOutputs = sortItems(recentOutputItems).slice(0, limit);
   const weeklyOutputs = sortItems(weeklyOutputItems).slice(0, limit);
   const knowledgeUpdates = sortItems([...knowledgeHealthItems, ...knowledgeItems]).slice(0, limit);
@@ -474,6 +526,14 @@ function buildRepositoryAssetRunReviewTarget(run: RepositoryAssetRunIndexItem): 
   return `/workbench?${params.toString()}`;
 }
 
+function buildRepositoryAssetRunOutputTarget(run: RepositoryAssetRunIndexItem): string {
+  const params = new URLSearchParams();
+  params.set('view', 'outputs');
+  params.set('assetRunPath', run.runPath);
+  if (run.workItemPath) params.set('workItemPath', run.workItemPath);
+  return `/workbench?${params.toString()}`;
+}
+
 function parseRepositoryOutputIndex(markdown: string): RepositoryOutputIndexItem[] {
   const items: RepositoryOutputIndexItem[] = [];
   let current: (RepositoryOutputIndexItem & { metadata: Record<string, string> }) | null = null;
@@ -533,7 +593,7 @@ function parseRepositoryAssetRunIndex(markdown: string): RepositoryAssetRunIndex
   const pushCurrent = () => {
     if (!current) return;
     const runPath = current.metadata.runPath || normalizeRepositoryAssetRunHref(current.href);
-    if (!runPath || !runPath.startsWith('runs/assets/')) return;
+    if (!isSafeRepositoryAssetRunPath(runPath)) return;
     const status = current.status || 'unknown';
     items.push({
       title: current.title,
@@ -577,9 +637,11 @@ function parseRepositoryAssetRunIndex(markdown: string): RepositoryAssetRunIndex
 
 function normalizeRepositoryAssetRunHref(href: string): string | undefined {
   const trimmed = href.trim().replace(/^\/+/, '');
-  if (trimmed.startsWith('runs/assets/')) return trimmed;
-  if (trimmed.startsWith('assets/')) return `runs/${trimmed}`;
-  return undefined;
+  if (trimmed.startsWith('assets/')) {
+    const runPath = `runs/${trimmed}`;
+    return isSafeRepositoryAssetRunPath(runPath) ? runPath : undefined;
+  }
+  return isSafeRepositoryAssetRunPath(trimmed) ? trimmed : undefined;
 }
 
 function parseArtifactUri(value?: string): string | undefined {
@@ -665,7 +727,7 @@ function collectConfirmedAssetRunReviewPaths(
     }
     if (readReviewFrontmatterValue(document.content, 'status') !== 'confirmed') continue;
     const assetRunPath = readReviewFrontmatterValue(document.content, 'assetRunPath');
-    if (assetRunPath?.startsWith('runs/assets/') && assetRunPath.endsWith('.md')) {
+    if (isSafeRepositoryAssetRunPath(assetRunPath)) {
       paths.add(assetRunPath);
     }
   }
@@ -791,14 +853,29 @@ function isTerminalActionRun(run: AiActionRun): boolean {
   return run.status === 'done' || run.status === 'failed' || run.status === 'cancelled';
 }
 
-function hasWorkItemPath(run: AiActionRun): run is AiActionRun & { workItemPath: string } {
-  return Boolean(run.workItemPath);
+function getActionRunSourceIds(run: AiActionRun): string[] {
+  return Array.from(new Set([run.id, run.gatewayRunId].filter((runId): runId is string => Boolean(runId))));
+}
+
+function hasSafeWorkItemPath(run: AiActionRun): run is AiActionRun & { workItemPath: string } {
+  return Boolean(run.workItemPath && isSafeWorkbenchMatterLikePath(run.workItemPath));
 }
 
 function isActionRunArchivedInRepository(run: AiActionRun, runsMarkdown: string): boolean {
   if (!runsMarkdown.trim()) return false;
-  const runPath = `runs/action-runs/${run.id}.md`;
-  return runsMarkdown.includes(runPath) || runsMarkdown.includes(`runId: ${run.id}`);
+  return getActionRunSourceIds(run).some((runId) => {
+    const runPath = `runs/action-runs/${runId}.md`;
+    return runsMarkdown.includes(runPath) || hasActionRunArchiveIdLine(runsMarkdown, runId);
+  });
+}
+
+function hasActionRunArchiveIdLine(markdown: string, runId: string): boolean {
+  const escapedRunId = escapeRegExp(runId);
+  return new RegExp(`(^|\\n)\\s*(?:-\\s*)?(?:runId|gatewayRunId):\\s*${escapedRunId}\\s*(?=$|\\n)`).test(markdown);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function isBlockedStatus(status?: string): boolean {
@@ -817,8 +894,28 @@ function hasCrossWorkDependencies(
   return Boolean(metadata.dependencies?.length);
 }
 
+function hasWorkCrossWorkDependencies(
+  metadata: NonNullable<WorkbenchSnapshot['workMetadata']>[number],
+): metadata is NonNullable<WorkbenchSnapshot['workMetadata']>[number] & { dependencies: string[] } {
+  return Boolean(metadata.dependencies?.length);
+}
+
 function isCompletedCrossWorkDependency(dependency: string, completedDependencyPaths: Set<string>): boolean {
-  return completedDependencyPaths.has(dependency) || /(^|\/)(work|plans)\/completed\//.test(dependency);
+  return completedDependencyPaths.has(dependency) || isSafeCompletedDependencyPath(dependency);
+}
+
+function isSafeCompletedDependencyPath(dependency: string): boolean {
+  if (!isSafeWorkbenchMarkdownPath(dependency)) return false;
+  const segments = dependency.split('/').slice(0, -1);
+  return segments.some((segment) => segment.toLowerCase() === 'completed');
+}
+
+function uniqueCrossWorkDependencies(dependencies: string[]): string[] {
+  return [...new Set(dependencies.filter(isTrustedCrossWorkDependencyReference))];
+}
+
+function isTrustedCrossWorkDependencyReference(dependency: string): boolean {
+  return isSafeWorkbenchMarkdownPath(dependency) && isSafeWorkbenchMatterLikePath(dependency);
 }
 
 function formatCrossWorkRiskDetail(dependencies: string[]): string {
@@ -829,11 +926,16 @@ function formatCrossWorkDependencyDetail(
   dependency: string,
   context: {
     activeFiles: Map<string, RepositoryMarkdownFile>;
+    dependencySources?: Record<string, string>;
     now: number;
     planMetadataByPath: Map<string, WorkbenchSnapshot['planMetadata'][number]>;
+    workMetadataByPath: Map<string, NonNullable<WorkbenchSnapshot['workMetadata']>[number]>;
   },
 ): string {
   const notes: string[] = [];
+  const source = context.dependencySources?.[dependency]?.trim();
+  if (source) notes.push(`来源: ${source}`);
+
   const activeFile = context.activeFiles.get(dependency);
   const staleDays = activeFile ? getCrossWorkDependencyStaleDays(activeFile.updatedAt, context.now) : null;
   if (staleDays !== null) notes.push(`停滞 ${staleDays} 天`);
@@ -841,6 +943,8 @@ function formatCrossWorkDependencyDetail(
   if (isActivePlanDependencyPath(dependency) && !context.planMetadataByPath.get(dependency)?.blockerOwner) {
     notes.push('负责人未知');
   }
+  const owner = context.workMetadataByPath.get(dependency)?.owner;
+  if (owner) notes.push(`负责人: ${owner}`);
 
   return notes.length ? `${dependency} (${notes.join('，')})` : dependency;
 }
@@ -853,6 +957,10 @@ function getCrossWorkDependencyStaleDays(updatedAt: number, now: number): number
 
 function isActivePlanDependencyPath(dependency: string): boolean {
   return /(^|\/)plans\/active\//.test(dependency);
+}
+
+function buildWorkbenchPlanTarget(planPath: string): string {
+  return `/workbench?view=plans&planPath=${encodeURIComponent(planPath)}`;
 }
 
 function formatBlockedPlanDetail(metadata: WorkbenchSnapshot['planMetadata'][number]): string | undefined {

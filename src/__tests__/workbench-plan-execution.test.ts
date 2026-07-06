@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import * as workbenchPlanExecution from '../lib/workbench-plan-execution';
 import {
   findPlanExecutionKnowledgeFollowUpRuns,
   findPlanExecutionKnowledgeUpdateState,
@@ -12,6 +13,7 @@ import {
   shouldOfferPlanExecutionReview,
 } from '../lib/workbench-plan-execution';
 import type { AiActionRun } from '../lib/types';
+import type { ArtifactMeta } from '../lib/artifact-types';
 
 function createRun(overrides: Partial<AiActionRun>): AiActionRun {
   return {
@@ -29,7 +31,293 @@ function createRun(overrides: Partial<AiActionRun>): AiActionRun {
   };
 }
 
+function createArtifact(overrides: Partial<ArtifactMeta>): ArtifactMeta {
+  return {
+    id: overrides.id ?? 'artifact-1',
+    title: overrides.title ?? '发布验证报告',
+    icon: 'file',
+    type: overrides.type ?? 'report',
+    source: overrides.source ?? { type: 'manual' },
+    tags: overrides.tags ?? [],
+    currentVersion: 1,
+    status: overrides.status ?? 'published',
+    createdAt: overrides.createdAt ?? 1,
+    updatedAt: overrides.updatedAt ?? 1,
+    ...overrides,
+  };
+}
+
 describe('workbench plan execution observability', () => {
+  it('builds a first-matter golden path state from related plan, execution, and follow-up facts', () => {
+    const buildGoldenPathState = (
+      workbenchPlanExecution as typeof workbenchPlanExecution & {
+        buildWorkbenchMatterGoldenPathState?: (input: {
+          workItemPath: string;
+          plans: Array<{ path: string; workItemPath?: string }>;
+          actionRuns?: AiActionRun[];
+          artifacts?: ArtifactMeta[];
+          reviewDocuments?: Array<{ path: string; content: string }>;
+        }) => {
+          steps: Array<{ key: string; status: string; targetPath?: string; runId?: string }>;
+          nextAction: { key: string; targetPath?: string; runId?: string; reasonKey?: string };
+        };
+      }
+    ).buildWorkbenchMatterGoldenPathState;
+
+    const planRun = createRun({
+      id: 'run-plan',
+      status: 'done',
+      resultSummary: '完成第一轮执行，产出账单整理方案。',
+      workItemPath: 'work/active/bills.md',
+      input: '计划执行\nplanPath: plans/active/bills-plan.md\nworkItemPath: work/active/bills.md',
+      updatedAt: 20,
+    });
+    const knowledgeRun = createRun({
+      id: 'run-knowledge',
+      type: 'knowledge_rewrite',
+      status: 'awaiting_approval',
+      input: '知识更新\naction-run-knowledge:run-plan',
+      workItemPath: 'work/active/bills.md',
+      updatedAt: 30,
+    });
+
+    expect(buildGoldenPathState).toBeTypeOf('function');
+    const state = buildGoldenPathState?.({
+      workItemPath: 'work/active/bills.md',
+      plans: [{ path: 'plans/active/bills-plan.md', workItemPath: 'work/active/bills.md' }],
+      actionRuns: [knowledgeRun, planRun],
+      artifacts: [],
+      reviewDocuments: [],
+    });
+
+    expect(state?.steps.map((step) => [step.key, step.status])).toEqual([
+      ['plan', 'done'],
+      ['execution', 'done'],
+      ['output', 'pending'],
+      ['knowledge', 'active'],
+      ['review', 'pending'],
+    ]);
+    expect(state?.nextAction).toEqual({
+      key: 'preserve-output',
+      reasonKey: 'output-missing',
+      runId: 'run-plan',
+      targetPath: 'plans/active/bills-plan.md',
+    });
+  });
+
+  it('starts the first-matter golden path with plan generation when no related plan exists', () => {
+    const buildGoldenPathState = (
+      workbenchPlanExecution as typeof workbenchPlanExecution & {
+        buildWorkbenchMatterGoldenPathState?: (input: {
+          workItemPath: string;
+          plans: Array<{ path: string; workItemPath?: string }>;
+        }) => {
+          steps: Array<{ key: string; status: string }>;
+          nextAction: { key: string; reasonKey?: string };
+        };
+      }
+    ).buildWorkbenchMatterGoldenPathState;
+
+    expect(buildGoldenPathState).toBeTypeOf('function');
+    const state = buildGoldenPathState?.({
+      workItemPath: 'work/active/bills.md',
+      plans: [],
+    });
+
+    expect(state?.steps.map((step) => [step.key, step.status])).toEqual([
+      ['plan', 'pending'],
+      ['execution', 'blocked'],
+      ['output', 'blocked'],
+      ['knowledge', 'blocked'],
+      ['review', 'blocked'],
+    ]);
+    expect(state?.nextAction).toEqual({ key: 'generate-plan', reasonKey: 'plan-missing' });
+  });
+
+  it('keeps a failed first-matter execution focused on the execution details', () => {
+    const buildGoldenPathState = (
+      workbenchPlanExecution as typeof workbenchPlanExecution & {
+        buildWorkbenchMatterGoldenPathState?: (input: {
+          workItemPath: string;
+          plans: Array<{ path: string; workItemPath?: string }>;
+          actionRuns?: AiActionRun[];
+        }) => {
+          steps: Array<{ key: string; status: string; runId?: string }>;
+          nextAction: { key: string; reasonKey?: string; runId?: string };
+        };
+      }
+    ).buildWorkbenchMatterGoldenPathState;
+
+    expect(buildGoldenPathState).toBeTypeOf('function');
+    const state = buildGoldenPathState?.({
+      workItemPath: 'work/active/bills.md',
+      plans: [{ path: 'plans/active/bills-plan.md', workItemPath: 'work/active/bills.md' }],
+      actionRuns: [
+        createRun({
+          id: 'run-failed',
+          status: 'failed',
+          input: '计划执行\nplanPath: plans/active/bills-plan.md\nworkItemPath: work/active/bills.md',
+          workItemPath: 'work/active/bills.md',
+          updatedAt: 40,
+        }),
+      ],
+    });
+
+    expect(state?.steps.map((step) => [step.key, step.status])).toEqual([
+      ['plan', 'done'],
+      ['execution', 'failed'],
+      ['output', 'blocked'],
+      ['knowledge', 'blocked'],
+      ['review', 'blocked'],
+    ]);
+    expect(state?.nextAction).toEqual({
+      key: 'open-execution',
+      reasonKey: 'execution-failed',
+      runId: 'run-failed',
+    });
+  });
+
+  it('does not ask the first-matter golden path to preserve output without an execution summary', () => {
+    const buildGoldenPathState = (
+      workbenchPlanExecution as typeof workbenchPlanExecution & {
+        buildWorkbenchMatterGoldenPathState?: (input: {
+          workItemPath: string;
+          plans: Array<{ path: string; workItemPath?: string }>;
+          actionRuns?: AiActionRun[];
+        }) => {
+          steps: Array<{ key: string; status: string; runId?: string }>;
+          nextAction: { key: string; reasonKey?: string; runId?: string };
+        };
+      }
+    ).buildWorkbenchMatterGoldenPathState;
+
+    expect(buildGoldenPathState).toBeTypeOf('function');
+    const state = buildGoldenPathState?.({
+      workItemPath: 'work/active/bills.md',
+      plans: [{ path: 'plans/active/bills-plan.md', workItemPath: 'work/active/bills.md' }],
+      actionRuns: [
+        createRun({
+          id: 'run-empty',
+          status: 'done',
+          input: '计划执行\nplanPath: plans/active/bills-plan.md\nworkItemPath: work/active/bills.md',
+          workItemPath: 'work/active/bills.md',
+          updatedAt: 50,
+        }),
+      ],
+    });
+
+    expect(state?.steps.map((step) => [step.key, step.status])).toEqual([
+      ['plan', 'done'],
+      ['execution', 'done'],
+      ['output', 'blocked'],
+      ['knowledge', 'blocked'],
+      ['review', 'blocked'],
+    ]);
+    expect(state?.nextAction).toEqual({
+      key: 'open-execution',
+      reasonKey: 'execution-summary-missing',
+      runId: 'run-empty',
+    });
+  });
+
+  it('does not complete the first-matter golden path when only output exists for a summary-less execution', () => {
+    const buildGoldenPathState = (
+      workbenchPlanExecution as typeof workbenchPlanExecution & {
+        buildWorkbenchMatterGoldenPathState?: (input: {
+          workItemPath: string;
+          plans: Array<{ path: string; workItemPath?: string }>;
+          actionRuns?: AiActionRun[];
+          artifacts?: ArtifactMeta[];
+        }) => {
+          steps: Array<{ key: string; status: string; runId?: string }>;
+          nextAction: { key: string; reasonKey?: string; runId?: string };
+        };
+      }
+    ).buildWorkbenchMatterGoldenPathState;
+
+    expect(buildGoldenPathState).toBeTypeOf('function');
+    const state = buildGoldenPathState?.({
+      workItemPath: 'work/active/bills.md',
+      plans: [{ path: 'plans/active/bills-plan.md', workItemPath: 'work/active/bills.md' }],
+      actionRuns: [
+        createRun({
+          id: 'run-empty',
+          status: 'done',
+          input: '计划执行\nplanPath: plans/active/bills-plan.md\nworkItemPath: work/active/bills.md',
+          workItemPath: 'work/active/bills.md',
+          updatedAt: 50,
+        }),
+      ],
+      artifacts: [createArtifact({ source: { type: 'action_run', id: 'run-empty' } })],
+    });
+
+    expect(state?.steps.map((step) => [step.key, step.status])).toEqual([
+      ['plan', 'done'],
+      ['execution', 'done'],
+      ['output', 'done'],
+      ['knowledge', 'blocked'],
+      ['review', 'blocked'],
+    ]);
+    expect(state?.nextAction).toEqual({
+      key: 'open-execution',
+      reasonKey: 'execution-summary-missing',
+      runId: 'run-empty',
+    });
+  });
+
+  it('labels the first-matter golden path output follow-up as reviewed after review confirmation', () => {
+    const buildGoldenPathState = (
+      workbenchPlanExecution as typeof workbenchPlanExecution & {
+        buildWorkbenchMatterGoldenPathState?: (input: {
+          workItemPath: string;
+          plans: Array<{ path: string; workItemPath?: string }>;
+          actionRuns?: AiActionRun[];
+          reviewDocuments?: Array<{ path: string; content: string }>;
+        }) => {
+          nextAction: { key: string; reasonKey?: string; runId?: string; labelKey?: string; hintKey?: string };
+        };
+      }
+    ).buildWorkbenchMatterGoldenPathState;
+
+    const state = buildGoldenPathState?.({
+      workItemPath: 'work/active/bills.md',
+      plans: [{ path: 'plans/active/bills-plan.md', workItemPath: 'work/active/bills.md' }],
+      actionRuns: [
+        createRun({
+          id: 'run-reviewed',
+          status: 'done',
+          resultSummary: '完成账单梳理，确认需要保存成果。',
+          input: '计划执行\nplanPath: plans/active/bills-plan.md\nworkItemPath: work/active/bills.md',
+          workItemPath: 'work/active/bills.md',
+          updatedAt: 60,
+        }),
+      ],
+      reviewDocuments: [
+        {
+          path: 'reviews/weekly/reviewed.md',
+          content: [
+            '---',
+            'status: confirmed',
+            'workItemPath: work/active/bills.md',
+            'sourceExecutionId: action-run-review:run-reviewed',
+            'reviewedAt: 2026-06-30T12:00:00.000Z',
+            '---',
+            '',
+            '# 已确认复盘',
+          ].join('\n'),
+        },
+      ],
+    });
+
+    expect(state?.nextAction).toMatchObject({
+      key: 'preserve-output',
+      reasonKey: 'output-missing',
+      runId: 'run-reviewed',
+      labelKey: 'workbench.preserveReviewedPlanExecutionOutput',
+      hintKey: 'workbench.preserveReviewedPlanExecutionOutputHint',
+    });
+  });
+
   it('extracts a standalone planPath line from a plan execution ActionRun input', () => {
     expect(
       getPlanExecutionPlanPath('计划执行\nplanPath: plans/active/release.md\nworkItemPath: work/active/release.md'),
@@ -134,6 +422,95 @@ describe('workbench plan execution observability', () => {
     ).toBe(false);
   });
 
+  it('does not offer output preservation when an action-run artifact already exists', () => {
+    const run = createRun({
+      id: 'run-plan',
+      status: 'done',
+      resultSummary: '完成打包验证',
+      workItemPath: 'work/active/release.md',
+    });
+
+    expect(
+      shouldOfferPlanExecutionOutputPreservation(run, {
+        artifacts: [createArtifact({ source: { type: 'action_run', id: 'run-plan' } })],
+      }),
+    ).toBe(false);
+  });
+
+  it('does not offer output preservation when the existing artifact uses the Gateway run id', () => {
+    const run = createRun({
+      id: 'local-run-plan',
+      gatewayRunId: 'gateway-run-plan',
+      status: 'done',
+      resultSummary: '完成打包验证',
+      workItemPath: 'work/active/release.md',
+    });
+
+    expect(
+      shouldOfferPlanExecutionOutputPreservation(run, {
+        artifacts: [createArtifact({ source: { type: 'action_run', id: 'gateway-run-plan' } })],
+      }),
+    ).toBe(false);
+  });
+
+  it('marks first-matter output done when the existing artifact uses the Gateway run id', () => {
+    const buildGoldenPathState = (
+      workbenchPlanExecution as typeof workbenchPlanExecution & {
+        buildWorkbenchMatterGoldenPathState?: (input: {
+          workItemPath: string;
+          plans: Array<{ path: string; workItemPath?: string }>;
+          actionRuns?: AiActionRun[];
+          artifacts?: ArtifactMeta[];
+        }) => {
+          steps: Array<{ key: string; status: string; runId?: string }>;
+          nextAction: { key: string; reasonKey?: string; runId?: string };
+        };
+      }
+    ).buildWorkbenchMatterGoldenPathState;
+    const planRun = createRun({
+      id: 'local-run-plan',
+      gatewayRunId: 'gateway-run-plan',
+      status: 'done',
+      resultSummary: '完成打包验证，产出发布检查报告。',
+      workItemPath: 'work/active/release.md',
+      input: '计划执行\nplanPath: plans/active/release-plan.md\nworkItemPath: work/active/release.md',
+    });
+
+    const state = buildGoldenPathState?.({
+      workItemPath: 'work/active/release.md',
+      plans: [{ path: 'plans/active/release-plan.md', workItemPath: 'work/active/release.md' }],
+      actionRuns: [planRun],
+      artifacts: [createArtifact({ source: { type: 'action_run', id: 'gateway-run-plan' } })],
+    });
+
+    expect(state?.steps.map((step) => [step.key, step.status])).toEqual([
+      ['plan', 'done'],
+      ['execution', 'done'],
+      ['output', 'done'],
+      ['knowledge', 'pending'],
+      ['review', 'pending'],
+    ]);
+    expect(state?.nextAction).toEqual({
+      key: 'update-knowledge',
+      reasonKey: 'knowledge-missing',
+      runId: 'local-run-plan',
+      targetPath: 'plans/active/release-plan.md',
+    });
+  });
+
+  it('offers plan execution follow-ups for semantic-mapped work item paths', () => {
+    const run = createRun({
+      status: 'done',
+      resultSummary: '完成映射仓库计划执行，生成验证记录。',
+      workItemPath: '10-ops/tasks/active/release.md',
+      input: '计划执行\nplanPath: 10-ops/plans/active/release-plan.md\nworkItemPath: 10-ops/tasks/active/release.md',
+    });
+
+    expect(shouldOfferPlanExecutionOutputPreservation(run)).toBe(true);
+    expect(shouldOfferPlanExecutionKnowledgeUpdate(run)).toBe(true);
+    expect(shouldOfferPlanExecutionReview(run)).toBe(true);
+  });
+
   it('offers knowledge update for completed work-bound plan execution with a result summary', () => {
     expect(
       shouldOfferPlanExecutionKnowledgeUpdate(
@@ -191,6 +568,66 @@ describe('workbench plan execution observability', () => {
     });
 
     expect(shouldOfferPlanExecutionKnowledgeUpdate(planRun, { actionRuns: [knowledgeRun] })).toBe(false);
+  });
+
+  it('does not offer knowledge update again when the source-bound knowledge ActionRun uses the Gateway run id', () => {
+    const planRun = createRun({
+      id: 'local-run-plan',
+      gatewayRunId: 'gateway-run-plan',
+      status: 'done',
+      resultSummary: '完成打包验证，发现发布文档需要补充',
+      workItemPath: 'work/active/release.md',
+    });
+    const knowledgeRun = createRun({
+      id: 'run-knowledge',
+      type: 'knowledge_rewrite',
+      status: 'done',
+      input: '知识更新\n来源执行记录 action-run-knowledge:gateway-run-plan',
+      workItemPath: 'work/active/release.md',
+      resultSummary: '已更新发布知识',
+      updatedAt: 10,
+    });
+
+    expect(
+      findPlanExecutionKnowledgeFollowUpRuns(planRun, {
+        actionRuns: [knowledgeRun],
+      }).map((run) => run.id),
+    ).toEqual(['run-knowledge']);
+    expect(shouldOfferPlanExecutionKnowledgeUpdate(planRun, { actionRuns: [knowledgeRun] })).toBe(false);
+    expect(
+      findPlanExecutionKnowledgeUpdateState(planRun, {
+        actionRuns: [knowledgeRun],
+      }),
+    ).toEqual({
+      status: 'done',
+      runId: 'run-knowledge',
+      summary: '已更新发布知识',
+      updatedAt: 10,
+    });
+  });
+
+  it('does not treat a prefixed knowledge source execution id as the same plan execution', () => {
+    const planRun = createRun({
+      id: 'run-plan',
+      status: 'done',
+      resultSummary: '完成打包验证，发现发布文档需要补充',
+      workItemPath: 'work/active/release.md',
+    });
+    const otherExecutionKnowledgeRun = createRun({
+      id: 'run-knowledge',
+      type: 'knowledge_rewrite',
+      status: 'done',
+      input: '知识更新\n来源执行记录 action-run-knowledge:run-plan-v2',
+      workItemPath: 'work/active/release.md',
+      updatedAt: 10,
+    });
+
+    expect(
+      findPlanExecutionKnowledgeFollowUpRuns(planRun, {
+        actionRuns: [otherExecutionKnowledgeRun],
+      }),
+    ).toEqual([]);
+    expect(shouldOfferPlanExecutionKnowledgeUpdate(planRun, { actionRuns: [otherExecutionKnowledgeRun] })).toBe(true);
   });
 
   it('finds active source-bound knowledge follow-up runs for a plan execution', () => {
@@ -436,6 +873,39 @@ describe('workbench plan execution observability', () => {
     expect(shouldOfferPlanExecutionReview(planRun, { reviewDocuments: [{ content: reviewMarkdown }] })).toBe(false);
   });
 
+  it('does not offer review draft creation again when the source-bound review uses the Gateway run id', () => {
+    const planRun = createRun({
+      id: 'local-run-plan',
+      gatewayRunId: 'gateway-run-plan',
+      status: 'done',
+      resultSummary: '完成打包验证，需要复盘遗留风险',
+      workItemPath: 'work/active/release.md',
+    });
+    const reviewMarkdown = [
+      '---',
+      'source: desktop-workbench-review-source-execution',
+      'workItemPath: work/active/release.md',
+      'tailActionId: action-run-review:gateway-run-plan',
+      'sourceExecutionId: action-run-review:gateway-run-plan',
+      'status: confirmed',
+      'reviewedAt: 2026-07-02T08:30:00.000Z',
+      '---',
+      '',
+      '# release 复盘',
+    ].join('\n');
+
+    expect(shouldOfferPlanExecutionReview(planRun, { reviewDocuments: [{ content: reviewMarkdown }] })).toBe(false);
+    expect(
+      findPlanExecutionReviewState(planRun, {
+        reviewDocuments: [{ path: 'reviews/weekly/release.md', content: reviewMarkdown }],
+      }),
+    ).toEqual({
+      status: 'confirmed',
+      path: 'reviews/weekly/release.md',
+      reviewedAt: '2026-07-02T08:30:00.000Z',
+    });
+  });
+
   it('reports source-bound plan execution review draft and confirmed states', () => {
     const planRun = createRun({
       id: 'run-plan',
@@ -512,5 +982,30 @@ describe('workbench plan execution observability', () => {
     ].join('\n');
 
     expect(shouldOfferPlanExecutionReview(planRun, { reviewDocuments: [otherReviewMarkdown] })).toBe(true);
+  });
+
+  it('ignores body-only source execution fields when checking existing plan execution reviews', () => {
+    const planRun = createRun({
+      id: 'run-plan',
+      status: 'done',
+      resultSummary: '完成打包验证，需要复盘遗留风险',
+      workItemPath: 'work/active/release.md',
+    });
+    const bodyOnlyReviewMarkdown = [
+      '---',
+      'source: desktop-workbench-review-source-execution',
+      'status: draft',
+      '---',
+      '',
+      '# 普通复盘记录',
+      '',
+      '下面是人工摘录的字段示例，不是 frontmatter:',
+      'workItemPath: work/active/release.md',
+      'sourceExecutionId: action-run-review:run-plan',
+      'tailActionId: action-run-review:run-plan',
+    ].join('\n');
+
+    expect(findPlanExecutionReviewState(planRun, { reviewDocuments: [bodyOnlyReviewMarkdown] })).toBeUndefined();
+    expect(shouldOfferPlanExecutionReview(planRun, { reviewDocuments: [bodyOnlyReviewMarkdown] })).toBe(true);
   });
 });

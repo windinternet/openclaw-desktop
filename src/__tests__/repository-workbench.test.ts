@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultRepositoryBinding } from '../lib/agentic-repository';
+import * as repositoryWorkbench from '../lib/repository-workbench';
 import {
   applyWorkbenchMatterPlanApproval,
   archiveCompletedWorkbenchMatter,
@@ -9,6 +10,7 @@ import {
   confirmWorkbenchReviewDraft,
   completeWorkbenchTailAction,
   groupReviewsByFolder,
+  isWorkbenchSnapshotMatterPath,
   loadWorkbenchSnapshot,
   parsePlanMetadata,
   preserveWorkbenchOutputFromTailAction,
@@ -60,6 +62,10 @@ describe('repository workbench', () => {
         ].join('\n');
       if (relativePath === 'work/active/project.md')
         return [
+          'owner: @release',
+          'dependsOn: work/active/design.md, [API 计划](plans/active/api.md)',
+          '依赖事项: work/completed/research.md, 10-ops/tasks/active/mapped-design.md',
+          '',
           '# 发布推进',
           '',
           '## 收尾动作',
@@ -97,6 +103,24 @@ describe('repository workbench', () => {
       { path: 'plans/active/plan.md', status: 'approved', approval: 'user-approved' },
       { path: 'plans/active/owner-only.md', blockerOwner: '@api' },
       { path: 'plans/completed/plan-done.md', status: 'done' },
+    ]);
+    expect(snapshot.workMetadata).toEqual([
+      {
+        path: 'work/active/project.md',
+        owner: '@release',
+        dependencies: [
+          'work/active/design.md',
+          'plans/active/api.md',
+          'work/completed/research.md',
+          '10-ops/tasks/active/mapped-design.md',
+        ],
+        dependencySources: {
+          'work/active/design.md': 'dependsOn',
+          'plans/active/api.md': 'dependsOn',
+          'work/completed/research.md': '依赖事项',
+          '10-ops/tasks/active/mapped-design.md': '依赖事项',
+        },
+      },
     ]);
     expect(snapshot.tailActions).toEqual([
       {
@@ -221,6 +245,146 @@ describe('repository workbench', () => {
     );
     expect(readText).toHaveBeenCalledWith('/repo', '10-ops/tasks/now.md');
     expect(listMarkdown).toHaveBeenCalledWith('/repo', '20-projects');
+  });
+
+  it('recognizes semantic-mapped work item paths from the loaded snapshot', () => {
+    const snapshot = {
+      activeWork: [{ path: '10-ops/tasks/active/first-thing.md', name: 'first-thing.md', size: 10, updatedAt: 1 }],
+      completedWork: [],
+      somedayWork: [],
+    };
+
+    expect(isWorkbenchSnapshotMatterPath(snapshot, '10-ops/tasks/active/first-thing.md')).toBe(true);
+    expect(isWorkbenchSnapshotMatterPath(snapshot, '../10-ops/tasks/active/first-thing.md')).toBe(false);
+  });
+
+  it('includes first matters written to mapped work roots in semantic snapshots', async () => {
+    const firstMatter = {
+      path: '10-ops/tasks/active/first-thing.md',
+      name: 'first-thing.md',
+      size: 120,
+      updatedAt: 6,
+    };
+    const listMarkdown = vi.fn(async (_repoPath: string, directory: string) => {
+      if (directory === '10-ops/tasks/active') return [firstMatter];
+      return [];
+    });
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === '10-ops/tasks/now.md') return '# 正在进行';
+      if (relativePath === '10-ops/tasks/active/first-thing.md') return '# 第一件事';
+      return '';
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { listMarkdown, readText },
+      },
+    });
+
+    const snapshot = await loadWorkbenchSnapshot({
+      ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      status: 'repo_ready',
+      paths: {
+        ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }).paths,
+        work: '10-ops/tasks',
+      },
+      workbench: {
+        isWorkbenchRepository: true,
+        mappingSource: 'agent',
+        slots: {
+          current: {
+            label: '正在进行',
+            paths: ['10-ops/tasks/now.md'],
+            kind: 'document',
+            confidence: 'high',
+            reason: 'Current work.',
+          },
+        },
+      },
+    });
+
+    expect(snapshot.activeWork).toEqual(expect.arrayContaining([firstMatter]));
+    expect(isWorkbenchSnapshotMatterPath(snapshot, '10-ops/tasks/active/first-thing.md')).toBe(true);
+    expect(listMarkdown).toHaveBeenCalledWith('/repo', '10-ops/tasks/active');
+  });
+
+  it('keeps mapped plan workItemPath from frontmatter when prose repeats the source matter with backticks', async () => {
+    const workItem = {
+      path: '10-ops/tasks/active/mapped-execute.md',
+      name: 'mapped-execute.md',
+      size: 120,
+      updatedAt: 6,
+    };
+    const plan = {
+      path: '10-ops/plans/active/mapped-execute-plan.md',
+      name: 'mapped-execute-plan.md',
+      size: 120,
+      updatedAt: 7,
+    };
+    const listMarkdown = vi.fn(async (_repoPath: string, directory: string) => {
+      if (directory === '10-ops/tasks/active') return [workItem];
+      if (directory === '10-ops/plans/active') return [plan];
+      return [];
+    });
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === workItem.path) return '# 映射执行事项';
+      if (relativePath === plan.path) {
+        return [
+          '---',
+          'status: active',
+          `workItemPath: ${workItem.path}`,
+          '---',
+          '',
+          '# 映射执行计划',
+          '',
+          `来源事项: \`${workItem.path}\``,
+        ].join('\n');
+      }
+      return '';
+    });
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { listMarkdown, readText },
+      },
+    });
+
+    const snapshot = await loadWorkbenchSnapshot({
+      ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+      status: 'repo_ready',
+      paths: {
+        ...createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }).paths,
+        work: '10-ops/tasks',
+        plans: '10-ops/plans',
+      },
+      workbench: {
+        isWorkbenchRepository: true,
+        mappingSource: 'agent',
+        slots: {
+          current: {
+            label: '正在进行',
+            paths: ['10-ops/tasks/active'],
+            kind: 'directory',
+            confidence: 'high',
+            reason: 'Current work.',
+          },
+          plans: {
+            active: {
+              label: '活跃计划',
+              paths: ['10-ops/plans/active'],
+              kind: 'directory',
+              confidence: 'high',
+              reason: 'Active plans.',
+            },
+          },
+        },
+      },
+    });
+
+    expect(snapshot.planMetadata).toContainEqual({
+      path: plan.path,
+      status: 'active',
+      workItemPath: workItem.path,
+    });
+    expect(isWorkbenchSnapshotMatterPath(snapshot, snapshot.planMetadata[0]?.workItemPath)).toBe(true);
   });
 
   it('groups semantic reviews by their review folder', async () => {
@@ -470,6 +634,192 @@ describe('repository workbench', () => {
       status: 'active',
       workItemPath: 'work/active/release.md',
       dependencies: ['work/active/design.md', 'plans/active/api.md', 'work/active/release.md', 'work/someday/legal.md'],
+      dependencySources: {
+        'work/active/design.md': 'dependsOn',
+        'plans/active/api.md': 'dependsOn',
+        'work/active/release.md': '关联事项',
+        'work/someday/legal.md': '关联事项',
+      },
+    });
+    expect(
+      parsePlanMetadata(
+        'plans/active/multiline-cross-work.md',
+        [
+          'status: active',
+          'dependencies:',
+          '  - work/active/design.md',
+          '  - [API 计划](plans/active/api.md)',
+          '  - work/completed/research.md',
+          '# 多行依赖计划',
+        ].join('\n'),
+      ),
+    ).toEqual({
+      path: 'plans/active/multiline-cross-work.md',
+      status: 'active',
+      dependencies: ['work/active/design.md', 'plans/active/api.md', 'work/completed/research.md'],
+      dependencySources: {
+        'work/active/design.md': 'dependencies',
+        'plans/active/api.md': 'dependencies',
+        'work/completed/research.md': 'dependencies',
+      },
+    });
+    expect(
+      parsePlanMetadata(
+        'plans/active/relative-cross-work.md',
+        [
+          'status: active',
+          'dependencies:',
+          '  - [同目录 API](./api.md)',
+          '  - [完成研究](../completed/research.md)',
+          '  - work/active/design.md',
+          '# 相对依赖计划',
+        ].join('\n'),
+      ),
+    ).toEqual({
+      path: 'plans/active/relative-cross-work.md',
+      status: 'active',
+      dependencies: ['plans/active/api.md', 'plans/completed/research.md', 'work/active/design.md'],
+      dependencySources: {
+        'plans/active/api.md': 'dependencies',
+        'plans/completed/research.md': 'dependencies',
+        'work/active/design.md': 'dependencies',
+      },
+    });
+    expect(
+      parsePlanMetadata(
+        'plans/active/inline-array-cross-work.md',
+        'status: active\ndependencies: ["./api.md", "../completed/research.md", work/active/design.md]\n# Inline',
+      ),
+    ).toEqual({
+      path: 'plans/active/inline-array-cross-work.md',
+      status: 'active',
+      dependencies: ['plans/active/api.md', 'plans/completed/research.md', 'work/active/design.md'],
+      dependencySources: {
+        'plans/active/api.md': 'dependencies',
+        'plans/completed/research.md': 'dependencies',
+        'work/active/design.md': 'dependencies',
+      },
+    });
+    expect(
+      parsePlanMetadata(
+        'plans/active/object-list-cross-work.md',
+        [
+          'status: active',
+          'dependencies:',
+          '  - path: ./api.md',
+          '  - workItemPath: work/active/design.md',
+          '  - planPath: ../completed/research.md',
+          '# 对象列表依赖计划',
+        ].join('\n'),
+      ),
+    ).toEqual({
+      path: 'plans/active/object-list-cross-work.md',
+      status: 'active',
+      dependencies: ['plans/active/api.md', 'work/active/design.md', 'plans/completed/research.md'],
+      dependencySources: {
+        'plans/active/api.md': 'dependencies',
+        'work/active/design.md': 'dependencies',
+        'plans/completed/research.md': 'dependencies',
+      },
+    });
+    expect(
+      parsePlanMetadata(
+        'plans/active/deduped-cross-work.md',
+        [
+          'status: active',
+          'dependsOn: plans/active/api.md, work/active/design.md',
+          'dependencies: ["./api.md", "work/active/design.md"]',
+          '# 去重依赖计划',
+        ].join('\n'),
+      ),
+    ).toEqual({
+      path: 'plans/active/deduped-cross-work.md',
+      status: 'active',
+      dependencies: ['plans/active/api.md', 'work/active/design.md'],
+      dependencySources: {
+        'plans/active/api.md': 'dependsOn',
+        'work/active/design.md': 'dependsOn',
+      },
+    });
+    expect(
+      parsePlanMetadata(
+        'plans/active/trusted-cross-work.md',
+        [
+          'status: active',
+          'dependencies: work/active/design.md, https://example.com/spec, #local-anchor, /Users/example/private.md',
+          'requires: plans/active/api.md',
+          '# 可信依赖计划',
+        ].join('\n'),
+      ),
+    ).toEqual({
+      path: 'plans/active/trusted-cross-work.md',
+      status: 'active',
+      dependencies: ['work/active/design.md', 'plans/active/api.md'],
+      dependencySources: {
+        'work/active/design.md': 'dependencies',
+        'plans/active/api.md': 'requires',
+      },
+    });
+    expect(
+      parsePlanMetadata(
+        'plans/active/waiting-cross-work.md',
+        [
+          'status: blocked',
+          'waitingOn: work/active/design.md',
+          'waitingFor: [API 计划](plans/active/api.md)',
+          '# 等待依赖计划',
+        ].join('\n'),
+      ),
+    ).toEqual({
+      path: 'plans/active/waiting-cross-work.md',
+      status: 'blocked',
+      dependencies: ['work/active/design.md', 'plans/active/api.md'],
+      dependencySources: {
+        'work/active/design.md': 'waitingOn',
+        'plans/active/api.md': 'waitingFor',
+      },
+    });
+    expect(
+      parsePlanMetadata(
+        'plans/active/cn-waiting-cross-work.md',
+        [
+          'status: blocked',
+          '等待事项: work/active/design.md；[API 计划](plans/active/api.md)',
+          '# 等待中文依赖计划',
+        ].join('\n'),
+      ),
+    ).toEqual({
+      path: 'plans/active/cn-waiting-cross-work.md',
+      status: 'blocked',
+      dependencies: ['work/active/design.md', 'plans/active/api.md'],
+      dependencySources: {
+        'work/active/design.md': '等待事项',
+        'plans/active/api.md': '等待事项',
+      },
+    });
+    expect(
+      parsePlanMetadata(
+        '10-ops/plans/active/mapped-cross-work.md',
+        [
+          'status: active',
+          'dependencies: 10-ops/tasks/active/mapped-design.md, 10-ops/plans/active/api.md, https://example.com/spec, /Users/example/private.md, docs/random-note.md',
+          'requires: ../completed/research.md',
+          '# 映射依赖计划',
+        ].join('\n'),
+      ),
+    ).toEqual({
+      path: '10-ops/plans/active/mapped-cross-work.md',
+      status: 'active',
+      dependencies: [
+        '10-ops/tasks/active/mapped-design.md',
+        '10-ops/plans/active/api.md',
+        '10-ops/plans/completed/research.md',
+      ],
+      dependencySources: {
+        '10-ops/tasks/active/mapped-design.md': 'dependencies',
+        '10-ops/plans/active/api.md': 'dependencies',
+        '10-ops/plans/completed/research.md': 'requires',
+      },
     });
 
     expect(
@@ -637,6 +987,61 @@ describe('repository workbench', () => {
     );
   });
 
+  it('writes a review draft for a semantic-mapped plan execution source record', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === '10-ops/tasks/active/release.md') {
+        return [
+          '# 映射发布推进',
+          '',
+          '## 复盘',
+          '',
+          '- 暂无',
+          '',
+          '## 收尾动作',
+          '',
+          '- [ ] 判断是否需要写入复盘。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const binding = createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' });
+    binding.paths.work = '10-ops/tasks';
+
+    const draft = await writeWorkbenchReviewDraft(binding, {
+      workItemPath: '10-ops/tasks/active/release.md',
+      tailActionId: 'action-run-review:run-1',
+      createdAt: new Date('2026-06-28T10:00:00.000Z'),
+    });
+
+    expect(draft.path).toBe('reviews/weekly/2026-06-28-work-release-action-run-review-run-1-review.md');
+    expect(draft.content).toContain('source: desktop-workbench-review-source-execution');
+    expect(draft.content).toContain('workItemPath: 10-ops/tasks/active/release.md');
+    expect(draft.content).toContain('tailActionId: action-run-review:run-1');
+    expect(writeText).toHaveBeenCalledWith('/repo', draft.path, draft.content);
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      '10-ops/tasks/active/release.md',
+      [
+        '# 映射发布推进',
+        '',
+        '## 复盘',
+        '',
+        '- [2026-06-28 复盘草稿](../../../reviews/weekly/2026-06-28-work-release-action-run-review-run-1-review.md) - 来源执行记录: `action-run-review:run-1`',
+        '',
+        '## 收尾动作',
+        '',
+        '- [ ] 判断是否需要写入复盘。',
+      ].join('\n'),
+    );
+  });
+
   it('writes related knowledge ActionRuns into a plan execution review draft', async () => {
     const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
       if (relativePath === 'work/active/release.md') {
@@ -790,6 +1195,1910 @@ describe('repository workbench', () => {
     );
   });
 
+  it('writes a semantic-mapped asset execution review draft and links it to the mapped work item', async () => {
+    const runPath = 'runs/assets/20260629-010203-tools-release-check-sh.md';
+    const reviewPath = 'reviews/weekly/2026-06-29-asset-run-tools-release-check-sh-review.md';
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === runPath) {
+        return [
+          '---',
+          'title: "仓库资产执行 - 发布检查脚本"',
+          'source: desktop-repository-asset-execution',
+          'assetId: tools-release-check-sh',
+          'assetPath: tools/release-check.sh',
+          'assetReuseKind: script',
+          'status: succeeded',
+          'repositoryOutputPath: outputs/reports/release-check.md',
+          'workItemPath: 10-ops/tasks/active/release.md',
+          `runPath: ${runPath}`,
+          'executedAt: 2026-06-29T01:02:03.000Z',
+          'recordOnly: true',
+          'desktopExecutes: false',
+          'grantsPermission: false',
+          '---',
+          '',
+          '# 仓库资产执行：发布检查脚本',
+          '',
+          '## 摘要',
+          '',
+          '- 执行结果：发布检查通过',
+        ].join('\n');
+      }
+      if (relativePath === '10-ops/tasks/active/release.md') {
+        return ['# 发布推进', '', '## 复盘', '', '- 暂无'].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+    const binding = createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' });
+    binding.paths.work = '10-ops/tasks';
+
+    const draft = await writeWorkbenchAssetRunReviewDraft(binding, {
+      assetRunPath: runPath,
+      createdAt: new Date('2026-06-29T08:00:00.000Z'),
+    });
+
+    expect(draft.path).toBe(reviewPath);
+    expect(draft.content).toContain('workItemPath: 10-ops/tasks/active/release.md');
+    expect(writeText).toHaveBeenCalledWith('/repo', reviewPath, draft.content);
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      '10-ops/tasks/active/release.md',
+      [
+        '# 发布推进',
+        '',
+        '## 复盘',
+        '',
+        `- [2026-06-29 资产运行复盘草稿](../../../${reviewPath}) - 来源资产运行: \`${runPath}\``,
+      ].join('\n'),
+    );
+  });
+
+  it('rejects absolute repository asset run paths before writing an asset run review draft', async () => {
+    const readText = vi.fn(async () =>
+      [
+        '---',
+        'source: desktop-repository-asset-execution',
+        'assetId: tools-release-check-sh',
+        'status: succeeded',
+        '---',
+      ].join('\n'),
+    );
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    await expect(
+      writeWorkbenchAssetRunReviewDraft(
+        createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+        {
+          assetRunPath: '/runs/assets/20260629-010203-tools-release-check-sh.md',
+        },
+      ),
+    ).rejects.toThrow('Asset execution review source must be a safe runs/assets markdown path');
+    expect(readText).not.toHaveBeenCalled();
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it('extracts repository asset permission boundaries from markdown frontmatter', () => {
+    const parsePermissionBoundary = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        parseRepositoryAssetPermissionBoundary?: (content: string) => {
+          recordOnly: boolean | null;
+          desktopExecutes: boolean | null;
+          grantsPermission: boolean | null;
+          requiresApproval: boolean;
+        };
+      }
+    ).parseRepositoryAssetPermissionBoundary;
+
+    expect(parsePermissionBoundary).toBeTypeOf('function');
+    expect(
+      parsePermissionBoundary?.(
+        [
+          '---',
+          'title: "发布检查脚本"',
+          'reuseKind: script',
+          'recordOnly: true',
+          'desktopExecutes: false',
+          'grantsPermission: false',
+          'requiresApproval: true',
+          '---',
+          '',
+          '# 发布检查脚本',
+        ].join('\n'),
+      ),
+    ).toEqual({
+      recordOnly: true,
+      desktopExecutes: false,
+      grantsPermission: false,
+      requiresApproval: true,
+    });
+  });
+
+  it('builds a repository asset execution approval record command from asset markdown', () => {
+    const buildApprovalCommand = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        buildRepositoryAssetExecutionApprovalCommand?: (
+          repoPath: string,
+          previewPath: string,
+          content: string,
+        ) => {
+          command: 'desktop.repository.assets.execution.record';
+          params: {
+            repoPath: string;
+            assetId?: string;
+            path?: string;
+            status: 'approval_required';
+            approvalTitle?: string;
+            approvalRisk?: string;
+            approvalReason?: string;
+            runner: string;
+            command: string;
+            workItemPath?: string;
+          };
+          text: string;
+        } | null;
+      }
+    ).buildRepositoryAssetExecutionApprovalCommand;
+
+    expect(buildApprovalCommand).toBeTypeOf('function');
+    expect(
+      buildApprovalCommand?.(
+        '/repo',
+        'tools/release-check.md',
+        [
+          '---',
+          'title: "发布检查脚本"',
+          'assetId: tools-release-check-sh',
+          'assetPath: tools/release-check.sh',
+          'reuseKind: script',
+          'requiresApproval: true',
+          'approvalTitle: 运行发布检查',
+          'approvalRisk: high',
+          'approvalReason: 会调用本地脚本，需要用户审批',
+          'runner: Gateway Agent',
+          'command: bash tools/release-check.sh',
+          'workItemPath: work/active/release.md',
+          '---',
+          '',
+          '# 发布检查脚本',
+        ].join('\n'),
+      ),
+    ).toEqual({
+      command: 'desktop.repository.assets.execution.record',
+      params: {
+        repoPath: '/repo',
+        assetId: 'tools-release-check-sh',
+        path: 'tools/release-check.sh',
+        status: 'approval_required',
+        approvalTitle: '运行发布检查',
+        approvalRisk: 'high',
+        approvalReason: '会调用本地脚本，需要用户审批',
+        runner: 'Gateway Agent',
+        command: 'bash tools/release-check.sh',
+        workItemPath: 'work/active/release.md',
+      },
+      text: JSON.stringify(
+        {
+          command: 'desktop.repository.assets.execution.record',
+          params: {
+            repoPath: '/repo',
+            assetId: 'tools-release-check-sh',
+            path: 'tools/release-check.sh',
+            status: 'approval_required',
+            approvalTitle: '运行发布检查',
+            approvalRisk: 'high',
+            approvalReason: '会调用本地脚本，需要用户审批',
+            runner: 'Gateway Agent',
+            command: 'bash tools/release-check.sh',
+            workItemPath: 'work/active/release.md',
+          },
+        },
+        null,
+        2,
+      ),
+    });
+    expect(buildApprovalCommand?.('/repo', 'outputs/report.md', 'reuseKind: template')).toBeNull();
+  });
+
+  it('does not use path-like repository asset run previews as executable asset approval paths', () => {
+    const buildApprovalCommand = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        buildRepositoryAssetExecutionApprovalCommand?: (
+          repoPath: string,
+          previewPath: string,
+          content: string,
+        ) => {
+          params: {
+            path?: string;
+          };
+        } | null;
+      }
+    ).buildRepositoryAssetExecutionApprovalCommand;
+
+    expect(buildApprovalCommand).toBeTypeOf('function');
+    expect(
+      buildApprovalCommand?.(
+        '/repo',
+        '/runs/assets/20260629-010203-tools-release-check-sh.md',
+        ['---', 'reuseKind: script', '---'].join('\n'),
+      ),
+    ).toBeNull();
+  });
+
+  it('finds unresolved pending approval runs for repository asset approval actions', () => {
+    const buildApprovalCommand = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        buildRepositoryAssetExecutionApprovalCommand?: (
+          repoPath: string,
+          previewPath: string,
+          content: string,
+        ) => {
+          params: {
+            assetId?: string;
+            path?: string;
+          };
+        } | null;
+      }
+    ).buildRepositoryAssetExecutionApprovalCommand;
+    const parseAssetRunLinks = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        parseRepositoryAssetRunIndexLinks?: (markdown: string) => Array<{
+          path: string;
+          title: string;
+          assetId?: string;
+          assetPath?: string;
+          status?: string;
+          sourceApprovalRunPath?: string;
+        }>;
+      }
+    ).parseRepositoryAssetRunIndexLinks;
+    const findPendingApproval = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        findRepositoryAssetPendingApprovalState?: (
+          command: {
+            params: {
+              repoPath: string;
+              assetId?: string;
+              path?: string;
+              runner?: string;
+              command?: string;
+              workItemPath?: string;
+            };
+          } | null,
+          runs: Array<{
+            path: string;
+            title: string;
+            assetId?: string;
+            assetPath?: string;
+            status?: string;
+            approvalTitle?: string;
+            approvalRisk?: string;
+            approvalReason?: string;
+            sourceApprovalRunPath?: string;
+          }>,
+        ) => {
+          status: 'pending';
+          runPath: string;
+          title: string;
+          approvalTitle?: string;
+          approvalRisk?: string;
+          approvalReason?: string;
+          decisionCommands?: {
+            approve: {
+              params: {
+                repoPath: string;
+                status: 'approved';
+                assetId?: string;
+                path?: string;
+                approvalTitle?: string;
+                approvalRisk?: string;
+                approvalReason?: string;
+                sourceApprovalRunPath?: string;
+                runner?: string;
+                command?: string;
+                workItemPath?: string;
+              };
+            };
+            deny: {
+              params: {
+                repoPath: string;
+                status: 'denied';
+                assetId?: string;
+                path?: string;
+                approvalTitle?: string;
+                approvalRisk?: string;
+                approvalReason?: string;
+                sourceApprovalRunPath?: string;
+                runner?: string;
+                command?: string;
+                workItemPath?: string;
+              };
+            };
+          };
+        } | null;
+      }
+    ).findRepositoryAssetPendingApprovalState;
+
+    const command = buildApprovalCommand?.(
+      '/repo',
+      'tools/manual.md',
+      [
+        '---',
+        'assetId: manual-approval',
+        'assetPath: tools/manual.sh',
+        'reuseKind: script',
+        'approvalTitle: 运行手动检查',
+        'approvalRisk: medium',
+        'approvalReason: 需要外部 runner 使用本地脚本',
+        'runner: Gateway Agent',
+        'command: bash tools/manual.sh',
+        'workItemPath: work/active/release.md',
+        '---',
+      ].join('\n'),
+    );
+    const links = parseAssetRunLinks?.(
+      [
+        '# Asset Runs',
+        '- [Resolved Approval](runs/assets/20260629-010203-manual-approval.md) (`manual-approval`, script, approval_required)',
+        '  - assetPath: tools/manual.sh',
+        '  - executedAt: 2026-06-29T01:02:03.000Z',
+        '- [Resolved Approval Decision](runs/assets/20260629-020304-manual-approval.md) (`manual-approval`, script, approved)',
+        '  - assetPath: tools/manual.sh',
+        '  - sourceApprovalRunPath: runs/assets/20260629-010203-manual-approval.md',
+        '  - executedAt: 2026-06-29T02:03:04.000Z',
+        '- [Pending Approval](runs/assets/20260629-030405-manual-approval.md) (`manual-approval`, script, approval_required)',
+        '  - assetPath: tools/manual.sh',
+        '  - approvalTitle: 运行手动检查',
+        '  - approvalRisk: high',
+        '  - approvalReason: 同一资产待审批运行里的最新风险说明',
+        '  - executedAt: 2026-06-29T03:04:05.000Z',
+      ].join('\n'),
+    );
+
+    expect(findPendingApproval).toBeTypeOf('function');
+    expect(findPendingApproval?.(command ?? null, links ?? [])).toEqual({
+      status: 'pending',
+      runPath: 'runs/assets/20260629-030405-manual-approval.md',
+      title: 'Pending Approval',
+      requestedAt: '2026-06-29T03:04:05.000Z',
+      approvalTitle: '运行手动检查',
+      approvalRisk: 'high',
+      approvalReason: '同一资产待审批运行里的最新风险说明',
+      decisionCommands: {
+        approve: {
+          command: 'desktop.repository.assets.execution.record',
+          params: {
+            repoPath: '/repo',
+            assetId: 'manual-approval',
+            path: 'tools/manual.sh',
+            status: 'approved',
+            approvalTitle: '运行手动检查',
+            approvalRisk: 'high',
+            approvalReason: '同一资产待审批运行里的最新风险说明',
+            sourceApprovalRunPath: 'runs/assets/20260629-030405-manual-approval.md',
+            runner: 'Gateway Agent',
+            command: 'bash tools/manual.sh',
+            workItemPath: 'work/active/release.md',
+          },
+          text: expect.stringContaining('"sourceApprovalRunPath": "runs/assets/20260629-030405-manual-approval.md"'),
+        },
+        deny: {
+          command: 'desktop.repository.assets.execution.record',
+          params: {
+            repoPath: '/repo',
+            assetId: 'manual-approval',
+            path: 'tools/manual.sh',
+            status: 'denied',
+            approvalTitle: '运行手动检查',
+            approvalRisk: 'high',
+            approvalReason: '同一资产待审批运行里的最新风险说明',
+            sourceApprovalRunPath: 'runs/assets/20260629-030405-manual-approval.md',
+            runner: 'Gateway Agent',
+            command: 'bash tools/manual.sh',
+            workItemPath: 'work/active/release.md',
+          },
+          text: expect.stringContaining('"sourceApprovalRunPath": "runs/assets/20260629-030405-manual-approval.md"'),
+        },
+      },
+    });
+    expect(findPendingApproval?.(command ?? null, links?.slice(0, 2) ?? [])).toBeNull();
+  });
+
+  it('finds latest resolved run state for repository asset approval actions', () => {
+    const buildApprovalCommand = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        buildRepositoryAssetExecutionApprovalCommand?: (
+          repoPath: string,
+          previewPath: string,
+          content: string,
+        ) => {
+          params: {
+            assetId?: string;
+            path?: string;
+          };
+        } | null;
+      }
+    ).buildRepositoryAssetExecutionApprovalCommand;
+    const parseAssetRunLinks = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        parseRepositoryAssetRunIndexLinks?: (markdown: string) => Array<{
+          path: string;
+          title: string;
+          assetId?: string;
+          assetPath?: string;
+          status?: string;
+          approvalState?: 'pending' | 'approved' | 'denied';
+          executedAt?: string;
+          resultSummary?: string;
+          outputState?: 'pending' | 'preserved';
+          workItemPath?: string;
+          reviewPending?: boolean;
+        }>;
+      }
+    ).parseRepositoryAssetRunIndexLinks;
+    const findResolvedRunState = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        findRepositoryAssetResolvedRunState?: (
+          command: { params: { assetId?: string; path?: string } } | null,
+          runs: Array<{
+            path: string;
+            title: string;
+            assetId?: string;
+            assetPath?: string;
+            status?: string;
+            approvalState?: 'pending' | 'approved' | 'denied';
+            executedAt?: string;
+            resultSummary?: string;
+            outputState?: 'pending' | 'preserved';
+            workItemPath?: string;
+            reviewPending?: boolean;
+          }>,
+          reviewDocuments?: Array<{
+            path: string;
+            content: string;
+          }>,
+        ) => {
+          status: 'approved' | 'denied' | 'succeeded' | 'failed' | 'cancelled';
+          runPath: string;
+          recordedAt?: string;
+          resultSummary?: string;
+          outputState?: 'pending' | 'preserved';
+          workItemPath?: string;
+          reviewState?: 'pending' | 'draft' | 'confirmed';
+        } | null;
+      }
+    ).findRepositoryAssetResolvedRunState;
+
+    const command = buildApprovalCommand?.(
+      '/repo',
+      'tools/manual.md',
+      ['---', 'assetId: manual-approval', 'assetPath: tools/manual.sh', 'reuseKind: script', '---'].join('\n'),
+    );
+    const links = parseAssetRunLinks?.(
+      [
+        '# Asset Runs',
+        '- [Old Approval](runs/assets/20260629-010203-manual-approval.md) (`manual-approval`, script, approval_required)',
+        '  - assetPath: tools/manual.sh',
+        '  - executedAt: 2026-06-29T01:02:03.000Z',
+        '- [Approval Decision](runs/assets/20260629-020304-manual-approval.md) (`manual-approval`, script, approved)',
+        '  - assetPath: tools/manual.sh',
+        '  - sourceApprovalRunPath: runs/assets/20260629-010203-manual-approval.md',
+        '  - executedAt: 2026-06-29T02:03:04.000Z',
+        '- [Terminal Run](runs/assets/20260629-030405-manual-approval.md) (`manual-approval`, script, succeeded)',
+        '  - assetPath: tools/manual.sh',
+        '  - output: outputs/reports/manual.md',
+        '  - result: 手动检查通过',
+        '  - workItemPath: work/active/release.md',
+        '  - review: pending, write reviews/weekly/ entry',
+        '  - executedAt: 2026-06-29T03:04:05.000Z',
+        '- [Other Asset Run](runs/assets/20260629-040506-other-asset.md) (`other-asset`, script, failed)',
+        '  - assetPath: tools/other.sh',
+        '  - result: 其他资产失败',
+        '  - executedAt: 2026-06-29T04:05:06.000Z',
+      ].join('\n'),
+    );
+
+    expect(findResolvedRunState).toBeTypeOf('function');
+    expect(findResolvedRunState?.(command ?? null, links ?? [])).toEqual({
+      status: 'succeeded',
+      runPath: 'runs/assets/20260629-030405-manual-approval.md',
+      recordedAt: '2026-06-29T03:04:05.000Z',
+      resultSummary: '手动检查通过',
+      outputState: 'preserved',
+      workItemPath: 'work/active/release.md',
+      reviewState: 'pending',
+    });
+    expect(
+      findResolvedRunState?.(command ?? null, links ?? [], [
+        {
+          path: 'reviews/weekly/manual-review.md',
+          content: [
+            '---',
+            'source: desktop-repository-asset-execution-review',
+            'status: confirmed',
+            'assetRunPath: runs/assets/20260629-030405-manual-approval.md',
+            '---',
+            '# 已确认复盘',
+          ].join('\n'),
+        },
+      ]),
+    ).toMatchObject({
+      status: 'succeeded',
+      runPath: 'runs/assets/20260629-030405-manual-approval.md',
+      reviewState: 'confirmed',
+    });
+    expect(findResolvedRunState?.(command ?? null, links?.slice(0, 1) ?? [])).toBeNull();
+  });
+
+  it('derives follow-up actions for resolved repository asset runs from existing states', () => {
+    const getFollowUpActions = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        getRepositoryAssetResolvedRunFollowUpActions?: (
+          state: {
+            status: 'approved' | 'denied' | 'succeeded' | 'failed' | 'cancelled';
+            runPath: string;
+            outputState?: 'pending' | 'preserved';
+            reviewState?: 'pending' | 'draft' | 'confirmed';
+          } | null,
+          knowledgeUpdateState?: {
+            status: 'running' | 'awaiting_approval' | 'done' | 'no_write_needed' | 'failed' | 'cancelled';
+          },
+        ) => {
+          canPreserveOutput: boolean;
+          canUpdateKnowledge: boolean;
+          canWriteReview: boolean;
+        };
+      }
+    ).getRepositoryAssetResolvedRunFollowUpActions;
+
+    expect(getFollowUpActions).toBeTypeOf('function');
+    expect(
+      getFollowUpActions?.({
+        status: 'succeeded',
+        runPath: 'runs/assets/20260629-030405-manual-approval.md',
+        outputState: 'pending',
+        reviewState: 'pending',
+      }),
+    ).toEqual({
+      canPreserveOutput: true,
+      canUpdateKnowledge: true,
+      canWriteReview: true,
+    });
+    expect(
+      getFollowUpActions?.(
+        {
+          status: 'succeeded',
+          runPath: 'runs/assets/20260629-030405-manual-approval.md',
+          outputState: 'preserved',
+          reviewState: 'confirmed',
+        },
+        { status: 'done' },
+      ),
+    ).toEqual({
+      canPreserveOutput: false,
+      canUpdateKnowledge: false,
+      canWriteReview: false,
+    });
+    expect(
+      getFollowUpActions?.(
+        {
+          status: 'succeeded',
+          runPath: 'runs/assets/20260629-030405-manual-approval.md',
+          outputState: 'preserved',
+          reviewState: 'confirmed',
+        },
+        { status: 'failed' },
+      ),
+    ).toMatchObject({
+      canUpdateKnowledge: true,
+    });
+    expect(
+      getFollowUpActions?.({
+        status: 'approved',
+        runPath: 'runs/assets/20260629-020304-manual-approval.md',
+      }),
+    ).toEqual({
+      canPreserveOutput: false,
+      canUpdateKnowledge: false,
+      canWriteReview: false,
+    });
+  });
+
+  it('finds same-source repository asset run knowledge update state without fuzzy prefix matches', () => {
+    const findKnowledgeUpdateState = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        findRepositoryAssetRunKnowledgeUpdateState?: (
+          assetRunPath: string | undefined,
+          context: {
+            actionRuns?: Array<{
+              id: string;
+              type: string;
+              sourcePage: string;
+              instanceId: string;
+              agentId: string;
+              status: 'draft' | 'planning' | 'awaiting_approval' | 'running' | 'done' | 'failed' | 'cancelled';
+              executionMode: 'isolated-session' | 'domain-thread' | 'subagent-tree' | 'local-bridge';
+              input: string;
+              resultSummary?: string;
+              lastAssistantResponse?: string;
+              createdAt: number;
+              updatedAt: number;
+            }>;
+          },
+        ) => { status: string; runId: string; summary?: string; updatedAt: number } | undefined;
+      }
+    ).findRepositoryAssetRunKnowledgeUpdateState;
+
+    expect(findKnowledgeUpdateState).toBeTypeOf('function');
+    expect(
+      findKnowledgeUpdateState?.('runs/assets/20260629-030405-manual-approval.md', {
+        actionRuns: [
+          {
+            id: 'knowledge-prefix',
+            type: 'knowledge_rewrite',
+            sourcePage: 'knowledge',
+            instanceId: 'desktop',
+            agentId: 'agent',
+            status: 'done',
+            executionMode: 'isolated-session',
+            input: 'sourceExecutionId: asset-run-knowledge:runs/assets/20260629-030405-manual-approval.md-v2',
+            resultSummary: '不应匹配相似前缀',
+            createdAt: 1,
+            updatedAt: 9,
+          },
+          {
+            id: 'knowledge-asset-1',
+            type: 'knowledge_rewrite',
+            sourcePage: 'knowledge',
+            instanceId: 'desktop',
+            agentId: 'agent',
+            status: 'done',
+            executionMode: 'isolated-session',
+            input: 'sourceExecutionId: asset-run-knowledge:runs/assets/20260629-030405-manual-approval.md',
+            resultSummary: '写入 wiki/topics/manual.md',
+            createdAt: 1,
+            updatedAt: 8,
+          },
+        ],
+      }),
+    ).toEqual({
+      status: 'done',
+      runId: 'knowledge-asset-1',
+      summary: '写入 wiki/topics/manual.md',
+      updatedAt: 8,
+    });
+  });
+
+  it('extracts repository asset run detail facts from execution markdown', () => {
+    const parseRunDetails = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        parseRepositoryAssetRunDetails?: (
+          path: string,
+          content: string,
+        ) => {
+          assetRunPath: string;
+          title: string;
+          assetId?: string;
+          assetPath?: string;
+          assetReuseKind?: string;
+          status?: string;
+          approvalTitle?: string;
+          approvalRisk?: string;
+          approvalReason?: string;
+          runner?: string;
+          command?: string;
+          repositoryOutputPath?: string;
+          outputArtifactId?: string;
+          workItemPath?: string;
+          executedAt?: string;
+          resultSummary?: string;
+        } | null;
+      }
+    ).parseRepositoryAssetRunDetails;
+
+    expect(parseRunDetails).toBeTypeOf('function');
+    expect(
+      parseRunDetails?.(
+        'runs/assets/20260629-010203-tools-release-check-sh.md',
+        [
+          '---',
+          'title: "仓库资产执行 - 发布检查脚本"',
+          'source: desktop-repository-asset-execution',
+          'assetId: tools-release-check-sh',
+          'assetPath: tools/release-check.sh',
+          'assetReuseKind: script',
+          'status: succeeded',
+          'approvalTitle: 运行发布检查',
+          'approvalRisk: high',
+          'approvalReason: 会调用本地脚本，需要用户审批',
+          'runner: Gateway Agent',
+          'command: bash tools/release-check.sh',
+          'repositoryOutputPath: outputs/reports/release-check.md',
+          'outputArtifactId: artifact-release-check',
+          'workItemPath: work/active/release.md',
+          'executedAt: 2026-06-29T01:02:03.000Z',
+          '---',
+          '',
+          '# 仓库资产执行：发布检查脚本',
+          '',
+          '## 摘要',
+          '',
+          '- 执行结果：发布检查通过',
+        ].join('\n'),
+      ),
+    ).toEqual({
+      assetRunPath: 'runs/assets/20260629-010203-tools-release-check-sh.md',
+      title: '发布检查脚本',
+      assetId: 'tools-release-check-sh',
+      assetPath: 'tools/release-check.sh',
+      assetReuseKind: 'script',
+      status: 'succeeded',
+      approvalTitle: '运行发布检查',
+      approvalRisk: 'high',
+      approvalReason: '会调用本地脚本，需要用户审批',
+      runner: 'Gateway Agent',
+      command: 'bash tools/release-check.sh',
+      repositoryOutputPath: 'outputs/reports/release-check.md',
+      outputArtifactId: 'artifact-release-check',
+      workItemPath: 'work/active/release.md',
+      executedAt: '2026-06-29T01:02:03.000Z',
+      resultSummary: '发布检查通过',
+    });
+    expect(parseRunDetails?.('tools/release-check.sh', 'status: succeeded')).toBeNull();
+  });
+
+  it('builds repository asset run approval decision record commands from pending runs', () => {
+    const buildDecisionCommands = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        buildRepositoryAssetRunApprovalDecisionCommands?: (
+          repoPath: string,
+          details: {
+            assetRunPath: string;
+            title: string;
+            assetId?: string;
+            assetPath?: string;
+            status?: string;
+            approvalTitle?: string;
+            approvalRisk?: string;
+            approvalReason?: string;
+            runner?: string;
+            command?: string;
+            workItemPath?: string;
+          },
+        ) => {
+          approve: {
+            command: 'desktop.repository.assets.execution.record';
+            params: {
+              repoPath: string;
+              status: 'approved';
+              assetId?: string;
+              path?: string;
+              sourceApprovalRunPath?: string;
+            };
+            text: string;
+          };
+          deny: {
+            command: 'desktop.repository.assets.execution.record';
+            params: {
+              repoPath: string;
+              status: 'denied';
+              assetId?: string;
+              path?: string;
+              sourceApprovalRunPath?: string;
+            };
+            text: string;
+          };
+        } | null;
+      }
+    ).buildRepositoryAssetRunApprovalDecisionCommands;
+
+    expect(buildDecisionCommands).toBeTypeOf('function');
+    const commands = buildDecisionCommands?.('/repo', {
+      assetRunPath: 'runs/assets/20260629-030405-manual-approval.md',
+      title: 'Manual Approval',
+      assetId: 'manual-approval',
+      assetPath: 'tools/manual.sh',
+      status: 'approval_required',
+      approvalTitle: '运行手动检查',
+      approvalRisk: 'medium',
+      approvalReason: '需要外部 runner 使用本地脚本',
+      runner: 'Gateway Agent',
+      command: 'bash tools/manual.sh',
+      workItemPath: 'work/active/release.md',
+    });
+
+    expect(commands?.approve.params).toEqual({
+      repoPath: '/repo',
+      assetId: 'manual-approval',
+      path: 'tools/manual.sh',
+      status: 'approved',
+      approvalTitle: '运行手动检查',
+      approvalRisk: 'medium',
+      approvalReason: '需要外部 runner 使用本地脚本',
+      runner: 'Gateway Agent',
+      command: 'bash tools/manual.sh',
+      workItemPath: 'work/active/release.md',
+      sourceApprovalRunPath: 'runs/assets/20260629-030405-manual-approval.md',
+    });
+    expect(commands?.deny.params).toEqual({
+      repoPath: '/repo',
+      assetId: 'manual-approval',
+      path: 'tools/manual.sh',
+      status: 'denied',
+      approvalTitle: '运行手动检查',
+      approvalRisk: 'medium',
+      approvalReason: '需要外部 runner 使用本地脚本',
+      runner: 'Gateway Agent',
+      command: 'bash tools/manual.sh',
+      workItemPath: 'work/active/release.md',
+      sourceApprovalRunPath: 'runs/assets/20260629-030405-manual-approval.md',
+    });
+    expect(commands?.approve.text).toContain('"status": "approved"');
+    expect(commands?.approve.text).toContain(
+      '"sourceApprovalRunPath": "runs/assets/20260629-030405-manual-approval.md"',
+    );
+    expect(commands?.deny.text).toContain('"status": "denied"');
+    expect(commands?.deny.text).toContain('"sourceApprovalRunPath": "runs/assets/20260629-030405-manual-approval.md"');
+    expect(
+      buildDecisionCommands?.('/repo', {
+        assetRunPath: 'runs/assets/20260629-040506-approved.md',
+        title: 'Already Approved',
+        assetId: 'approved',
+        status: 'approved',
+      }),
+    ).toBeNull();
+  });
+
+  it('finds repository asset run review state from review documents', () => {
+    const findReviewState = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        findRepositoryAssetRunReviewState?: (
+          assetRunPath: string,
+          documents: Array<{
+            path: string;
+            title: string;
+            content: string;
+            file: { path: string; name: string; size: number; updatedAt: number };
+          }>,
+        ) => { status: 'draft' | 'confirmed'; reviewPath: string } | null;
+      }
+    ).findRepositoryAssetRunReviewState;
+
+    const assetRunPath = 'runs/assets/20260629-010203-tools-release-check-sh.md';
+    expect(findReviewState).toBeTypeOf('function');
+    expect(
+      findReviewState?.(assetRunPath, [
+        {
+          path: 'reviews/weekly/2026-06-29-asset-run-draft.md',
+          title: 'draft',
+          file: { path: 'reviews/weekly/2026-06-29-asset-run-draft.md', name: 'draft.md', size: 1, updatedAt: 1 },
+          content: [
+            '---',
+            'source: desktop-repository-asset-execution-review',
+            `assetRunPath: ${assetRunPath}`,
+            'status: draft',
+            '---',
+          ].join('\n'),
+        },
+        {
+          path: 'reviews/weekly/2026-06-30-asset-run-confirmed.md',
+          title: 'confirmed',
+          file: {
+            path: 'reviews/weekly/2026-06-30-asset-run-confirmed.md',
+            name: 'confirmed.md',
+            size: 1,
+            updatedAt: 2,
+          },
+          content: [
+            '---',
+            'source: desktop-repository-asset-execution-review',
+            `assetRunPath: ${assetRunPath}`,
+            'status: confirmed',
+            '---',
+          ].join('\n'),
+        },
+      ]),
+    ).toEqual({
+      status: 'confirmed',
+      reviewPath: 'reviews/weekly/2026-06-30-asset-run-confirmed.md',
+    });
+    expect(
+      findReviewState?.('runs/assets/other.md', [
+        {
+          path: 'reviews/weekly/2026-06-29-asset-run-draft.md',
+          title: 'draft',
+          file: { path: 'reviews/weekly/2026-06-29-asset-run-draft.md', name: 'draft.md', size: 1, updatedAt: 1 },
+          content: [
+            '---',
+            'source: desktop-repository-asset-execution-review',
+            `assetRunPath: ${assetRunPath}`,
+            'status: draft',
+            '---',
+          ].join('\n'),
+        },
+      ]),
+    ).toBeNull();
+    expect(
+      findReviewState?.('runs/assets/../secret.md', [
+        {
+          path: 'reviews/weekly/2026-06-29-asset-run-draft.md',
+          title: 'draft',
+          file: { path: 'reviews/weekly/2026-06-29-asset-run-draft.md', name: 'draft.md', size: 1, updatedAt: 1 },
+          content: [
+            '---',
+            'source: desktop-repository-asset-execution-review',
+            'assetRunPath: runs/assets/../secret.md',
+            'status: draft',
+            '---',
+          ].join('\n'),
+        },
+      ]),
+    ).toBeNull();
+  });
+
+  it('checks asset run review draft confirmation eligibility from frontmatter only', () => {
+    const canConfirmAssetRunDraft = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        isRepositoryAssetRunReviewDraftForRun?: (content: string, assetRunPath: string) => boolean;
+      }
+    ).isRepositoryAssetRunReviewDraftForRun;
+
+    const assetRunPath = 'runs/assets/20260629-010203-tools-release-check-sh.md';
+
+    expect(canConfirmAssetRunDraft).toBeTypeOf('function');
+    expect(
+      canConfirmAssetRunDraft?.(
+        [
+          '---',
+          'source: desktop-repository-asset-execution-review',
+          `assetRunPath: ${assetRunPath}`,
+          'status: draft',
+          '---',
+          '',
+          '# 资产运行复盘',
+        ].join('\n'),
+        assetRunPath,
+      ),
+    ).toBe(true);
+    expect(
+      canConfirmAssetRunDraft?.(
+        [
+          '---',
+          'source: desktop-repository-asset-execution-review',
+          'status: draft',
+          '---',
+          '',
+          '# 普通复盘记录',
+          '',
+          '下面只是复制的字段示例:',
+          `assetRunPath: ${assetRunPath}`,
+        ].join('\n'),
+        assetRunPath,
+      ),
+    ).toBe(false);
+    expect(
+      canConfirmAssetRunDraft?.(
+        [
+          '---',
+          'source: desktop-repository-asset-execution-review',
+          'assetRunPath: runs/assets/../secret.md',
+          'status: draft',
+          '---',
+        ].join('\n'),
+        'runs/assets/../secret.md',
+      ),
+    ).toBe(false);
+  });
+
+  it('derives effective repository asset run review pending state for list filtering', () => {
+    const isReviewPending = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        isRepositoryAssetRunEffectivelyReviewPending?: (
+          run: repositoryWorkbench.RepositoryAssetRunIndexLink,
+          documents: Array<{
+            path: string;
+            title: string;
+            content: string;
+            file: { path: string; name: string; size: number; updatedAt: number };
+          }>,
+        ) => boolean;
+      }
+    ).isRepositoryAssetRunEffectivelyReviewPending;
+    const getReviewState = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        getRepositoryAssetRunEffectiveReviewState?: (
+          run: repositoryWorkbench.RepositoryAssetRunIndexLink,
+          documents?: Array<{
+            path: string;
+            title: string;
+            content: string;
+            file: { path: string; name: string; size: number; updatedAt: number };
+          }>,
+        ) => 'pending' | 'draft' | 'confirmed' | null;
+      }
+    ).getRepositoryAssetRunEffectiveReviewState;
+
+    expect(isReviewPending).toBeTypeOf('function');
+    expect(getReviewState).toBeTypeOf('function');
+    const reviewedRun = {
+      path: 'runs/assets/20260629-010203-reviewed.md',
+      title: 'Reviewed',
+      status: 'succeeded',
+      reviewPending: true,
+    };
+    const draftOnlyRun = {
+      path: 'runs/assets/20260629-020304-draft-only.md',
+      title: 'Draft Only',
+      status: 'succeeded',
+      reviewPending: true,
+    };
+    const noReviewRun = {
+      path: 'runs/assets/20260629-030405-no-review.md',
+      title: 'No Review',
+      status: 'succeeded',
+      reviewPending: false,
+    };
+
+    expect(
+      isReviewPending?.(reviewedRun, [
+        {
+          path: 'reviews/weekly/2026-06-29-reviewed.md',
+          title: 'reviewed',
+          file: { path: 'reviews/weekly/2026-06-29-reviewed.md', name: 'reviewed.md', size: 1, updatedAt: 1 },
+          content: [
+            '---',
+            'source: desktop-repository-asset-execution-review',
+            'assetRunPath: runs/assets/20260629-010203-reviewed.md',
+            'status: confirmed',
+            '---',
+          ].join('\n'),
+        },
+      ]),
+    ).toBe(false);
+    expect(
+      getReviewState?.(reviewedRun, [
+        {
+          path: 'reviews/weekly/2026-06-29-reviewed.md',
+          title: 'reviewed',
+          file: { path: 'reviews/weekly/2026-06-29-reviewed.md', name: 'reviewed.md', size: 1, updatedAt: 1 },
+          content: [
+            '---',
+            'source: desktop-repository-asset-execution-review',
+            'assetRunPath: runs/assets/20260629-010203-reviewed.md',
+            'status: confirmed',
+            '---',
+          ].join('\n'),
+        },
+      ]),
+    ).toBe('confirmed');
+    expect(
+      isReviewPending?.(draftOnlyRun, [
+        {
+          path: 'reviews/weekly/2026-06-29-draft.md',
+          title: 'draft',
+          file: { path: 'reviews/weekly/2026-06-29-draft.md', name: 'draft.md', size: 1, updatedAt: 1 },
+          content: [
+            '---',
+            'source: desktop-repository-asset-execution-review',
+            'assetRunPath: runs/assets/20260629-020304-draft-only.md',
+            'status: draft',
+            '---',
+          ].join('\n'),
+        },
+      ]),
+    ).toBe(true);
+    expect(
+      getReviewState?.(draftOnlyRun, [
+        {
+          path: 'reviews/weekly/2026-06-29-draft.md',
+          title: 'draft',
+          file: { path: 'reviews/weekly/2026-06-29-draft.md', name: 'draft.md', size: 1, updatedAt: 1 },
+          content: [
+            '---',
+            'source: desktop-repository-asset-execution-review',
+            'assetRunPath: runs/assets/20260629-020304-draft-only.md',
+            'status: draft',
+            '---',
+          ].join('\n'),
+        },
+      ]),
+    ).toBe('draft');
+    expect(getReviewState?.(draftOnlyRun, [])).toBe('pending');
+    expect(isReviewPending?.(noReviewRun, [])).toBe(false);
+    expect(getReviewState?.(noReviewRun, [])).toBeNull();
+  });
+
+  it('finds repository asset run follow-up state from source tail actions', () => {
+    const findFollowUpState = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        findRepositoryAssetRunFollowUpState?: (
+          assetRunPath: string,
+          tailActions: Array<{
+            id: string;
+            text: string;
+            sourcePath: string;
+            completed: boolean;
+            updatedAt: number;
+          }>,
+        ) => Array<{
+          kind: 'status' | 'output' | 'knowledge' | 'review' | 'general';
+          text: string;
+          sourcePath: string;
+          completed: boolean;
+        }>;
+      }
+    ).findRepositoryAssetRunFollowUpState;
+
+    const assetRunPath = 'runs/assets/20260629-010203-tools-release-check-sh.md';
+    expect(findFollowUpState).toBeTypeOf('function');
+    expect(
+      findFollowUpState?.(assetRunPath, [
+        {
+          id: 'work/active/release.md:tail-action:0',
+          sourcePath: 'work/active/release.md',
+          text: `根据资产运行 ${assetRunPath} 更新事项状态。`,
+          completed: true,
+          updatedAt: 1,
+        },
+        {
+          id: 'work/active/release.md:tail-action:1',
+          sourcePath: 'work/active/release.md',
+          text: `判断是否基于 ${assetRunPath} 沉淀成果。`,
+          completed: false,
+          updatedAt: 1,
+        },
+        {
+          id: 'work/active/release.md:tail-action:2',
+          sourcePath: 'work/active/release.md',
+          text: `判断是否基于 ${assetRunPath} 更新知识库。`,
+          completed: true,
+          updatedAt: 1,
+        },
+        {
+          id: 'work/active/release.md:tail-action:3',
+          sourcePath: 'work/active/release.md',
+          text: `误复制的备份路径 ${assetRunPath}.bak 不应算作这次资产运行。`,
+          completed: false,
+          updatedAt: 1,
+        },
+        {
+          id: 'work/active/release.md:tail-action:4',
+          sourcePath: 'work/active/release.md',
+          text: '这条尾动作没有引用资产运行。',
+          completed: false,
+          updatedAt: 1,
+        },
+      ]),
+    ).toEqual([
+      {
+        kind: 'status',
+        text: `根据资产运行 ${assetRunPath} 更新事项状态。`,
+        sourcePath: 'work/active/release.md',
+        completed: true,
+      },
+      {
+        kind: 'output',
+        text: `判断是否基于 ${assetRunPath} 沉淀成果。`,
+        sourcePath: 'work/active/release.md',
+        completed: false,
+      },
+      {
+        kind: 'knowledge',
+        text: `判断是否基于 ${assetRunPath} 更新知识库。`,
+        sourcePath: 'work/active/release.md',
+        completed: true,
+      },
+    ]);
+    expect(findFollowUpState?.('outputs/demo.md', [])).toEqual([]);
+  });
+
+  it('derives repository asset run output preservation state from run facts', () => {
+    const getOutputState = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        getRepositoryAssetRunOutputState?: (
+          details: repositoryWorkbench.RepositoryAssetRunDetails,
+        ) => { status: 'preserved' | 'pending'; outputPath?: string; artifactId?: string } | null;
+      }
+    ).getRepositoryAssetRunOutputState;
+
+    const baseRun = {
+      assetRunPath: 'runs/assets/20260629-010203-tools-release-check-sh.md',
+      title: 'Release Check',
+      status: 'succeeded',
+      resultSummary: '发布检查通过',
+    };
+
+    expect(getOutputState).toBeTypeOf('function');
+    expect(
+      getOutputState?.({
+        ...baseRun,
+        repositoryOutputPath: 'outputs/reports/release-check.md',
+      }),
+    ).toEqual({
+      status: 'preserved',
+      outputPath: 'outputs/reports/release-check.md',
+    });
+    expect(
+      getOutputState?.({
+        ...baseRun,
+        outputArtifactId: 'artifact-release-check',
+      }),
+    ).toEqual({
+      status: 'preserved',
+      artifactId: 'artifact-release-check',
+    });
+    expect(getOutputState?.(baseRun)).toEqual({ status: 'pending' });
+    expect(
+      getOutputState?.({
+        ...baseRun,
+        status: 'approval_required',
+      }),
+    ).toBeNull();
+  });
+
+  it('parses repository asset run index links for filtering', () => {
+    const parseAssetRunLinks = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        parseRepositoryAssetRunIndexLinks?: (markdown: string) => Array<{
+          path: string;
+          title: string;
+          assetId?: string;
+          reuseKind?: string;
+          status?: string;
+          approvalState?: 'pending' | 'approved' | 'denied';
+          approvalPending?: boolean;
+          outputState?: 'preserved' | 'pending';
+          reviewPending: boolean;
+        }>;
+      }
+    ).parseRepositoryAssetRunIndexLinks;
+
+    expect(parseAssetRunLinks).toBeTypeOf('function');
+    expect(
+      parseAssetRunLinks?.(
+        [
+          '# Asset Runs',
+          '- [Release Check](assets/20260629-010203-tools-release-check-sh.md) (`tools-release-check-sh`, script, succeeded)',
+          '  - runPath: runs/assets/20260629-010203-tools-release-check-sh.md',
+          '  - result: 发布检查通过',
+          '  - review: pending, write reviews/weekly/ entry',
+          '- [Deploy Workflow](runs/assets/20260629-020304-deploy-workflow.md) (`deploy-workflow`, workflow, failed)',
+          '  - result: 部署失败',
+          '  - outputArtifact: artifact://deploy-report',
+          '- [Manual Approval](runs/assets/20260629-030405-manual-approval.md) (`manual-approval`, tool, approval_required)',
+          '  - approvalTitle: 运行手动检查',
+          '  - approvalRisk: medium',
+          '  - approvalReason: 需要外部 runner 使用本地脚本',
+          '- [Approved Tool](runs/assets/20260629-040506-approved-tool.md) (`approved-tool`, tool, approved)',
+          '- [Denied Tool](runs/assets/20260629-050607-denied-tool.md) (`denied-tool`, tool, denied)',
+        ].join('\n'),
+      ),
+    ).toEqual([
+      {
+        path: 'runs/assets/20260629-010203-tools-release-check-sh.md',
+        title: 'Release Check',
+        assetId: 'tools-release-check-sh',
+        reuseKind: 'script',
+        status: 'succeeded',
+        outputState: 'pending',
+        resultSummary: '发布检查通过',
+        reviewPending: true,
+      },
+      {
+        path: 'runs/assets/20260629-020304-deploy-workflow.md',
+        title: 'Deploy Workflow',
+        assetId: 'deploy-workflow',
+        reuseKind: 'workflow',
+        status: 'failed',
+        outputState: 'preserved',
+        resultSummary: '部署失败',
+        reviewPending: false,
+      },
+      {
+        path: 'runs/assets/20260629-030405-manual-approval.md',
+        title: 'Manual Approval',
+        assetId: 'manual-approval',
+        reuseKind: 'tool',
+        status: 'approval_required',
+        approvalState: 'pending',
+        approvalPending: true,
+        approvalTitle: '运行手动检查',
+        approvalRisk: 'medium',
+        approvalReason: '需要外部 runner 使用本地脚本',
+        reviewPending: false,
+      },
+      {
+        path: 'runs/assets/20260629-040506-approved-tool.md',
+        title: 'Approved Tool',
+        assetId: 'approved-tool',
+        reuseKind: 'tool',
+        status: 'approved',
+        approvalState: 'approved',
+        reviewPending: false,
+      },
+      {
+        path: 'runs/assets/20260629-050607-denied-tool.md',
+        title: 'Denied Tool',
+        assetId: 'denied-tool',
+        reuseKind: 'tool',
+        status: 'denied',
+        approvalState: 'denied',
+        reviewPending: false,
+      },
+    ]);
+  });
+
+  it('filters unsafe repository asset run paths from the run index', () => {
+    const parseAssetRunLinks = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        parseRepositoryAssetRunIndexLinks?: (markdown: string) => repositoryWorkbench.RepositoryAssetRunIndexLink[];
+      }
+    ).parseRepositoryAssetRunIndexLinks;
+
+    expect(parseAssetRunLinks).toBeTypeOf('function');
+    expect(
+      parseAssetRunLinks?.(
+        [
+          '# Asset Runs',
+          '- [Valid Run](runs/assets/20260629-010203-valid.md) (`valid`, script, succeeded)',
+          '  - result: ok',
+          '- [Unsafe Metadata](runs/assets/20260629-020304-safe-looking.md) (`unsafe-metadata`, script, succeeded)',
+          '  - runPath: runs/assets/../secret.md',
+          '- [Unsafe Href](assets/../secret.md) (`unsafe-href`, script, succeeded)',
+          '',
+          'Copied unsafe path: runs/assets/../secret.md',
+        ].join('\n'),
+      )?.map((run) => run.path),
+    ).toEqual(['runs/assets/20260629-010203-valid.md']);
+  });
+
+  it('finds repository asset run approval decision state from the run index', () => {
+    const findDecisionState = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        findRepositoryAssetRunApprovalDecisionState?: (
+          details: repositoryWorkbench.RepositoryAssetRunDetails,
+          runs: Array<{
+            path: string;
+            title: string;
+            assetId?: string;
+            assetPath?: string;
+            status?: string;
+            approvalState?: 'pending' | 'approved' | 'denied';
+            executedAt?: string;
+            reviewPending: boolean;
+          }>,
+        ) => { status: 'approved' | 'denied'; runPath: string; decidedAt?: string } | null;
+      }
+    ).findRepositoryAssetRunApprovalDecisionState;
+
+    const parseAssetRunLinks = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        parseRepositoryAssetRunIndexLinks?: (markdown: string) => Array<{
+          path: string;
+          title: string;
+          assetId?: string;
+          assetPath?: string;
+          status?: string;
+          approvalState?: 'pending' | 'approved' | 'denied';
+          executedAt?: string;
+          reviewPending: boolean;
+        }>;
+      }
+    ).parseRepositoryAssetRunIndexLinks;
+    const pendingRun: repositoryWorkbench.RepositoryAssetRunDetails = {
+      assetRunPath: 'runs/assets/20260629-030405-manual-approval.md',
+      title: 'Manual Approval',
+      assetId: 'manual-approval',
+      assetPath: 'tools/manual.sh',
+      status: 'approval_required',
+    };
+
+    expect(findDecisionState).toBeTypeOf('function');
+    const links = parseAssetRunLinks?.(
+      [
+        '# Asset Runs',
+        '- [Manual Approval](runs/assets/20260629-030405-manual-approval.md) (`manual-approval`, tool, approval_required)',
+        '  - assetPath: tools/manual.sh',
+        '  - executedAt: 2026-06-29T03:04:05.000Z',
+        '- [Manual Approval Approved](runs/assets/20260629-040506-manual-approval.md) (`manual-approval`, tool, approved)',
+        '  - assetPath: tools/manual.sh',
+        '  - executedAt: 2026-06-29T04:05:06.000Z',
+        '- [Manual Approval Denied](runs/assets/20260629-050607-manual-approval.md) (`manual-approval`, tool, denied)',
+        '  - assetPath: tools/manual.sh',
+        '  - executedAt: 2026-06-29T05:06:07.000Z',
+        '- [Other Approval](runs/assets/20260629-060708-other.md) (`other`, tool, approved)',
+        '  - assetPath: tools/other.sh',
+        '  - executedAt: 2026-06-29T06:07:08.000Z',
+      ].join('\n'),
+    );
+
+    expect(findDecisionState?.(pendingRun, links ?? [])).toEqual({
+      status: 'denied',
+      runPath: 'runs/assets/20260629-050607-manual-approval.md',
+      decidedAt: '2026-06-29T05:06:07.000Z',
+    });
+    expect(
+      findDecisionState?.(
+        {
+          ...pendingRun,
+          status: 'succeeded',
+        },
+        links ?? [],
+      ),
+    ).toBeNull();
+  });
+
+  it('matches repository asset run approval decisions to explicit source approval run paths', () => {
+    const findDecisionState = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        findRepositoryAssetRunApprovalDecisionState?: (
+          details: repositoryWorkbench.RepositoryAssetRunDetails,
+          runs: repositoryWorkbench.RepositoryAssetRunIndexLink[],
+        ) => { status: 'approved' | 'denied'; runPath: string; decidedAt?: string } | null;
+      }
+    ).findRepositoryAssetRunApprovalDecisionState;
+    const parseAssetRunLinks = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        parseRepositoryAssetRunIndexLinks?: (markdown: string) => repositoryWorkbench.RepositoryAssetRunIndexLink[];
+      }
+    ).parseRepositoryAssetRunIndexLinks;
+
+    const links = parseAssetRunLinks?.(
+      [
+        '# Asset Runs',
+        '- [First Approval](runs/assets/20260629-010203-manual-approval.md) (`manual-approval`, tool, approval_required)',
+        '  - assetPath: tools/manual.sh',
+        '  - executedAt: 2026-06-29T01:02:03.000Z',
+        '- [Second Approval](runs/assets/20260629-020304-manual-approval.md) (`manual-approval`, tool, approval_required)',
+        '  - assetPath: tools/manual.sh',
+        '  - executedAt: 2026-06-29T02:03:04.000Z',
+        '- [Second Approval Approved](runs/assets/20260629-030405-manual-approval.md) (`manual-approval`, tool, approved)',
+        '  - assetPath: tools/manual.sh',
+        '  - sourceApprovalRunPath: runs/assets/20260629-020304-manual-approval.md',
+        '  - executedAt: 2026-06-29T03:04:05.000Z',
+      ].join('\n'),
+    );
+
+    expect(
+      findDecisionState?.(
+        {
+          assetRunPath: 'runs/assets/20260629-010203-manual-approval.md',
+          title: 'First Approval',
+          assetId: 'manual-approval',
+          assetPath: 'tools/manual.sh',
+          status: 'approval_required',
+        },
+        links ?? [],
+      ),
+    ).toBeNull();
+    expect(
+      findDecisionState?.(
+        {
+          assetRunPath: 'runs/assets/20260629-020304-manual-approval.md',
+          title: 'Second Approval',
+          assetId: 'manual-approval',
+          assetPath: 'tools/manual.sh',
+          status: 'approval_required',
+        },
+        links ?? [],
+      ),
+    ).toEqual({
+      status: 'approved',
+      runPath: 'runs/assets/20260629-030405-manual-approval.md',
+      decidedAt: '2026-06-29T03:04:05.000Z',
+    });
+  });
+
+  it('finds repository asset run execution state from the run index', () => {
+    const findExecutionState = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        findRepositoryAssetRunExecutionState?: (
+          details: repositoryWorkbench.RepositoryAssetRunDetails,
+          runs: Array<{
+            path: string;
+            title: string;
+            assetId?: string;
+            assetPath?: string;
+            status?: string;
+            outputState?: 'preserved' | 'pending';
+            executedAt?: string;
+            resultSummary?: string;
+            reviewPending: boolean;
+          }>,
+        ) => {
+          status: 'succeeded' | 'failed' | 'cancelled';
+          runPath: string;
+          executedAt?: string;
+          resultSummary?: string;
+          outputState?: 'preserved' | 'pending';
+        } | null;
+      }
+    ).findRepositoryAssetRunExecutionState;
+
+    const parseAssetRunLinks = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        parseRepositoryAssetRunIndexLinks?: (markdown: string) => Array<{
+          path: string;
+          title: string;
+          assetId?: string;
+          assetPath?: string;
+          status?: string;
+          outputState?: 'preserved' | 'pending';
+          executedAt?: string;
+          resultSummary?: string;
+          reviewPending: boolean;
+        }>;
+      }
+    ).parseRepositoryAssetRunIndexLinks;
+    const pendingRun: repositoryWorkbench.RepositoryAssetRunDetails = {
+      assetRunPath: 'runs/assets/20260629-030405-manual-approval.md',
+      title: 'Manual Approval',
+      assetId: 'manual-approval',
+      assetPath: 'tools/manual.sh',
+      status: 'approval_required',
+    };
+
+    expect(findExecutionState).toBeTypeOf('function');
+    const links = parseAssetRunLinks?.(
+      [
+        '# Asset Runs',
+        '- [Manual Approval](runs/assets/20260629-030405-manual-approval.md) (`manual-approval`, tool, approval_required)',
+        '  - assetPath: tools/manual.sh',
+        '  - executedAt: 2026-06-29T03:04:05.000Z',
+        '- [Manual Approval Approved](runs/assets/20260629-040506-manual-approval.md) (`manual-approval`, tool, approved)',
+        '  - assetPath: tools/manual.sh',
+        '  - executedAt: 2026-06-29T04:05:06.000Z',
+        '- [Manual Run Succeeded](runs/assets/20260629-050607-manual-approval.md) (`manual-approval`, tool, succeeded)',
+        '  - assetPath: tools/manual.sh',
+        '  - result: wrote release checklist',
+        '  - output: outputs/assets/manual-release.md',
+        '  - executedAt: 2026-06-29T05:06:07.000Z',
+        '- [Manual Run Failed](runs/assets/20260629-060708-manual-approval.md) (`manual-approval`, tool, failed)',
+        '  - assetPath: tools/manual.sh',
+        '  - result: command exited 1',
+        '  - executedAt: 2026-06-29T06:07:08.000Z',
+        '- [Other Run](runs/assets/20260629-070809-other.md) (`other`, tool, succeeded)',
+        '  - assetPath: tools/other.sh',
+        '  - result: unrelated',
+        '  - executedAt: 2026-06-29T07:08:09.000Z',
+      ].join('\n'),
+    );
+
+    expect(findExecutionState?.(pendingRun, links ?? [])).toEqual({
+      status: 'failed',
+      runPath: 'runs/assets/20260629-060708-manual-approval.md',
+      executedAt: '2026-06-29T06:07:08.000Z',
+      resultSummary: 'command exited 1',
+      outputState: 'pending',
+    });
+    expect(findExecutionState?.({ ...pendingRun, status: 'approved' }, links ?? [])).toBeNull();
+  });
+
+  it('matches repository asset terminal execution state to explicit source approval run paths', () => {
+    const findExecutionState = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        findRepositoryAssetRunExecutionState?: (
+          details: repositoryWorkbench.RepositoryAssetRunDetails,
+          runs: repositoryWorkbench.RepositoryAssetRunIndexLink[],
+        ) => repositoryWorkbench.RepositoryAssetRunExecutionState | null;
+      }
+    ).findRepositoryAssetRunExecutionState;
+    const parseAssetRunLinks = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        parseRepositoryAssetRunIndexLinks?: (markdown: string) => repositoryWorkbench.RepositoryAssetRunIndexLink[];
+      }
+    ).parseRepositoryAssetRunIndexLinks;
+
+    const links = parseAssetRunLinks?.(
+      [
+        '# Asset Runs',
+        '- [First Approval](runs/assets/20260629-010203-manual-approval.md) (`manual-approval`, tool, approval_required)',
+        '  - assetPath: tools/manual.sh',
+        '  - executedAt: 2026-06-29T01:02:03.000Z',
+        '- [Second Approval](runs/assets/20260629-020304-manual-approval.md) (`manual-approval`, tool, approval_required)',
+        '  - assetPath: tools/manual.sh',
+        '  - executedAt: 2026-06-29T02:03:04.000Z',
+        '- [Second Approval Run Succeeded](runs/assets/20260629-030405-manual-approval.md) (`manual-approval`, tool, succeeded)',
+        '  - assetPath: tools/manual.sh',
+        '  - sourceApprovalRunPath: runs/assets/20260629-020304-manual-approval.md',
+        '  - result: wrote release checklist',
+        '  - executedAt: 2026-06-29T03:04:05.000Z',
+      ].join('\n'),
+    );
+
+    expect(
+      findExecutionState?.(
+        {
+          assetRunPath: 'runs/assets/20260629-010203-manual-approval.md',
+          title: 'First Approval',
+          assetId: 'manual-approval',
+          assetPath: 'tools/manual.sh',
+          status: 'approval_required',
+        },
+        links ?? [],
+      ),
+    ).toBeNull();
+    expect(
+      findExecutionState?.(
+        {
+          assetRunPath: 'runs/assets/20260629-020304-manual-approval.md',
+          title: 'Second Approval',
+          assetId: 'manual-approval',
+          assetPath: 'tools/manual.sh',
+          status: 'approval_required',
+        },
+        links ?? [],
+      ),
+    ).toEqual({
+      status: 'succeeded',
+      runPath: 'runs/assets/20260629-030405-manual-approval.md',
+      executedAt: '2026-06-29T03:04:05.000Z',
+      resultSummary: 'wrote release checklist',
+      outputState: 'pending',
+    });
+  });
+
+  it('derives repository asset run list follow-up state from the run index', () => {
+    const getListFollowUpState = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        getRepositoryAssetRunListFollowUpState?: (
+          run: repositoryWorkbench.RepositoryAssetRunIndexLink,
+          runs: repositoryWorkbench.RepositoryAssetRunIndexLink[],
+          context?: {
+            actionRuns?: Array<{
+              id: string;
+              type: string;
+              sourcePage: string;
+              instanceId: string;
+              agentId: string;
+              status: 'draft' | 'planning' | 'awaiting_approval' | 'running' | 'done' | 'failed' | 'cancelled';
+              executionMode: 'isolated-session' | 'domain-thread' | 'subagent-tree' | 'local-bridge';
+              input: string;
+              resultSummary?: string;
+              lastAssistantResponse?: string;
+              createdAt: number;
+              updatedAt: number;
+            }>;
+            reviewDocuments?: Array<{
+              path: string;
+              title: string;
+              content: string;
+              file: { path: string; name: string; size: number; updatedAt: number };
+            }>;
+          },
+        ) => {
+          approvalDecisionState?: {
+            status: 'approved' | 'denied';
+            runPath: string;
+            decidedAt?: string;
+          };
+          executionState?: {
+            status: 'succeeded' | 'failed' | 'cancelled';
+            runPath: string;
+            executedAt?: string;
+            resultSummary?: string;
+            outputState?: 'preserved' | 'pending';
+          };
+          knowledgeUpdateState?: {
+            status: 'running' | 'awaiting_approval' | 'done' | 'no_write_needed' | 'failed' | 'cancelled';
+            runId: string;
+            summary?: string;
+            updatedAt: number;
+          };
+          reviewState?: {
+            status: 'draft' | 'confirmed';
+            reviewPath: string;
+          };
+        } | null;
+      }
+    ).getRepositoryAssetRunListFollowUpState;
+    const parseAssetRunLinks = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        parseRepositoryAssetRunIndexLinks?: (markdown: string) => repositoryWorkbench.RepositoryAssetRunIndexLink[];
+      }
+    ).parseRepositoryAssetRunIndexLinks;
+
+    expect(getListFollowUpState).toBeTypeOf('function');
+    const links = parseAssetRunLinks?.(
+      [
+        '# Asset Runs',
+        '- [Manual Approval](runs/assets/20260629-030405-manual-approval.md) (`manual-approval`, tool, approval_required)',
+        '  - assetPath: tools/manual.sh',
+        '  - executedAt: 2026-06-29T03:04:05.000Z',
+        '- [Manual Approval Approved](runs/assets/20260629-040506-manual-approval.md) (`manual-approval`, tool, approved)',
+        '  - assetPath: tools/manual.sh',
+        '  - executedAt: 2026-06-29T04:05:06.000Z',
+        '- [Manual Run Failed](runs/assets/20260629-060708-manual-approval.md) (`manual-approval`, tool, failed)',
+        '  - assetPath: tools/manual.sh',
+        '  - result: command exited 1',
+        '  - executedAt: 2026-06-29T06:07:08.000Z',
+      ].join('\n'),
+    );
+    const pendingRun = links?.find((run) => run.status === 'approval_required');
+
+    expect(pendingRun).toBeTruthy();
+    expect(
+      getListFollowUpState?.(pendingRun as repositoryWorkbench.RepositoryAssetRunIndexLink, links ?? [], {
+        actionRuns: [
+          {
+            id: 'asset-knowledge-run',
+            type: 'knowledge_rewrite',
+            sourcePage: 'knowledge',
+            instanceId: 'desktop',
+            agentId: 'agent',
+            status: 'done',
+            executionMode: 'isolated-session',
+            input: 'sourceExecutionId: asset-run-knowledge:runs/assets/20260629-030405-manual-approval.md',
+            resultSummary: '写入 wiki/topics/manual-run.md',
+            createdAt: 1,
+            updatedAt: 12,
+          },
+        ],
+        reviewDocuments: [
+          {
+            path: 'reviews/weekly/2026-06-30-manual-run-confirmed.md',
+            title: 'confirmed',
+            file: {
+              path: 'reviews/weekly/2026-06-30-manual-run-confirmed.md',
+              name: 'confirmed.md',
+              size: 1,
+              updatedAt: 2,
+            },
+            content: [
+              '---',
+              'source: desktop-repository-asset-execution-review',
+              'assetRunPath: runs/assets/20260629-030405-manual-approval.md',
+              'status: confirmed',
+              '---',
+            ].join('\n'),
+          },
+        ],
+      }),
+    ).toEqual({
+      approvalDecisionState: {
+        status: 'approved',
+        runPath: 'runs/assets/20260629-040506-manual-approval.md',
+        decidedAt: '2026-06-29T04:05:06.000Z',
+      },
+      executionState: {
+        status: 'failed',
+        runPath: 'runs/assets/20260629-060708-manual-approval.md',
+        executedAt: '2026-06-29T06:07:08.000Z',
+        resultSummary: 'command exited 1',
+        outputState: 'pending',
+      },
+      knowledgeUpdateState: {
+        status: 'done',
+        runId: 'asset-knowledge-run',
+        summary: '写入 wiki/topics/manual-run.md',
+        updatedAt: 12,
+      },
+      reviewState: {
+        status: 'confirmed',
+        reviewPath: 'reviews/weekly/2026-06-30-manual-run-confirmed.md',
+      },
+    });
+    expect(
+      getListFollowUpState?.(links?.find((run) => run.status === 'approved') ?? ({} as never), links ?? []),
+    ).toBeNull();
+  });
+
+  it('derives effective repository asset run approval state for list filtering', () => {
+    const getEffectiveApprovalState = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        getRepositoryAssetRunEffectiveApprovalState?: (
+          run: repositoryWorkbench.RepositoryAssetRunIndexLink,
+          runs: repositoryWorkbench.RepositoryAssetRunIndexLink[],
+        ) => 'pending' | 'approved' | 'denied' | null;
+      }
+    ).getRepositoryAssetRunEffectiveApprovalState;
+    const parseAssetRunLinks = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        parseRepositoryAssetRunIndexLinks?: (markdown: string) => repositoryWorkbench.RepositoryAssetRunIndexLink[];
+      }
+    ).parseRepositoryAssetRunIndexLinks;
+
+    expect(getEffectiveApprovalState).toBeTypeOf('function');
+    const links = parseAssetRunLinks?.(
+      [
+        '# Asset Runs',
+        '- [Still Pending](runs/assets/20260629-010203-still-pending.md) (`still-pending`, tool, approval_required)',
+        '  - assetPath: tools/pending.sh',
+        '- [Resolved Approval](runs/assets/20260629-020304-resolved.md) (`resolved`, tool, approval_required)',
+        '  - assetPath: tools/resolved.sh',
+        '- [Resolved Approved](runs/assets/20260629-030405-resolved-approved.md) (`resolved`, tool, approved)',
+        '  - assetPath: tools/resolved.sh',
+        '  - executedAt: 2026-06-29T03:04:05.000Z',
+        '- [Already Ran](runs/assets/20260629-040506-ran.md) (`ran`, tool, approval_required)',
+        '  - assetPath: tools/ran.sh',
+        '- [Ran Succeeded](runs/assets/20260629-050607-ran-succeeded.md) (`ran`, tool, succeeded)',
+        '  - assetPath: tools/ran.sh',
+        '  - result: already executed',
+        '  - executedAt: 2026-06-29T05:06:07.000Z',
+      ].join('\n'),
+    );
+
+    const stillPending = links?.find((run) => run.assetId === 'still-pending');
+    const resolved = links?.find((run) => run.assetId === 'resolved' && run.status === 'approval_required');
+    const alreadyRan = links?.find((run) => run.assetId === 'ran' && run.status === 'approval_required');
+    const approved = links?.find((run) => run.status === 'approved');
+
+    expect(
+      getEffectiveApprovalState?.(stillPending as repositoryWorkbench.RepositoryAssetRunIndexLink, links ?? []),
+    ).toBe('pending');
+    expect(getEffectiveApprovalState?.(resolved as repositoryWorkbench.RepositoryAssetRunIndexLink, links ?? [])).toBe(
+      'approved',
+    );
+    expect(
+      getEffectiveApprovalState?.(alreadyRan as repositoryWorkbench.RepositoryAssetRunIndexLink, links ?? []),
+    ).toBeNull();
+    expect(getEffectiveApprovalState?.(approved as repositoryWorkbench.RepositoryAssetRunIndexLink, links ?? [])).toBe(
+      'approved',
+    );
+  });
+
+  it('derives effective repository asset run output state for list filtering', () => {
+    const getEffectiveOutputState = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        getRepositoryAssetRunEffectiveOutputState?: (
+          run: repositoryWorkbench.RepositoryAssetRunIndexLink,
+          runs: repositoryWorkbench.RepositoryAssetRunIndexLink[],
+        ) => 'pending' | 'preserved' | null;
+      }
+    ).getRepositoryAssetRunEffectiveOutputState;
+    const parseAssetRunLinks = (
+      repositoryWorkbench as typeof repositoryWorkbench & {
+        parseRepositoryAssetRunIndexLinks?: (markdown: string) => repositoryWorkbench.RepositoryAssetRunIndexLink[];
+      }
+    ).parseRepositoryAssetRunIndexLinks;
+
+    expect(getEffectiveOutputState).toBeTypeOf('function');
+    const links = parseAssetRunLinks?.(
+      [
+        '# Asset Runs',
+        '- [Pending Approval With Pending Output](runs/assets/20260629-010203-pending-output.md) (`pending-output`, tool, approval_required)',
+        '  - assetPath: tools/pending-output.sh',
+        '- [Pending Output Run](runs/assets/20260629-020304-pending-output-run.md) (`pending-output`, tool, failed)',
+        '  - assetPath: tools/pending-output.sh',
+        '  - result: generated error report',
+        '  - executedAt: 2026-06-29T02:03:04.000Z',
+        '- [Pending Approval With Preserved Output](runs/assets/20260629-030405-preserved-output.md) (`preserved-output`, tool, approval_required)',
+        '  - assetPath: tools/preserved-output.sh',
+        '- [Preserved Output Run](runs/assets/20260629-040506-preserved-output-run.md) (`preserved-output`, tool, succeeded)',
+        '  - assetPath: tools/preserved-output.sh',
+        '  - result: wrote report',
+        '  - output: outputs/assets/preserved-output.md',
+        '  - executedAt: 2026-06-29T04:05:06.000Z',
+      ].join('\n'),
+    );
+
+    const pendingOutput = links?.find((run) => run.assetId === 'pending-output' && run.status === 'approval_required');
+    const preservedOutput = links?.find(
+      (run) => run.assetId === 'preserved-output' && run.status === 'approval_required',
+    );
+    const terminalRun = links?.find((run) => run.assetId === 'preserved-output' && run.status === 'succeeded');
+
+    expect(
+      getEffectiveOutputState?.(pendingOutput as repositoryWorkbench.RepositoryAssetRunIndexLink, links ?? []),
+    ).toBe('pending');
+    expect(
+      getEffectiveOutputState?.(preservedOutput as repositoryWorkbench.RepositoryAssetRunIndexLink, links ?? []),
+    ).toBe('preserved');
+    expect(getEffectiveOutputState?.(terminalRun as repositoryWorkbench.RepositoryAssetRunIndexLink, links ?? [])).toBe(
+      'preserved',
+    );
+  });
+
   it('confirms a repository asset execution review draft without completing a source tail action', async () => {
     const runPath = 'runs/assets/20260629-010203-tools-release-check-sh.md';
     const reviewPath = 'reviews/weekly/2026-06-29-asset-run-tools-release-check-sh-review.md';
@@ -842,6 +3151,37 @@ describe('repository workbench', () => {
     expect(reviewWrite).toContain('reviewedAt: 2026-06-29T09:00:00.000Z');
     expect(reviewWrite).toContain(`assetRunPath: ${runPath}`);
     expect(reviewWrite).not.toContain('status: draft');
+  });
+
+  it('rejects absolute repository asset run paths before confirming an asset run review draft', async () => {
+    const reviewPath = 'reviews/weekly/2026-06-29-asset-run-tools-release-check-sh-review.md';
+    const readText = vi.fn(async () =>
+      [
+        '---',
+        'source: desktop-repository-asset-execution-review',
+        'assetRunPath: runs/assets/20260629-010203-tools-release-check-sh.md',
+        'status: draft',
+        '---',
+      ].join('\n'),
+    );
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    await expect(
+      confirmWorkbenchAssetRunReviewDraft(
+        createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' }),
+        {
+          reviewPath,
+          assetRunPath: '/runs/assets/20260629-010203-tools-release-check-sh.md',
+        },
+      ),
+    ).resolves.toBe(false);
+    expect(readText).not.toHaveBeenCalled();
+    expect(writeText).not.toHaveBeenCalled();
   });
 
   it('confirms a review draft and completes the matching source tail action', async () => {
@@ -972,6 +3312,67 @@ describe('repository workbench', () => {
     );
   });
 
+  it('confirms a semantic-mapped plan execution review draft without completing a source tail action', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === 'reviews/weekly/2026-06-28-work-release-action-run-review-run-1-review.md') {
+        return [
+          '---',
+          'source: desktop-workbench-review-source-execution',
+          'workItemPath: 10-ops/tasks/active/release.md',
+          'tailActionId: action-run-review:run-1',
+          'sourceExecutionId: action-run-review:run-1',
+          'createdAt: 2026-06-28T10:00:00.000Z',
+          'status: draft',
+          '---',
+          '',
+          '# release 复盘草稿',
+          '',
+          '## 复盘正文',
+          '',
+          '- 本次推进：映射计划执行完成，知识更新已核对。',
+        ].join('\n');
+      }
+      if (relativePath === '10-ops/tasks/active/release.md') {
+        return [
+          '# 映射发布推进',
+          '',
+          '## 收尾动作',
+          '',
+          '- [ ] 根据 ActionRun 更新事项状态。',
+          '- [ ] 判断是否需要写入复盘。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const binding = createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' });
+    binding.paths.work = '10-ops/tasks';
+
+    const confirmed = await confirmWorkbenchReviewDraft(binding, {
+      reviewPath: 'reviews/weekly/2026-06-28-work-release-action-run-review-run-1-review.md',
+      workItemPath: '10-ops/tasks/active/release.md',
+      tailActionId: 'action-run-review:run-1',
+      reviewedAt: new Date('2026-06-28T11:00:00.000Z'),
+    });
+
+    expect(confirmed).toBe(true);
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(writeText.mock.calls[0]).toEqual([
+      '/repo',
+      'reviews/weekly/2026-06-28-work-release-action-run-review-run-1-review.md',
+      expect.stringContaining('status: confirmed'),
+    ]);
+    expect((writeText.mock.calls[0] as unknown as [string, string, string])[2]).toContain(
+      'reviewedAt: 2026-06-28T11:00:00.000Z',
+    );
+  });
+
   it('updates a work item status and completes the matching status tail action', async () => {
     const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
       if (relativePath === 'work/active/release.md') {
@@ -1028,6 +3429,63 @@ describe('repository workbench', () => {
         '- [ ] 判断是否需要写入复盘。',
       ].join('\n'),
     ]);
+  });
+
+  it('updates a semantic-mapped work item status and completes the matching status tail action', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === '10-ops/tasks/active/release.md') {
+        return [
+          '---',
+          'id: mapped-release',
+          'status: active',
+          'source: desktop-onboarding',
+          '---',
+          '',
+          '# 映射发布推进',
+          '',
+          '## 收尾动作',
+          '',
+          '- [ ] 根据 ActionRun 更新事项状态。',
+          '- [ ] 判断是否需要写入复盘。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const binding = createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' });
+    binding.paths.work = '10-ops/tasks';
+
+    const updated = await updateWorkbenchMatterStatusFromTailAction(binding, {
+      workItemPath: '10-ops/tasks/active/release.md',
+      tailActionId: '10-ops/tasks/active/release.md:tail-action:0',
+      status: 'blocked',
+    });
+
+    expect(updated).toBe(true);
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      '10-ops/tasks/active/release.md',
+      [
+        '---',
+        'id: mapped-release',
+        'status: blocked',
+        'source: desktop-onboarding',
+        '---',
+        '',
+        '# 映射发布推进',
+        '',
+        '## 收尾动作',
+        '',
+        '- [x] 根据 ActionRun 更新事项状态。',
+        '- [ ] 判断是否需要写入复盘。',
+      ].join('\n'),
+    );
   });
 
   it('refuses unknown work item status values from status tail actions', async () => {
@@ -1096,6 +3554,46 @@ describe('repository workbench', () => {
 
     expect(archived).toEqual({ archived: true, archivedPath: 'work/completed/release.md' });
     expect(moveText).toHaveBeenCalledWith('/repo', 'work/active/release.md', 'work/completed/release.md');
+  });
+
+  it('archives a done semantic-mapped active work item into the mapped completed root', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === '10-ops/tasks/active/release.md') {
+        return [
+          '---',
+          'id: mapped-release',
+          'status: done',
+          '---',
+          '',
+          '# 映射发布推进',
+          '',
+          '## 执行记录',
+          '',
+          '- 已完成验收。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const moveText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, moveText },
+      },
+    });
+
+    const binding = createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' });
+    binding.paths.work = '10-ops/tasks';
+
+    const archived = await archiveCompletedWorkbenchMatter(binding, {
+      workItemPath: '10-ops/tasks/active/release.md',
+    });
+
+    expect(archived).toEqual({ archived: true, archivedPath: '10-ops/tasks/completed/release.md' });
+    expect(moveText).toHaveBeenCalledWith(
+      '/repo',
+      '10-ops/tasks/active/release.md',
+      '10-ops/tasks/completed/release.md',
+    );
   });
 
   it('refuses to archive active work items before the status is done', async () => {
@@ -1244,6 +3742,62 @@ describe('repository workbench', () => {
     );
   });
 
+  it('confirms a knowledge tail action for semantic-mapped work items', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === '10-ops/tasks/active/release.md') {
+        return [
+          '---',
+          'id: mapped-release',
+          'status: active',
+          '---',
+          '',
+          '# 映射发布推进',
+          '',
+          '## 收尾动作',
+          '',
+          '- [ ] 根据 ActionRun 更新事项状态。',
+          '- [ ] 判断是否需要更新知识库。',
+          '- [ ] 判断是否需要写入复盘。',
+        ].join('\n');
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const binding = createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' });
+    binding.paths.work = '10-ops/tasks';
+
+    const confirmed = await confirmWorkbenchKnowledgeTailAction(binding, {
+      workItemPath: '10-ops/tasks/active/release.md',
+      tailActionId: '10-ops/tasks/active/release.md:tail-action:1',
+    });
+
+    expect(confirmed).toBe(true);
+    expect(writeText).toHaveBeenCalledWith(
+      '/repo',
+      '10-ops/tasks/active/release.md',
+      [
+        '---',
+        'id: mapped-release',
+        'status: active',
+        '---',
+        '',
+        '# 映射发布推进',
+        '',
+        '## 收尾动作',
+        '',
+        '- [ ] 根据 ActionRun 更新事项状态。',
+        '- [x] 判断是否需要更新知识库。',
+        '- [ ] 判断是否需要写入复盘。',
+      ].join('\n'),
+    );
+  });
+
   it('refuses to confirm a non-knowledge tail action through the knowledge path', async () => {
     const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
       if (relativePath === 'work/active/release.md') {
@@ -1316,6 +3870,54 @@ describe('repository workbench', () => {
         '## 关联成果',
         '',
         '- [发布报告](artifact://art_1) (`art_1`, report)',
+      ].join('\n'),
+    ]);
+  });
+
+  it('records an output-preservation diagnostic artifact for semantic-mapped work items', async () => {
+    const readText = vi.fn(async (_repoPath: string, relativePath: string) => {
+      if (relativePath === '10-ops/tasks/active/release.md') {
+        return ['# 发布推进', '', '## 执行记录', '', '- 已生成映射仓库发布报告', '', '## 关联成果', '', '- 暂无'].join(
+          '\n',
+        );
+      }
+      return '';
+    });
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('window', {
+      electronAPI: {
+        repository: { readText, writeText },
+      },
+    });
+
+    const binding = createDefaultRepositoryBinding({ gatewayInstanceId: 'inst-1', repoPath: '/repo' });
+    binding.paths.work = '10-ops/tasks';
+
+    const updated = await preserveWorkbenchOutputFromTailAction(binding, {
+      workItemPath: '10-ops/tasks/active/release.md',
+      tailActionId: 'action-run-output:run_1',
+      artifact: {
+        id: 'art_1',
+        title: '映射发布报告',
+        type: 'report',
+        repositoryOutputPath: 'outputs/reports/art_1.md',
+      },
+    });
+
+    expect(updated).toBe(true);
+    expect(writeText.mock.calls[0]).toEqual([
+      '/repo',
+      '10-ops/tasks/active/release.md',
+      [
+        '# 发布推进',
+        '',
+        '## 执行记录',
+        '',
+        '- 已生成映射仓库发布报告',
+        '',
+        '## 关联成果',
+        '',
+        '- [映射发布报告](../../../outputs/reports/art_1.md) (`art_1`, report)',
       ].join('\n'),
     ]);
   });
@@ -1500,6 +4102,7 @@ describe('repository workbench', () => {
     const en = readFileSync('src/locales/en.json', 'utf8');
 
     expect(source).toContain('buildWorkMatterPlanPrompt');
+    expect(source).toContain('createAiActionRunWithWorkItemAssignment');
     expect(source).toContain("type: 'work_matter_plan'");
     expect(source).toContain("sourcePage: 'workbench'");
     expect(actionCenterPage).toContain('applyWorkbenchMatterPlanApproval');
@@ -1511,12 +4114,14 @@ describe('repository workbench', () => {
     expect(source).toContain('setSelectedPreviewPath(initialPlanPath)');
     expect(source).toContain('workItemId: selectedWorkItemId');
     expect(source).toContain('workItemPath: selectedWorkItemPath');
+    expect(source).not.toContain('const { workItemId: resolvedWorkItemId');
     expect(source).toContain("t('workbench.generatePlanForMatter')");
     expect(source).toContain("t('workbench.generatePlanActionTitle')");
     expect(source).toContain('`/actions?runId=${encodeURIComponent(latestRun.id)}`');
     expect(actionCenterPage).toContain('getActionCenterSearchRunId');
     expect(actionCenterPage).toContain('selectedSearchRunId');
-    expect(actionCenterPage).toContain('setSelectedRunId(selectedSearchRunId)');
+    expect(actionCenterPage).toContain('run.gatewayRunId === selectedSearchRunId');
+    expect(actionCenterPage).toContain('setSelectedRunId(matchedSearchRun.id)');
     expect(promptSource).toContain('workMatterPlanTemplate');
     expect(promptSource).toContain('buildWorkMatterPlanPrompt');
     expect(actionCenterPage).toContain("work_matter_plan: 'actions.typeWorkMatterPlan'");
@@ -1533,12 +4138,14 @@ describe('repository workbench', () => {
     const en = readFileSync('src/locales/en.json', 'utf8');
 
     expect(source).toContain('buildPlanExecutePrompt');
+    expect(source).toContain('createAiActionRunWithWorkItemAssignment');
     expect(source).toContain("type: 'plan_execute'");
     expect(source).toContain("sourcePage: 'workbench'");
     expect(source).toContain('planPath: selectedPlanPath');
     expect(source).toContain('safeSelectedPlanWorkItemPath');
-    expect(source).toContain('isWorkbenchMatterPath(selectedPlanMetadata.workItemPath)');
+    expect(source).toContain('isWorkbenchSnapshotMatterPath(snapshot, selectedPlanMetadata.workItemPath)');
     expect(source).toContain('workItemPath: safeSelectedPlanWorkItemPath');
+    expect(source).not.toContain('const { workItemId: resolvedWorkItemId');
     expect(source).toContain("t('workbench.executePlanForMatter')");
     expect(source).toContain("t('workbench.executePlanActionTitle')");
     expect(source).toContain('`/actions?runId=${encodeURIComponent(latestRun.id)}`');
@@ -1651,6 +4258,7 @@ describe('repository workbench', () => {
     expect(zh).toContain('"writePlanExecutionReviewAfterKnowledgeNoWrite": "复盘无需写入"');
     expect(zh).toContain('"planExecutionKnowledgeNoWrite": "知识无需写入"');
     expect(zh).toContain('"planExecutionKnowledgeAwaitingApproval": "知识待审批"');
+    expect(zh).toContain('"assetRunKnowledgeAll": "全部知识"');
     expect(zh).toContain('"planExecutionReviewDraft": "复盘草稿"');
     expect(zh).toContain('"planExecutionReviewConfirmed": "已复盘"');
     expect(en).toContain('"writePlanExecutionReview": "Write Review"');
@@ -1662,8 +4270,17 @@ describe('repository workbench', () => {
     expect(en).toContain('"writePlanExecutionReviewAfterKnowledgeNoWrite": "Review No-Write Decision"');
     expect(en).toContain('"planExecutionKnowledgeNoWrite": "Knowledge No Write"');
     expect(en).toContain('"planExecutionKnowledgeAwaitingApproval": "Knowledge Approval"');
+    expect(en).toContain('"assetRunKnowledgeAll": "All Knowledge"');
     expect(en).toContain('"planExecutionReviewDraft": "Review Draft"');
     expect(en).toContain('"planExecutionReviewConfirmed": "Review Confirmed"');
+  });
+
+  it('shows the current work root in the status tail action card instead of a hardcoded work root', () => {
+    const source = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
+
+    expect(source).toContain('activeWorkRootLabel');
+    expect(source).toContain('<Tag color="blue">{activeWorkRootLabel}</Tag>');
+    expect(source).not.toContain('<Tag color="blue">work/</Tag>');
   });
 
   it('wires ActionCenter unassigned ActionRun backfill to repository work items', () => {
@@ -1672,15 +4289,24 @@ describe('repository workbench', () => {
     const en = readFileSync('src/locales/en.json', 'utf8');
 
     expect(page).toContain('assignAiActionRunToWorkItem');
-    expect(page).toContain('loadRepositoryBinding');
-    expect(page).toContain('loadWorkbenchSnapshot');
+    expect(page).toContain('useWorkbenchWorkItemOptions');
+    expect(page).toContain('ActionRunWorkItemPicker');
+    expect(page).toContain('createActionCenterWorkItem');
+    expect(page).toContain('selectedActionCenterWorkItemPath');
+    expect(page).toContain('selectedActionCenterWorkItem?.path');
     expect(page).toContain('selectedAssignmentPath');
     expect(page).toContain('selectedRun.workItemRequired && !selectedRun.workItemPath');
     expect(page).toContain("t('actions.assignWorkItem')");
+    expect(page).toContain("t('actions.workItemCreatePlaceholder')");
+    expect(page).toContain("t('actions.workItemCreateSuccess')");
     expect(page).toContain("t('actions.fieldWorkItem')");
     expect(page).toContain("t('actions.fieldWorkItemUnassignedReason')");
     expect(zh).toContain('"assignWorkItem": "关联事项"');
+    expect(zh).toContain('"workItemCreatePlaceholder": "输入新事项标题"');
+    expect(zh).toContain('"workItemCreateSuccess": "事项已创建并选中"');
     expect(en).toContain('"assignWorkItem": "Assign Work Item"');
+    expect(en).toContain('"workItemCreatePlaceholder": "Enter a new work item title"');
+    expect(en).toContain('"workItemCreateSuccess": "Work item created and selected"');
   });
 
   it('renders semantic Workbench sections and keeps default fallback components', () => {
@@ -1720,14 +4346,181 @@ describe('repository workbench', () => {
     expect(panel).toContain('path.startsWith(`${projectRoot}/outputs/`)');
     expect(panel).not.toContain('matchingArtifacts');
     expect(panel).not.toContain('dialogDeliverables');
-    expect(panel).toContain("const standaloneView = panelView === 'dashboard' || panelView === 'outputs'");
+    expect(panel).toContain(
+      "const standaloneView = panelView === 'dashboard' || (panelView === 'outputs' && !assetRunPath)",
+    );
     expect(panel).toContain("panelView === 'dashboard' || panelView === 'outputs' || panelView === 'projects'");
+    expect(panel).toContain("panelView !== 'outputs' || !initialOutputPath || !snapshot");
+    expect(panel).toContain('selectedPreviewPath === initialOutputPath');
+    expect(panel).toContain('openableOutputPaths.has(initialOutputPath)');
+    expect(panel).toContain("panelView !== 'reviews' || !initialReviewPath || !snapshot");
+    expect(panel).toContain('selectedPreviewPath === initialReviewPath');
+    expect(panel).toContain('snapshot.reviews.some((review) => review.path === initialReviewPath)');
+    expect(readFileSync('src/pages/WorkbenchPage.tsx', 'utf8')).toContain('getWorkbenchSearchOutputPath');
+    expect(readFileSync('src/pages/WorkbenchPage.tsx', 'utf8')).toContain('initialOutputPath={searchOutputPath}');
+    expect(readFileSync('src/pages/WorkbenchPage.tsx', 'utf8')).toContain('getWorkbenchSearchReviewPath');
+    expect(readFileSync('src/pages/WorkbenchPage.tsx', 'utf8')).toContain('initialReviewPath={searchReviewPath}');
     expect(panel).toContain('minmax(300px, 380px) minmax(460px, 1fr)');
     expect(panel).toContain('snapshot?.taskGroups.flatMap');
     expect(panel).not.toContain('taskGroups.map((group) => (');
     expect(panel).toContain('repositoryAssetSections');
     expect(panel).toContain('dialogArtifacts');
     expect(panel).toContain('workbench.repositoryAssets');
+    expect(panel).toContain('parseRepositoryAssetPermissionBoundary(selectedPreviewContent)');
+    expect(panel).toContain('workbench.assetPermissionBoundary');
+    expect(panel).toContain('workbench.assetBoundaryRecordOnly');
+    expect(panel).toContain('workbench.assetBoundaryNoDesktopExecution');
+    expect(panel).toContain('workbench.assetBoundaryNoPermissionGrant');
+    expect(panel).toContain('buildRepositoryAssetExecutionApprovalCommand(');
+    expect(panel).toContain('binding.repoPath,');
+    expect(panel).toContain('findRepositoryAssetPendingApprovalState');
+    expect(panel).toContain('selectedAssetApprovalCommand,');
+    expect(panel).toContain('selectedAssetPendingApprovalState');
+    expect(panel).toContain('findRepositoryAssetResolvedRunState');
+    expect(panel).toContain('selectedAssetResolvedRunState');
+    expect(panel).toContain('findRepositoryAssetRunKnowledgeUpdateState');
+    expect(panel).toContain('selectedAssetResolvedRunKnowledgeUpdateState');
+    expect(panel).toContain('selectedAssetResolvedRunState?.runPath');
+    expect(panel).toContain('selectedAssetResolvedRunKnowledgeUpdateState,');
+    expect(panel).toContain('selectedAssetResolvedRunKnowledgeUpdateState.status');
+    expect(panel).toContain('getRepositoryAssetResolvedRunFollowUpActions');
+    expect(panel).toContain('selectedAssetResolvedRunFollowUpActions');
+    expect(panel).toContain('workbench.assetResolvedRun');
+    expect(panel).toContain('workbench.assetResolvedRunDesc');
+    expect(panel).toContain('workbench.assetResolvedRunPath');
+    expect(panel).toContain('selectedAssetResolvedRunState.resultSummary');
+    expect(panel).toContain('selectedAssetResolvedRunState.outputState');
+    expect(panel).toContain('workbench.assetRunOutputPreserved');
+    expect(panel).toContain('workbench.assetRunOutputPending');
+    expect(panel).toContain('selectedAssetResolvedRunState.workItemPath');
+    expect(panel).toContain('selectedAssetResolvedRunState.reviewState');
+    expect(panel).toContain('workbench.assetRunReviewPending');
+    expect(panel).toContain('`asset-run-output:${selectedAssetResolvedRunState.runPath}`');
+    expect(panel).toContain('`asset-run-knowledge:${selectedAssetResolvedRunState.runPath}`');
+    expect(panel).toContain('`asset-run-review:${selectedAssetResolvedRunState.runPath}`');
+    expect(panel).toContain('selectedAssetResolvedRunFollowUpActions.canPreserveOutput');
+    expect(panel).toContain('selectedAssetResolvedRunFollowUpActions.canUpdateKnowledge');
+    expect(panel).toContain('selectedAssetResolvedRunFollowUpActions.canWriteReview');
+    expect(panel).toContain('workItemPath: selectedAssetResolvedRunState.workItemPath');
+    expect(panel).toContain('assetRunPath: selectedAssetResolvedRunState.runPath');
+    expect(panel).toContain('workbench.assetApprovalAction');
+    expect(panel).toContain('workbench.assetPendingApproval');
+    expect(panel).toContain('workbench.assetPendingApprovalDesc');
+    expect(panel).toContain('workbench.assetPendingApprovalRun');
+    expect(panel).toContain('selectedAssetPendingApprovalState.decisionCommands');
+    expect(panel).toContain('selectedAssetPendingApprovalState.decisionCommands.approve.text');
+    expect(panel).toContain('selectedAssetPendingApprovalState.decisionCommands.deny.text');
+    expect(panel).toContain('workbench.assetApprovalRecordCommand');
+    expect(panel).toContain('!selectedAssetPendingApprovalState');
+    expect(panel).toContain('selectedAssetApprovalCommand.text');
+    expect(panel).toContain('parseRepositoryAssetRunDetails(selectedPreviewPath, selectedPreviewContent)');
+    expect(panel).toContain('workbench.assetRunDetails');
+    expect(panel).toContain('workbench.assetRunResult');
+    expect(panel).toContain('workbench.assetRunCommand');
+    expect(panel).toContain('workbench.assetRunApproval');
+    expect(panel).toContain('workbench.assetRunOutput');
+    expect(panel).toContain('getRepositoryAssetRunOutputState(selectedAssetRunDetails)');
+    expect(panel).toContain('workbench.assetRunOutputState');
+    expect(panel).toContain('workbench.assetRunOutputPreserved');
+    expect(panel).toContain('workbench.assetRunOutputPending');
+    expect(panel).toContain('workbench.assetRunPreserveOutput');
+    expect(panel).toContain('workbench.assetRunUpdateKnowledge');
+    expect(panel).toContain('workbench.assetRunWriteReview');
+    expect(panel).toContain('findRepositoryAssetRunReviewState(selectedAssetRunDetails.assetRunPath');
+    expect(panel).toContain('findRepositoryAssetRunFollowUpState(selectedAssetRunDetails.assetRunPath');
+    expect(panel).toContain('selectedAssetRunDetailsKnowledgeUpdateState');
+    expect(panel).toContain('selectedAssetRunDetailsFollowUpActions');
+    expect(panel).toContain('selectedAssetRunDetailsFollowUpActions.canUpdateKnowledge');
+    expect(panel).toContain('selectedAssetRunDetailsKnowledgeUpdateState.status');
+    expect(panel).toContain('workbench.assetRunReviewDraft');
+    expect(panel).toContain('workbench.assetRunReviewConfirmed');
+    expect(panel).toContain('isRepositoryAssetRunReviewDraftForRun(selectedPreviewContent');
+    expect(panel).toContain('workbench.assetRunFollowUps');
+    expect(panel).toContain('workbench.assetRunFollowUpDone');
+    expect(panel).toContain('workbench.assetRunFollowUpPending');
+    expect(panel).toContain('assetRunOutputFilter');
+    expect(panel).toContain('setAssetRunOutputFilter');
+    expect(panel).toContain('assetRunApprovalFilter');
+    expect(panel).toContain('setAssetRunApprovalFilter');
+    expect(panel).toContain('assetRunKnowledgeFilter');
+    expect(panel).toContain('setAssetRunKnowledgeFilter');
+    expect(panel).toContain('assetRunKnowledgeStatusOptions');
+    expect(panel).toContain('const knowledgeMatches =');
+    expect(panel).toContain('knowledgeUpdateState?.status === assetRunKnowledgeFilter');
+    expect(panel).toContain('workbench.assetRunKnowledgeAll');
+    expect(panel).toContain('workbench.assetRunApprovalAll');
+    expect(panel).toContain('workbench.assetRunApprovalPendingOnly');
+    expect(panel).toContain('workbench.assetRunApprovalApprovedOnly');
+    expect(panel).toContain('workbench.assetRunApprovalDeniedOnly');
+    expect(panel).toContain('workbench.assetRunApprovalPending');
+    expect(panel).toContain('workbench.assetRunApprovalApproved');
+    expect(panel).toContain('workbench.assetRunApprovalDenied');
+    expect(panel).toContain('findRepositoryAssetRunApprovalDecisionState(');
+    expect(panel).toContain('selectedAssetRunApprovalDecisionState');
+    expect(panel).toContain('workbench.assetRunApprovalDecisionState');
+    expect(panel).toContain('workbench.assetRunApprovalDecisionApproved');
+    expect(panel).toContain('workbench.assetRunApprovalDecisionDenied');
+    expect(panel).toContain('findRepositoryAssetRunExecutionState(');
+    expect(panel).toContain('selectedAssetRunExecutionState');
+    expect(panel).toContain('workbench.assetRunExecutionState');
+    expect(panel).toContain('workbench.assetRunExecutionSucceeded');
+    expect(panel).toContain('workbench.assetRunExecutionFailed');
+    expect(panel).toContain('workbench.assetRunExecutionCancelled');
+    expect(panel).toContain('getRepositoryAssetRunListFollowUpState(');
+    expect(panel).toContain('assetRunFollowUpByPath');
+    expect(panel).toContain('listFollowUp.approvalDecisionState');
+    expect(panel).toContain('listFollowUp.executionState');
+    expect(panel).toContain('getRepositoryAssetRunEffectiveApprovalState(');
+    expect(panel).toContain('assetRunEffectiveApprovalStateByPath');
+    expect(panel).toContain('const effectiveApprovalState = assetRunEffectiveApprovalStateByPath.get(run.path)');
+    expect(panel).toContain('getRepositoryAssetRunEffectiveOutputState(');
+    expect(panel).toContain('assetRunEffectiveOutputStateByPath');
+    expect(panel).toContain('const effectiveOutputState = assetRunEffectiveOutputStateByPath.get(run.path)');
+    expect(panel).toContain('getRepositoryAssetRunEffectiveReviewState(');
+    expect(panel).toContain('assetRunEffectiveReviewStateByPath');
+    expect(panel).toContain('const effectiveReviewState = assetRunEffectiveReviewStateByPath.get(run.path)');
+    expect(panel).toContain("effectiveReviewState === 'pending'");
+    expect(panel).toContain("effectiveReviewState === 'draft'");
+    expect(panel).toContain("effectiveReviewState === 'confirmed'");
+    expect(panel).toContain('actionRuns: activityRuns');
+    expect(panel).toContain('listFollowUp?.knowledgeUpdateState');
+    expect(panel).toContain('const knowledgeUpdateState = listFollowUp?.knowledgeUpdateState');
+    expect(panel).toContain('knowledgeUpdateState.status');
+    expect(panel).not.toContain('assetRunKnowledgeUpdateStateByPath');
+    expect(panel).not.toContain('run.reviewPending ? <Tag color="orange">');
+    expect(panel).toContain('buildRepositoryAssetRunApprovalDecisionCommands(');
+    expect(panel).toContain('selectedAssetRunApprovalDecisionCommands');
+    expect(panel).toContain('workbench.assetRunApprovalDecision');
+    expect(panel).toContain('workbench.assetRunApproveCommand');
+    expect(panel).toContain('workbench.assetRunDenyCommand');
+    expect(panel).toContain('workbench.assetRunOutputAll');
+    expect(panel).toContain('workbench.assetRunOutputPendingOnly');
+    expect(panel).toContain('workbench.assetRunOutputPreservedOnly');
+    expect(panel).not.toContain("assetRunReviewFilter === 'all' || run.reviewPending");
+    expect(panel).not.toContain('run.approvalPending');
+    expect(panel).toContain('effectiveApprovalState ===');
+    expect(panel).toContain('run.approvalTitle');
+    expect(panel).toContain('run.approvalRisk');
+    expect(panel).toContain('run.approvalReason');
+    expect(panel).toContain('workbench.assetRunApprovalContext');
+    expect(panel).not.toContain('run.outputState ===');
+    expect(panel).toContain('effectiveOutputState ===');
+    expect(panel).toContain('buildWorkbenchMatterGoldenPathState(');
+    expect(panel).toContain('selectedMatterGoldenPathState');
+    expect(panel).toContain('renderMatterGoldenPathCard');
+    expect(panel).toContain('workbench.firstMatterGoldenPath');
+    expect(panel).toContain('nextAction.hintKey ?? GOLDEN_PATH_REASON_LABEL_KEYS[nextAction.reasonKey]');
+    expect(panel).toContain('nextAction.labelKey ?? GOLDEN_PATH_ACTION_LABEL_KEYS[nextAction.key]');
+    expect(panel).toContain('workbench.goldenPathReasonPlanMissing');
+    expect(panel).toContain('workbench.goldenPathReasonOutputMissing');
+    expect(panel).toContain('workbench.goldenPathGeneratePlan');
+    expect(panel).toContain('workbench.goldenPathPreserveOutput');
+    expect(panel).toContain('`asset-run-output:${selectedAssetRunDetails.assetRunPath}`');
+    expect(panel).toContain('`asset-run-knowledge:${selectedAssetRunDetails.assetRunPath}`');
+    expect(panel).toContain('`asset-run-review:${selectedAssetRunDetails.assetRunPath}`');
+    expect(panel).toContain("buildDashboardTailActionTarget('/artifacts'");
+    expect(panel).toContain("buildDashboardTailActionTarget('/knowledge'");
+    expect(panel).toContain("buildDashboardTailActionTarget('/workbench'");
     expect(panel).toContain('outputCards.map');
     expect(panel).toContain('outputSourceFilters');
     expect(panel).toContain('outputTypeFilters');
@@ -1740,6 +4533,19 @@ describe('repository workbench', () => {
     expect(panel).toContain('workbench.outputFilterType');
     expect(panel).toContain('workbench.outputGroupBy');
     expect(panel).toContain('workbench.outputSource');
+    expect(panel).toContain('parseRepositoryAssetRunIndexLinks(snapshot?.runsMarkdown');
+    expect(panel).toContain('activityRunFilter');
+    expect(panel).toContain('assetRunStatusFilter');
+    expect(panel).toContain('assetRunReviewFilter');
+    expect(panel).toContain('workbench.activityFilterAll');
+    expect(panel).toContain('workbench.activityFilterAssetRuns');
+    expect(panel).toContain('workbench.assetRunStatusAll');
+    expect(panel).toContain('workbench.assetRunReviewAll');
+    expect(panel).toContain('workbench.assetRunReviewPendingOnly');
+    expect(panel).toContain('workbench.assetRunReviewDraftOnly');
+    expect(panel).toContain('workbench.assetRunReviewConfirmedOnly');
+    expect(panel).toContain('workbench.repositoryAssetRuns');
+    expect(panel).toContain('openAssetRunLink');
     expect(panel).toContain('filteredOutputCards');
     expect(panel).not.toContain('MarkdownView content={section.markdown}');
     expect(kanban).toContain('taskGroups');
@@ -1750,5 +4556,19 @@ describe('repository workbench', () => {
     expect(kanban).not.toContain('semanticSections');
     expect(kanban).not.toContain("filesFor('projects')");
     expect(kanban).not.toContain('{item.sourcePath}</Text>');
+  });
+
+  it('keeps reading an initial asset run preview when the path is set before content arrives', () => {
+    const panel = readFileSync('src/components/WorkbenchRepositoryPanel.tsx', 'utf8');
+
+    expect(panel).toContain('const hasInitialAssetRunPreviewContent = Boolean(');
+    expect(panel).toContain('selectedPreviewPath === assetRunPath && selectedPreviewContent.trim()');
+    expect(panel).toContain('if (openedInitialAssetRunPath === assetRunPath) {');
+    expect(panel).toContain('if (selectedPreviewPath !== assetRunPath) return');
+    expect(panel).toContain('if (selectedPreviewContent.trim()) return');
+    expect(panel).not.toContain(
+      'if (openedInitialAssetRunPath === assetRunPath && hasInitialAssetRunPreviewContent) return',
+    );
+    expect(panel).toContain('if (hasInitialAssetRunPreviewContent) return');
   });
 });

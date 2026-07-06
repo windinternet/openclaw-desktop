@@ -3,7 +3,12 @@ import type { ReactNode } from 'react';
 import { Button, Card, Input, Modal, Select, Space, Tag, Toast, Typography } from '@douyinfe/semi-ui';
 import { IconBranch, IconCloud, IconFolderOpen, IconRefresh, IconTickCircle } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
-import { createAiActionRun, executeAiActionRunWithGateway, syncAiActionRunWithGateway, useStore } from '../lib';
+import {
+  createAiActionRunWithWorkItemAssignment,
+  executeAiActionRunWithGateway,
+  syncAiActionRunWithGateway,
+  useStore,
+} from '../lib';
 import { upsertAiActionRun } from '../lib/ai-action-run-store';
 import type {
   KnowledgeRepositoryMapping,
@@ -13,21 +18,24 @@ import type {
   WorkbenchSemanticMapping,
 } from '../lib/agentic-repository';
 import {
+  adaptRepositoryBinding,
   bootstrapRepositoryBinding,
   createAndSaveRepositoryBinding,
   inspectRepositoryBinding,
   loadRepositoryBinding,
   saveRepositoryBinding,
+  type RepositoryInspectDetails,
 } from '../lib/agentic-repository-store';
 import {
   buildKnowledgeRepositoryMappingPrompt,
   parseKnowledgeRepositoryMappingResponse,
 } from '../lib/repository-knowledge';
 import {
+  buildWorkbenchRepositorySetupFeedback,
   buildWorkbenchSemanticMappingPrompt,
+  buildWorkbenchStructureSignals,
   parseWorkbenchSemanticMappingResponse,
   sanitizeWorkbenchSemanticMapping,
-  type WorkbenchStructureSignal,
 } from '../lib/repository-workbench-mapping';
 import { buildRepositoryContextPayload } from '../lib/repository-context';
 import { syncRepositoryContextToAgentFiles } from '../lib/repository-context-fallback';
@@ -87,6 +95,7 @@ export default function RepositoryGate({
   const [gatewayTargetPath] = useState('~/OpenClaw/Agentic Repository');
   const [location, setLocation] = useState<RepositoryLocation>('desktop-local');
   const [status, setStatus] = useState<RepositoryStatus>('repo_unbound');
+  const [inspectDetails, setInspectDetails] = useState<RepositoryInspectDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [mappingLoading, setMappingLoading] = useState(false);
   const [fallbackSyncing, setFallbackSyncing] = useState(false);
@@ -112,6 +121,7 @@ export default function RepositoryGate({
       const result = await inspectRepositoryBinding(nextBinding);
       setBinding(result.binding);
       setStatus(result.status);
+      setInspectDetails(result.details);
       setRepoPath(result.binding.repoPath);
       setLocation(result.binding.location);
       await saveRepositoryBinding(result.binding);
@@ -125,6 +135,7 @@ export default function RepositoryGate({
     if (!currentInstanceId) {
       setBinding(null);
       setStatus('repo_unbound');
+      setInspectDetails(null);
       return;
     }
 
@@ -135,6 +146,7 @@ export default function RepositoryGate({
         if (!stored) {
           setBinding(null);
           setStatus('repo_unbound');
+          setInspectDetails(null);
           return;
         }
         setBinding(stored);
@@ -180,6 +192,7 @@ export default function RepositoryGate({
     if (!stored) {
       setBinding(null);
       setStatus('repo_unbound');
+      setInspectDetails(null);
       setRepoPath('');
       return;
     }
@@ -213,6 +226,7 @@ export default function RepositoryGate({
       const result = await bootstrapRepositoryBinding(next);
       setBinding(result.binding);
       setStatus(result.status);
+      setInspectDetails(result.details);
       setRepoPath(result.binding.repoPath);
       setLocation(result.binding.location);
       await saveRepositoryBinding(result.binding);
@@ -245,11 +259,45 @@ export default function RepositoryGate({
       const result = await bootstrapRepositoryBinding(binding);
       setBinding(result.binding);
       setStatus(result.status);
+      setInspectDetails(result.details);
       await saveRepositoryBinding(result.binding);
       Toast.success(t('repositoryGate.bootstrapDone'));
     } finally {
       setLoading(false);
     }
+  };
+
+  const runApprovedRepositoryAdaptation = async () => {
+    if (!binding) return;
+    setLoading(true);
+    try {
+      const result = await adaptRepositoryBinding(binding);
+      setBinding(result.binding);
+      setStatus(result.status);
+      setInspectDetails(result.details);
+      await saveRepositoryBinding(result.binding);
+      Toast.success(t('repositoryGate.adaptationDone'));
+    } catch (err) {
+      Toast.error(err instanceof Error ? err.message : t('repositoryGate.adaptationFailed'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApproveRepositoryAdaptation = () => {
+    if (!binding) return;
+    Modal.confirm({
+      title: t('repositoryGate.adaptationConfirmTitle'),
+      content: (
+        <Space vertical align="start">
+          <Text>{t('repositoryGate.adaptationConfirmDesc')}</Text>
+          <Text size="small">{t('repositoryGate.adaptationSafety')}</Text>
+        </Space>
+      ),
+      okText: t('repositoryGate.approveAdaptation'),
+      cancelText: t('common.cancel'),
+      onOk: () => void runApprovedRepositoryAdaptation(),
+    });
   };
 
   const handleSyncRepositoryRulesFallback = async () => {
@@ -308,44 +356,6 @@ export default function RepositoryGate({
       })),
     );
     return excerpts.filter((item) => item.content.trim().length > 0);
-  };
-
-  const buildWorkbenchStructureSignals = (tree: string[]): WorkbenchStructureSignal[] => {
-    const signals = tree
-      .map((path) => ({ path, hints: inferWorkbenchPathHints(path) }))
-      .filter((item) => item.hints.length > 0);
-    return signals.slice(0, 120);
-  };
-
-  const inferWorkbenchPathHints = (path: string): string[] => {
-    const normalized = path.toLowerCase();
-    const hints: string[] = [];
-    if (/(^|\/)(inbox|capture|captures|input|inputs)(\/|\.md$)/.test(normalized)) hints.push('inbox');
-    if (/(^|\/)(now|current|active)\.md$/.test(normalized) || /(^|\/)(current|active)(\/|$)/.test(normalized))
-      hints.push('current-work');
-    if (
-      /(^|\/)(next|todo|backlog|someday)\.md$/.test(normalized) ||
-      /(^|\/)(next|todo|backlog|someday)(\/|$)/.test(normalized)
-    )
-      hints.push('next-work');
-    if (/(^|\/)(done|completed|archive)\.md$/.test(normalized) || /(^|\/)(done|completed)(\/|$)/.test(normalized))
-      hints.push('done-work');
-    if (
-      /(^|\/)(project|projects|initiative|initiatives|client|clients)(\/|$)/.test(normalized) ||
-      /(^|\/)(readme|brief|prd)\.md$/.test(normalized)
-    )
-      hints.push('project-system');
-    if (/(^|\/)(plan|roadmap|milestone|timeline)\.md$/.test(normalized) || /(^|\/)(plans)(\/|$)/.test(normalized))
-      hints.push('planning');
-    if (/(^|\/)(run|runs|log|logs|journal)(\/|\.md$)/.test(normalized)) hints.push('execution-record');
-    if (/(^|\/)(output|outputs|deliverable|deliverables|artifact|artifacts)(\/|$)/.test(normalized))
-      hints.push('output');
-    if (/(^|\/)(review|reviews|retro|retrospective)(\/|\.md$)/.test(normalized)) hints.push('review');
-    if (/(^|\/)(tool|tools|script|scripts|template|templates|sop|prompts?)(\/|\.md$)/.test(normalized))
-      hints.push('reusable-tool');
-    if (/(^|\/)(knowledge|wiki|source|sources|map|maps)(\/|$)/.test(normalized)) hints.push('knowledge-system');
-    if (/(^|\/)(agent|agents|agentic|workflow|workflows)(\/|\.md$)/.test(normalized)) hints.push('agent-workflow');
-    return hints;
   };
 
   const isSafeMapping = (mapping: KnowledgeRepositoryMapping): boolean => {
@@ -418,17 +428,15 @@ export default function RepositoryGate({
         }));
       const tree = await repository.listTree(path, 400);
       const excerpts = await readMappingExcerpts(path, tree);
-      const resolvedWorkItemPath = selectedRepositoryWorkItem?.path;
-      const resolvedWorkItemId = selectedRepositoryWorkItemId;
-      const run = createAiActionRun({
+      const run = createAiActionRunWithWorkItemAssignment({
         type: 'knowledge_repository_map',
         sourcePage: 'knowledge',
         instanceId: currentInstanceId,
         agentId: agent.id,
         executionMode: 'isolated-session',
         input: t('repositoryGate.mappingActionInput', { path }),
-        workItemId: resolvedWorkItemId,
-        workItemPath: resolvedWorkItemPath,
+        selectedWorkItem: selectedRepositoryWorkItem,
+        selectedWorkItemId: selectedRepositoryWorkItemId,
       });
       await upsertAiActionRun(currentInstanceId, { ...run, status: 'planning', updatedAt: Date.now() });
       const running = await executeAiActionRunWithGateway(activeClient, run, {
@@ -514,17 +522,15 @@ export default function RepositoryGate({
         }));
       const tree = await repository.listTree(path, 400);
       const structureSignals = buildWorkbenchStructureSignals(tree);
-      const resolvedWorkItemPath = selectedRepositoryWorkItem?.path;
-      const resolvedWorkItemId = selectedRepositoryWorkItemId;
-      const run = createAiActionRun({
+      const run = createAiActionRunWithWorkItemAssignment({
         type: 'workbench_repository_map',
         sourcePage: 'workbench',
         instanceId: currentInstanceId,
         agentId: agent.id,
         executionMode: 'isolated-session',
         input: t('repositoryGate.workbenchMappingActionInput', { path }),
-        workItemId: resolvedWorkItemId,
-        workItemPath: resolvedWorkItemPath,
+        selectedWorkItem: selectedRepositoryWorkItem,
+        selectedWorkItemId: selectedRepositoryWorkItemId,
       });
       await upsertAiActionRun(currentInstanceId, { ...run, status: 'planning', updatedAt: Date.now() });
       const running = await executeAiActionRunWithGateway(activeClient, run, {
@@ -573,6 +579,11 @@ export default function RepositoryGate({
   const showDesktopActions = location === 'desktop-local';
   const canRefresh = Boolean(binding);
   const canCreateRepositoryWorkItem = binding?.status === 'repo_ready';
+  const setupFeedback = buildWorkbenchRepositorySetupFeedback({
+    status,
+    binding,
+    missingRecommendedEntries: inspectDetails?.missingTemplateEntries,
+  });
   const renderMappingWorkItemPicker = () =>
     repositoryWorkItemOptions.length > 0 || canCreateRepositoryWorkItem ? (
       <ActionRunWorkItemPicker
@@ -643,6 +654,36 @@ export default function RepositoryGate({
                 <Text type="tertiary" size="small">
                   {t('repositoryGate.desktopSetupDesc')}
                 </Text>
+                {area === 'workbench' && (
+                  <Card style={{ width: '100%', background: 'var(--semi-color-bg-0)' }} bodyStyle={{ padding: 12 }}>
+                    <Space vertical align="start" style={{ width: '100%' }}>
+                      <Space align="center" wrap>
+                        <Text strong>{t(`repositoryGate.setupFeedback.${setupFeedback.kind}.title`)}</Text>
+                        <Tag
+                          color={
+                            setupFeedback.tone === 'success'
+                              ? 'green'
+                              : setupFeedback.tone === 'danger'
+                                ? 'red'
+                                : 'blue'
+                          }
+                        >
+                          {t(`repositoryGate.setupFeedback.${setupFeedback.kind}.tag`)}
+                        </Tag>
+                      </Space>
+                      <Text type="tertiary" size="small">
+                        {t(`repositoryGate.setupFeedback.${setupFeedback.kind}.desc`)}
+                      </Text>
+                      {setupFeedback.missingRecommendedEntries.length > 0 && (
+                        <Text type="tertiary" size="small">
+                          {t('repositoryGate.missingRecommendedEntries', {
+                            entries: setupFeedback.missingRecommendedEntries.join('、'),
+                          })}
+                        </Text>
+                      )}
+                    </Space>
+                  </Card>
+                )}
                 {renderMappingWorkItemPicker()}
                 <Space wrap>
                   <Button
@@ -661,8 +702,16 @@ export default function RepositoryGate({
                   >
                     {t('repositoryGate.desktopInitializeDefault')}
                   </Button>
-                  <Button loading={loading} disabled={!binding || ready} onClick={handleBootstrap}>
-                    {t('repositoryGate.bootstrap')}
+                  <Button
+                    loading={loading}
+                    disabled={!binding || ready}
+                    onClick={
+                      setupFeedback.requiresApproval ? handleApproveRepositoryAdaptation : () => void handleBootstrap()
+                    }
+                  >
+                    {setupFeedback.requiresApproval
+                      ? t('repositoryGate.approveAdaptation')
+                      : t('repositoryGate.bootstrap')}
                   </Button>
                   <Button
                     icon={<IconCloud />}
