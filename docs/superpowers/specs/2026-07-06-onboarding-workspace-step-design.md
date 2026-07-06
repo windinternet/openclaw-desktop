@@ -7,7 +7,7 @@ Fix the opening golden path so workspace setup is step 4 of onboarding, not a Da
 ## Scope
 
 - After language/theme and Gateway connection, keep users inside the same Setup wizard and advance to a fourth workspace step.
-- The fourth step offers skip, create recommended repository, bind existing repository, and map/adapt existing repository.
+- The fourth step first offers three directions: skip for now, create a recommended repository, or use an existing repository. Mapping/adaptation stays inside the existing-repository flow when detailed repository parameters are needed.
 - Skipping enters the app through the existing lightweight new-session path.
 - If users skip and later open Workbench or Knowledge, the existing `RepositoryGate` remains the prominent setup surface.
 - Dashboard returns to being an observation page only: current work, pending confirmations, stuck items, outputs, knowledge updates, usage, and Gateway status.

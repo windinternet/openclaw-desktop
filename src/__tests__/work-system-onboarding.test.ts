@@ -98,9 +98,10 @@ describe('work system onboarding route', () => {
     expect(setup).toContain("import WorkSystemWorkspaceChoice from '../components/WorkSystemWorkspaceChoice'");
     expect(setup).toContain('<WorkSystemWorkspaceChoice');
     expect(setup).toContain("t('dashboard.onboardingTitle')");
-    expect(setup).toContain("t('dashboard.onboardingGatewayDone')");
-    expect(setup).toContain("t('dashboard.onboardingRepositoryNext')");
-    expect(setup).toContain("t('dashboard.onboardingFirstThingNext')");
+    expect(setup).not.toContain("t('dashboard.onboardingGatewayDone')");
+    expect(setup).not.toContain("t('dashboard.onboardingRepositoryNext')");
+    expect(setup).not.toContain("t('dashboard.onboardingFirstThingNext')");
+    expect(setup).not.toContain('dashboard-onboarding-steps');
     expect(dashboard).not.toContain("import WorkSystemWorkspaceChoice from '../components/WorkSystemWorkspaceChoice'");
     expect(dashboard).not.toContain('<WorkSystemWorkspaceChoice');
     expect(dashboard).not.toContain('<RepositoryGate area="workbench"');
@@ -109,8 +110,10 @@ describe('work system onboarding route', () => {
     expect(workspaceChoice).toContain("t('dashboard.workspaceChoiceSkip')");
     expect(workspaceChoice).toContain("t('dashboard.workspaceChoiceCreate')");
     expect(workspaceChoice).toContain("t('dashboard.workspaceChoiceBind')");
-    expect(workspaceChoice).toContain("t('dashboard.workspaceChoiceMap')");
-    expect(workspaceChoice).toContain("t('dashboard.workspaceChoiceProposal')");
+    expect(workspaceChoice).not.toContain("t('dashboard.workspaceChoiceMap')");
+    expect(workspaceChoice).not.toContain("t('dashboard.workspaceChoiceProposal')");
+    expect(workspaceChoice).toContain("useState<'create' | 'existing' | null>(null)");
+    expect(workspaceChoice).toContain('activeChoice ? (');
   });
 
   it('carries skipped workspace onboarding into a lightweight new-session context', () => {

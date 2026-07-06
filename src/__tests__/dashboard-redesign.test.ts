@@ -118,9 +118,10 @@ describe('dashboard redesign', () => {
     expect(dashboard).not.toContain('repositorySetupNeeded');
     expect(dashboard).not.toContain('<WorkSystemWorkspaceChoice');
     expect(setup).toContain("t('dashboard.onboardingTitle')");
-    expect(setup).toContain("t('dashboard.onboardingGatewayDone')");
-    expect(setup).toContain("t('dashboard.onboardingRepositoryNext')");
-    expect(setup).toContain("t('dashboard.onboardingFirstThingNext')");
+    expect(setup).not.toContain("t('dashboard.onboardingGatewayDone')");
+    expect(setup).not.toContain("t('dashboard.onboardingRepositoryNext')");
+    expect(setup).not.toContain("t('dashboard.onboardingFirstThingNext')");
+    expect(setup).not.toContain('dashboard-onboarding-steps');
     expect(getByPath(zh, 'dashboard.onboardingTitle')).toBeTruthy();
     expect(getByPath(zh, 'dashboard.onboardingRepositoryNext')).toBeTruthy();
     expect(getByPath(en, 'dashboard.onboardingTitle')).toBeTruthy();

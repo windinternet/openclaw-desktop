@@ -1402,7 +1402,7 @@ body[theme-mode='dark'] .new-session-card-chip {
 
 .dashboard-workspace-choice-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -1416,6 +1416,11 @@ body[theme-mode='dark'] .new-session-card-chip {
   border: 1px solid var(--semi-color-border);
   border-radius: 8px;
   background: var(--semi-color-bg-0);
+}
+
+.dashboard-workspace-choice-card-active {
+  border-color: color-mix(in srgb, var(--semi-color-primary) 52%, var(--semi-color-border));
+  background: color-mix(in srgb, var(--semi-color-primary-light-default) 35%, var(--semi-color-bg-0));
 }
 
 .dashboard-workspace-choice-body {

@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Steps, Button, Toast, Typography } from '@douyinfe/semi-ui';
-import { IconBolt, IconBranch, IconTickCircle } from '@douyinfe/semi-icons';
 import { useSettingsStore } from '../lib/settings-store';
 import { PRESET_THEME_COLORS, DEFAULT_SETTINGS } from '../lib/settings-types';
 import type { ThemeMode, SupportedLocale } from '../lib/settings-types';
@@ -385,42 +384,6 @@ export default function SetupPage() {
                   {t('dashboard.onboardingTitle')}
                 </Title>
                 <Text type="secondary">{t('dashboard.onboardingDesc')}</Text>
-              </div>
-
-              <div className="dashboard-onboarding-steps">
-                <div className="dashboard-onboarding-step dashboard-onboarding-step-done">
-                  <span className="dashboard-onboarding-step-icon">
-                    <IconTickCircle />
-                  </span>
-                  <span>
-                    <Text strong>{t('dashboard.onboardingGatewayDone')}</Text>
-                    <Text type="tertiary" size="small">
-                      {t('dashboard.onboardingGatewayDoneDesc')}
-                    </Text>
-                  </span>
-                </div>
-                <div className="dashboard-onboarding-step dashboard-onboarding-step-active">
-                  <span className="dashboard-onboarding-step-icon">
-                    <IconBranch />
-                  </span>
-                  <span>
-                    <Text strong>{t('dashboard.onboardingRepositoryNext')}</Text>
-                    <Text type="tertiary" size="small">
-                      {t('dashboard.onboardingRepositoryNextDesc')}
-                    </Text>
-                  </span>
-                </div>
-                <div className="dashboard-onboarding-step">
-                  <span className="dashboard-onboarding-step-icon">
-                    <IconBolt />
-                  </span>
-                  <span>
-                    <Text strong>{t('dashboard.onboardingFirstThingNext')}</Text>
-                    <Text type="tertiary" size="small">
-                      {t('dashboard.onboardingFirstThingNextDesc')}
-                    </Text>
-                  </span>
-                </div>
               </div>
 
               <WorkSystemWorkspaceChoice
