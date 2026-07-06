@@ -1,6 +1,6 @@
 # 前端架构
 
-> 最后更新: 2026-06-28
+> 最后更新: 2026-07-02
 > 技术栈：React 18 + TypeScript + Vite + Electron + Semi Design
 
 ## 当前目录结构
@@ -27,7 +27,7 @@ src/
 
 - `src/App.tsx` 注册实际路由。
 - `src/lib/navigation.ts` 定义当前主导航：Dashboard、新会话、Workbench、Knowledge、Collaboration、Control Center。
-- Search、Sessions、Artifacts、Tasks、Teams、Office、Extensions、Tuning、Repository Protocol 等旧入口仍保留为路由或嵌入页，但主心智入口已收敛到 6 个导航项。
+- Search、Sessions、Action Center (`/actions`)、Artifacts、Tasks、Teams、Office、Extensions、Tuning、Repository Protocol 等旧入口仍保留为路由或嵌入页，但主心智入口已收敛到 6 个导航项。
 
 ## 状态管理
 
@@ -50,11 +50,11 @@ src/
 
 ## 测试与质量
 
-- 当前已有 `src/__tests__/` 下 59 个测试文件。
+- 当前已有 `src/__tests__/` 下 132 个测试文件、1416 个测试。
 - `npm test` 使用 Vitest。
 - `npm run check` 组合执行 lint、format、stylelint。
 - `npm run typecheck` 使用 `tsc --noEmit`。
-- GitHub Actions 会跑质量、测试、构建和文档结构校验。
+- GitHub Actions 会跑 lint、format、stylelint、typecheck、test、build 和 docs:status。
 
 ## 关键约束
 

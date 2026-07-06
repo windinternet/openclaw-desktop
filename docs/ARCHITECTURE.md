@@ -1,9 +1,9 @@
 # 产品架构
 
-> 最后更新: 2026-06-28
+> 最后更新: 2026-07-02
 > 当前事实源: 代码以 `src/App.tsx`、`src/lib/navigation.ts`、`src/lib/store.ts` 和 `electron/` 为准。
 
-OpenClaw Desktop 是连接 OpenClaw Gateway 的桌面控制台。当前产品已经从早期“12 个平铺模块”收敛为 6 个主导航域：概览、工作、智能体/运行控制。旧模块仍存在，但多数被迁移到 Workbench、Knowledge、Collaboration 和 Control Center 内。
+OpenClaw Desktop 是连接 OpenClaw Gateway 的桌面控制台。当前产品已经从早期“12 个平铺模块”收敛为 3 个主导航分组、6 个主导航项：概览（首页、新会话）、工作（工作台、知识库）、智能体（协作、控制中心）。旧模块仍存在，但多数被迁移到 Workbench、Knowledge、Collaboration 和 Control Center 内。
 
 ## 快速导航
 
@@ -46,6 +46,7 @@ OpenClaw Desktop 是连接 OpenClaw Gateway 的桌面控制台。当前产品已
 | 新会话           | `/new-session`                   | `src/pages/NewSessionPage.tsx`, `src/components/NewSessionComposer.tsx`                    | 发起新会话或把用户意图转成可推进事项                                                            |
 | 会话             | `/chat/:sessionKey`, `/sessions` | `src/pages/SessionChatPage.tsx`, `src/pages/SessionsPage.tsx`                              | Chat 原生体验；`/sessions` 目前是轻量 Hub                                                       |
 | 工作台           | `/workbench`                     | `src/pages/WorkbenchPage.tsx`, `src/components/WorkbenchRepositoryPanel.tsx`               | Repository work/plans/runs/outputs/reviews/Kanban                                               |
+| Action Center    | `/actions`                       | `src/pages/ActionCenterPage.tsx`, `src/lib/ai-action-center.ts`                            | 非聊天式 ActionRun 审批、执行状态、结果和错误定位                                               |
 | 知识库           | `/knowledge`                     | `src/pages/KnowledgeBasePage.tsx`, `src/components/KnowledgeRepositoryPanel.tsx`           | Repository sources/wiki/index/log/relationships                                                 |
 | 协作             | `/collaboration`                 | `src/pages/CollaborationPage.tsx`, `src/pages/TeamsPage.tsx`, `src/pages/Office3DPage.tsx` | Agent Teams、3D Office、协作相关运行记录                                                        |
 | 控制中心         | `/control-center`                | `src/pages/ControlCenterPage.tsx`                                                          | Cron Tasks、技能/插件/工具、Agent 调教、仓库协议                                                |
@@ -84,4 +85,4 @@ OpenClaw Desktop
 | 3D       | Three.js                                                                              |
 | 图表     | AntV Charts                                                                           |
 | 测试     | Vitest                                                                                |
-| CI       | GitHub Actions: lint / format / stylelint / typecheck / test / build / doc validation |
+| CI       | GitHub Actions: lint / format / stylelint / typecheck / test / build / docs:status |

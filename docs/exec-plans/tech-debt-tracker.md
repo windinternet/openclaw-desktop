@@ -1,28 +1,31 @@
 # 技术债务追踪
 
-> 最后更新: 2026-05-21
+> 最后更新: 2026-07-02
 > 本文档跟踪已知的技术债务项，按优先级排列
 
 ## 当前债务
 
-| # | 项目 | 严重度 | 状态 | 创建时间 | 说明 |
-|---|------|--------|------|---------|------|
-| 1 | 无 linter/CI 门禁 | 高 | 待处理 | 2026-05-21 | PR 合入前无自动 lint/typecheck/test 检查链 |
-| 2 | 缺少测试覆盖 | 高 | 待处理 | 2026-05-21 | vitest 已配置但零测试用例，核心模块无防护 |
-| 3 | 无文档过期检测 | 中 | 待处理 | 2026-05-21 | docs/ 文档无自动校验机制，容易与代码脱节 |
-| 4 | 无 Zustand store | 中 | 待处理 | 2026-05-21 | zustand 已安装但未创建任何 store（useChatStore 等）|
-| 5 | src/ 目录结构扁平 | 中 | 待处理 | 2026-05-21 | 按 FRONTEND.md 计划应有 components/{chat,sidebar,dashboard,...}/ 等子目录 |
-| 6 | 无 CSP 配置 | 中 | 待处理 | 2026-05-21 | 生产构建未启用 Content Security Policy |
-| 7 | 无依赖安全扫描 | 中 | 待处理 | 2026-05-21 | 无 Dependabot / Renovate / npm audit CI 集成 |
-| 8 | 无 IPC 测试 | 低 | 待处理 | 2026-05-21 | electron/ 层缺少主进程-渲染进程通信的单元测试 |
+| #   | 项目                               | 严重度 | 状态   | 创建时间   | 说明                                                                                                |
+| --- | ---------------------------------- | ------ | ------ | ---------- | --------------------------------------------------------------------------------------------------- |
+| 1   | 缺少固定 Electron/CDP e2e 常规门禁 | 高     | 待处理 | 2026-07-02 | 单元测试和静态门禁已覆盖主线，但真实 Electron/UI 金线仍主要依赖专项验证记录，尚未进入 CI 常规门禁   |
+| 2   | 应用级 CSP / 安全头收口            | 中     | 待处理 | 2026-05-21 | Artifact 预览和只读协议已有局部 CSP / sandbox 边界，但应用级生产 CSP 仍需按 `docs/SECURITY.md` 收口 |
+| 3   | 依赖安全扫描                       | 中     | 待处理 | 2026-05-21 | 尚未看到 npm audit / Dependabot / Renovate 作为 CI 阻断门禁稳定落地                                 |
+| 4   | Electron IPC 专门测试体系          | 低     | 待处理 | 2026-05-21 | 已有 Electron handler / preload / artifact 协议相关测试，但还缺少系统化主进程-渲染进程通信测试矩阵  |
+
+## 当前已校准事实
+
+- CI / lint / typecheck / test / build / docs:status 门禁已落地；`docs/QUALITY_SCORE.md` 继续作为当前质量事实源。
+- 测试覆盖计数已校准到 132 个测试文件、1416 个测试；`npm test -- --reporter=dot` 当前输出为 132 个测试文件、1416 个测试全部通过。
+- Zustand store 已落地：`src/lib/store.ts` 暴露主 `useStore`，`src/lib/settings-store.ts` 暴露 `useSettingsStore`。
+- 文档状态校验已落地：`scripts/validate-doc-status.mjs` 和 `npm run docs:status` 会校验核心状态文档、active plan 元数据和关键技术债状态。
 
 ## 严重度定义
 
-| 等级 | 含义 | 响应时间 |
-|------|------|---------|
-| 高 | 影响开发质量或安全，应尽快处理 | 1 周内 |
-| 中 | 存在改善空间，影响可维护性 | 1 个月内 |
-| 低 | 理想状态下的改进项 | 按里程碑规划 |
+| 等级 | 含义                           | 响应时间     |
+| ---- | ------------------------------ | ------------ |
+| 高   | 影响开发质量或安全，应尽快处理 | 1 周内       |
+| 中   | 存在改善空间，影响可维护性     | 1 个月内     |
+| 低   | 理想状态下的改进项             | 按里程碑规划 |
 
 ## 迁移计划
 
@@ -30,49 +33,37 @@
 
 **目标**：PR 合入前自动运行 lint + typecheck + test
 
-- 选择：GitHub Actions
-- 触发：push / pull_request
-- 步骤：npm ci → npm run lint → npm run typecheck → npm run test
-- 阻止合并：上述任一步骤失败
-- 参考：docs/FRONTEND.md 中的验证命令
+- 状态：已关闭，转为持续维护。
+- 当前事实：GitHub Actions 已覆盖 lint、format、stylelint、typecheck、test、build 和 docs:status；本地最低门禁仍是 `npm run check`、`npm run typecheck`、`npm test`、`npm run build`。
 
-**预计工作量**：1-2 小时
+**后续维护**：防止新入口绕过既有门禁。
 
 ### TD-2: 补充测试覆盖
 
 **目标**：核心模块关键路径有测试保护
 
-- 优先级顺序：
-  1. gateway.ts（通信协议层）
-  2. store（状态管理层）
-  3. utils.ts（工具函数层）
-  4. 组件渲染测试（WelcomeView, ChatView）
-- 框架：vitest + @testing-library/react
+- 状态：基础测试覆盖已关闭，Electron e2e 常规门禁仍是当前债务。
+- 当前事实：测试覆盖计数已校准到 132 个测试文件、1416 个测试；覆盖 Repository、Office、Dashboard、Gateway、Artifact、Navigation、ActionRun、Knowledge、Workbench 等主功能域。
 
-**预计工作量**：2-3 天
+**后续维护**：新增功能继续补 Vitest 或 Electron/CDP 验证；把高价值金线逐步纳入固定 e2e 门禁。
 
 ### TD-3: 文档养护自动化
 
 **目标**：建立文档过期检测和交叉引用校验
 
-- 方案：
-  1. 脚本扫描 docs/ 中所有 .md 文件的最后更新日期
-  2. 超过 30 天未更新的文档标记为待审查
-  3. 检查 AGENTS.md 引用的文档路径是否实际存在
+- 状态：第一版已关闭，转为扩展语义一致性维护。
+- 当前事实：`npm run docs:status` 已校验核心状态文档更新时间、active plan 元数据和关键技术债勾选/状态。
 
-**预计工作量**：半天
+**后续维护**：继续扩展到更多文档族和跨文档语义一致性。
 
 ### TD-4: 创建 Zustand Store
 
 **目标**：按模块创建独立 store 实例
 
-- 需要创建的 store：
-  - `useChatStore` — 会话管理
-  - `useInstanceStore` — 实例连接管理
-  - `useSettingsStore` — 应用设置
-- 所有 store 遵循同一模式，方便代码生成
+- 状态：已关闭。
+- 当前事实：主状态入口 `src/lib/store.ts` 已通过 Zustand 暴露 `useStore`，设置状态入口 `src/lib/settings-store.ts` 已通过 Zustand 暴露 `useSettingsStore`；当前路线图不要求继续按早期 `useChatStore` / `useInstanceStore` 命名拆分。
 
-**预计工作量**：半天
+**后续维护**：只在真实复杂度需要时再拆分 store，不为早期命名假设重构。
 
 ### TD-5: 重整 src/ 目录结构
 
@@ -106,6 +97,9 @@
 
 ## 已关闭债务
 
-| # | 项目 | 严重度 | 关闭时间 | 解决方式 |
-|---|------|--------|---------|---------|
-| — | — | — | — | — |
+| #    | 项目                        | 严重度 | 关闭时间   | 解决方式                                                                                           |
+| ---- | --------------------------- | ------ | ---------- | -------------------------------------------------------------------------------------------------- |
+| TD-1 | 无 linter/CI 门禁           | 高     | 2026-06-30 | CI / lint / typecheck / test / build / docs:status 门禁已落地，本地最低门禁仍保留                  |
+| TD-2 | 零测试用例 / 核心模块无防护 | 高     | 2026-07-03 | 测试覆盖计数已校准到 132 个测试文件、1416 个测试；剩余 Electron e2e 常规门禁另列当前债务           |
+| TD-3 | 无文档过期检测              | 中     | 2026-06-30 | `npm run docs:status` 与 `scripts/validate-doc-status.mjs` 已覆盖核心文档状态和 active plan 元数据 |
+| TD-4 | 无 Zustand store            | 中     | 2026-06    | `src/lib/store.ts` / `src/lib/settings-store.ts` 已提供 Zustand store 入口                         |

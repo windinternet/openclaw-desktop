@@ -1,6 +1,6 @@
 # 产品规格目录
 
-> 最后更新: 2026-06-28
+> 最后更新: 2026-07-02
 > 当前代码事实以 `src/App.tsx` 和 `src/lib/navigation.ts` 为准。
 
 OpenClaw Desktop 的早期 12 模块清单已经被导航重组吸收。当前产品规格按用户心智域维护：概览、工作、智能体协作、控制中心，以及若干 legacy/嵌入式路由。
@@ -23,6 +23,7 @@ OpenClaw Desktop 的早期 12 模块清单已经被导航重组吸收。当前�
 | `/sessions` | 🟡 轻量 Hub | 会话 | 当前只提供新会话和搜索跳转；完整最近会话体验仍需补强 |
 | `/chat/:sessionKey` | ✅ 已实现 | 会话 | Gateway Session Chat 原生体验 |
 | `/search` | ✅ 已实现 | 会话/全局辅助 | 会话搜索与 Web 搜索 |
+| `/actions` | ✅ 已实现 | Workbench / Action Center | AI ActionRun 审批、执行和结果追踪中心 |
 | `/artifacts` | ✅ 已实现 | Workbench / Outputs | Desktop artifact UI；仓库绑定就绪时镜像到 Repository outputs |
 | `/taskkanban` | ✅ 已实现 | Control Center / legacy | Gateway Cron Tasks 与旧 Kanban 组合页 |
 | `/teams` | ✅ 已实现 | Collaboration | Agent 团队编辑与自然语言编排草稿 |
@@ -31,7 +32,6 @@ OpenClaw Desktop 的早期 12 模块清单已经被导航重组吸收。当前�
 | `/tuning` | ✅ 已实现 | Control Center | Agent identity/files、模型配置、集成配置 |
 | `/repository-protocol` | ✅ 已实现 | Control Center | Repository AGENTS/BOOTSTRAP/schema/path/permission 预览 |
 | `/settings` | ✅ 已实现 | Control Center / 设置 | 本地显示、实例偏好、主题与链接策略 |
-| `/workspace` / `/memory` | 🟡 保留页面 | legacy | 功能存在但不再是主导航入口 |
 
 ## 旧 12 模块映射
 
