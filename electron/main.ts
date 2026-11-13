@@ -35,8 +35,10 @@ function execOpenclaw(
 }
 
 // === 开发调试：开启 CDP 远程调试端口，供 Playwright 等工具连接运行时 Chromium ===
+// 端口默认随机（'0' 由 Chromium 分配），避免与本机已占用的 9222（例如 Chrome）冲突；
+// 可用 OPENCLAW_CDP_PORT 固定端口。实际端口见主进程日志与 userData/DevToolsActivePort。
 if (!app.isPackaged) {
-  app.commandLine.appendSwitch('remote-debugging-port', '9222');
+  app.commandLine.appendSwitch('remote-debugging-port', process.env.OPENCLAW_CDP_PORT || '0');
 }
 
 const isDev = !app.isPackaged;
@@ -625,8 +627,20 @@ ipcMain.on('set-external-link-mode', (_event, mode: string) => {
   }
 });
 
+/** 打印本次启动实际生效的 CDP 调试端口（随机端口时 Chromium 写入 userData/DevToolsActivePort） */
+function logDevToolsPort(): void {
+  const portFile = path.join(app.getPath('userData'), 'DevToolsActivePort');
+  try {
+    const port = readFileSync(portFile, 'utf-8').split('\n')[0]?.trim();
+    writeMain('INFO', `[main] CDP 调试端口: http://127.0.0.1:${port}`);
+  } catch (err) {
+    writeMain('WARN', '[main] 读取 CDP 调试端口失败:', String(err).slice(0, 100));
+  }
+}
+
 app.whenReady().then(() => {
   setupMainLogger();
+  if (!app.isPackaged) logDevToolsPort();
   registerArtifactProtocol();
   createWindow();
 });

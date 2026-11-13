@@ -61,3 +61,4 @@ src/
 - 智能体可读性优先。
 - 新功能优先沿用现有页面、store、IPC 和纯逻辑模块边界。
 - 排查真实 UI / DOM / 样式 / 滚动 / 接口数据问题时，优先用 Playwright CDP 探查运行态。
+- Dev 模式 CDP 端口默认随机（避免与已占用的 9222 冲突）：实际端口见主进程日志或 `DevToolsActivePort`，需要固定时用 `OPENCLAW_CDP_PORT`。

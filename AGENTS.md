@@ -5,6 +5,7 @@ OpenClaw Desktop — AI 平台控制台，连接 OpenClaw Gateway 管理 Agent �
 ## 前端调试规则
 
 - 本应用是 Electron + Vite 前端，通常已开启 CDP 调试；排查真实 UI / DOM / 样式 / 滚动 / 接口数据问题时，优先编写临时 `.mjs` Playwright 脚本连接 CDP 观察运行态，而不是只凭源码猜测。
+- CDP 端口默认随机（避免与本机已占用的 9222 等端口冲突）：实际端口启动时打印在主进程日志，也可读 `~/Library/Application Support/<app>/DevToolsActivePort`；需要固定时用 `OPENCLAW_CDP_PORT=9223 npm run dev`。
 - 推荐路径：`chromium.connectOverCDP('http://127.0.0.1:<port>')` → 找到页面 → `page.evaluate()` 读取真实 DOM、computed style、scrollHeight/clientHeight、localStorage、已连接 Gateway client 的 RPC 返回。
 - CDP/Playwright 探查用于定位和验证真实前端问题；如果用户明确说“先不要调试”或问题能由静态代码直接确认，可不启动探查。
 
